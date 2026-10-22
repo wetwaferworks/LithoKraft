@@ -1,6 +1,9 @@
 ﻿# keys and secrets: never tracked
-*key*
-*Key*
+*-Key/
+*-Keys/
+*+Key*
+*.key
+signing*/
 *.pem
 *.pfx
 *.p12
