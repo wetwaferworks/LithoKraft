@@ -1,4 +1,4 @@
-# CLAIMS.md — Wet Wafer Works source claims board
+﻿# CLAIMS.md — Wet Wafer Works source claims board
 
 One board for the whole company. Its whole job: nobody steps on anybody's toes, and everybody can always read everything.
 
@@ -17,6 +17,7 @@ One board for the whole company. Its whole job: nobody steps on anybody's toes, 
 |---|---|
 | Windows build, repo order | Cortana |
 | Mobile build, web interface (thin layer / `wasm/`) | Elfie |
+| Hardware CEF layer (`host/lithocef`) | Elfie, with JD (big/shared area: claim + podium, rule 6) |
 | Architecture, locks, final say | JD |
 | Hints & spot review | Archie (Argon) |
 | Art & textures | CloudAtlas |
