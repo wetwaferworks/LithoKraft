@@ -1,0 +1,20 @@
+﻿# keys and secrets: never tracked
+*key*
+*Key*
+*.pem
+*.pfx
+*.p12
+*.jks
+*.keystore
+.env
+# art and big binaries: shared via folder, not git
+Assets/
+*.rar
+*.zip
+*.mp4
+*.7z
+# nested repos keep their own history
+Redstone-Trace-Translation/Advanced-Structure-Inspector/
+# build output
+build/
+out/
