@@ -1,0 +1,17 @@
+{
+  "url": "http://127.0.0.1:8933/gl.html?bench=1",
+  "finished": true,
+  "status": "Running...",
+  "audit": {
+    "via": "cdp-screenshot-clip",
+    "rect": {
+      "x": -80,
+      "y": 202,
+      "w": 962,
+      "h": 542
+    },
+    "distinctSampledColors": 3370,
+    "nonBlackFrac": 0.6106,
+    "colorfulFrac": 0.5841
+  }
+}

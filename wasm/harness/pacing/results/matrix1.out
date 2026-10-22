@@ -1,0 +1,4 @@
+ship-top-gl-still-r20-b BENCH OK {"frames":17,"avg":2902.131,"p50":3391.4,"p99":8704.265,"max":8704.265,"input":5.366,"update":66.537,"upload":1636.593,"render":1191.752,"present":0.004} tailSec {"count":25,"tailN":15,"input":0,"update":0,"upload":0,"render":0,"present":0,"tick":1.747,"sum":0} rafMed 16.67
+DRIVER FAIL Error: Attempted to use detached Frame 'F9D00F5DB32255465E3AF238CBAA5EC4'.
+    at CdpFrame.<anonymous> (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:99:23)
+    at main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/bench_driver.js:54:25)

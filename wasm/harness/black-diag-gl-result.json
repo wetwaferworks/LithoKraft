@@ -1,0 +1,27 @@
+{
+  "page": "gl.html?diag=1",
+  "variant": "base",
+  "backendLive": true,
+  "webPresentLine": true,
+  "menu": true,
+  "perfLines": true,
+  "marks": {
+    "backend live": "1.9s",
+    "web present:": "6.0s",
+    "menu: launch menu": "6.0s",
+    "perf ": "8.0s"
+  },
+  "cap": {
+    "ua": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/155 Mobile Safari/537.36 LithoBlackProbe",
+    "offscreenType": "function",
+    "transferType": "function",
+    "ocWebgl2": "px=255,0,255,255",
+    "mainWebgl2": "ok"
+  },
+  "lum": {
+    "meanLum": 101.81,
+    "pctBright": 94.68,
+    "w": 962,
+    "h": 542
+  }
+}

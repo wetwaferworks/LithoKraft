@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext is permitted ONLY to the loopback interface, where the
+     shell's own in-app server lives (http://127.0.0.1:<ephemeral port>).
+     Everywhere else cleartext stays off. The localhost origin is what
+     lets WebView grant cross-origin isolation to the served pages —
+     the v1.0–v1.3 intercepted https://app.local origin never received
+     isolation processing in WebView (device evidence, 2026-10-20). -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

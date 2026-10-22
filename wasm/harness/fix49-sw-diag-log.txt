@@ -1,0 +1,460 @@
+[15:18:48.347] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[15:18:48.355] LithoKraft Alpha 0.0.2.52 (nogit) Release built Oct 19 2026 14:21:22
+[15:18:48.360] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m49[0m
+[15:18:48.404] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[15:18:48.412] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[15:18:48.416] input: emscripten-html5 backend live (keyboard=document, mouse+wheel=#canvas, pointer lock armed; debug echo ON (?debuginput=1))
+[15:18:48.419] window: emscripten window 1280x720 (api gl33)
+[15:18:48.536] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[15:18:48.571] software present (webgl): BGRA extension unavailable — upload path: RGBA (CPU swizzle)
+[15:18:48.572] renderer: software | software rasterizer (CPU, no GPU)
+[15:18:48.596] materials: 17 materials from /assets/materials/lithokraft.materials
+[15:18:48.598] mods: game 'lithokraft' 0.1.0
+[15:18:48.600] mods: no mods/ directory — continuing with zero mods (seal decision still applies)
+[15:18:48.603] mods: registry sealed (release build (fail closed: no verified hot-swap mod))
+[15:18:50.000]   resources: worldgen/wafer.json from lithokraft
+[15:18:50.006]   resources: worldgen/organic.json from lithokraft
+[15:18:50.008]   resources: ui/theme.json from lithokraft
+[15:18:50.008] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[15:18:50.009]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[15:18:50.009]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[15:18:50.011]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[15:18:50.011]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[15:18:50.012]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[15:18:50.012]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[15:18:50.012]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[15:18:50.012]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+[15:18:50.044] audio: muted (--mute)
+[15:18:50.048] input: bindings from /config/input.json
+ERR: [15:18:50.183] WARN software: PBR transparency tiers are not implemented on the CPU path; PBR fragments shade opaque (tier selection still enables the PBR fragment path)
+[15:18:50.191] world clock: tick 0, day 0 00:00
+[15:18:51.060] sim: tick area radius 8, round (dx^2+dz^2 <= r^2+r), 225 chunk columns
+[15:18:51.064] timing handshake: ON (phases/cycle 4; applies at this world load)
+[15:18:51.404] dimension 'wafer' loaded: 256 columns, 833 sub-chunks, 1208.8 ms
+[15:18:51.406] spawn: granted the starting item (the Fragment)
+ERR: [15:18:51.424] ERROR [script]  (0,0) error: Failed in call to function 'RegisterGlobalFunction' with 'void log(const string &in)' (Code: asNOT_SUPPORTED, -7)
+ERR: [15:18:51.427] ERROR [script] binding registration failed: 'void log(const string &in)' (-7)
+ERR: [15:18:51.452] ERROR AngelScript: register log failed (-7)
+[15:18:51.455] LithoKraft Alpha 0.0.2.52 (nogit) Release built Oct 19 2026 14:21:22 | renderer: Software scalar x2 threads
+[15:18:51.459] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[15:18:51.464] present: framebuffer (swap-interval-1) (software)
+[15:18:51.468] input: poll heartbeat pushed=0 polled=0
+[15:18:51.515] software renderer: Pass 2 mask 0x7 (LL_SW_P2), texture layout linear, 372 layers
+ERR: software renderer: SIMD path scalar
+ERR: software renderer: hardware_concurrency=2, render bands=2 (1 spawned workers + caller)
+[15:18:51.556] software renderer: hardware_concurrency=2, render bands=2 (1 spawned workers + caller)
+[15:18:53.488] perf fps=10 frame=101.77/193.8ms tps=0.9/256 tick=79.270/79.270ms budget=7.45% dropped=142 chunks=256 meshes=364/833 dim=wafer p99=193.80ms hitches=0
+[15:18:53.519] stream: +4 columns around chunk (3, 2); 260 loaded
+[15:18:53.683] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=610 chunks=260 meshes=401/845 dim=wafer p99=0.00ms hitches=0
+[15:18:53.691] stream: +4 columns around chunk (3, 2); 264 loaded
+[15:18:53.816] stream: +4 columns around chunk (3, 2); 268 loaded
+[15:18:53.891] stream: +4 columns around chunk (3, 2); 272 loaded
+[15:18:53.993] stream: +4 columns around chunk (3, 2); 276 loaded
+[15:18:54.166] stream: +4 columns around chunk (3, 2); 280 loaded
+[15:18:54.284] stream: +4 columns around chunk (3, 2); 284 loaded
+[15:18:54.459] stream: +4 columns around chunk (3, 2); 288 loaded
+[15:18:55.065] hitch: frame 609.3 ms (avg 150.25 ms)
+[15:18:55.072] stream: +4 columns around chunk (3, 2); 292 loaded
+[15:18:55.360] perf fps=4 frame=197.20/609.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1008 chunks=292 meshes=733/956 dim=wafer p99=609.27ms hitches=1
+[15:18:55.368] stream: +4 columns around chunk (3, 2); 296 loaded
+[15:18:55.552] stream: +4 columns around chunk (3, 2); 300 loaded
+[15:18:55.712] stream: +4 columns around chunk (3, 2); 304 loaded
+[15:18:56.105] hitch: frame 404.2 ms (avg 172.68 ms)
+[15:18:56.112] stream: +4 columns around chunk (3, 2); 308 loaded
+[15:18:56.321] perf fps=3 frame=246.87/404.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1327 chunks=308 meshes=889/1010 dim=wafer p99=404.24ms hitches=1
+[15:18:56.352] stream: +4 columns around chunk (3, 2); 312 loaded
+[15:18:56.583] input: poll heartbeat pushed=0 polled=0
+[15:18:56.590] stream: +4 columns around chunk (3, 2); 316 loaded
+[15:18:56.860] stream: +4 columns around chunk (3, 2); 320 loaded
+[15:18:57.520] hitch: frame 662.7 ms (avg 193.80 ms)
+[15:18:57.544] stream: +4 columns around chunk (4, 2); 324 loaded
+[page] mousedown button 0
+[15:18:57.854] perf fps=3 frame=353.65/662.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1855 chunks=324 meshes=1033/1061 dim=wafer p99=662.65ms hitches=1
+[15:18:57.865] stream: +4 columns around chunk (4, 2); 328 loaded
+[15:18:58.118] stream: +4 columns around chunk (4, 2); 332 loaded
+[page] keydown Enter
+[15:18:58.494] stream: +4 columns around chunk (4, 2); 336 loaded
+[15:18:58.751] stream: +4 columns around chunk (4, 2); 340 loaded
+[15:18:59.088] perf fps=2 frame=296.32/383.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=2265 chunks=340 meshes=1086/1112 dim=wafer p99=383.28ms hitches=0
+[15:18:59.094] stream: +4 columns around chunk (4, 2); 344 loaded
+[15:18:59.451] stream: +4 columns around chunk (4, 2); 348 loaded
+[15:18:59.664] stream: +4 columns around chunk (4, 2); 352 loaded
+[15:18:59.876] stream: +4 columns around chunk (4, 2); 356 loaded
+[15:19:00.150] perf fps=3 frame=260.82/332.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=2635 chunks=356 meshes=1127/1161 dim=wafer p99=332.10ms hitches=0
+[15:19:00.158] stream: +4 columns around chunk (4, 2); 360 loaded
+[15:19:00.464] stream: +4 columns around chunk (4, 2); 364 loaded
+[15:19:00.775] stream: +4 columns around chunk (4, 2); 368 loaded
+[15:19:01.091] stream: +4 columns around chunk (4, 2); 372 loaded
+[15:19:01.404] perf fps=3 frame=303.68/320.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=3049 chunks=372 meshes=1187/1211 dim=wafer p99=320.15ms hitches=0
+[15:19:01.417] stream: +4 columns around chunk (4, 2); 376 loaded
+[15:19:01.791] input: poll heartbeat pushed=0 polled=0
+[15:19:01.798] stream: +4 columns around chunk (4, 2); 380 loaded
+[15:19:02.144] stream: +4 columns around chunk (4, 2); 384 loaded
+[15:19:02.476] perf fps=3 frame=341.98/381.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=3419 chunks=384 meshes=1223/1246 dim=wafer p99=381.63ms hitches=0
+[15:19:02.515] stream: +4 columns around chunk (4, 2); 388 loaded
+[15:19:02.795] stream: +4 columns around chunk (4, 2); 392 loaded
+[15:19:03.054] stream: +4 columns around chunk (4, 2); 396 loaded
+[15:19:03.280] stream: +4 columns around chunk (4, 2); 400 loaded
+[15:19:03.472] perf fps=3 frame=254.93/277.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=3807 chunks=400 meshes=1270/1296 dim=wafer p99=277.01ms hitches=0
+[15:19:03.478] stream: +4 columns around chunk (4, 2); 404 loaded
+[15:19:03.807] stream: +4 columns around chunk (4, 2); 408 loaded
+[15:19:04.163] stream: +4 columns around chunk (4, 2); 412 loaded
+[15:19:04.475] stream: +4 columns around chunk (4, 2); 416 loaded
+[15:19:04.710] perf fps=3 frame=298.64/354.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=4212 chunks=416 meshes=1324/1345 dim=wafer p99=354.87ms hitches=0
+[15:19:04.713] stream: +4 columns around chunk (4, 2); 420 loaded
+[15:19:04.913] stream: +4 columns around chunk (4, 2); 424 loaded
+[15:19:05.208] stream: +4 columns around chunk (4, 2); 428 loaded
+[15:19:05.510] stream: +4 columns around chunk (4, 2); 432 loaded
+[15:19:05.766] perf fps=4 frame=258.79/302.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=4537 chunks=432 meshes=1383/1398 dim=wafer p99=302.42ms hitches=0
+[15:19:05.769] stream: +4 columns around chunk (4, 2); 436 loaded
+[15:19:06.024] stream: +4 columns around chunk (4, 2); 440 loaded
+[15:19:06.294] stream: +4 columns around chunk (4, 2); 444 loaded
+[15:19:06.582] stream: +4 columns around chunk (4, 2); 448 loaded
+[15:19:06.864] perf fps=3 frame=270.25/287.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=4877 chunks=448 meshes=1439/1452 dim=wafer p99=287.94ms hitches=0
+[15:19:06.865] input: poll heartbeat pushed=0 polled=0
+[15:19:06.871] stream: +4 columns around chunk (4, 2); 452 loaded
+[15:19:07.108] stream: +4 columns around chunk (4, 2); 456 loaded
+[15:19:07.323] stream: +4 columns around chunk (4, 2); 460 loaded
+[15:19:07.560] stream: +4 columns around chunk (4, 2); 464 loaded
+[15:19:07.814] stream: +4 columns around chunk (4, 2); 468 loaded
+[15:19:08.136] perf fps=3 frame=235.56/253.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=5249 chunks=468 meshes=1490/1518 dim=wafer p99=253.93ms hitches=0
+[15:19:08.161] stream: +4 columns around chunk (4, 2); 472 loaded
+[15:19:08.680] hitch: frame 523.0 ms (avg 260.74 ms)
+[15:19:08.684] stream: +4 columns around chunk (4, 2); 476 loaded
+[15:19:08.966] stream: +4 columns around chunk (4, 2); 480 loaded
+[15:19:09.375] perf fps=2 frame=403.30/523.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=5686 chunks=480 meshes=1541/1560 dim=wafer p99=523.02ms hitches=1
+[15:19:09.392] stream: +4 columns around chunk (4, 2); 484 loaded
+[15:19:09.784] stream: +4 columns around chunk (4, 2); 488 loaded
+[15:19:10.100] stream: +4 columns around chunk (4, 2); 492 loaded
+[15:19:10.448] perf fps=3 frame=377.57/412.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=6109 chunks=492 meshes=1587/1600 dim=wafer p99=412.43ms hitches=0
+[15:19:10.463] stream: +4 columns around chunk (4, 2); 496 loaded
+[15:19:10.888] stream: +4 columns around chunk (4, 2); 500 loaded
+[15:19:11.151] stream: +4 columns around chunk (4, 2); 504 loaded
+[15:19:11.392] perf fps=2 frame=343.75/424.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=6492 chunks=504 meshes=1626/1638 dim=wafer p99=424.07ms hitches=0
+[15:19:11.396] stream: +4 columns around chunk (4, 2); 508 loaded
+[15:19:11.766] stream: +4 columns around chunk (4, 2); 512 loaded
+[15:19:12.060] input: poll heartbeat pushed=0 polled=0
+[15:19:12.063] stream: +4 columns around chunk (4, 2); 516 loaded
+[15:19:12.296] stream: +4 columns around chunk (4, 2); 520 loaded
+[15:19:12.560] perf fps=3 frame=286.12/367.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=6872 chunks=520 meshes=1679/1691 dim=wafer p99=367.87ms hitches=0
+[15:19:12.566] stream: +4 columns around chunk (4, 2); 524 loaded
+[15:19:12.963] stream: +4 columns around chunk (4, 2); 528 loaded
+[15:19:13.324] stream: +4 columns around chunk (4, 2); 532 loaded
+[15:19:13.620] perf fps=3 frame=343.28/397.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=7244 chunks=532 meshes=1717/1730 dim=wafer p99=397.08ms hitches=0
+[15:19:13.625] stream: +4 columns around chunk (4, 2); 536 loaded
+[15:19:13.964] stream: +4 columns around chunk (4, 2); 540 loaded
+[15:19:14.456] stream: +4 columns around chunk (4, 2); 544 loaded
+[15:19:14.694] perf fps=2 frame=415.54/493.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=7667 chunks=544 meshes=1757/1770 dim=wafer p99=493.16ms hitches=0
+[15:19:14.696] stream: +4 columns around chunk (4, 2); 548 loaded
+[15:19:14.960] stream: +4 columns around chunk (4, 2); 552 loaded
+[15:19:15.252] stream: +4 columns around chunk (4, 2); 556 loaded
+[15:19:15.510] stream: +4 columns around chunk (4, 2); 560 loaded
+[15:19:15.806] perf fps=4 frame=263.21/291.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=8000 chunks=560 meshes=1810/1822 dim=wafer p99=291.68ms hitches=0
+[15:19:15.817] stream: +4 columns around chunk (4, 2); 564 loaded
+[15:19:16.168] stream: +4 columns around chunk (4, 2); 568 loaded
+[15:19:16.508] stream: +4 columns around chunk (4, 2); 572 loaded
+[15:19:16.868] stream: +4 columns around chunk (4, 2); 576 loaded
+[15:19:17.185] perf fps=3 frame=339.70/358.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=8487 chunks=576 meshes=1861/1873 dim=wafer p99=358.89ms hitches=0
+[15:19:17.191] input: poll heartbeat pushed=0 polled=0
+[15:19:17.193] stream: +4 columns around chunk (4, 2); 580 loaded
+[15:19:17.456] stream: +4 columns around chunk (4, 2); 584 loaded
+[15:19:17.711] stream: +4 columns around chunk (4, 2); 588 loaded
+[15:19:17.990] stream: +4 columns around chunk (4, 2); 592 loaded
+[15:19:18.342] perf fps=4 frame=280.92/327.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=8856 chunks=592 meshes=1913/1925 dim=wafer p99=327.39ms hitches=0
+[15:19:18.347] stream: +4 columns around chunk (5, 2); 596 loaded
+[15:19:18.713] stream: +4 columns around chunk (5, 2); 600 loaded
+[15:19:18.992] stream: +4 columns around chunk (5, 2); 604 loaded
+[15:19:19.312] perf fps=3 frame=333.82/366.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=9214 chunks=604 meshes=1952/1965 dim=wafer p99=366.19ms hitches=0
+[15:19:19.316] stream: +4 columns around chunk (5, 2); 608 loaded
+[15:19:19.660] stream: +4 columns around chunk (5, 2); 612 loaded
+[15:19:19.982] stream: +4 columns around chunk (5, 2); 616 loaded
+[15:19:20.305] stream: +4 columns around chunk (5, 2); 620 loaded
+[15:19:20.590] perf fps=2 frame=329.10/345.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=9679 chunks=620 meshes=2002/2015 dim=wafer p99=344.95ms hitches=0
+[15:19:20.593] stream: +4 columns around chunk (5, 2); 624 loaded
+[15:19:20.908] stream: +4 columns around chunk (5, 2); 628 loaded
+[15:19:21.311] stream: +4 columns around chunk (5, 2); 632 loaded
+[15:19:21.596] perf fps=2 frame=358.24/402.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=10039 chunks=632 meshes=2041/2053 dim=wafer p99=401.97ms hitches=0
+[15:19:21.600] stream: +4 columns around chunk (5, 2); 636 loaded
+[15:19:21.916] stream: +4 columns around chunk (5, 2); 640 loaded
+[15:19:22.356] input: poll heartbeat pushed=0 polled=0
+[15:19:22.360] stream: +4 columns around chunk (5, 2); 644 loaded
+[15:19:22.646] perf fps=3 frame=349.69/442.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=10421 chunks=644 meshes=2080/2094 dim=wafer p99=442.60ms hitches=0
+[15:19:22.651] stream: +4 columns around chunk (5, 2); 648 loaded
+[15:19:22.912] stream: +4 columns around chunk (5, 2); 652 loaded
+[15:19:23.384] stream: +4 columns around chunk (5, 2); 656 loaded
+[15:19:23.892] perf fps=2 frame=363.30/464.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=10791 chunks=656 meshes=2107/2133 dim=wafer p99=464.10ms hitches=0
+[15:19:23.896] stream: +4 columns around chunk (5, 2); 660 loaded
+[15:19:24.512] stream: +4 columns around chunk (5, 2); 664 loaded
+[15:19:25.376] perf fps=2 frame=566.40/613.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=11265 chunks=664 meshes=2146/2159 dim=wafer p99=613.40ms hitches=0
+[15:19:25.404] stream: +4 columns around chunk (5, 2); 668 loaded
+[15:19:25.879] stream: +4 columns around chunk (5, 2); 672 loaded
+[15:19:26.296] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=11860 chunks=672 meshes=2173/2186 dim=wafer p99=0.00ms hitches=0
+[15:19:26.302] stream: +4 columns around chunk (5, 2); 676 loaded
+[15:19:26.604] stream: +4 columns around chunk (5, 2); 680 loaded
+[15:19:26.908] stream: +4 columns around chunk (5, 2); 684 loaded
+[15:19:27.208] perf fps=3 frame=342.91/422.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=12231 chunks=684 meshes=2210/2222 dim=wafer p99=422.36ms hitches=0
+[15:19:27.215] stream: +4 columns around chunk (5, 2); 688 loaded
+[15:19:27.526] input: poll heartbeat pushed=0 polled=0
+[15:19:27.531] stream: +4 columns around chunk (5, 2); 692 loaded
+[15:19:28.000] stream: +4 columns around chunk (5, 2); 696 loaded
+[15:19:28.304] perf fps=2 frame=393.13/470.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=12635 chunks=696 meshes=2248/2262 dim=wafer p99=470.24ms hitches=0
+[15:19:28.311] stream: +4 columns around chunk (5, 2); 700 loaded
+[15:19:28.604] stream: +4 columns around chunk (5, 2); 704 loaded
+[15:19:28.921] stream: +4 columns around chunk (5, 2); 708 loaded
+[15:19:29.464] stream: +4 columns around chunk (5, 2); 712 loaded
+[15:19:29.863] perf fps=3 frame=365.67/542.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=13179 chunks=712 meshes=2302/2316 dim=wafer p99=542.39ms hitches=0
+[15:19:29.867] stream: +4 columns around chunk (5, 2); 716 loaded
+[15:19:30.160] stream: +4 columns around chunk (5, 2); 720 loaded
+[15:19:30.464] stream: +4 columns around chunk (5, 2); 724 loaded
+[15:19:30.811] stream: +4 columns around chunk (5, 2); 728 loaded
+[15:19:31.246] perf fps=2 frame=313.85/345.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=13661 chunks=728 meshes=2355/2367 dim=wafer p99=345.90ms hitches=0
+[15:19:31.256] stream: +4 columns around chunk (5, 2); 732 loaded
+[15:19:31.592] stream: +4 columns around chunk (5, 2); 736 loaded
+[15:19:31.903] stream: +4 columns around chunk (5, 2); 740 loaded
+[15:19:32.260] perf fps=2 frame=321.61/336.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=14063 chunks=740 meshes=2396/2410 dim=wafer p99=336.56ms hitches=0
+[15:19:32.279] stream: +4 columns around chunk (5, 2); 744 loaded
+[15:19:32.660] input: poll heartbeat pushed=0 polled=0
+[15:19:32.664] stream: +4 columns around chunk (5, 2); 748 loaded
+[15:19:33.065] stream: +4 columns around chunk (5, 2); 752 loaded
+[15:19:33.448] perf fps=3 frame=388.76/400.8ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=14504 chunks=752 meshes=2435/2448 dim=wafer p99=400.78ms hitches=0
+[15:19:33.452] stream: +4 columns around chunk (5, 2); 756 loaded
+[15:19:33.800] stream: +4 columns around chunk (5, 2); 760 loaded
+[15:19:34.310] stream: +4 columns around chunk (5, 2); 764 loaded
+[15:19:34.724] perf fps=2 frame=428.70/509.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=14986 chunks=764 meshes=2472/2484 dim=wafer p99=509.72ms hitches=0
+[15:19:34.732] stream: +4 columns around chunk (5, 2); 768 loaded
+[15:19:35.024] stream: +4 columns around chunk (5, 2); 772 loaded
+[15:19:35.387] stream: +4 columns around chunk (5, 2); 776 loaded
+[15:19:35.761] perf fps=2 frame=328.30/364.8ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=15382 chunks=776 meshes=2511/2523 dim=wafer p99=364.83ms hitches=0
+[15:19:35.766] stream: +4 columns around chunk (5, 2); 780 loaded
+[15:19:36.075] stream: +4 columns around chunk (5, 2); 784 loaded
+[15:19:36.391] stream: +4 columns around chunk (5, 2); 788 loaded
+[15:19:36.708] perf fps=3 frame=334.78/379.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=15742 chunks=788 meshes=2551/2564 dim=wafer p99=379.55ms hitches=0
+[15:19:36.716] stream: +4 columns around chunk (5, 2); 792 loaded
+[15:19:37.172] stream: +4 columns around chunk (5, 2); 796 loaded
+[15:19:37.599] stream: +4 columns around chunk (5, 2); 800 loaded
+[15:19:38.107] perf fps=2 frame=437.60/455.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=16201 chunks=800 meshes=2590/2603 dim=wafer p99=455.08ms hitches=0
+[15:19:38.110] input: poll heartbeat pushed=0 polled=0
+[15:19:38.113] stream: +4 columns around chunk (5, 2); 804 loaded
+[15:19:38.420] stream: +4 columns around chunk (5, 2); 808 loaded
+[15:19:38.788] stream: +4 columns around chunk (5, 2); 812 loaded
+[15:19:39.196] perf fps=3 frame=397.57/523.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=16659 chunks=812 meshes=2642/2642 dim=wafer p99=523.25ms hitches=0
+[15:19:39.201] stream: +4 columns around chunk (5, 2); 816 loaded
+[15:19:39.615] stream: +4 columns around chunk (5, 2); 820 loaded
+[15:19:39.872] stream: +4 columns around chunk (5, 2); 824 loaded
+[15:19:40.182] perf fps=2 frame=335.64/354.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=17060 chunks=824 meshes=2671/2682 dim=wafer p99=354.16ms hitches=0
+[15:19:40.191] stream: +4 columns around chunk (5, 2); 828 loaded
+[15:19:40.523] stream: +4 columns around chunk (5, 2); 832 loaded
+[15:19:40.800] stream: +4 columns around chunk (5, 2); 836 loaded
+[15:19:41.167] stream: +4 columns around chunk (5, 2); 840 loaded
+[15:19:41.484] perf fps=3 frame=323.53/365.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=17515 chunks=840 meshes=2724/2735 dim=wafer p99=365.94ms hitches=0
+[15:19:41.491] stream: +4 columns around chunk (5, 2); 844 loaded
+[15:19:41.871] stream: +4 columns around chunk (5, 2); 848 loaded
+[15:19:42.321] stream: +4 columns around chunk (5, 2); 852 loaded
+[15:19:42.595] perf fps=3 frame=384.98/451.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=17952 chunks=852 meshes=2762/2777 dim=wafer p99=451.86ms hitches=0
+[15:19:42.600] stream: +4 columns around chunk (5, 2); 856 loaded
+[15:19:42.876] stream: +4 columns around chunk (5, 2); 860 loaded
+[15:19:43.255] input: poll heartbeat pushed=0 polled=0
+[15:19:43.268] stream: +4 columns around chunk (5, 2); 864 loaded
+[15:19:43.648] stream: +4 columns around chunk (5, 2); 868 loaded
+[15:19:43.919] perf fps=2 frame=349.61/388.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=18425 chunks=868 meshes=2827/2828 dim=wafer p99=388.43ms hitches=0
+[15:19:43.945] stream: +4 columns around chunk (5, 2); 872 loaded
+[15:19:44.304] stream: +4 columns around chunk (5, 2); 876 loaded
+[15:19:44.664] stream: +4 columns around chunk (5, 2); 880 loaded
+[15:19:44.916] perf fps=2 frame=369.97/380.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=18788 chunks=880 meshes=2858/2869 dim=wafer p99=380.67ms hitches=0
+[15:19:44.923] stream: +4 columns around chunk (5, 2); 884 loaded
+[15:19:45.412] stream: +4 columns around chunk (5, 2); 888 loaded
+[15:19:45.944] stream: +4 columns around chunk (5, 2); 892 loaded
+[15:19:46.411] perf fps=2 frame=413.10/490.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=19274 chunks=892 meshes=2898/2908 dim=wafer p99=490.21ms hitches=0
+[15:19:46.416] stream: +4 columns around chunk (5, 2); 896 loaded
+[15:19:46.800] stream: +4 columns around chunk (5, 2); 900 loaded
+[15:19:47.097] stream: +4 columns around chunk (5, 2); 904 loaded
+[15:19:47.369] perf fps=1 frame=297.04/297.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=19711 chunks=904 meshes=2934/2947 dim=wafer p99=297.04ms hitches=0
+[15:19:47.376] stream: +4 columns around chunk (5, 2); 908 loaded
+[15:19:47.703] stream: +4 columns around chunk (5, 2); 912 loaded
+[15:19:48.060] stream: +4 columns around chunk (5, 2); 916 loaded
+[15:19:48.353] input: poll heartbeat pushed=0 polled=0
+[15:19:48.358] stream: +4 columns around chunk (5, 2); 920 loaded
+[15:19:48.619] perf fps=2 frame=327.06/359.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=20148 chunks=920 meshes=2989/3003 dim=wafer p99=359.85ms hitches=0
+[15:19:48.648] stream: +4 columns around chunk (5, 2); 924 loaded
+[15:19:48.985] stream: +4 columns around chunk (5, 2); 928 loaded
+[15:19:49.390] stream: +4 columns around chunk (5, 2); 932 loaded
+[15:19:49.675] perf fps=2 frame=371.43/405.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=20521 chunks=932 meshes=3045/3045 dim=wafer p99=405.11ms hitches=0
+[15:19:49.680] stream: +4 columns around chunk (5, 2); 936 loaded
+[15:19:50.003] stream: +4 columns around chunk (5, 2); 940 loaded
+[15:19:50.409] stream: +4 columns around chunk (5, 2); 944 loaded
+[15:19:50.761] perf fps=3 frame=340.04/409.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=20889 chunks=944 meshes=3076/3086 dim=wafer p99=409.30ms hitches=0
+[15:19:50.768] stream: +4 columns around chunk (5, 2); 948 loaded
+[15:19:51.046] stream: +4 columns around chunk (5, 2); 952 loaded
+[15:19:51.311] stream: +4 columns around chunk (5, 2); 956 loaded
+[15:19:51.598] stream: +4 columns around chunk (5, 2); 960 loaded
+[15:19:51.916] perf fps=3 frame=276.74/286.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=21290 chunks=960 meshes=3127/3141 dim=wafer p99=286.63ms hitches=0
+[15:19:51.950] stream: +4 columns around chunk (5, 2); 964 loaded
+[15:19:52.268] stream: +4 columns around chunk (5, 2); 968 loaded
+[15:19:52.663] stream: +4 columns around chunk (5, 2); 972 loaded
+[15:19:53.096] perf fps=2 frame=356.71/393.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=21679 chunks=972 meshes=3180/3181 dim=wafer p99=393.91ms hitches=0
+[15:19:53.100] stream: +4 columns around chunk (5, 2); 976 loaded
+[15:19:53.420] input: poll heartbeat pushed=0 polled=0
+[15:19:53.425] stream: +4 columns around chunk (6, 2); 980 loaded
+[15:19:53.809] stream: +4 columns around chunk (6, 2); 984 loaded
+[15:19:54.291] perf fps=3 frame=382.32/438.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=22112 chunks=984 meshes=3207/3223 dim=wafer p99=438.27ms hitches=0
+[15:19:54.296] stream: +4 columns around chunk (6, 2); 988 loaded
+[15:19:54.579] stream: +4 columns around chunk (6, 2); 992 loaded
+[15:19:54.960] stream: +4 columns around chunk (6, 2); 996 loaded
+[15:19:55.345] perf fps=2 frame=331.39/380.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=22546 chunks=996 meshes=3253/3264 dim=wafer p99=380.37ms hitches=0
+[15:19:55.352] stream: +4 columns around chunk (6, 2); 1000 loaded
+[15:19:55.619] stream: +4 columns around chunk (6, 2); 1004 loaded
+[15:19:55.916] stream: +4 columns around chunk (6, 2); 1008 loaded
+[15:19:56.268] stream: +4 columns around chunk (6, 2); 1012 loaded
+[15:19:56.604] perf fps=3 frame=327.44/392.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=23010 chunks=1012 meshes=3306/3315 dim=wafer p99=392.06ms hitches=0
+[15:19:56.646] stream: +4 columns around chunk (6, 2); 1016 loaded
+[15:19:56.966] stream: +4 columns around chunk (6, 2); 1020 loaded
+[15:19:57.270] stream: +4 columns around chunk (6, 2); 1024 loaded
+[15:19:57.720] perf fps=3 frame=333.34/377.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=23366 chunks=1024 meshes=3347/3358 dim=wafer p99=377.20ms hitches=0
+[15:19:57.724] stream: +4 columns around chunk (6, 2); 1028 loaded
+[15:19:58.030] stream: +4 columns around chunk (6, 2); 1032 loaded
+[15:19:58.348] stream: +4 columns around chunk (6, 2); 1036 loaded
+[15:19:58.624] perf fps=2 frame=312.16/319.5ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=23764 chunks=1036 meshes=3388/3397 dim=wafer p99=319.46ms hitches=0
+[15:19:58.654] input: poll heartbeat pushed=0 polled=0
+[15:19:58.660] stream: +4 columns around chunk (6, 2); 1040 loaded
+[15:19:59.006] stream: +4 columns around chunk (6, 2); 1044 loaded
+[15:19:59.414] stream: +4 columns around chunk (6, 2); 1048 loaded
+[15:19:59.699] perf fps=3 frame=354.53/407.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=24153 chunks=1048 meshes=3427/3439 dim=wafer p99=407.14ms hitches=0
+[15:19:59.708] stream: +4 columns around chunk (6, 2); 1052 loaded
+[15:20:00.000] stream: +4 columns around chunk (6, 2); 1056 loaded
+[15:20:00.391] stream: +4 columns around chunk (6, 2); 1060 loaded
+[15:20:00.803] stream: +4 columns around chunk (6, 2); 1064 loaded
+[15:20:01.201] perf fps=2 frame=363.57/409.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=24655 chunks=1064 meshes=3491/3491 dim=wafer p99=409.89ms hitches=0
+[15:20:01.208] stream: +4 columns around chunk (6, 2); 1068 loaded
+[15:20:01.516] stream: +4 columns around chunk (6, 2); 1072 loaded
+[15:20:01.988] stream: +4 columns around chunk (6, 2); 1076 loaded
+[15:20:02.289] perf fps=2 frame=391.02/474.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=25109 chunks=1076 meshes=3522/3532 dim=wafer p99=474.16ms hitches=0
+[15:20:02.295] stream: +4 columns around chunk (6, 2); 1080 loaded
+[15:20:02.591] stream: +4 columns around chunk (6, 2); 1084 loaded
+[15:20:02.891] stream: +4 columns around chunk (6, 2); 1088 loaded
+[15:20:03.193] stream: +4 columns around chunk (6, 2); 1092 loaded
+[15:20:03.580] perf fps=3 frame=301.21/306.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=25523 chunks=1092 meshes=3585/3585 dim=wafer p99=306.20ms hitches=0
+[15:20:03.587] stream: +4 columns around chunk (6, 2); 1096 loaded
+[15:20:03.980] input: poll heartbeat pushed=0 polled=0
+[15:20:03.988] stream: +4 columns around chunk (6, 2); 1100 loaded
+[15:20:04.454] stream: +4 columns around chunk (6, 2); 1104 loaded
+[15:20:04.779] perf fps=2 frame=419.75/465.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=26008 chunks=1104 meshes=3619/3628 dim=wafer p99=464.95ms hitches=0
+[15:20:04.788] stream: +4 columns around chunk (6, 2); 1108 loaded
+[15:20:05.300] stream: +4 columns around chunk (6, 2); 1112 loaded
+[15:20:05.611] stream: +4 columns around chunk (6, 2); 1116 loaded
+[15:20:05.918] perf fps=2 frame=411.71/513.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=26445 chunks=1116 meshes=3664/3667 dim=wafer p99=513.11ms hitches=0
+[15:20:05.923] stream: +4 columns around chunk (6, 2); 1120 loaded
+[15:20:06.249] stream: +4 columns around chunk (6, 2); 1124 loaded
+[15:20:06.771] stream: +4 columns around chunk (6, 2); 1128 loaded
+[15:20:07.100] perf fps=3 frame=386.86/548.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=26884 chunks=1128 meshes=3701/3709 dim=wafer p99=548.58ms hitches=0
+[15:20:07.107] stream: +4 columns around chunk (6, 2); 1132 loaded
+[15:20:07.409] stream: +4 columns around chunk (6, 2); 1136 loaded
+[15:20:07.760] stream: +4 columns around chunk (6, 2); 1140 loaded
+[15:20:08.246] stream: +4 columns around chunk (6, 2); 1144 loaded
+[15:20:08.553] perf fps=2 frame=380.26/485.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=27433 chunks=1144 meshes=3745/3757 dim=wafer p99=485.35ms hitches=0
+[15:20:08.560] stream: +4 columns around chunk (6, 2); 1148 loaded
+[15:20:08.868] stream: +4 columns around chunk (6, 2); 1152 loaded
+[15:20:09.227] input: poll heartbeat pushed=0 polled=0
+[15:20:09.232] stream: +4 columns around chunk (6, 2); 1156 loaded
+[15:20:09.544] stream: +4 columns around chunk (6, 2); 1160 loaded
+[15:20:09.888] perf fps=2 frame=321.68/362.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=27881 chunks=1160 meshes=3800/3809 dim=wafer p99=362.90ms hitches=0
+[15:20:09.894] stream: +4 columns around chunk (6, 2); 1164 loaded
+[15:20:10.303] stream: +4 columns around chunk (6, 2); 1168 loaded
+[15:20:10.691] stream: +4 columns around chunk (6, 2); 1172 loaded
+[15:20:11.052] perf fps=2 frame=397.73/407.8ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=28322 chunks=1172 meshes=3839/3850 dim=wafer p99=407.80ms hitches=0
+[15:20:11.059] stream: +4 columns around chunk (6, 2); 1176 loaded
+[15:20:11.424] stream: +4 columns around chunk (6, 2); 1180 loaded
+[15:20:11.756] stream: +4 columns around chunk (6, 2); 1184 loaded
+[15:20:12.065] perf fps=3 frame=355.57/369.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=28713 chunks=1184 meshes=3880/3891 dim=wafer p99=369.12ms hitches=0
+[15:20:12.079] stream: +4 columns around chunk (6, 2); 1188 loaded
+[15:20:12.392] stream: +4 columns around chunk (6, 2); 1192 loaded
+[15:20:12.892] stream: +4 columns around chunk (6, 2); 1196 loaded
+[15:20:13.212] perf fps=2 frame=408.41/500.5ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=29139 chunks=1196 meshes=3920/3930 dim=wafer p99=500.55ms hitches=0
+[15:20:13.219] stream: +4 columns around chunk (6, 2); 1200 loaded
+[15:20:13.555] stream: +4 columns around chunk (6, 2); 1204 loaded
+[15:20:14.055] stream: +4 columns around chunk (6, 2); 1208 loaded
+[15:20:14.659] perf fps=2 frame=417.77/501.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=29581 chunks=1208 meshes=3969/3970 dim=wafer p99=501.22ms hitches=0
+[15:20:14.663] input: poll heartbeat pushed=0 polled=0
+[15:20:14.668] stream: +4 columns around chunk (6, 2); 1212 loaded
+[15:20:15.185] stream: +4 columns around chunk (6, 2); 1216 loaded
+[15:20:15.608] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=30055 chunks=1216 meshes=3985/3995 dim=wafer p99=0.00ms hitches=0
+[15:20:15.612] stream: +4 columns around chunk (6, 2); 1220 loaded
+[15:20:16.103] stream: +4 columns around chunk (6, 2); 1224 loaded
+[15:20:16.558] stream: +4 columns around chunk (6, 2); 1228 loaded
+[15:20:16.972] perf fps=1 frame=472.17/488.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=30602 chunks=1228 meshes=4023/4033 dim=wafer p99=488.73ms hitches=0
+[15:20:16.977] stream: +4 columns around chunk (6, 2); 1232 loaded
+[15:20:17.295] stream: +4 columns around chunk (6, 2); 1236 loaded
+[15:20:17.622] stream: +4 columns around chunk (6, 2); 1240 loaded
+[15:20:18.123] perf fps=3 frame=354.69/420.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=30992 chunks=1240 meshes=4065/4074 dim=wafer p99=420.38ms hitches=0
+[15:20:18.128] stream: +4 columns around chunk (6, 2); 1244 loaded
+[15:20:18.495] stream: +4 columns around chunk (6, 2); 1248 loaded
+[15:20:18.849] stream: +4 columns around chunk (6, 2); 1252 loaded
+[15:20:19.215] perf fps=1 frame=354.70/354.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=31466 chunks=1252 meshes=4104/4114 dim=wafer p99=354.70ms hitches=0
+[15:20:19.227] stream: +4 columns around chunk (6, 2); 1256 loaded
+[15:20:19.576] stream: +4 columns around chunk (6, 2); 1260 loaded
+[15:20:19.971] input: poll heartbeat pushed=0 polled=0
+[15:20:19.980] stream: +4 columns around chunk (6, 2); 1264 loaded
+[15:20:20.372] perf fps=2 frame=376.57/403.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=31890 chunks=1264 meshes=4145/4151 dim=wafer p99=403.10ms hitches=0
+[15:20:20.383] stream: +4 columns around chunk (6, 2); 1268 loaded
+[15:20:20.812] stream: +4 columns around chunk (6, 2); 1272 loaded
+[15:20:21.211] stream: +4 columns around chunk (6, 2); 1276 loaded
+[15:20:21.584] perf fps=2 frame=409.33/426.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=32364 chunks=1276 meshes=4183/4190 dim=wafer p99=426.75ms hitches=0
+[15:20:21.592] stream: +4 columns around chunk (6, 2); 1280 loaded
+[15:20:21.897] stream: +4 columns around chunk (6, 2); 1284 loaded
+[15:20:22.215] stream: +4 columns around chunk (6, 2); 1288 loaded
+[15:20:22.556] perf fps=2 frame=311.52/315.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=32724 chunks=1288 meshes=4228/4228 dim=wafer p99=315.22ms hitches=0
+[15:20:22.569] stream: +4 columns around chunk (6, 2); 1292 loaded
+[15:20:23.017] stream: +4 columns around chunk (6, 2); 1296 loaded
+[15:20:23.376] stream: +4 columns around chunk (6, 2); 1300 loaded
+[15:20:23.688] perf fps=3 frame=387.73/448.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=33164 chunks=1300 meshes=4257/4267 dim=wafer p99=448.60ms hitches=0
+[15:20:23.694] stream: +4 columns around chunk (6, 2); 1304 loaded
+[15:20:24.212] stream: +4 columns around chunk (6, 2); 1308 loaded
+[15:20:24.651] stream: +4 columns around chunk (6, 2); 1312 loaded
+[15:20:25.012] perf fps=2 frame=478.17/516.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=33662 chunks=1312 meshes=4296/4305 dim=wafer p99=516.23ms hitches=0
+[15:20:25.020] input: poll heartbeat pushed=0 polled=0
+[15:20:25.028] stream: +4 columns around chunk (6, 2); 1316 loaded
+[15:20:25.388] stream: +4 columns around chunk (6, 2); 1320 loaded
+[15:20:25.708] stream: +4 columns around chunk (6, 2); 1324 loaded
+[15:20:26.191] perf fps=3 frame=353.00/376.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=34049 chunks=1324 meshes=4342/4343 dim=wafer p99=376.35ms hitches=0
+[15:20:26.196] stream: +4 columns around chunk (6, 2); 1328 loaded
+[15:20:26.516] stream: +4 columns around chunk (6, 2); 1332 loaded
+[15:20:26.867] stream: +4 columns around chunk (6, 2); 1336 loaded
+[15:20:27.192] perf fps=2 frame=334.83/349.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=34485 chunks=1336 meshes=4373/4382 dim=wafer p99=349.74ms hitches=0
+[15:20:27.211] stream: +4 columns around chunk (6, 2); 1340 loaded
+[15:20:27.672] stream: +4 columns around chunk (6, 2); 1344 loaded
+[15:20:27.992] stream: +4 columns around chunk (6, 2); 1348 loaded
+[15:20:28.369] perf fps=3 frame=375.48/463.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=34905 chunks=1348 meshes=4411/4421 dim=wafer p99=463.70ms hitches=0
+[15:20:28.380] stream: +4 columns around chunk (6, 2); 1352 loaded
+[15:20:28.753] stream: +4 columns around chunk (6, 2); 1356 loaded
+[15:20:29.185] stream: +4 columns around chunk (6, 2); 1360 loaded
+[15:20:29.684] perf fps=2 frame=403.60/431.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=35360 chunks=1360 meshes=4447/4460 dim=wafer p99=431.61ms hitches=0
+[15:20:29.705] stream: +4 columns around chunk (6, 2); 1364 loaded
+[15:20:30.190] input: poll heartbeat pushed=0 polled=0
+[15:20:30.199] stream: +4 columns around chunk (6, 2); 1368 loaded
+[15:20:30.584] perf fps=2 frame=506.88/515.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=35776 chunks=1368 meshes=4476/4492 dim=wafer p99=515.35ms hitches=0
+[15:20:30.595] stream: +4 columns around chunk (6, 2); 1372 loaded
+[15:20:31.472] hitch: frame 878.4 ms (avg 391.94 ms)
+[15:20:31.480] stream: +4 columns around chunk (6, 2); 1376 loaded
+[15:20:32.292] perf fps=2 frame=637.37/878.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=36327 chunks=1376 meshes=4504/4517 dim=wafer p99=878.35ms hitches=1
+[15:20:32.299] stream: +4 columns around chunk (6, 2); 1380 loaded
+[page] keydown F3
+[15:20:33.073] stream: +4 columns around chunk (6, 2); 1384 loaded
+[page] mousedown button 0
+[15:20:33.864] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=37040 chunks=1384 meshes=4530/4543 dim=wafer p99=0.00ms hitches=0
+[15:20:33.916] stream: +4 columns around chunk (6, 2); 1388 loaded
+[15:20:34.528] stream: +4 columns around chunk (6, 2); 1392 loaded
+[15:20:35.044] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=37681 chunks=1392 meshes=4555/4568 dim=wafer p99=0.00ms hitches=0
+[15:20:35.056] stream: +4 columns around chunk (6, 2); 1396 loaded
+[page] keydown KeyW
+[15:20:35.400] input: poll heartbeat pushed=0 polled=0
+[15:20:35.407] stream: +4 columns around chunk (6, 2); 1400 loaded
+[15:20:35.763] stream: +4 columns around chunk (6, 2); 1404 loaded
+[15:20:36.105] perf fps=1 frame=355.96/356.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=38158 chunks=1404 meshes=4597/4606 dim=wafer p99=355.96ms hitches=0
+[15:20:36.113] stream: +4 columns around chunk (6, 2); 1408 loaded
+[15:20:36.548] stream: +4 columns around chunk (6, 2); 1412 loaded
+[15:20:36.968] stream: +4 columns around chunk (6, 2); 1416 loaded
+[15:20:37.385] perf fps=2 frame=423.61/433.6ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=38615 chunks=1416 meshes=4636/4645 dim=wafer p99=433.55ms hitches=0
+[15:20:37.392] stream: +4 columns around chunk (6, 2); 1420 loaded
+[15:20:37.870] stream: +4 columns around chunk (6, 2); 1424 loaded
+[15:20:38.547] stream: +4 columns around chunk (6, 2); 1428 loaded

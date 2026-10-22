@@ -1,0 +1,27 @@
+cbase-top-gl-r20-a sat false cast null tickMed 1.28 lock engaged
+DRIVER FAIL Error: Attempted to use detached Frame '9BAFC2916C469D63B3A2620E93A39CB5'.
+    at CdpFrame.<anonymous> (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:99:23)
+    at logOf (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:60:14)
+    at async main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:91:15)
+DRIVER FAIL TargetCloseError: Protocol error (Input.dispatchKeyEvent): Session closed. Most likely the page has been closed.
+    at CdpCDPSession.send (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/CdpSession.js:69:35)
+    at CdpKeyboard.down (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Input.js:33:28)
+    at CdpKeyboard.press (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Input.js:143:20)
+    at main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:70:23)
+DRIVER FAIL ConnectionClosedError: Connection closed.
+    at Connection._rawSend (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Connection.js:119:35)
+    at Connection.send (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Connection.js:112:21)
+    at Connection._createSession (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Connection.js:239:42)
+    at PageTarget.createSession (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Browser.js:162:37)
+    at PageTarget.createCDPSession (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Target.js:96:36)
+    at CdpPage.createCDPSession (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Page.js:785:36)
+    at main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:108:29)
+DRIVER FAIL Error: Attempted to use detached Frame '9382D50E0883734B502334846FB181B8'.
+    at CdpFrame.<anonymous> (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:99:23)
+    at logOf (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:65:14)
+    at async main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:99:15)
+DRIVER FAIL Error: Attempted to use detached Frame 'F46D6D08B1A51941A9D008417B8857A1'.
+    at CdpFrame.<anonymous> (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:99:23)
+    at logOf (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:65:14)
+    at async main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:99:15)
+MATRIX2_DONE

@@ -1,0 +1,45 @@
+{
+ "tag": "cbase2-top-gl-r20-b",
+ "mode": "top",
+ "url": "http://127.0.0.1:8902/gl.html",
+ "settleS": 240,
+ "windowS": 90,
+ "menuSeen": true,
+ "playSeen": true,
+ "pointerLock": "engaged",
+ "meshesAtCast": 1398,
+ "totalSubsAtCast": 1413,
+ "tickAvgAtCast": 1.893,
+ "tpsAtCast": 255.8,
+ "droppedAtCast": 4646,
+ "cast": {
+  "intervals": 5,
+  "fps": 0.08,
+  "medianMs": 13020,
+  "p95Ms": 13950.1,
+  "maxMs": 13950.1,
+  "fracOver40": 1,
+  "fracOver100": 1,
+  "fracOver1000": 1
+ },
+ "intervalsMs": [
+  11298.2,
+  12586,
+  13020,
+  13536.9,
+  13950.1
+ ],
+ "tickAvgAfter": 1.685,
+ "tpsAfter": 266.4,
+ "droppedAfter": 5141,
+ "meshesAfter": 1490,
+ "aaLine": null,
+ "iso": {
+  "crossOriginIsolated": true,
+  "sab": "function"
+ },
+ "wallS": 399.3,
+ "consoleIssues": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)"
+ ]
+}

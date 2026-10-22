@@ -1,0 +1,8 @@
+opening http://127.0.0.1:8933/index.html variant notransfer
+backend live: false 
+web present line: false
+menu: false 
+perf lines: false
+capability: {"ua":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/155 Mobile Safari/537.36 LithoBlackProbe","offscreenType":"function","transferType":"undefined","ocWebgl2":"px=255,0,255,255","mainWebgl2":"ok"}
+LUMINANCE: {"meanLum":4.09,"pctBright":3.21,"w":962,"h":542}
+VERDICT {"page":"index.html","variant":"notransfer","backendLive":false,"webPresentLine":false,"menu":false,"perfLines":false,"marks":{},"cap":{"ua":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/155 Mobile Safari/537.36 LithoBlackProbe","offscreenType":"function","transferType":"undefined","ocWebgl2":"px=255,0,255,255","mainWebgl2":"ok"},"lum":{"meanLum":4.09,"pctBright":3.21,"w":962,"h":542}}

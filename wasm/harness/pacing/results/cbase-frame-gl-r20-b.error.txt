@@ -1,0 +1,8 @@
+ConnectionClosedError: Connection closed.
+    at Connection._rawSend (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Connection.js:119:35)
+    at Connection.send (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Connection.js:112:21)
+    at Connection._createSession (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Connection.js:239:42)
+    at PageTarget.createSession (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Browser.js:162:37)
+    at PageTarget.createCDPSession (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Target.js:96:36)
+    at CdpPage.createCDPSession (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Page.js:785:36)
+    at main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:108:29)

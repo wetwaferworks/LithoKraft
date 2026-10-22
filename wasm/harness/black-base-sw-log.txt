@@ -1,0 +1,94 @@
+[15:20:15.057] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[15:20:15.063] LithoKraft Alpha 0.0.3.4 (nogit) Release built Oct 20 2026 06:57:47
+[15:20:15.064] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m1[0m.[38;2;168;158;146m2[0m
+[15:20:15.118] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[15:20:15.124] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[15:20:15.128] input: emscripten-html5 backend live (transport: main-thread listeners; ring drains at step cadence, legacy queue per frame; debug echo off)
+[15:20:15.129] input: memory-mapped ring LIVE (records at wasm+853888; legacy queue on standby until first record)
+[15:20:15.132] input: mapped ring drain at STEP cadence (256/s, dedicated thread; frames no longer gate input)
+[15:20:15.135] window: emscripten window 1280x720 (api gl33)
+[15:20:15.136] window: WebGL antialias off (?aa=off)
+[15:20:15.723] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[15:20:15.740] software present (webgl): BGRA extension unavailable — upload path: RGBA (CPU swizzle)
+[15:20:15.744] software present (webgl): thin-import present engaged
+[15:20:15.747] renderer: software | software rasterizer (CPU, no GPU)
+[15:20:15.782] materials: 17 materials from /assets/materials/lithokraft.materials
+[15:20:15.788] mods: game 'lithokraft' 0.1.0
+[15:20:15.796] mods: no mods/ directory — continuing with zero mods (seal decision still applies)
+[15:20:15.801] mods: registry sealed (release build (fail closed: no verified hot-swap mod))
+[15:20:17.233]   resources: worldgen/wafer.json from lithokraft
+[15:20:17.236]   resources: worldgen/organic.json from lithokraft
+[15:20:17.239]   resources: ui/theme.json from lithokraft
+[15:20:17.240] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[15:20:17.241]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[15:20:17.244]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[15:20:17.246]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[15:20:17.247]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[15:20:17.248]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[15:20:17.248]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[15:20:17.249]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[15:20:17.254]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+[15:20:17.299] audio: muted (--mute)
+[15:20:17.304] input: bindings from /config/input.json
+ERR: [15:20:17.483] WARN software: PBR transparency tiers are not implemented on the CPU path; PBR fragments shade opaque (tier selection still enables the PBR fragment path)
+[15:20:17.519] world clock: tick 0, day 0 00:00
+[15:20:18.423] sim: tick area radius 8, round (dx^2+dz^2 <= r^2+r), 225 chunk columns
+[15:20:18.428] timing handshake: ON (phases/cycle 4; applies at this world load)
+[15:20:18.849] dimension 'wafer' loaded: 256 columns, 833 sub-chunks, 1325.4 ms
+[15:20:18.852] spawn: granted the starting item (the Fragment)
+ERR: [15:20:18.867] ERROR [script]  (0,0) error: Failed in call to function 'RegisterGlobalFunction' with 'void log(const string &in)' (Code: asNOT_SUPPORTED, -7)
+ERR: [15:20:18.868] ERROR [script] binding registration failed: 'void log(const string &in)' (-7)
+ERR: [15:20:18.872] ERROR AngelScript: register log failed (-7)
+[15:20:18.878] LithoKraft Alpha 0.0.3.4 (nogit) Release built Oct 20 2026 06:57:47 | renderer: Software scalar x2 threads
+[15:20:18.881] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[15:20:18.884] present: framebuffer (swap-interval-1) (software)
+[15:20:18.887] web present: interactive loop via emscripten_set_main_loop (task boundary per frame)
+[15:20:19.006] software renderer: Pass 2 mask 0x7 (LL_SW_P2), texture layout linear, 372 layers
+ERR: software renderer: SIMD path scalar
+ERR: software renderer: hardware_concurrency=2, render bands=2 (1 spawned workers + caller)
+[15:20:19.028] software renderer: hardware_concurrency=2, render bands=2 (1 spawned workers + caller)
+[15:20:19.987] perf fps=4 frame=241.79/368.0ms tps=1.0/256 tick=33.450/33.450ms budget=3.57% dropped=287 chunks=256 meshes=158/833 dim=wafer p99=368.04ms hitches=0
+[15:20:20.339] stream: +4 columns around chunk (3, 2); 260 loaded
+[15:20:20.436] stream: +4 columns around chunk (3, 2); 264 loaded
+[15:20:20.561] stream: +4 columns around chunk (3, 2); 268 loaded
+[15:20:20.867] stream: +4 columns around chunk (3, 2); 272 loaded
+[15:20:21.048] stream: +4 columns around chunk (3, 2); 276 loaded
+[15:20:21.299] perf fps=7 frame=144.06/301.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=466 chunks=276 meshes=452/901 dim=wafer p99=301.15ms hitches=0
+[15:20:21.308] stream: +4 columns around chunk (3, 2); 280 loaded
+[15:20:21.432] stream: +4 columns around chunk (3, 2); 284 loaded
+[15:20:21.560] stream: +4 columns around chunk (3, 2); 288 loaded
+[15:20:21.740] stream: +4 columns around chunk (3, 2); 292 loaded
+[15:20:21.878] stream: +4 columns around chunk (3, 2); 296 loaded
+[15:20:22.134] stream: +4 columns around chunk (3, 2); 300 loaded
+[15:20:22.255] perf fps=6 frame=181.73/260.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=713 chunks=300 meshes=696/982 dim=wafer p99=260.30ms hitches=0
+[15:20:22.264] stream: +4 columns around chunk (3, 2); 304 loaded
+[15:20:22.486] stream: +4 columns around chunk (3, 2); 308 loaded
+[15:20:22.735] stream: +4 columns around chunk (3, 2); 312 loaded
+[15:20:22.959] stream: +4 columns around chunk (3, 2); 316 loaded
+[15:20:23.172] stream: +4 columns around chunk (3, 2); 320 loaded
+[15:20:23.382] perf fps=4 frame=227.37/248.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=986 chunks=320 meshes=889/1048 dim=wafer p99=248.30ms hitches=0
+[15:20:23.390] stream: +4 columns around chunk (4, 2); 324 loaded
+[15:20:23.655] stream: +4 columns around chunk (4, 2); 328 loaded
+[15:20:23.953] stream: +4 columns around chunk (4, 2); 332 loaded
+[15:20:24.172] stream: +4 columns around chunk (4, 2); 336 loaded
+[15:20:24.436] stream: +4 columns around chunk (4, 2); 340 loaded
+[15:20:24.726] perf fps=4 frame=252.61/297.4ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1375 chunks=340 meshes=1063/1112 dim=wafer p99=297.38ms hitches=0
+[15:20:24.734] stream: +4 columns around chunk (4, 2); 344 loaded
+[15:20:25.062] stream: +4 columns around chunk (4, 2); 348 loaded
+[15:20:25.344] stream: +4 columns around chunk (4, 2); 352 loaded
+[15:20:25.639] stream: +4 columns around chunk (4, 2); 356 loaded
+[15:20:25.926] perf fps=3 frame=300.07/328.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1784 chunks=356 meshes=1136/1161 dim=wafer p99=328.03ms hitches=0
+[15:20:25.934] stream: +4 columns around chunk (4, 2); 360 loaded
+[15:20:26.358] stream: +4 columns around chunk (4, 2); 364 loaded
+[15:20:26.646] stream: +4 columns around chunk (4, 2); 368 loaded
+[15:20:27.071] perf fps=3 frame=336.31/420.1ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=2142 chunks=368 meshes=1173/1199 dim=wafer p99=420.13ms hitches=0
+[15:20:27.089] stream: +4 columns around chunk (4, 2); 372 loaded
+[15:20:27.428] stream: +4 columns around chunk (4, 2); 376 loaded
+[15:20:27.758] stream: +4 columns around chunk (4, 2); 380 loaded
+[15:20:28.188] perf fps=2 frame=333.46/338.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=2556 chunks=380 meshes=1223/1234 dim=wafer p99=338.25ms hitches=0
+[15:20:28.334] hitch: frame 579.1 ms (avg 275.82 ms)
+[15:20:28.356] stream: +4 columns around chunk (4, 2); 384 loaded
+[15:20:29.071] hitch: frame 736.2 ms (avg 290.99 ms)
+[15:20:29.092] stream: +4 columns around chunk (4, 2); 388 loaded

@@ -1,0 +1,22 @@
+{
+  "page": "gl.html",
+  "variant": "nooffscreen",
+  "backendLive": false,
+  "webPresentLine": false,
+  "menu": false,
+  "perfLines": false,
+  "marks": {},
+  "cap": {
+    "ua": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/155 Mobile Safari/537.36 LithoBlackProbe",
+    "offscreenType": "undefined",
+    "transferType": "undefined",
+    "ocWebgl2": "throw: OffscreenCanvas is not a constructor",
+    "mainWebgl2": "ok"
+  },
+  "lum": {
+    "meanLum": 4.09,
+    "pctBright": 3.21,
+    "w": 962,
+    "h": 542
+  }
+}

@@ -1,0 +1,88 @@
+[17:50:26.192] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[17:50:26.217] LithoKraft Alpha 0.0.2.57 (nogit) Release built Oct 19 2026 17:46:00
+[17:50:26.224] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m54[0m
+[17:50:26.507] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[17:50:26.564] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[17:50:26.579] input: emscripten-html5 backend live (transport: main-thread listeners + per-frame drain; debug echo off)
+[17:50:26.601] window: emscripten window 1280x720 (api gl33)
+[17:50:27.662] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[17:50:27.665] gl33: chunk meshes in one VBO + VAO per sub-chunk
+ERR: [17:50:27.793] ERROR built-in shader 'chunk_pbr' failed:
+ERR: fragment: ERROR: 0:36: 'samplerBuffer' : Illegal use of reserved word
+ERR: ERROR: 0:36: 'samplerBuffer' : syntax error
+ERR: 
+ERR: [17:50:27.840] ERROR gl33: chunk_pbr unavailable - PBR/BinaryQuad path disabled, classic path only
+[17:50:27.944] renderer: OpenGL 3.3 core | WebKit | WebKit WebGL | OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium))
+[17:50:28.038] materials: 17 materials from /assets/materials/lithokraft.materials
+[17:50:28.052] mods: game 'lithokraft' 0.1.0
+[17:50:28.070] mods: no mods/ directory — continuing with zero mods (seal decision still applies)
+[17:50:28.076] mods: registry sealed (release build (fail closed: no verified hot-swap mod))
+[17:50:31.880]   resources: worldgen/wafer.json from lithokraft
+[17:50:31.889]   resources: worldgen/organic.json from lithokraft
+[17:50:31.934]   resources: ui/theme.json from lithokraft
+[17:50:31.947] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[17:50:31.952]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[17:50:31.956]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[17:50:31.960]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[17:50:31.964]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[17:50:31.967]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[17:50:31.971]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[17:50:31.972]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[17:50:31.975]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+[17:50:32.455] shader 'chunk_pbr': not in any pack, using the built-in copy
+ERR: [17:50:32.641] ERROR built-in shader 'chunk_pbr' failed:
+ERR: fragment: ERROR: 0:36: 'samplerBuffer' : Illegal use of reserved word
+ERR: ERROR: 0:36: 'samplerBuffer' : syntax error
+ERR: 
+[17:50:32.647] shader 'sprite': not in any pack, using the built-in copy
+ERR: [17:50:32.652] ERROR gl33: chunk_pbr unavailable - PBR/BinaryQuad path disabled, classic path only
+[17:50:32.660] audio: muted (--mute)
+[17:50:32.688] input: bindings from /config/input.json
+[17:50:33.108] world clock: tick 0, day 0 00:00
+[17:50:35.907] sim: tick area radius 8, round (dx^2+dz^2 <= r^2+r), 225 chunk columns
+[17:50:35.920] timing handshake: ON (phases/cycle 4; applies at this world load)
+[17:50:37.128] dimension 'wafer' loaded: 256 columns, 833 sub-chunks, 3985.5 ms
+[17:50:37.172] spawn: granted the starting item (the Fragment)
+ERR: [17:50:37.371] ERROR [script]  (0,0) error: Failed in call to function 'RegisterGlobalFunction' with 'void log(const string &in)' (Code: asNOT_SUPPORTED, -7)
+ERR: [17:50:37.423] ERROR [script] binding registration failed: 'void log(const string &in)' (-7)
+ERR: [17:50:37.454] ERROR AngelScript: register log failed (-7)
+[17:50:37.489] LithoKraft Alpha 0.0.2.57 (nogit) Release built Oct 19 2026 17:46:00 | renderer: GL33
+[17:50:37.520] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[17:50:37.548] present: swap-interval-0 (OpenGL 3.3 core)
+[17:50:38.558] perf fps=39 frame=24.17/146.9ms tps=16.8/256 tick=20.836/191.950ms budget=35.89% dropped=184 chunks=256 meshes=304/833 dim=wafer p99=146.92ms hitches=0
+[17:50:39.312] hitch: frame 628.0 ms (avg 24.61 ms)
+[17:50:40.643] hitch: frame 1244.7 ms (avg 56.29 ms)
+[17:50:40.664] stream: +4 columns around chunk (3, 2); 260 loaded
+[17:50:40.696] perf fps=7 frame=149.03/1244.7ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1052 chunks=260 meshes=426/845 dim=wafer p99=1244.75ms hitches=2
+[17:50:40.707] stream: +4 columns around chunk (3, 2); 264 loaded
+[17:50:40.740] stream: +1 columns around chunk (3, 2); 265 loaded
+[17:50:50.804] hitch: frame 10065.3 ms (avg 111.76 ms)
+[17:50:50.812] stream: +4 columns around chunk (3, 2); 269 loaded
+[17:50:55.239] perf fps=0 frame=5050.96/10065.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=6155 chunks=269 meshes=546/877 dim=wafer p99=10065.33ms hitches=1
+[17:50:55.244] stream: +4 columns around chunk (3, 2); 273 loaded
+[17:51:00.408] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=8374 chunks=273 meshes=587/891 dim=wafer p99=0.00ms hitches=0
+[17:51:00.424] stream: +4 columns around chunk (3, 2); 277 loaded
+[17:51:01.843] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=10971 chunks=277 meshes=629/905 dim=wafer p99=0.00ms hitches=0
+[17:51:01.852] menu: play - creative/testing
+[17:51:01.887] stream: +4 columns around chunk (3, 2); 281 loaded
+[17:51:03.451] perf fps=0 frame=0.00/0.0ms tps=276.8/256 tick=2.257/26.625ms budget=82.21% dropped=11662 chunks=281 meshes=668/919 dim=wafer p99=0.00ms hitches=0
+[17:51:03.495] input: pointer lock engaged
+[17:51:03.588] stream: +4 columns around chunk (3, 2); 285 loaded
+[17:51:03.620] perf fps=0 frame=0.00/0.0ms tps=276.8/256 tick=2.257/26.625ms budget=82.21% dropped=11662 chunks=285 meshes=705/932 dim=wafer p99=0.00ms hitches=0
+[17:51:03.678] stream: +4 columns around chunk (3, 2); 289 loaded
+ERR: [17:51:03.779] WARN timing-handshake: component 'signal.mark' (id 2) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[17:51:03.889] stream: +4 columns around chunk (3, 2); 293 loaded
+[17:51:03.992] stream: +4 columns around chunk (3, 2); 297 loaded
+ERR: [17:51:05.632] WARN timing-handshake: component 'signal.components' (id 1) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[17:51:09.080] hitch: frame 5132.9 ms (avg 565.39 ms)
+[17:51:09.105] stream: +4 columns around chunk (3, 2); 301 loaded
+[17:51:10.507] perf fps=1 frame=1814.67/5132.9ms tps=250.0/256 tick=2.869/30.825ms budget=96.37% dropped=11958 chunks=301 meshes=863/986 dim=wafer p99=5132.88ms hitches=1
+[17:51:10.556] stream: +4 columns around chunk (3, 2); 305 loaded
+ERR: [17:51:11.639] WARN timing-handshake: component 'EUV' (id 6) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+ERR: [17:51:12.185] WARN timing-handshake: component 'signal.flip_torches' (id 0) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[17:51:14.216] perf fps=0 frame=0.00/0.0ms tps=255.6/256 tick=2.445/31.750ms budget=76.78% dropped=12154 chunks=305 meshes=898/999 dim=wafer p99=0.00ms hitches=0
+[17:51:14.303] stream: +4 columns around chunk (3, 2); 309 loaded
+[17:51:17.472] perf fps=0 frame=0.00/0.0ms tps=222.9/256 tick=3.202/71.840ms budget=88.51% dropped=12225 chunks=309 meshes=939/1013 dim=wafer p99=0.00ms hitches=0
+[17:51:17.500] stream: +4 columns around chunk (3, 2); 313 loaded

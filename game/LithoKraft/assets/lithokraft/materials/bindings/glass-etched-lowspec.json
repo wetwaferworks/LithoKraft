@@ -1,0 +1,15 @@
+{
+  "model": "glass-etched-lowspec",
+  "credit": "Proposed by JD, Built by Cortana. Art: CloudAtlas 2026-10-16.",
+  "note": "etched glass: 50 = etched base, 51 = etched line; normal map glass_etched_normal",
+  "materials": {
+    "50": {
+      "texture": "glass",
+      "shade": "tex"
+    },
+    "51": {
+      "texture": "glass",
+      "shade": "tex"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+ "tag": "new-top-gl-r12-a",
+ "mode": "top",
+ "url": "http://127.0.0.1:8903/gl.html?radius=12",
+ "settleS": 120,
+ "windowS": 90,
+ "menuSeen": true,
+ "playSeen": true,
+ "pointerLock": "engaged",
+ "meshesAtCast": 1333,
+ "totalSubsAtCast": 1345,
+ "tickAvgAtCast": 1.505,
+ "tpsAtCast": 268,
+ "droppedAtCast": 500,
+ "cast": {
+  "intervals": 15,
+  "fps": 0.19,
+  "medianMs": 5241.9,
+  "p95Ms": 9704.6,
+  "maxMs": 9704.6,
+  "fracOver40": 1,
+  "fracOver100": 1,
+  "fracOver1000": 0.933
+ },
+ "intervalsMs": [
+  5172.2,
+  9704.6,
+  4912.4,
+  4937.5,
+  5912.2,
+  5662,
+  4361.8,
+  710.1,
+  5241.9,
+  6817.9,
+  6007.7,
+  5146.2,
+  5135.3,
+  5255.4,
+  5245.9
+ ],
+ "tickAvgAfter": 1.752,
+ "tpsAfter": 255.7,
+ "droppedAfter": 664,
+ "meshesAfter": 1563,
+ "aaLine": "window: WebGL antialias off (?aa=off)",
+ "iso": {
+  "crossOriginIsolated": true,
+  "sab": "function"
+ },
+ "wallS": 250.5,
+ "consoleIssues": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)"
+ ]
+}

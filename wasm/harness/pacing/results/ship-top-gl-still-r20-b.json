@@ -1,0 +1,47 @@
+{
+ "tag": "ship-top-gl-still-r20-b",
+ "mode": "top",
+ "url": "http://127.0.0.1:8902/benchgl.html?bench=1&bsecs=120&bpath=still&radius=20",
+ "wallS": 138.3,
+ "benchLine": "bench renderer=OpenGL 3.3 core present=swap-interval-0 path=still seconds=120 frames=17 rthreads=2 avg=2902.131ms p50=3391.400ms p99=8704.265ms max=8704.265ms input=5.366 update=66.537 upload=1636.593 render=1191.752 present=0.004 ms upload=1783292 B/frame tick=1.813/3.035ms gen=0.0 cols/s (0.00/0.00ms) mesh=0.0 subs/s (0.000/0.000ms) ram=0.0->0.0 MB (peak 0.0)",
+ "raf": {
+  "n": 360,
+  "median": 16.67,
+  "p95": 3033.21,
+  "p99": 4949.8,
+  "max": 9732.94,
+  "mean": 378.33,
+  "fracOver25": 0.356,
+  "fracOver40": 0.256
+ },
+ "iso": {
+  "crossOriginIsolated": true,
+  "sab": "function"
+ },
+ "consoleIssues": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)"
+ ],
+ "benchSecs": {
+  "count": 25,
+  "tailN": 15,
+  "input": 0,
+  "update": 0,
+  "upload": 0,
+  "render": 0,
+  "present": 0,
+  "tick": 1.747,
+  "sum": 0
+ },
+ "parsed": {
+  "frames": 17,
+  "avg": 2902.131,
+  "p50": 3391.4,
+  "p99": 8704.265,
+  "max": 8704.265,
+  "input": 5.366,
+  "update": 66.537,
+  "upload": 1636.593,
+  "render": 1191.752,
+  "present": 0.004
+ }
+}

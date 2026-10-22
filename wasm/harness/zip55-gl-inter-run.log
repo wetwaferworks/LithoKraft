@@ -1,0 +1,54 @@
+TIMEOUT waiting for menu play after Enter ("menu: play")
+{
+  "url": "http://127.0.0.1:8934/gl.html?debuginput=1",
+  "stages": {
+    "menuReached": true,
+    "backendLine": "[18:13:12.800] input: emscripten-html5 backend live (transport: main-thread listeners + per-frame drain; debug echo ON (?debuginput=1))",
+    "menuShot": {
+      "distinctSampledColors": 1212,
+      "nonBlackFrac": 0.6106,
+      "colorfulFrac": 0.5058,
+      "meanSum": 281.56
+    },
+    "playReached": false,
+    "playShot": {
+      "distinctSampledColors": 12022,
+      "nonBlackFrac": 0.8316,
+      "colorfulFrac": 0.662,
+      "meanSum": 266.24
+    },
+    "pointerLockElement": null,
+    "moveShot": {
+      "distinctSampledColors": 12452,
+      "nonBlackFrac": 0.8316,
+      "colorfulFrac": 0.6583,
+      "meanSum": 264.25
+    },
+    "diffMenuVsPlay": 0.4911,
+    "diffPlayVsMoved": 0.2446
+  },
+  "stats": {
+    "release": "Alpha 0.0.2.58 Release, built Oct 19 2026 17:53:33",
+    "counter": "0.0.0.0.0.0.0.55",
+    "renderer": "OpenGL 3.3 core | WebKit | WebKit WebGL | OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium))",
+    "mode": "interactive play",
+    "fps": "0 fps",
+    "input": "canvas focused",
+    "lock": "free",
+    "bench": "…",
+    "tick": "…"
+  },
+  "logEvidence": {
+    "backendLive": true,
+    "debugEchoOn": true,
+    "keyDownEnter": true,
+    "keyDownW": true,
+    "mouseDown": true,
+    "mouseMove": true,
+    "lockLines": []
+  },
+  "consoleErrors": [
+    "[error] Failed to load resource: the server responded with a status of 404 (File not found)"
+  ],
+  "glErrors": []
+}

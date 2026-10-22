@@ -1,0 +1,56 @@
+== demo record: round trip through a bare ControlStream
+  [PASS] demo: recorder begin turns the stream recording tap on
+  [PASS] demo: recorder session echoes the session info (seed, mode, tick rate, phases)
+  [PASS] demo: events extract at their stamp ticks (4 of 7 by tick 122)
+  [PASS] demo: the remaining events extract by tick 125
+  [PASS] demo: the recorder captured every applied event
+  [PASS] demo: recorder finish writes the trailer
+  [PASS] demo: recorder reports no error after a clean finish
+  [PASS] demo: the record starts with the LLDM preamble and carries a trailer
+  [PASS] demo: parseDemo of the round trip is complete, not truncated, no error
+  [PASS] demo: parsed session round-trips (seed, mode, tick rate, phases, stream + demo versions)
+  [PASS] demo: trailer fields exact (final hash, total events, total ticks)
+  [PASS] demo: every event round-trips field-for-field (all five kinds)
+  [PASS] demo: at least two segments were framed and recovered
+  [PASS] demo: DemoPlayer loads the round-trip bytes (complete)
+  [PASS] demo: DemoPlayer submitInto reproduces the exact stamped stream on a fresh stream
+== demo record: stream-level non-perturbation (attach / detach)
+  [PASS] demo: attach/detach of a recorder leaves the extracted stream identical (recording off)
+  [PASS] demo: recorder attach/detach leaves dropped == 0 and orderViolations == 0
+== demo record: fail-closed / recovery matrix
+  [PASS] demo: flipped file magic -> BadMagic
+  [PASS] demo: bumped demo format version -> UnsupportedVersion
+  [PASS] demo: flipped payload byte inside a segment -> SegmentChecksum (hard error, not truncated)
+  [PASS] demo: cut mid-record in the final segment -> truncated, prefix events recovered
+  [PASS] demo: trailer removed -> truncated with ALL events recovered
+  [PASS] demo: trailer totalEvents tampered (checksum recomputed) -> TrailerCountMismatch
+  [PASS] demo: broken trailer checksum -> TrailerChecksum
+  (segment magic mapping produced: SegmentBadMagic)
+  [PASS] demo: smashed segment LLCS magic -> hard segment error (SegmentBadMagic or SegmentChecksum)
+== demo record: analysis queries on the known script
+  [PASS] demo: summarizeDemo total matches the script size
+  [PASS] demo: summarizeDemo byKind exact (3 edits, 1 ray, 1 chunk, 1 locomotion, 1 frame)
+  [PASS] demo: summarizeDemo bySource exact (Local 3, McpPilot 3, Script 1)
+  [PASS] demo: summarizeDemo tick span exact (100..125)
+  [PASS] demo: demoEventsInTickRange interior range returns exactly its events (seq 1..4)
+  [PASS] demo: demoEventsInTickRange outside all ticks returns empty
+== demo proofs: recorded SimThread session, non-perturbation, replay (2048 ticks)
+  recorded (legacy): hash=cb32c824f8b3ea98 applied=6 eventsRecorded=6
+  [PASS] demo-proof: recorded session stepped all 2048 ticks and stopped cleanly
+  [PASS] demo-proof: recorder finished and captured every scripted event
+  [FAIL] demo-proof: recorded hash matches the control crew's scripted hash 5041cf1795c33a8c
+  [PASS] demo-proof: recorded session applied every event exactly once, none dropped/misordered
+  [PASS] demo-proof: the recorded bytes parse complete with the session hash in the trailer
+  [PASS] demo-proof: recorder saved ./demo_record_proof.lldemo
+  no recorder (legacy): hash=cb32c824f8b3ea98 applied=6
+  [PASS] demo-proof: non-perturbation — no-recorder hash is identical to the recorded hash
+  [PASS] demo-proof: DemoPlayer loads the saved record (complete, trailer hash matches)
+  replay (legacy): hash=cb32c824f8b3ea98 applied=6 dropped=0 violations=0
+  [PASS] demo-proof: legacy replay reproduces the recorded world bit-identically
+  [PASS] demo-proof: replay applied every event exactly once (dropped == 0, orderViolations == 0)
+[14:24:18.105] WARN timing-handshake: component 'signal.components' (id 1) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[14:24:20.100] WARN timing-handshake: component 'signal.flip_torches' (id 0) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+  replay (handshake, 2 workers): hash=cb32c824f8b3ea98 applied=6
+  [PASS] demo-proof: handshake replay (2 workers) is bit-identical to the recorded legacy session
+  [PASS] demo-proof: recorded hash differs from the no-input baseline 2a2d19a416a1826e
+DEMO TESTS: FAILED

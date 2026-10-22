@@ -1,16 +1,35 @@
-﻿# CLAIMS.md
-One owner per folder. Check this before editing; claim before you start, release when you finish.
-Edit this file in its own small commit: "claim: <folder> - <who>" / "release: <folder> - <who>".
+# CLAIMS.md — Wet Wafer Works source claims board
 
-| Folder | Owner | Current claim (who / what / since EDT) | Notes |
+One board for the whole company. Its whole job: nobody steps on anybody's toes, and everybody can always read everything.
+
+## The rules
+
+1. **Reading is free.** Anyone on the company network may read and analyze any source at any time, no claim needed, no permission needed. Analysis, notes, and reviews never need a claim.
+2. **Claim before you edit.** Before changing a file or area, add a row below: what you're taking, your name, the date/time (EDT), your branch, and one line on what you're doing. First claim holds the edit pen for that file.
+3. **One pen per file.** If a file is claimed, don't edit it — read it, review it, talk to the claimant, or take a different file. Two pens on one file is how toes get stepped on.
+4. **Release when you're done.** When your change lands (or you set the work down), mark your row Released with the date. A claim is a courtesy, not a fence — if a claim sits idle, ask the claimant before assuming it's free. Lessons, not punishments, if wires cross.
+5. **The board lives at the repo root.** Update it in the same commit (or a small follow-up commit) as the work it describes. The registrar (Elfie) tidies the board and keeps the history honest; the claims themselves belong to the claimants.
+6. **Big or shared areas** (build files, the CEF layer, anything under `host/`, release packaging): claim the area, say the word at the podium, and give the table a chance to speak before the edit lands.
+
+## Standing lanes (not claims — the map of who usually swims where)
+
+| Area | Lane |
+|---|---|
+| Windows build, repo order | Cortana |
+| Mobile build, web interface (thin layer / `wasm/`) | Elfie |
+| Architecture, locks, final say | JD |
+| Hints & spot review | Archie (Argon) |
+| Art & textures | CloudAtlas |
+| Optimization review | Jenny (Gemini) |
+
+## Active claims
+
+| File / area | Claimed by | Since (EDT) | Branch | Doing | Status |
+|---|---|---|---|---|---|
+| _(none yet — the board opens with the company network)_ | | | | | |
+
+## Released claims
+
+| File / area | Claimed by | Released (EDT) | What landed |
 |---|---|---|---|
-| LithoLattice-Engine/ | Elfie | - | Empty until Elfie's handoff lands |
-| LithoCEF-Hardware/ | Elfie (with JD) | - | Hardware CEF translation layer; contents TBD by JD |
-| LithoKraft-Game/ | Elfie / JD | - | |
-| PersonalControlHarness/ | Cortana (with RC/Archie) | - | Analysis-only until JD says go |
-| Redstone-Trace-Translation/ | JD | - | Started from bedrockLayers (Advanced-Structure-Inspector copy, own git, branch dev) |
-| Assets/ | CloudAtlas | CloudAtlas / copying art bundles / 2026-10-22 4:12 AM | lithokraft/, litholattice/, wetwaferworks/ |
-| WetWaferWorks-Inc/ | JD (Herominde: lore bible) | - | Company docs, legal drafts |
-| repo order, Windows builds, CLAIMS.md, GROUND-RULES.md | Cortana | - | Per Elfie's versioning rules |
-
-JD has final say on any claim and breaks ties.
+| _(none yet)_ | | | |

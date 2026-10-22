@@ -1,0 +1,36 @@
+{
+ "tag": "base-top-gl-r20-a",
+ "mode": "top",
+ "url": "http://127.0.0.1:8902/benchgl.html?bench=1&bsecs=40&bpath=still&radius=20",
+ "wallS": 53.7,
+ "benchLine": "bench renderer=OpenGL 3.3 core present=swap-interval-0 path=still seconds=40 frames=17 rthreads=2 avg=1471.187ms p50=90.180ms p99=8517.415ms max=8517.415ms input=4.109 update=39.801 upload=1108.141 render=319.107 present=0.003 ms upload=1770481 B/frame tick=1.551/2.904ms gen=0.0 cols/s (0.00/0.00ms) mesh=0.0 subs/s (0.000/0.000ms) ram=0.0->0.0 MB (peak 0.0)",
+ "raf": {
+  "n": 263,
+  "median": 16.67,
+  "p95": 1299.94,
+  "p99": 4316.49,
+  "max": 8716.32,
+  "mean": 199.22,
+  "fracOver25": 0.255,
+  "fracOver40": 0.221
+ },
+ "iso": {
+  "crossOriginIsolated": true,
+  "sab": "function"
+ },
+ "consoleIssues": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)"
+ ],
+ "parsed": {
+  "frames": 17,
+  "avg": 1471.187,
+  "p50": 90.18,
+  "p99": 8517.415,
+  "max": 8517.415,
+  "input": 4.109,
+  "update": 39.801,
+  "upload": 1108.141,
+  "render": 319.107,
+  "present": 0.003
+ }
+}

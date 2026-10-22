@@ -1,0 +1,19 @@
+opening http://127.0.0.1:8931/index.html?touch=1&debuginput=1
+PASS boot: backend live
+PASS overlay present (?touch=1) — {"flag":true,"dom":true,"joy":true,"enter":true}
+PASS menu reached
+PASS ENTER button: KeyDown Enter echo
+PASS ENTER button: menu -> play
+PASS no pointer lock in play (WebView condition) — free
+PASS joystick up: KeyDown W echo
+PASS joystick release: KeyUp W echo
+PASS look drag: MouseMove +dx echoes
+PASS BREAK hold: MouseDown Left echo
+PASS BREAK release: MouseUp Left echo
+PASS PLACE hold: MouseDown Right echo
+PASS PLACE release: MouseUp Right echo
+PASS JUMP hold: KeyDown Space echo
+PASS ESC tap: KeyDown Escape echo
+PASS no page errors
+PROBE RESULT: ALL PASS
+probe exit: 0

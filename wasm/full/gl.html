@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LithoKraft — Full Test (GL / WebGL2 path)</title>
+<style>
+  body { background:#0A0A12; color:#E8E4F8; font-family: system-ui, sans-serif;
+         display:flex; flex-direction:column; align-items:center; padding:24px; margin:0; }
+  h1 { color:#A970FF; font-size:20px; margin:0 0 4px; }
+  p.sub { color:#9a93b8; margin:0 0 12px; font-size:13px; max-width:900px; text-align:center; }
+  .ab { font:13px ui-monospace, monospace; margin-bottom:12px; }
+  .ab a { color:#A970FF; } .ab b { color:#FF6F00; }
+  #wrap { position:relative; width:960px; height:540px; }
+  canvas { width:960px; height:540px; background:#000; outline:none;
+           border:1px solid #2c2748; border-radius:6px; }
+  #grab { position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
+          background:rgba(13,13,24,.88); border:1px solid #A970FF; color:#E8E4F8;
+          border-radius:6px; padding:7px 14px; font:13px ui-monospace, monospace;
+          pointer-events:none; white-space:nowrap; }
+  #grab.hide { display:none; }
+  #status { margin-top:12px; font:13px ui-monospace, monospace; color:#FF6F00; }
+  #stats { margin-top:10px; border-collapse:collapse; font:12px ui-monospace, monospace;
+           color:#b9b3d6; background:#0d0d18; border:1px solid #2c2748; border-radius:6px; }
+  #stats td { padding:4px 12px; border-bottom:1px solid #1c1830; }
+  #stats tr:last-child td { border-bottom:none; }
+  #stats td.k { color:#9a93b8; } #stats td.v { color:#E8E4F8; text-align:right; }
+  #log { margin-top:8px; width:960px; max-height:260px; overflow:auto; white-space:pre-wrap;
+         font:11px ui-monospace, monospace; color:#b9b3d6; background:#0d0d18;
+         border:1px solid #2c2748; border-radius:6px; padding:8px; box-sizing:border-box; }
+  #logbar { margin-top:6px; width:960px; display:flex; align-items:center; gap:10px; }
+  #lk-copylog { background:#171430; color:#E8E4F8; border:1px solid #A970FF; border-radius:6px;
+         padding:6px 14px; font:12px ui-monospace, monospace; cursor:pointer; }
+  #lk-copylog:active { background:#2a2160; }
+  #lk-copied { font:12px ui-monospace, monospace; color:#8be28b; }
+  #errslot { display:none; position:sticky; top:6px; z-index:40; margin-top:8px; width:960px;
+         box-sizing:border-box; font:12px ui-monospace, monospace; color:#ffd9d0;
+         background:#3a0f08; border:1px solid #FF6F00; border-radius:6px; padding:8px;
+         white-space:pre-wrap; cursor:pointer; }
+</style>
+</head>
+<body>
+<h1>LITHOKRAFT &mdash; FULL TEST</h1>
+<p class="sub">The full engine + game in WebAssembly, booting the
+<b>GL33 renderer on WebGL2</b> (shaders: the pack carries GLSL ES 3.00
+translations; chunk meshes run with <code>--gl-arena off</code> because
+WebGL2 has no base-vertex draw &mdash; same meshes and pixels, per-mesh VAOs
+instead of one arena) &mdash; and it is playable: click the game, press
+<b>Enter</b> on the launch menu (Play), then click again to grab the mouse
+(Esc releases). WASD moves, Space jumps, F3 toggles the live tick overlay.
+Same build, same world seed as the software page.
+Add <code>?bench=1</code> to the URL for the original 4-second bench boot,
+<code>?debuginput=1</code> to echo every input event into the log below.
+Pacing switches: <code>?radius=N</code> (chunk stream radius, default 16)
+and <code>?aa=on</code> / <code>?aa=4</code> (multisampled framebuffer,
+default off) &mdash; combine freely, e.g. <code>gl.html?radius=16&amp;aa=on</code>.
+On touch devices, basic on-screen controls (move stick, look-drag,
+buttons) appear automatically &mdash; force with <code>?touch=1</code>,
+hide with <code>?touch=0</code>. Play does not start by itself: the launch menu waits for <b>Enter</b> / a click on Play &mdash; on touch devices, the <b>ENTER</b> button at the top right. The <b>Copy log</b> button under the log copies the whole log for pasting.</p>
+<div class="ab">A/B present path: <a href="index.html">&larr; SOFTWARE</a> &nbsp;|&nbsp; <b>GL (WebGL2)</b></div>
+<div id="wrap">
+  <canvas id="canvas" width="1280" height="720" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+  <div id="grab">Click the game &mdash; Enter starts play &mdash; click again to grab the mouse (Esc releases)</div>
+</div>
+<div id="status">booting&hellip;</div>
+<table id="stats">
+  <tr><td class="k">game release</td><td class="v" id="st-release">&hellip;</td>
+      <td class="k">engine build counter</td><td class="v" id="st-counter">&hellip;</td></tr>
+  <tr><td class="k">renderer</td><td class="v" id="st-renderer">&hellip;</td>
+      <td class="k">world seed</td><td class="v">20261019</td></tr>
+  <tr><td class="k">mode</td><td class="v" id="st-mode">&hellip;</td>
+      <td class="k">page cadence (rAF)</td><td class="v" id="st-fps">&hellip;</td></tr>
+  <tr><td class="k">input</td><td class="v" id="st-input">click the game canvas</td>
+      <td class="k">pointer lock</td><td class="v" id="st-lock">free</td></tr>
+  <tr id="row-bench" style="display:none"><td class="k">bench frame avg / p50 / p99 / max</td><td class="v" id="st-bench">&hellip;</td>
+      <td class="k">sim tick avg / p99</td><td class="v" id="st-tick">&hellip;</td></tr>
+</table>
+<div id="errslot" title="click to dismiss"></div>
+<div id="log"></div>
+<div id="logbar"><button id="lk-copylog" type="button">Copy log</button><span id="lk-copied" role="status"></span></div>
+<script>
+  // Module (with print + boot arguments) is defined BEFORE lkboot.js
+  // loads — the thin loader reads its callbacks at boot, so a Module
+  // assigned afterwards races it (web-spike lesson #8).
+  const params = new URLSearchParams(location.search);
+  const BENCH = params.has('bench');
+  const DEBUGINPUT = params.has('debuginput');
+  // Pacing pass (2026-10-19): ?radius=N overrides the chunk stream radius
+  // (default 20, JD's ruling). Build 79 (2026-10-21): default aligned to
+  // JD's floor — render radius 16 / sim radius 8 (2026-10-17) — after the
+  // build-78 device flicker was traced to the radius-20 fill never
+  // settling on modest hardware. ?radius=N still overrides; 20 remains
+  // one flag away (owner's hardware, owner's choice); ?aa=on|4 requests a multisampled WebGL
+  // framebuffer (default off — the binary reads the URL itself at context
+  // creation; the page mirrors both here for the args + stats panel).
+  const RAD = (() => { const n = parseInt(params.get('radius') || '16', 10); return (n >= 4 && n <= 32) ? String(n) : '16'; })();
+  const AA = params.get('aa') || 'off';
+  if (DEBUGINPUT) window.LK_DEBUG_INPUT = 1;
+  // ---- ?diag=1 instrumentation (black-screen diagnosis, 2026-10-20) ----
+  // Default OFF; desktop behavior unchanged. When on (URL param, or the
+  // localStorage flag a previous diag load set — so the A/B page hop in
+  // the shell keeps diag), the page records: whether the canvas ->
+  // OffscreenCanvas transfer is attempted / succeeds / throws (kept as
+  // a canary: in the CURRENT thin-layer build the canvas is NEVER
+  // transferred — the page owns it, the engine runs on a main worker,
+  // GL arrives via the shared-memory command stream — so the transfer
+  // counters stay 0 by design and a nonzero value would itself be
+  // news); whether this browser can render WebGL2 into an
+  // OffscreenCanvas at all; and a periodic ticker of engine-log
+  // milestones. A small self-test canvas is appended: left half = plain
+  // 2D fill (page compositing sanity), right half = ImageBitmap drawn
+  // FROM an OffscreenCanvas WebGL render (the OC render+transfer path).
+  const DIAG = params.has('diag') || (() => { try { return localStorage.getItem('lk-diag') === '1'; } catch (e) { return false; } })();
+  if (params.has('diag')) { try { localStorage.setItem('lk-diag', '1'); } catch (e) {} }
+  const lkDiag = { transferAttempts: 0, transferOk: 0, transferErr: '(none)',
+                   offscreenType: typeof OffscreenCanvas,
+                   ocWebgl2: 'untested', mainWebgl2: 'untested',
+                   live: 0, presentLine: 0, menu: 0, perfLines: 0, lastPerf: '',
+                   t0: performance.now() };
+  window.__lkDiag = lkDiag;
+  if (DIAG) {
+    const origTransfer = HTMLCanvasElement.prototype.transferControlToOffscreen;
+    lkDiag.transferType = typeof origTransfer;
+    HTMLCanvasElement.prototype.transferControlToOffscreen = function () {
+      lkDiag.transferAttempts++;
+      try {
+        const r = origTransfer.apply(this, arguments);
+        lkDiag.transferOk++;
+        return r;
+      } catch (e) {
+        lkDiag.transferErr = e.name + ': ' + e.message;
+        throw e;
+      }
+    };
+  }
+  function diagObserve(s) {
+    if (s.includes('backend live')) lkDiag.live = 1;
+    if (s.includes('web present:')) lkDiag.presentLine = 1;
+    if (s.includes('menu: launch menu')) lkDiag.menu = 1;
+    if (s.includes('perf ')) { lkDiag.perfLines++; lkDiag.lastPerf = s.trim().slice(0, 110); }
+  }
+  function diagProbes() {
+    try {
+      const c = document.createElement('canvas');
+      lkDiag.mainWebgl2 = c.getContext('webgl2') ? 'ok' : 'no-context';
+    } catch (e) { lkDiag.mainWebgl2 = 'throw: ' + e.message; }
+    try {
+      const oc = new OffscreenCanvas(64, 64);
+      const gl = oc.getContext('webgl2');
+      if (!gl) { lkDiag.ocWebgl2 = 'no-context'; return; }
+      gl.clearColor(1, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      const px = new Uint8Array(4);
+      gl.readPixels(32, 32, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      lkDiag.ocWebgl2 = 'px=' + Array.from(px).join(',');
+      // Self-test: show 2D fill (left) vs OC-WebGL bitmap (right).
+      const t = document.createElement('canvas'); t.width = 128; t.height = 64;
+      t.style.cssText = 'display:block;margin-top:8px;border:1px solid #A970FF;';
+      t.id = 'lk-diag-test';
+      const g = t.getContext('2d');
+      g.fillStyle = '#FF00FF'; g.fillRect(0, 0, 64, 64);
+      document.body.appendChild(t);
+      if (typeof createImageBitmap === 'function') {
+        createImageBitmap(oc).then((bmp) => { g.drawImage(bmp, 64, 0); lkDiag.ocBitmap = 'drawn'; })
+          .catch((e) => { lkDiag.ocBitmap = 'throw: ' + e.message; });
+      } else lkDiag.ocBitmap = 'no createImageBitmap';
+    } catch (e) { lkDiag.ocWebgl2 = 'throw: ' + e.message; }
+  }
+  function diagStart() {
+    if (!DIAG) return;
+    toLog('[diag] ON — ua: ' + navigator.userAgent);
+    toLog('[diag] OffscreenCanvas type: ' + lkDiag.offscreenType + '; transferControlToOffscreen type: ' + lkDiag.transferType);
+    setTimeout(diagProbes, 2500);
+    setInterval(() => {
+      const t = ((performance.now() - lkDiag.t0) / 1000).toFixed(0);
+      const cv = document.getElementById('canvas');
+      toLog('[diag] t=' + t + 's transfer: attempts=' + lkDiag.transferAttempts + ' ok=' + lkDiag.transferOk +
+            ' err=' + lkDiag.transferErr +
+            ' | engine: live=' + lkDiag.live + ' presentLine=' + lkDiag.presentLine + ' menu=' + lkDiag.menu +
+            ' perfLines=' + lkDiag.perfLines +
+            ' | ocWebgl2=' + lkDiag.ocWebgl2 + ' mainWebgl2=' + lkDiag.mainWebgl2 +
+            ' ocBitmap=' + (lkDiag.ocBitmap || 'pending') +
+            ' | canvas backing=' + (cv ? cv.width + 'x' + cv.height : '?') +
+            ' vis=' + document.visibilityState);
+      if (lkDiag.lastPerf) toLog('[diag] last perf: ' + lkDiag.lastPerf);
+    }, 4000);
+  }
+  const logEl = document.getElementById('log');
+  const statusEl = document.getElementById('status');
+  const $ = (id) => document.getElementById(id);
+  const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
+  function setStat(id, v) { const el = $(id); if (el && v) el.textContent = v; }
+  function scrape(s) {
+    s = stripAnsi(s);
+    let m;
+    if ((m = s.match(/LithoKraft Alpha ([0-9.]+) \(nogit\) (\w+) built ([^|]+)/)))
+      setStat('st-release', 'Alpha ' + m[1] + ' ' + m[2] + ', built ' + m[3].trim());
+    if ((m = s.match(/rolling build counter: ([0-9.]+)/)))
+      setStat('st-counter', m[1]);
+    if ((m = s.match(/\] renderer: (.+)$/)) || (m = s.match(/^renderer: (.+)$/)))
+      setStat('st-renderer', m[1].trim());
+    if ((m = s.match(/bench renderer=\S+ present=\S+ path=\S+ seconds=\d+ frames=(\d+) rthreads=\d+ avg=([\d.]+)ms p50=([\d.]+)ms p99=([\d.]+)ms max=([\d.]+)ms .*tick=([\d.]+)\/([\d.]+)ms/))) {
+      $('row-bench').style.display = '';
+      setStat('st-bench', m[2] + ' / ' + m[3] + ' / ' + m[4] + ' / ' + m[5] + ' ms (' + m[1] + ' frames)');
+      setStat('st-tick', m[6] + ' / ' + m[7] + ' ms');
+    }
+    if (s.includes('menu: play')) { setStat('st-input', 'in game'); statusEl.textContent = 'playing — click the game to grab the mouse'; }
+    if (s.includes('input: pointer lock engaged')) setStat('st-lock', 'engaged');
+    if (s.includes('input: pointer lock released')) setStat('st-lock', 'free');
+    if (s.includes('input: pointer lock refused')) setStat('st-lock', 'refused — drag-look fallback active');
+  }
+  // Console scroll rule (JD's field report, 2026-10-20): follow the
+  // tail ONLY while the view is at (or within a few px of) the bottom;
+  // once the reader scrolls up, new lines must not move the view —
+  // an exception you are trying to read must stay readable. Returning
+  // to the bottom re-engages follow.
+  let logFollow = true;
+  logEl.addEventListener('scroll', () => {
+    logFollow = (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight) < 24;
+  });
+  const errSlot = document.getElementById('errslot');
+  if (errSlot) errSlot.addEventListener('click', () => { errSlot.style.display = 'none'; });
+  function toLog(s) {
+    const stick = logFollow;
+    logEl.textContent += s + '\n';
+    if (stick) logEl.scrollTop = logEl.scrollHeight;
+    // Layer failures (boot failure, main-worker death, GL stream
+    // errors) are ALSO pinned in the sticky error slot above the log,
+    // so ticker traffic can never scroll them out of view.
+    if (errSlot && s.startsWith('ERR:') && s.includes('lkboot:')) {
+      errSlot.textContent = s;
+      errSlot.style.display = 'block';
+    }
+    if (DIAG) diagObserve(s);
+    scrape(s);
+  }
+  // Build 80 (JD's spec: "it should just be a copy and paste"): one tap
+  // copies the FULL page log to the clipboard, ready to paste into a
+  // report or a chat. Clipboard API first (secure contexts, incl. the
+  // shell's loopback HTTPS); fallback: a temporary textarea +
+  // execCommand('copy') where the async API is denied.
+  const copyBtn = document.getElementById('lk-copylog');
+  const copiedEl = document.getElementById('lk-copied');
+  if (copyBtn) copyBtn.addEventListener('click', async () => {
+    const text = logEl.textContent;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch (e) { ok = false; }
+    }
+    copiedEl.textContent = ok ? ('Log copied \u2014 ' + text.length + ' characters')
+                              : 'Copy failed \u2014 long-press the log to select it manually';
+    setTimeout(() => { copiedEl.textContent = ''; }, 6000);
+  });
+  $('st-mode').textContent = (BENCH ? 'bench (4 s orbit, self-closing)' : 'interactive play') + ' · radius ' + RAD + ' · aa ' + AA;
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    arguments: BENCH
+      ? ['--renderer', 'gl33', '--gl-arena', 'off',
+         '--bench', '4', '--bench-path', 'orbit',
+         '--seed', '20261019', '--stream-radius', RAD,
+         '--scripts', 'exe', '--mute',
+         '--ui-shot', '/ui-gl.png',
+         '--bench-json', '/bench-gl.json']
+      : ['--renderer', 'gl33', '--gl-arena', 'off',
+         '--seed', '20261019', '--stream-radius', RAD,
+         '--scripts', 'exe', '--mute'],
+    print: (s) => toLog(s),
+    printErr: (s) => toLog('ERR: ' + s),
+    onExit: (code) => { statusEl.textContent = 'run finished (exit ' + code + ') — bench summary in the log above'; },
+    setStatus: (s) => { if (s) statusEl.textContent = s; },
+  };
+  // Verification switches (thin-layer rip-out, 2026-10-20): run the
+  // engine's own gates in-page instead of booting the game.
+  if (params.has('selftest')) Module.arguments = ['--selftest'];
+  if (params.has('demotest')) Module.arguments = ['--demo-test', '--cities', params.get('demotest') === 'off' ? 'off' : 'on'];
+  window.addEventListener('error', (e) => { statusEl.textContent = 'error: ' + e.message; });
+
+  // Page-side input plumbing: focus the canvas on any press (keyboard then
+  // belongs to this frame), mirror pointer-lock state, and — with
+  // ?debuginput=1 — echo what the PAGE observed, a separate layer from the
+  // backend's own "input>" echoes, so a missing event can be bisected.
+  const canvas = Module.canvas;
+  canvas.addEventListener('pointerdown', () => { canvas.focus(); setStat('st-input', 'canvas focused'); });
+  document.addEventListener('pointerlockchange', () => {
+    const locked = document.pointerLockElement === canvas;
+    setStat('st-lock', locked ? 'engaged' : 'free');
+    $('grab').classList.toggle('hide', locked);
+  });
+  if (DEBUGINPUT) {
+    document.addEventListener('keydown', (e) => toLog('[page] keydown ' + e.code));
+    canvas.addEventListener('mousedown', (e) => toLog('[page] mousedown button ' + e.button));
+  }
+  // Page presentation cadence (requestAnimationFrame rate of this tab —
+  // a page-level number, not the game's internal frame rate).
+  let rafCount = 0, rafT = performance.now();
+  (function rafLoop(ts) {
+    rafCount++;
+    if (ts - rafT >= 1000) { setStat('st-fps', Math.round(rafCount * 1000 / (ts - rafT)) + ' fps'); rafCount = 0; rafT = ts; }
+    requestAnimationFrame(rafLoop);
+  })(performance.now());
+  diagStart();
+</script>
+<script src="lkasm.js"></script>
+<script src="lkboot.js"></script>
+<script src="touch.js"></script>
+<script>
+  // Build 80: on touch pages, say how play starts where the player is
+  // looking: the launch menu waits for the on-screen ENTER button (top
+  // right). It does not start by itself.
+  if (window.LK_TOUCH_UI) {
+    document.getElementById('grab').textContent =
+      'Tap ENTER (top right) to start play \u2014 drag right side to look, stick to move';
+  }
+</script>
+</body>
+</html>

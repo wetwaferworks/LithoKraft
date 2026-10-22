@@ -1,0 +1,8 @@
+opening http://127.0.0.1:8933/index.html variant base
+backend live: true 1.6s
+web present line: true
+menu: true 5.6s
+perf lines: true
+capability: {"ua":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/155 Mobile Safari/537.36 LithoBlackProbe","offscreenType":"function","transferType":"function","ocWebgl2":"px=255,0,255,255","mainWebgl2":"ok"}
+LUMINANCE: {"meanLum":92.71,"pctBright":84.01,"w":962,"h":542}
+VERDICT {"page":"index.html","variant":"base","backendLive":true,"webPresentLine":true,"menu":true,"perfLines":true,"marks":{"backend live":"1.6s","web present:":"5.6s","menu: launch menu":"5.6s","perf ":"6.7s"},"cap":{"ua":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/155 Mobile Safari/537.36 LithoBlackProbe","offscreenType":"function","transferType":"function","ocWebgl2":"px=255,0,255,255","mainWebgl2":"ok"},"lum":{"meanLum":92.71,"pctBright":84.01,"w":962,"h":542}}

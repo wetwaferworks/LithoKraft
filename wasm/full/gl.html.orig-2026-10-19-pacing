@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LithoKraft — Full Test (GL / WebGL2 path)</title>
+<style>
+  body { background:#0A0A12; color:#E8E4F8; font-family: system-ui, sans-serif;
+         display:flex; flex-direction:column; align-items:center; padding:24px; margin:0; }
+  h1 { color:#A970FF; font-size:20px; margin:0 0 4px; }
+  p.sub { color:#9a93b8; margin:0 0 12px; font-size:13px; max-width:900px; text-align:center; }
+  .ab { font:13px ui-monospace, monospace; margin-bottom:12px; }
+  .ab a { color:#A970FF; } .ab b { color:#FF6F00; }
+  #wrap { position:relative; width:960px; height:540px; }
+  canvas { width:960px; height:540px; background:#000; outline:none;
+           border:1px solid #2c2748; border-radius:6px; }
+  #grab { position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
+          background:rgba(13,13,24,.88); border:1px solid #A970FF; color:#E8E4F8;
+          border-radius:6px; padding:7px 14px; font:13px ui-monospace, monospace;
+          pointer-events:none; white-space:nowrap; }
+  #grab.hide { display:none; }
+  #status { margin-top:12px; font:13px ui-monospace, monospace; color:#FF6F00; }
+  #stats { margin-top:10px; border-collapse:collapse; font:12px ui-monospace, monospace;
+           color:#b9b3d6; background:#0d0d18; border:1px solid #2c2748; border-radius:6px; }
+  #stats td { padding:4px 12px; border-bottom:1px solid #1c1830; }
+  #stats tr:last-child td { border-bottom:none; }
+  #stats td.k { color:#9a93b8; } #stats td.v { color:#E8E4F8; text-align:right; }
+  #log { margin-top:8px; width:960px; max-height:260px; overflow:auto; white-space:pre-wrap;
+         font:11px ui-monospace, monospace; color:#b9b3d6; background:#0d0d18;
+         border:1px solid #2c2748; border-radius:6px; padding:8px; box-sizing:border-box; }
+</style>
+</head>
+<body>
+<h1>LITHOKRAFT &mdash; FULL TEST</h1>
+<p class="sub">The full engine + game in WebAssembly, booting the
+<b>GL33 renderer on WebGL2</b> (shaders: the pack carries GLSL ES 3.00
+translations; chunk meshes run with <code>--gl-arena off</code> because
+WebGL2 has no base-vertex draw &mdash; same meshes and pixels, per-mesh VAOs
+instead of one arena) &mdash; and it is playable: click the game, press
+<b>Enter</b> on the launch menu (Play), then click again to grab the mouse
+(Esc releases). WASD moves, Space jumps, F3 toggles the live tick overlay.
+Same build, same world seed as the software page.
+Add <code>?bench=1</code> to the URL for the original 4-second bench boot,
+<code>?debuginput=1</code> to echo every input event into the log below.</p>
+<div class="ab">A/B present path: <a href="index.html">&larr; SOFTWARE</a> &nbsp;|&nbsp; <b>GL (WebGL2)</b></div>
+<div id="wrap">
+  <canvas id="canvas" width="1280" height="720" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+  <div id="grab">Click the game &mdash; Enter starts play &mdash; click again to grab the mouse (Esc releases)</div>
+</div>
+<div id="status">booting&hellip;</div>
+<table id="stats">
+  <tr><td class="k">game release</td><td class="v" id="st-release">&hellip;</td>
+      <td class="k">engine build counter</td><td class="v" id="st-counter">&hellip;</td></tr>
+  <tr><td class="k">renderer</td><td class="v" id="st-renderer">&hellip;</td>
+      <td class="k">world seed</td><td class="v">20261019</td></tr>
+  <tr><td class="k">mode</td><td class="v" id="st-mode">&hellip;</td>
+      <td class="k">page cadence (rAF)</td><td class="v" id="st-fps">&hellip;</td></tr>
+  <tr><td class="k">input</td><td class="v" id="st-input">click the game canvas</td>
+      <td class="k">pointer lock</td><td class="v" id="st-lock">free</td></tr>
+  <tr id="row-bench" style="display:none"><td class="k">bench frame avg / p50 / p99 / max</td><td class="v" id="st-bench">&hellip;</td>
+      <td class="k">sim tick avg / p99</td><td class="v" id="st-tick">&hellip;</td></tr>
+</table>
+<div id="log"></div>
+<script>
+  // Module (with print + boot arguments) is defined BEFORE LithoKraft.js
+  // loads — the runtime reads its callbacks at init completion, so a
+  // Module assigned afterwards races the runtime (web-spike lesson #8).
+  const params = new URLSearchParams(location.search);
+  const BENCH = params.has('bench');
+  const DEBUGINPUT = params.has('debuginput');
+  if (DEBUGINPUT) window.LK_DEBUG_INPUT = 1;
+  const logEl = document.getElementById('log');
+  const statusEl = document.getElementById('status');
+  const $ = (id) => document.getElementById(id);
+  const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
+  function setStat(id, v) { const el = $(id); if (el && v) el.textContent = v; }
+  function scrape(s) {
+    s = stripAnsi(s);
+    let m;
+    if ((m = s.match(/LithoKraft Alpha ([0-9.]+) \(nogit\) (\w+) built ([^|]+)/)))
+      setStat('st-release', 'Alpha ' + m[1] + ' ' + m[2] + ', built ' + m[3].trim());
+    if ((m = s.match(/rolling build counter: ([0-9.]+)/)))
+      setStat('st-counter', m[1]);
+    if ((m = s.match(/\] renderer: (.+)$/)) || (m = s.match(/^renderer: (.+)$/)))
+      setStat('st-renderer', m[1].trim());
+    if ((m = s.match(/bench renderer=\S+ present=\S+ path=\S+ seconds=\d+ frames=(\d+) rthreads=\d+ avg=([\d.]+)ms p50=([\d.]+)ms p99=([\d.]+)ms max=([\d.]+)ms .*tick=([\d.]+)\/([\d.]+)ms/))) {
+      $('row-bench').style.display = '';
+      setStat('st-bench', m[2] + ' / ' + m[3] + ' / ' + m[4] + ' / ' + m[5] + ' ms (' + m[1] + ' frames)');
+      setStat('st-tick', m[6] + ' / ' + m[7] + ' ms');
+    }
+    if (s.includes('menu: play')) { setStat('st-input', 'in game'); statusEl.textContent = 'playing — click the game to grab the mouse'; }
+    if (s.includes('input: pointer lock engaged')) setStat('st-lock', 'engaged');
+    if (s.includes('input: pointer lock released')) setStat('st-lock', 'free');
+    if (s.includes('input: pointer lock refused')) setStat('st-lock', 'refused — drag-look fallback active');
+  }
+  function toLog(s) { logEl.textContent += s + '\n'; logEl.scrollTop = logEl.scrollHeight; scrape(s); }
+  $('st-mode').textContent = BENCH ? 'bench (4 s orbit, self-closing)' : 'interactive play';
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    arguments: BENCH
+      ? ['--renderer', 'gl33', '--gl-arena', 'off',
+         '--bench', '4', '--bench-path', 'orbit',
+         '--seed', '20261019', '--stream-radius', '20',
+         '--scripts', 'exe', '--mute',
+         '--ui-shot', '/ui-gl.png',
+         '--bench-json', '/bench-gl.json']
+      : ['--renderer', 'gl33', '--gl-arena', 'off',
+         '--seed', '20261019', '--stream-radius', '20',
+         '--scripts', 'exe', '--mute'],
+    print: (s) => toLog(s),
+    printErr: (s) => toLog('ERR: ' + s),
+    onExit: (code) => { statusEl.textContent = 'run finished (exit ' + code + ') — bench summary in the log above'; },
+    setStatus: (s) => { if (s) statusEl.textContent = s; },
+  };
+  window.addEventListener('error', (e) => { statusEl.textContent = 'error: ' + e.message; });
+
+  // Page-side input plumbing: focus the canvas on any press (keyboard then
+  // belongs to this frame), mirror pointer-lock state, and — with
+  // ?debuginput=1 — echo what the PAGE observed, a separate layer from the
+  // backend's own "input>" echoes, so a missing event can be bisected.
+  const canvas = Module.canvas;
+  canvas.addEventListener('pointerdown', () => { canvas.focus(); setStat('st-input', 'canvas focused'); });
+  document.addEventListener('pointerlockchange', () => {
+    const locked = document.pointerLockElement === canvas;
+    setStat('st-lock', locked ? 'engaged' : 'free');
+    $('grab').classList.toggle('hide', locked);
+  });
+  if (DEBUGINPUT) {
+    document.addEventListener('keydown', (e) => toLog('[page] keydown ' + e.code));
+    canvas.addEventListener('mousedown', (e) => toLog('[page] mousedown button ' + e.button));
+  }
+  // Page presentation cadence (requestAnimationFrame rate of this tab —
+  // a page-level number, not the game's internal frame rate).
+  let rafCount = 0, rafT = performance.now();
+  (function rafLoop(ts) {
+    rafCount++;
+    if (ts - rafT >= 1000) { setStat('st-fps', Math.round(rafCount * 1000 / (ts - rafT)) + ' fps'); rafCount = 0; rafT = ts; }
+    requestAnimationFrame(rafLoop);
+  })(performance.now());
+</script>
+<script src="LithoKraft.js"></script>
+</body>
+</html>

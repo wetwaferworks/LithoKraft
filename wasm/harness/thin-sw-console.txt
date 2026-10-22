@@ -1,0 +1,59 @@
+error: Failed to load resource: the server responded with a status of 404 (File not found)
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:MAIN] worker: instantiated
+log: [lktrace:w:MAIN] worker: lk-main received ptr=896792
+log: [lktrace:w:MAIN] main worker: SP after init = 26119832 slot676312=825512 slot676308=1073157447 slot676316=825664
+log: [lktrace:w:MAIN] main worker: argv readback argc=10 argv=9336544 words=9336064,9333056,9315008,9297712,9296672,9334944,9304992,9301376,9332696,9297960,0 argv0="LithoKraft" all=["LithoKraft","--renderer","software","--seed","20261019","--stream-radius","20","--scripts","exe","--mute"] memPages=8192
+log: [lktrace:w:MAIN] main worker: entering __main_argc_argv
+log: [lktrace:w:MAIN] proxy call idx=22 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=10 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=16 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=34 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=35 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=32 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=14 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=12 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=37 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=33 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826457 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826559 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=831130 mode=1
+log: [lktrace:w:MAIN] proxy call idx=2 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=29 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826216 mode=1
+log: [lktrace:w:MAIN] webgl_create_context requested
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:P26135016] worker: instantiated
+log: [lktrace:w:P26135016] worker: lk-run routine=4111 pthread=26135016
+log: [lktrace:w:P26135016] worker: entering routine 4111
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826135 mode=1
+log: [lktrace:w:MAIN] proxy call idx=19 asm=0 mode=1
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:P55857624] worker: instantiated
+log: [lktrace:w:P55857624] worker: lk-run routine=4 pthread=55857624
+log: [lktrace:w:P55857624] worker: entering routine 4
+log: [lktrace:w:MAIN] proxy call idx=13 asm=0 mode=1
+log: [lktrace:w:P55857624] proxy call idx=16 asm=0 mode=1
+log: [lktrace:w:P55857624] proxy call idx=34 asm=0 mode=1
+log: [lktrace:w:P55857624] proxy call idx=32 asm=0 mode=1
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:P131730488] worker: instantiated
+log: [lktrace:w:P131730488] worker: lk-run routine=3944 pthread=131730488
+log: [lktrace:w:P131730488] worker: entering routine 3944
+log: [lktrace:w:MAIN] main loop registered cb=3 fps=0 simInf=1
+log: [lktrace:w:P140137760] worker: instantiated
+log: [lktrace:w:P140137760] worker: lk-run routine=3892 pthread=140137760
+log: [lktrace:w:P140137760] worker: entering routine 3892
+log: [lktrace:w:MAIN] proxy call idx=0 asm=831469 mode=1
+log: [lktrace:w:MAIN] proxy call idx=27 asm=0 mode=1
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:P161902216] worker: instantiated
+log: [lktrace:w:P161902216] worker: lk-run routine=3977 pthread=161902216
+log: [lktrace:w:P161902216] worker: entering routine 3977
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826321 mode=1
+log: [lktrace:w:P26135016] proxy call idx=37 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826360 mode=1
+log: [lktrace:w:MAIN] proxy call idx=28 asm=0 mode=1
+log: [lktrace:w:P55857624] proxy call idx=22 asm=0 mode=1
+log: [lktrace:w:P140137760] proxy call idx=37 asm=0 mode=1

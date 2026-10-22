@@ -1,0 +1,5 @@
+boot wait: TIMEOUT
+menu wait: OK
+shot: menu (same page)
+play wait: OK
+shot: play (same page)

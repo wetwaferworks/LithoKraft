@@ -1,0 +1,20 @@
+{
+  "model": "red-trace-bulb-glass-core",
+  "credit": "Proposed by JD, Built by Cortana. Art: CloudAtlas 2026-10-16.",
+  "note": "red Trace Bulb glass core: 40 = GlassRim (alpha-blended, sorted, no depth write), 41 = BulbCore (glow), 5 = Trace (glow)",
+  "materials": {
+    "40": {
+      "texture": "red_trace_bulb_ghost",
+      "shade": "alpha_blend",
+      "glow": false
+    },
+    "41": {
+      "texture": "red_trace_bulb_glass_core",
+      "shade": "emissive"
+    },
+    "5": {
+      "texture": "red_trace_cross",
+      "shade": "emissive"
+    }
+  }
+}

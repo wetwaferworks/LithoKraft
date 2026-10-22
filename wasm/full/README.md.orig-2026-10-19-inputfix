@@ -1,0 +1,52 @@
+# LithoKraft — Full Test Build (WASM, 2026-10-19)
+
+The full LithoLattice engine + LithoKraft game, compiled to WebAssembly,
+running the real game: real worldgen (seed **20261019**), the real texture
+packs (372 textures), the real wafer world.
+
+## The two pages (the A/B)
+
+- **`index.html`** — the **software rasterizer** path (CPU renderer +
+  WebGL presenter blit).
+- **`gl.html`** — the **GL33 renderer on WebGL2** (GLSL ES 3.00 shader
+  translations; `--gl-arena off`, see below).
+
+Same build, same world seed, same bench on both pages, cross-linked at the
+top of each page. That is the point of the pair: if both paths agree, a
+fault is above the renderer; if they differ, it is inside one renderer.
+
+Each page boots the game, generates the world, runs a 4-second orbit
+benchmark, prints the bench summary into the on-page log, and exits.
+**This is a test/bench build, not free play yet** — keyboard/mouse input
+is not wired into the browser build (the boot, the world, the rendering,
+and the sim all run; you watch the bench fly the orbit).
+
+## Requirements
+
+- A browser with **WebGL2** and **SharedArrayBuffer** (the build is
+  multithreaded). On itch.io that means the project's
+  **"SharedArrayBuffer support"** option must be enabled so the game is
+  served cross-origin-isolated; locally, serve with COOP/COEP headers
+  (the tree's `wasm/serve.py` does).
+- First load downloads ~12.8 MB (JS + WASM + asset package).
+
+## Known web-path differences (all logged on the page, nothing silent)
+
+- GL path: the PBR/BinaryQuad shader uses `samplerBuffer` (GLSL ES 3.10),
+  which WebGL2 cannot compile — the PBR pass is disabled and the classic
+  chunk path renders. Everything else compiles from the pack.
+- GL path: chunk meshes use per-mesh VAOs (`--gl-arena off`) because
+  WebGL2 has no base-vertex draw; same meshes, same pixels.
+- Software path: SwiftShader-class WebGL lacks the BGRA upload extension,
+  so the presenter falls back to a CPU-swizzle RGBA upload (one log line).
+- AngelScript's `log()` binding fails to register on WASM
+  (`asNOT_SUPPORTED`); scripts otherwise load.
+
+## Files
+
+`index.html`, `gl.html`, `LithoKraft.js`, `LithoKraft.wasm`,
+`LithoKraft.data` (the asset package: engine assets with ES 3.00 shaders,
+the game's real packs/models/textures, scripts, config).
+
+Full build/wiring notes and verification evidence: `wasm/FULL-TEST-REPORT.md`
+in the source tree (not shipped in this bundle).

@@ -1,0 +1,166 @@
+[22:04:10.347] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[22:04:10.352] LithoKraft Alpha 0.0.2.58 (nogit) Release built Oct 19 2026 17:53:33
+[22:04:10.352] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m55[0m
+[22:04:10.424] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[22:04:10.424] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[22:04:10.427] input: emscripten-html5 backend live (transport: main-thread listeners + per-frame drain; debug echo off)
+[22:04:10.428] window: emscripten window 1280x720 (api gl33)
+[22:04:11.104] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[22:04:11.107] gl33: chunk meshes in one VBO + VAO per sub-chunk
+ERR: [22:04:11.217] ERROR built-in shader 'chunk_pbr' failed:
+ERR: fragment: ERROR: 0:36: 'samplerBuffer' : Illegal use of reserved word
+ERR: ERROR: 0:36: 'samplerBuffer' : syntax error
+ERR: 
+ERR: [22:04:11.224] ERROR gl33: chunk_pbr unavailable - PBR/BinaryQuad path disabled, classic path only
+[22:04:11.247] renderer: OpenGL 3.3 core | WebKit | WebKit WebGL | OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium))
+[22:04:11.310] materials: 17 materials from /assets/materials/lithokraft.materials
+[22:04:11.318] mods: game 'lithokraft' 0.1.0
+[22:04:11.328] mods: no mods/ directory — continuing with zero mods (seal decision still applies)
+[22:04:11.332] mods: registry sealed (release build (fail closed: no verified hot-swap mod))
+[22:04:13.793]   resources: worldgen/wafer.json from lithokraft
+[22:04:13.798]   resources: worldgen/organic.json from lithokraft
+[22:04:13.808]   resources: ui/theme.json from lithokraft
+[22:04:13.812] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[22:04:13.812]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[22:04:13.817]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[22:04:13.825]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[22:04:13.827]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[22:04:13.832]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[22:04:13.833]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[22:04:13.838]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[22:04:13.843]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+[22:04:14.104] shader 'chunk_pbr': not in any pack, using the built-in copy
+ERR: [22:04:14.115] ERROR built-in shader 'chunk_pbr' failed:
+ERR: fragment: ERROR: 0:36: 'samplerBuffer' : Illegal use of reserved word
+ERR: ERROR: 0:36: 'samplerBuffer' : syntax error
+ERR: 
+[22:04:14.126] shader 'sprite': not in any pack, using the built-in copy
+ERR: [22:04:14.440] ERROR gl33: chunk_pbr unavailable - PBR/BinaryQuad path disabled, classic path only
+[22:04:14.444] audio: muted (--mute)
+[22:04:14.468] input: bindings from /config/input.json
+[22:04:16.556] sim: tick area radius 8, round (dx^2+dz^2 <= r^2+r), 225 chunk columns
+[22:04:16.564] timing handshake: ON (phases/cycle 4; applies at this world load)
+[22:04:17.627] dimension 'wafer' loaded: 256 columns, 833 sub-chunks, 2776.8 ms
+[22:04:17.628] spawn: granted the starting item (the Fragment)
+ERR: [22:04:17.648] ERROR [script]  (0,0) error: Failed in call to function 'RegisterGlobalFunction' with 'void log(const string &in)' (Code: asNOT_SUPPORTED, -7)
+ERR: [22:04:17.655] ERROR [script] binding registration failed: 'void log(const string &in)' (-7)
+ERR: [22:04:17.656] ERROR AngelScript: register log failed (-7)
+[22:04:17.657] LithoKraft Alpha 0.0.2.58 (nogit) Release built Oct 19 2026 17:53:33 | renderer: GL33
+[22:04:17.660] present: swap-interval-0 (OpenGL 3.3 core)
+[22:04:17.662] web present: direct frame loop (bench or Node)
+[22:04:17.705] bench still pose: 58.0,266.0,42.0,-1.571,-0.420
+[22:04:18.427] hitch: frame 218.5 ms (avg 42.65 ms)
+[22:04:19.198] hitch: frame 770.6 ms (avg 51.44 ms)
+[22:04:20.232] perf fps=12 frame=82.90/770.6ms tps=255.5/256 tick=2.228/28.010ms budget=66.50% dropped=19 chunks=256 meshes=324/833 dim=wafer p99=770.62ms hitches=2
+[22:04:20.238] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=2.228 ms, ram=0.0 MB
+[22:04:20.260] stream: +4 columns around chunk (3, 2); 260 loaded
+[22:04:20.884] perf fps=0 frame=0.00/0.0ms tps=256.0/256 tick=2.500/52.365ms budget=72.59% dropped=19 chunks=260 meshes=357/845 dim=wafer p99=0.00ms hitches=0
+[22:04:20.903] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=2.500 ms, ram=0.0 MB
+[22:04:20.912] stream: +4 columns around chunk (3, 2); 264 loaded
+[22:04:30.743] stream: +4 columns around chunk (3, 2); 268 loaded
+[22:04:30.752] perf fps=0 frame=0.00/0.0ms tps=257.9/256 tick=3.035/30.645ms budget=84.77% dropped=19 chunks=268 meshes=436/873 dim=wafer p99=0.00ms hitches=0
+[22:04:30.756] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=3.035 ms, ram=0.0 MB
+ERR: [22:04:30.825] WARN timing-handshake: component 'signal.mark' (id 2) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[22:04:31.083] stream: +4 columns around chunk (3, 2); 272 loaded
+[22:04:31.132] hitch: frame 374.7 ms (avg 87.40 ms)
+[22:04:31.193] stream: +4 columns around chunk (3, 2); 276 loaded
+[22:04:31.432] stream: +4 columns around chunk (3, 2); 280 loaded
+[22:04:31.471] hitch: frame 228.5 ms (avg 102.18 ms)
+[22:04:31.524] stream: +4 columns around chunk (3, 2); 284 loaded
+[22:04:31.673] stream: +4 columns around chunk (3, 2); 288 loaded
+[22:04:32.916] hitch: frame 1356.4 ms (avg 107.46 ms)
+[22:04:32.928] stream: +4 columns around chunk (3, 2); 292 loaded
+[22:04:33.879] perf fps=2 frame=431.49/1356.4ms tps=254.3/256 tick=1.604/32.880ms budget=59.10% dropped=37 chunks=292 meshes=676/956 dim=wafer p99=1356.38ms hitches=3
+[22:04:33.881] bench-sec frame: input=4.151 update=164.621 upload=248.630 render=7.747 present=0.002 ms, upload=3063552 B/frame, tick=1.604 ms, ram=0.0 MB
+[22:04:33.884] stream: +4 columns around chunk (3, 2); 296 loaded
+[22:04:35.748] stream: +4 columns around chunk (3, 2); 300 loaded
+[22:04:38.476] perf fps=0 frame=0.00/0.0ms tps=255.8/256 tick=1.774/28.720ms budget=65.29% dropped=42 chunks=300 meshes=756/982 dim=wafer p99=0.00ms hitches=0
+[22:04:38.488] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.774 ms, ram=0.0 MB
+[22:04:38.528] stream: +4 columns around chunk (3, 2); 304 loaded
+[22:04:38.553] perf fps=0 frame=0.00/0.0ms tps=255.8/256 tick=1.774/28.720ms budget=65.29% dropped=42 chunks=304 meshes=800/996 dim=wafer p99=0.00ms hitches=0
+[22:04:38.559] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.774 ms, ram=0.0 MB
+[22:04:38.569] stream: +4 columns around chunk (3, 2); 308 loaded
+[22:04:38.676] stream: +4 columns around chunk (3, 2); 312 loaded
+[22:04:46.003] hitch: frame 7420.5 ms (avg 162.28 ms)
+[22:04:46.028] stream: +4 columns around chunk (3, 2); 316 loaded
+ERR: [22:04:49.999] WARN timing-handshake: component 'signal.flip_torches' (id 0) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[22:04:51.743] perf fps=0 frame=3718.88/7420.5ms tps=255.8/256 tick=0.836/16.515ms budget=42.49% dropped=65 chunks=316 meshes=911/1036 dim=wafer p99=7420.45ms hitches=1
+[22:04:51.760] bench-sec frame: input=16.310 update=60.758 upload=3637.997 render=3.795 present=0.003 ms, upload=3010080 B/frame, tick=0.836 ms, ram=0.0 MB
+[22:04:51.772] stream: +4 columns around chunk (3, 2); 320 loaded
+[22:04:54.915] perf fps=0 frame=0.00/0.0ms tps=256.1/256 tick=2.692/28.790ms budget=76.01% dropped=65 chunks=320 meshes=948/1048 dim=wafer p99=0.00ms hitches=0
+[22:04:54.920] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=2.692 ms, ram=0.0 MB
+[22:04:54.927] stream: +4 columns around chunk (3, 2); 324 loaded
+[22:04:55.088] perf fps=0 frame=0.00/0.0ms tps=256.1/256 tick=2.692/28.790ms budget=76.01% dropped=65 chunks=324 meshes=980/1061 dim=wafer p99=0.00ms hitches=0
+[22:04:55.102] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=2.692 ms, ram=0.0 MB
+[22:04:55.119] stream: +4 columns around chunk (3, 2); 328 loaded
+[22:05:01.268] hitch: frame 6153.0 ms (avg 525.19 ms)
+[22:05:01.273] stream: +4 columns around chunk (3, 2); 332 loaded
+[22:05:03.934] perf fps=0 frame=6152.97/6153.0ms tps=255.7/256 tick=1.794/32.575ms budget=56.84% dropped=65 chunks=332 meshes=1047/1086 dim=wafer p99=6152.97ms hitches=1
+[22:05:03.939] bench-sec frame: input=1.470 update=15.815 upload=2992.845 render=3142.815 present=0.000 ms, upload=3036672 B/frame, tick=1.794 ms, ram=0.0 MB
+[22:05:03.944] stream: +4 columns around chunk (3, 2); 336 loaded
+[22:05:07.118] perf fps=0 frame=0.00/0.0ms tps=255.6/256 tick=1.747/28.595ms budget=49.88% dropped=65 chunks=336 meshes=1078/1099 dim=wafer p99=0.00ms hitches=0
+[22:05:07.120] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.747 ms, ram=0.0 MB
+[22:05:07.132] stream: +4 columns around chunk (3, 2); 340 loaded
+[22:05:07.144] perf fps=0 frame=0.00/0.0ms tps=255.6/256 tick=1.747/28.595ms budget=49.88% dropped=65 chunks=340 meshes=1099/1112 dim=wafer p99=0.00ms hitches=0
+[22:05:07.148] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.747 ms, ram=0.0 MB
+[22:05:07.152] stream: +4 columns around chunk (3, 2); 344 loaded
+[22:05:10.542] hitch: frame 3391.4 ms (avg 806.58 ms)
+[22:05:10.550] stream: +4 columns around chunk (3, 2); 348 loaded
+[22:05:10.646] perf fps=0 frame=3391.40/3391.4ms tps=255.9/256 tick=2.835/32.815ms budget=74.18% dropped=65 chunks=348 meshes=1124/1136 dim=wafer p99=3391.40ms hitches=1
+[22:05:10.655] bench-sec frame: input=6.050 update=4.440 upload=0.010 render=3380.880 present=0.005 ms, upload=0 B/frame, tick=2.835 ms, ram=0.0 MB
+[22:05:10.664] stream: +4 columns around chunk (3, 2); 352 loaded
+[22:05:10.808] stream: +4 columns around chunk (3, 2); 356 loaded
+[22:05:14.547] hitch: frame 3745.2 ms (avg 896.01 ms)
+[22:05:14.553] stream: +4 columns around chunk (3, 2); 360 loaded
+[22:05:14.814] perf fps=0 frame=1942.44/3745.2ms tps=256.0/256 tick=1.504/36.015ms budget=56.78% dropped=65 chunks=360 meshes=1161/1173 dim=wafer p99=3745.17ms hitches=1
+[22:05:14.816] bench-sec frame: input=6.463 update=9.732 upload=1861.000 render=65.210 present=0.010 ms, upload=609728 B/frame, tick=1.504 ms, ram=0.0 MB
+[22:05:14.823] stream: +4 columns around chunk (3, 2); 364 loaded
+[22:05:18.270] hitch: frame 3449.4 ms (avg 1038.47 ms)
+[22:05:18.297] stream: +4 columns around chunk (3, 2); 368 loaded
+[22:05:22.518] perf fps=0 frame=3449.42/3449.4ms tps=250.2/256 tick=1.401/27.655ms budget=58.42% dropped=65 chunks=368 meshes=1187/1199 dim=wafer p99=3449.42ms hitches=1
+[22:05:22.520] bench-sec frame: input=0.465 update=11.105 upload=3434.070 render=3.730 present=0.005 ms, upload=1220032 B/frame, tick=1.401 ms, ram=0.0 MB
+[22:05:22.524] stream: +4 columns around chunk (3, 2); 372 loaded
+[22:05:22.712] perf fps=0 frame=0.00/0.0ms tps=250.2/256 tick=1.401/27.655ms budget=58.42% dropped=65 chunks=372 meshes=1199/1211 dim=wafer p99=0.00ms hitches=0
+[22:05:22.721] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.401 ms, ram=0.0 MB
+[22:05:22.740] stream: +4 columns around chunk (3, 2); 376 loaded
+[22:05:27.243] hitch: frame 4504.6 ms (avg 1159.02 ms)
+[22:05:27.254] stream: +4 columns around chunk (3, 2); 380 loaded
+[22:05:27.271] perf fps=0 frame=4504.60/4504.6ms tps=270.5/256 tick=1.894/64.070ms budget=72.48% dropped=65 chunks=380 meshes=1223/1234 dim=wafer p99=4504.60ms hitches=1
+[22:05:27.276] bench-sec frame: input=0.195 update=10.160 upload=10.890 render=4483.325 present=0.000 ms, upload=1217856 B/frame, tick=1.894 ms, ram=0.0 MB
+[22:05:27.313] stream: +4 columns around chunk (3, 2); 384 loaded
+[22:05:27.441] stream: +4 columns around chunk (3, 2); 388 loaded
+[22:05:36.113] hitch: frame 8704.3 ms (avg 1266.53 ms)
+[22:05:36.128] stream: +4 columns around chunk (3, 2); 392 loaded
+ERR: [22:05:40.297] WARN timing-handshake: component 'signal.components' (id 1) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[22:05:45.667] perf fps=0 frame=4417.61/8704.3ms tps=259.6/256 tick=1.220/23.865ms budget=52.43% dropped=65 chunks=392 meshes=1258/1270 dim=wafer p99=8704.27ms hitches=1
+[22:05:45.699] bench-sec frame: input=5.205 update=39.295 upload=2180.997 render=2192.085 present=0.008 ms, upload=507200 B/frame, tick=1.220 ms, ram=0.0 MB
+[22:05:45.716] stream: +4 columns around chunk (3, 2); 396 loaded
+[22:05:45.849] perf fps=0 frame=0.00/0.0ms tps=259.6/256 tick=1.220/23.865ms budget=52.43% dropped=65 chunks=396 meshes=1270/1284 dim=wafer p99=0.00ms hitches=0
+[22:05:45.857] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.220 ms, ram=0.0 MB
+[22:05:45.899] stream: +4 columns around chunk (3, 2); 400 loaded
+[22:05:50.552] hitch: frame 4688.5 ms (avg 1638.42 ms)
+[22:05:50.561] stream: +4 columns around chunk (3, 2); 404 loaded
+[22:05:55.568] perf fps=0 frame=4688.48/4688.5ms tps=256.8/256 tick=1.537/25.850ms budget=51.79% dropped=65 chunks=404 meshes=1296/1308 dim=wafer p99=4688.48ms hitches=1
+[22:05:55.599] bench-sec frame: input=3.740 update=40.305 upload=0.005 render=4644.410 present=0.005 ms, upload=0 B/frame, tick=1.537 ms, ram=0.0 MB
+[22:05:55.608] stream: +4 columns around chunk (3, 2); 408 loaded
+[22:06:00.632] perf fps=0 frame=0.00/0.0ms tps=254.8/256 tick=1.844/16.825ms budget=65.15% dropped=65 chunks=408 meshes=1308/1320 dim=wafer p99=0.00ms hitches=0
+[22:06:00.636] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.844 ms, ram=0.0 MB
+[22:06:00.640] stream: +4 columns around chunk (3, 2); 412 loaded
+[22:06:05.208] perf fps=0 frame=0.00/0.0ms tps=256.0/256 tick=1.988/27.300ms budget=57.29% dropped=65 chunks=412 meshes=1320/1333 dim=wafer p99=0.00ms hitches=0
+[22:06:05.214] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.988 ms, ram=0.0 MB
+[22:06:05.224] stream: +4 columns around chunk (3, 2); 416 loaded
+[22:06:05.415] perf fps=0 frame=0.00/0.0ms tps=256.0/256 tick=1.988/27.300ms budget=57.29% dropped=65 chunks=416 meshes=1333/1345 dim=wafer p99=0.00ms hitches=0
+[22:06:05.420] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.988 ms, ram=0.0 MB
+[22:06:05.424] stream: +4 columns around chunk (3, 2); 420 loaded
+[22:06:10.257] hitch: frame 4834.1 ms (avg 1790.92 ms)
+[22:06:10.264] stream: +4 columns around chunk (3, 2); 424 loaded
+[22:06:15.056] perf fps=0 frame=4834.06/4834.1ms tps=256.6/256 tick=2.147/29.580ms budget=68.49% dropped=65 chunks=424 meshes=1358/1370 dim=wafer p99=4834.06ms hitches=1
+[22:06:15.081] bench-sec frame: input=2.585 update=6.630 upload=4781.120 render=43.705 present=0.010 ms, upload=1269632 B/frame, tick=2.147 ms, ram=0.0 MB
+[22:06:15.089] stream: +4 columns around chunk (3, 2); 428 loaded
+[22:06:24.840] perf fps=0 frame=0.00/0.0ms tps=259.7/256 tick=1.027/27.365ms budget=43.73% dropped=65 chunks=428 meshes=1370/1383 dim=wafer p99=0.00ms hitches=0
+[22:06:24.847] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=1.027 ms, ram=0.0 MB
+[22:06:24.852] bench renderer=OpenGL 3.3 core present=swap-interval-0 path=still seconds=120 frames=17 rthreads=2 avg=2902.131ms p50=3391.400ms p99=8704.265ms max=8704.265ms input=5.366 update=66.537 upload=1636.593 render=1191.752 present=0.004 ms upload=1783292 B/frame tick=1.813/3.035ms gen=0.0 cols/s (0.00/0.00ms) mesh=0.0 subs/s (0.000/0.000ms) ram=0.0->0.0 MB (peak 0.0)
+BENCH OpenGL 3.3 core present=swap-interval-0 display=windowed path=still frames=17 avg=2902.131 ms p99=8704.265 ms
+[22:06:25.056] exit

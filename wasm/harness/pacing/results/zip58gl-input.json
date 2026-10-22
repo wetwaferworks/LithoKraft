@@ -1,0 +1,14 @@
+{
+ "tag": "zip58gl-input",
+ "url": "http://127.0.0.1:8904/gl.html?debuginput=1",
+ "menuSeen": true,
+ "playSeen": true,
+ "pointerLock": "engaged",
+ "stateBefore": null,
+ "stateAfter": null,
+ "wEcho": true,
+ "wEchoRaw": "input> KeyDown W (code KeyW)",
+ "perfTail": "perf fps=6 frame=156.83/771.8ms tps=0.7/256 tick=39.075/39.075ms budget=3.02% dropped=433 chunks=256 meshes=302/833 dim=wafer p99=771.83ms hitches=2",
+ "aaLine": "window: WebGL antialias off (?aa=off)",
+ "wallS": 24.7
+}

@@ -1,0 +1,311 @@
+error: Failed to load resource: the server responded with a status of 404 (File not found)
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:MAIN] worker: instantiated
+log: [lktrace:w:MAIN] worker: lk-main received ptr=896792
+log: [lktrace:w:MAIN] main worker: SP after init = 26119888 slot676312=825512 slot676308=1073157447 slot676316=825664
+log: [lktrace:w:MAIN] main worker: argv readback argc=12 argv=17731224 words=9336064,9333056,9315008,9297712,9296672,9304992,9301376,9334944,9332696,9297960,9327784,9327800,0 argv0="LithoKraft" all=["LithoKraft","--renderer","gl33","--gl-arena","off","--seed","20261019","--stream-radius","20","--scripts","exe","--mute"] memPages=8192
+log: [lktrace:w:MAIN] main worker: entering __main_argc_argv
+log: [lktrace:w:MAIN] proxy call idx=22 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=10 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=16 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=34 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=35 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=32 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=14 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=12 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=37 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=33 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826457 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826559 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=831130 mode=1
+log: [lktrace:w:MAIN] proxy call idx=2 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=29 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826216 mode=1
+log: [lktrace:w:MAIN] webgl_create_context requested
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:P26135104] worker: instantiated
+log: [lktrace:w:P26135104] worker: lk-run routine=4111 pthread=26135104
+log: [lktrace:w:P26135104] worker: entering routine 4111
+log: [lktrace:w:MAIN] proxy call idx=19 asm=0 mode=1
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:P49935184] worker: instantiated
+log: [lktrace:w:P49935184] worker: lk-run routine=4 pthread=49935184
+log: [lktrace:w:MAIN] proxy call idx=13 asm=0 mode=1
+log: [lktrace:w:P49935184] worker: entering routine 4
+log: [lktrace:w:P49935184] proxy call idx=16 asm=0 mode=1
+log: [lktrace:w:P49935184] proxy call idx=34 asm=0 mode=1
+log: [lktrace:w:P49935184] proxy call idx=32 asm=0 mode=1
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:P121949632] worker: instantiated
+log: [lktrace:w:P121949632] worker: lk-run routine=3944 pthread=121949632
+log: [lktrace:w:P121949632] worker: entering routine 3944
+log: [lktrace:w:?] worker: lk-load received, instantiating
+log: [lktrace:w:MAIN] main loop registered cb=3 fps=0 simInf=1
+log: [lktrace:w:P131536648] worker: instantiated
+log: [lktrace:w:P131536648] worker: lk-run routine=3892 pthread=131536648
+log: [lktrace:w:P131536648] worker: entering routine 3892
+log: [lktrace:w:MAIN] proxy call idx=0 asm=831469 mode=1
+log: [lktrace:w:MAIN] proxy call idx=27 asm=0 mode=1
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826321 mode=1
+log: [lktrace:w:P49935184] proxy call idx=22 asm=0 mode=1
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+log: [lktrace:w:P26135104] proxy call idx=37 asm=0 mode=1
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+log: [lktrace:w:MAIN] proxy call idx=0 asm=826360 mode=1
+log: [lktrace:w:MAIN] proxy call idx=28 asm=0 mode=1
+log: [lktrace:w:P131536648] proxy call idx=37 asm=0 mode=1
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: [.WebGL-0x1b54001c1a00] GL_INVALID_OPERATION: glDrawElements: Must have element array buffer bound.
+warn: WebGL: too many errors, no more errors will be reported to the console for this context.

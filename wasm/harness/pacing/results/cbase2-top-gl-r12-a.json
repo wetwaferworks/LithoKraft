@@ -1,0 +1,55 @@
+{
+ "tag": "cbase2-top-gl-r12-a",
+ "mode": "top",
+ "url": "http://127.0.0.1:8902/benchgl.html?radius=12",
+ "settleS": 120,
+ "windowS": 90,
+ "menuSeen": true,
+ "playSeen": true,
+ "pointerLock": "engaged",
+ "meshesAtCast": 1310,
+ "totalSubsAtCast": 1320,
+ "tickAvgAtCast": 1.876,
+ "tpsAtCast": 256.4,
+ "droppedAtCast": 667,
+ "cast": {
+  "intervals": 15,
+  "fps": 0.19,
+  "medianMs": 5251.2,
+  "p95Ms": 5832.3,
+  "maxMs": 5832.3,
+  "fracOver40": 1,
+  "fracOver100": 1,
+  "fracOver1000": 1
+ },
+ "intervalsMs": [
+  4805.6,
+  5207.9,
+  5313.8,
+  5102.6,
+  5087.7,
+  5171.2,
+  5346.5,
+  5338.9,
+  5215.3,
+  5832.3,
+  5431.6,
+  5251.2,
+  5227.8,
+  5359.9,
+  5727.5
+ ],
+ "tickAvgAfter": 1.11,
+ "tpsAfter": 267.6,
+ "droppedAfter": 667,
+ "meshesAfter": 1547,
+ "aaLine": null,
+ "iso": {
+  "crossOriginIsolated": true,
+  "sab": "function"
+ },
+ "wallS": 249.7,
+ "consoleIssues": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)"
+ ]
+}

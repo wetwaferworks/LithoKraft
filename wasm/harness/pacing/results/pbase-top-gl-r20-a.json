@@ -1,0 +1,31 @@
+{
+ "tag": "pbase-top-gl-r20-a",
+ "mode": "top",
+ "url": "http://127.0.0.1:8902/gl.html",
+ "wallS": 653.3,
+ "entered": true,
+ "collected": 0,
+ "frameAvgMedian": null,
+ "frameMaxMedian": null,
+ "fpsMedian": null,
+ "tpsMedian": null,
+ "tickAvgMedian": null,
+ "meshesAtCollect": null,
+ "droppedMax": null,
+ "raf": {
+  "n": 299,
+  "median": 16.67,
+  "p95": 11249.55,
+  "max": 13532.79,
+  "fracOver25": 0.468,
+  "fracOver40": 0.452
+ },
+ "iso": {
+  "crossOriginIsolated": true,
+  "sab": "function"
+ },
+ "consoleIssues": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)"
+ ],
+ "lines": []
+}

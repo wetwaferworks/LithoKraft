@@ -1,0 +1,121 @@
+[diag] ON — ua: Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/155 Mobile Safari/537.36 LithoBlackProbe
+[diag] OffscreenCanvas type: function; transferControlToOffscreen type: function
+[15:21:23.222] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[15:21:23.224] LithoKraft Alpha 0.0.3.4 (nogit) Release built Oct 20 2026 06:57:47
+[15:21:23.225] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m1[0m.[38;2;168;158;146m2[0m
+[15:21:23.268] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[15:21:23.271] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[15:21:23.272] input: emscripten-html5 backend live (transport: main-thread listeners; ring drains at step cadence, legacy queue per frame; debug echo off)
+[15:21:23.273] input: memory-mapped ring LIVE (records at wasm+853888; legacy queue on standby until first record)
+[15:21:23.278] input: mapped ring drain at STEP cadence (256/s, dedicated thread; frames no longer gate input)
+[15:21:23.279] window: emscripten window 1280x720 (api gl33)
+[15:21:23.281] window: WebGL antialias off (?aa=off)
+[15:21:23.680] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[15:21:23.695] gl33: chunk meshes in one VBO + VAO per sub-chunk
+ERR: [15:21:23.816] ERROR built-in shader 'chunk_pbr' failed:
+ERR: fragment: ERROR: 0:36: 'samplerBuffer' : Illegal use of reserved word
+ERR: ERROR: 0:36: 'samplerBuffer' : syntax error
+ERR: 
+ERR: [15:21:23.937] ERROR gl33: chunk_pbr unavailable - PBR/BinaryQuad path disabled, classic path only
+[15:21:24.039] renderer: OpenGL 3.3 core | WebKit | WebKit WebGL | OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium))
+[15:21:24.071] materials: 17 materials from /assets/materials/lithokraft.materials
+[15:21:24.075] mods: game 'lithokraft' 0.1.0
+[15:21:24.080] mods: no mods/ directory — continuing with zero mods (seal decision still applies)
+[15:21:24.080] mods: registry sealed (release build (fail closed: no verified hot-swap mod))
+[15:21:25.539]   resources: worldgen/wafer.json from lithokraft
+[15:21:25.542]   resources: worldgen/organic.json from lithokraft
+[15:21:25.544]   resources: ui/theme.json from lithokraft
+[15:21:25.544] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[15:21:25.544]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[15:21:25.545]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[15:21:25.547]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[15:21:25.547]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[15:21:25.548]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[15:21:25.548]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[15:21:25.548]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[15:21:25.550]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+[15:21:25.651] shader 'chunk_pbr': not in any pack, using the built-in copy
+ERR: [15:21:25.676] ERROR built-in shader 'chunk_pbr' failed:
+ERR: fragment: ERROR: 0:36: 'samplerBuffer' : Illegal use of reserved word
+ERR: ERROR: 0:36: 'samplerBuffer' : syntax error
+ERR: 
+[15:21:25.684] shader 'sprite': not in any pack, using the built-in copy
+ERR: [15:21:25.686] ERROR gl33: chunk_pbr unavailable - PBR/BinaryQuad path disabled, classic path only
+[15:21:25.696] audio: muted (--mute)
+[15:21:25.742] input: bindings from /config/input.json
+[15:21:26.040] world clock: tick 0, day 0 00:00
+[diag] t=4s transfer: attempts=1 ok=1 err=(none attempted) | engine: live=1 presentLine=0 menu=0 perfLines=0 | ocWebgl2=px=255,0,255,255 mainWebgl2=ok ocBitmap=drawn | canvas backing=1280x720 vis=visible
+[15:21:27.032] sim: tick area radius 8, round (dx^2+dz^2 <= r^2+r), 225 chunk columns
+[15:21:27.040] timing handshake: ON (phases/cycle 4; applies at this world load)
+[15:21:27.368] dimension 'wafer' loaded: 256 columns, 833 sub-chunks, 1325.9 ms
+[15:21:27.372] spawn: granted the starting item (the Fragment)
+ERR: [15:21:27.390] ERROR [script]  (0,0) error: Failed in call to function 'RegisterGlobalFunction' with 'void log(const string &in)' (Code: asNOT_SUPPORTED, -7)
+ERR: [15:21:27.424] ERROR [script] binding registration failed: 'void log(const string &in)' (-7)
+ERR: [15:21:27.428] ERROR AngelScript: register log failed (-7)
+[15:21:27.430] LithoKraft Alpha 0.0.3.4 (nogit) Release built Oct 20 2026 06:57:47 | renderer: GL33
+[15:21:27.432] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[15:21:27.440] present: swap-interval-0 (OpenGL 3.3 core)
+[15:21:27.443] web present: interactive loop via emscripten_set_main_loop (task boundary per frame)
+[15:21:29.072] hitch: frame 901.3 ms (avg 148.67 ms)
+[15:21:29.076] stream: +4 columns around chunk (3, 2); 260 loaded
+[15:21:29.129] perf fps=4 frame=228.74/901.3ms tps=0.6/256 tick=65.030/65.030ms budget=4.03% dropped=537 chunks=260 meshes=273/845 dim=wafer p99=901.32ms hitches=1
+[15:21:29.328] stream: +4 columns around chunk (3, 2); 264 loaded
+[15:21:29.336] stream: +4 columns around chunk (3, 2); 268 loaded
+[15:21:29.673] stream: +4 columns around chunk (3, 2); 272 loaded
+[diag] t=8s transfer: attempts=1 ok=1 err=(none attempted) | engine: live=1 presentLine=1 menu=1 perfLines=1 | ocWebgl2=px=255,0,255,255 mainWebgl2=ok ocBitmap=drawn | canvas backing=1280x720 vis=visible
+[diag] last perf: [15:21:29.129] perf fps=4 frame=228.74/901.3ms tps=0.6/256 tick=65.030/65.030ms budget=4.03% dropped=537 chunk
+[15:21:30.254] hitch: frame 583.9 ms (avg 185.23 ms)
+[15:21:30.259] stream: +4 columns around chunk (3, 2); 276 loaded
+[15:21:30.265] perf fps=3 frame=308.75/583.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=983 chunks=276 meshes=408/901 dim=wafer p99=583.94ms hitches=1
+[15:21:30.632] stream: +4 columns around chunk (3, 2); 280 loaded
+[15:21:30.647] stream: +4 columns around chunk (3, 2); 284 loaded
+[15:21:31.177] hitch: frame 531.9 ms (avg 195.75 ms)
+[15:21:31.195] stream: +4 columns around chunk (3, 2); 288 loaded
+[15:21:32.454] hitch: frame 1276.0 ms (avg 212.56 ms)
+[15:21:32.463] stream: +4 columns around chunk (3, 2); 292 loaded
+[15:21:32.473] perf fps=1 frame=608.24/1276.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1945 chunks=292 meshes=578/956 dim=wafer p99=1275.99ms hitches=2
+[15:21:33.259] stream: +4 columns around chunk (3, 2); 296 loaded
+[15:21:34.164] stream: +4 columns around chunk (3, 2); 300 loaded
+[15:21:34.177] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=2713 chunks=300 meshes=655/982 dim=wafer p99=0.00ms hitches=0
+[diag] t=12s transfer: attempts=1 ok=1 err=(none attempted) | engine: live=1 presentLine=1 menu=1 perfLines=5 | ocWebgl2=px=255,0,255,255 mainWebgl2=ok ocBitmap=drawn | canvas backing=1280x720 vis=visible
+[diag] last perf: [15:21:34.177] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=2713 chunks=300
+[15:21:34.889] stream: +4 columns around chunk (3, 2); 304 loaded
+[15:21:35.672] stream: +4 columns around chunk (3, 2); 308 loaded
+[15:21:35.694] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=3382 chunks=308 meshes=733/1010 dim=wafer p99=0.00ms hitches=0
+[15:21:37.247] stream: +4 columns around chunk (3, 2); 312 loaded
+[15:21:37.262] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=4136 chunks=312 meshes=775/1022 dim=wafer p99=0.00ms hitches=0
+[15:21:37.280] stream: +4 columns around chunk (3, 2); 316 loaded
+[15:21:37.515] stream: +4 columns around chunk (3, 2); 320 loaded
+[diag] t=16s transfer: attempts=1 ok=1 err=(none attempted) | engine: live=1 presentLine=1 menu=1 perfLines=8 | ocWebgl2=px=255,0,255,255 mainWebgl2=ok ocBitmap=drawn | canvas backing=1280x720 vis=visible
+[diag] last perf: [15:21:37.262] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=4136 chunks=312
+[15:21:38.854] hitch: frame 1348.9 ms (avg 263.74 ms)
+[15:21:38.856] stream: +4 columns around chunk (3, 2); 324 loaded
+[15:21:38.870] perf fps=1 frame=787.45/1348.9ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=4840 chunks=324 meshes=889/1061 dim=wafer p99=1348.94ms hitches=1
+[15:21:38.872] stream: +4 columns around chunk (3, 2); 328 loaded
+[15:21:39.967] hitch: frame 1095.3 ms (avg 318.00 ms)
+[15:21:39.972] stream: +4 columns around chunk (3, 2); 332 loaded
+[15:21:39.979] perf fps=1 frame=1095.32/1095.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=5351 chunks=332 meshes=961/1086 dim=wafer p99=1095.32ms hitches=1
+[15:21:39.985] stream: +4 columns around chunk (3, 2); 336 loaded
+[diag] t=20s transfer: attempts=1 ok=1 err=(none attempted) | engine: live=1 presentLine=1 menu=1 perfLines=11 | ocWebgl2=px=255,0,255,255 mainWebgl2=ok ocBitmap=drawn | canvas backing=1280x720 vis=visible
+[diag] last perf: [15:21:39.979] perf fps=1 frame=1095.32/1095.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=5351 chun
+[15:21:43.065] hitch: frame 3081.5 ms (avg 356.86 ms)
+[15:21:43.076] stream: +4 columns around chunk (3, 2); 340 loaded
+[15:21:43.091] perf fps=0 frame=3081.53/3081.5ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=6876 chunks=340 meshes=1033/1112 dim=wafer p99=3081.53ms hitches=1
+[diag] t=24s transfer: attempts=1 ok=1 err=(none attempted) | engine: live=1 presentLine=1 menu=1 perfLines=13 | ocWebgl2=px=255,0,255,255 mainWebgl2=ok ocBitmap=drawn | canvas backing=1280x720 vis=visible
+[diag] last perf: [15:21:43.091] perf fps=0 frame=3081.53/3081.5ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=6876 chun
+[15:21:47.232] stream: +4 columns around chunk (3, 2); 344 loaded
+[15:21:47.249] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=8955 chunks=344 meshes=1063/1124 dim=wafer p99=0.00ms hitches=0
+[15:21:49.648] stream: +4 columns around chunk (3, 2); 348 loaded
+[15:21:49.687] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=10135 chunks=348 meshes=1091/1136 dim=wafer p99=0.00ms hitches=0
+[diag] t=28s transfer: attempts=1 ok=1 err=(none attempted) | engine: live=1 presentLine=1 menu=1 perfLines=16 | ocWebgl2=px=255,0,255,255 mainWebgl2=ok ocBitmap=drawn | canvas backing=1280x720 vis=hidden
+[diag] last perf: [15:21:49.687] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=10135 chunks=34
+[15:21:52.416] stream: +4 columns around chunk (4, 2); 352 loaded
+[15:21:52.483] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=11506 chunks=352 meshes=1123/1149 dim=wafer p99=0.00ms hitches=0
+[diag] t=32s transfer: attempts=1 ok=1 err=(none attempted) | engine: live=1 presentLine=1 menu=1 perfLines=18 | ocWebgl2=px=255,0,255,255 mainWebgl2=ok ocBitmap=drawn | canvas backing=1280x720 vis=hidden
+[diag] last perf: [15:21:52.483] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=11506 chunks=35
+[15:21:54.988] stream: +4 columns around chunk (4, 2); 356 loaded
+[15:21:55.028] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=12771 chunks=356 meshes=1149/1161 dim=wafer p99=0.00ms hitches=0
+[15:21:55.063] stream: +4 columns around chunk (4, 2); 360 loaded
+[15:21:55.256] stream: +4 columns around chunk (4, 2); 364 loaded

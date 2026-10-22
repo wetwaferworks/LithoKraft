@@ -1,0 +1,7 @@
+boot wait: OK
+menu wait: OK
+present path: web present: interactive loop via emscripten_set_main_loop (task boundary per frame)
+perf wait: OK
+shot: menu (same page)
+play wait: OK
+shot: play (same page)

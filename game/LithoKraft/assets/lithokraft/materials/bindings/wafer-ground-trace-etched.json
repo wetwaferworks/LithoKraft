@@ -1,0 +1,15 @@
+{
+  "model": "wafer-ground-trace-etched",
+  "credit": "Proposed by JD, Built by Cortana. Art: CloudAtlas 2026-10-16.",
+  "note": "etched wafer_ground_trace: 50 = etched base, 51 = etched line; normal map wafer_ground_trace_etched_normal",
+  "materials": {
+    "50": {
+      "texture": "wafer_ground_trace",
+      "shade": "tex"
+    },
+    "51": {
+      "texture": "wafer_ground_trace",
+      "shade": "emissive"
+    }
+  }
+}

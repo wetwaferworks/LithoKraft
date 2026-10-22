@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>itch-style embed harness</title>
+<style>body{background:#111;color:#ddd;font-family:system-ui,sans-serif;margin:0;padding:16px}
+iframe{border:1px solid #444;width:1000px;height:760px;background:#000}</style></head>
+<body>
+<p>Embedder origin (itch project-page analogue). Game runs in a cross-origin iframe below.</p>
+<script>
+  const q = new URLSearchParams(location.search);
+  const game = 'http://127.0.0.1:8902/benchgl.html?bench=1'
+    + '&bsecs=' + (q.get('bsecs') || '40')
+    + '&bpath=' + (q.get('bpath') || 'still')
+    + '&radius=' + (q.get('radius') || '20');
+  const f = document.createElement('iframe');
+  f.src = game;
+  f.setAttribute('allow', 'cross-origin-isolated; autoplay; fullscreen; gamepad; keyboard-map');
+  f.setAttribute('allowfullscreen', '');
+  document.body.appendChild(f);
+</script>
+</body></html>

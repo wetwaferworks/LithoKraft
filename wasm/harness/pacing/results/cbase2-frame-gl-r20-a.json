@@ -1,0 +1,30 @@
+{
+ "tag": "cbase2-frame-gl-r20-a",
+ "mode": "iframe",
+ "url": "http://127.0.0.1:8901/embed.html",
+ "settleS": 240,
+ "windowS": 90,
+ "menuSeen": false,
+ "playSeen": false,
+ "pointerLock": "unknown",
+ "meshesAtCast": 730,
+ "totalSubsAtCast": 845,
+ "tickAvgAtCast": 1.421,
+ "tpsAtCast": 254,
+ "droppedAtCast": 30,
+ "cast": null,
+ "intervalsMs": [],
+ "tickAvgAfter": 1.421,
+ "tpsAfter": 254,
+ "droppedAfter": 30,
+ "meshesAfter": 730,
+ "aaLine": null,
+ "iso": {
+  "crossOriginIsolated": true,
+  "sab": "function"
+ },
+ "wallS": 654,
+ "consoleIssues": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)"
+ ]
+}

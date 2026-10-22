@@ -1,0 +1,15 @@
+{
+  "page": "gl.html",
+  "variant": "base",
+  "backendLive": false,
+  "webPresentLine": false,
+  "menu": false,
+  "perfLines": false,
+  "marks": {},
+  "cap": {
+    "evalError": "Attempted to use detached Frame '6C3E025BAB949D5FBB2D71F3B8C4588C'."
+  },
+  "lum": {
+    "error": "no canvas box"
+  }
+}

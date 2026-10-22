@@ -1,0 +1,51 @@
+{
+ "tag": "perf-r20-override",
+ "mode": "top",
+ "url": "http://127.0.0.1:8931/gl.html?touch=1&debuginput=1&radius=20",
+ "settleS": 300,
+ "windowS": 90,
+ "menuSeen": true,
+ "playSeen": true,
+ "pointerLock": "engaged",
+ "meshesAtCast": 1665,
+ "totalSubsAtCast": 1679,
+ "tickAvgAtCast": 1.316,
+ "tpsAtCast": 256.5,
+ "droppedAtCast": 781,
+ "cast": {
+  "intervals": 11,
+  "fps": 0.15,
+  "medianMs": 6969.3,
+  "p95Ms": 8330.2,
+  "maxMs": 8330.2,
+  "fracOver40": 1,
+  "fracOver100": 1,
+  "fracOver1000": 1
+ },
+ "intervalsMs": [
+  3235.2,
+  6677.4,
+  7131.9,
+  6878.6,
+  6643.2,
+  6969.3,
+  8330.2,
+  7180.1,
+  7219.7,
+  7036.6,
+  6755.9
+ ],
+ "tickAvgAfter": 1.214,
+ "tpsAfter": 254.6,
+ "droppedAfter": 781,
+ "meshesAfter": 1846,
+ "aaLine": "window: WebGL antialias off (?aa=off)",
+ "iso": {
+  "crossOriginIsolated": true,
+  "sab": "function"
+ },
+ "wallS": 449.2,
+ "consoleIssues": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)"
+ ]
+}

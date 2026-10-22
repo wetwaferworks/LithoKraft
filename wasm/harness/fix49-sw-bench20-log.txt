@@ -1,0 +1,72 @@
+[15:48:04.196] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[15:48:04.200] LithoKraft Alpha 0.0.2.52 (nogit) Release built Oct 19 2026 14:21:22
+[15:48:04.208] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m49[0m
+[15:48:04.252] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[15:48:04.255] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[15:48:04.256] input: emscripten-html5 backend live (transport: main-thread listeners + per-frame drain; debug echo off)
+[15:48:04.259] window: emscripten window 1280x720 (api gl33)
+[15:48:04.326] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[15:48:04.348] software present (webgl): BGRA extension unavailable — upload path: RGBA (CPU swizzle)
+[15:48:04.350] renderer: software | software rasterizer (CPU, no GPU)
+[15:48:04.368] materials: 17 materials from /assets/materials/lithokraft.materials
+[15:48:04.377] mods: game 'lithokraft' 0.1.0
+[15:48:04.379] mods: no mods/ directory — continuing with zero mods (seal decision still applies)
+[15:48:04.380] mods: registry sealed (release build (fail closed: no verified hot-swap mod))
+[15:48:05.804]   resources: worldgen/wafer.json from lithokraft
+[15:48:05.808]   resources: worldgen/organic.json from lithokraft
+[15:48:05.811]   resources: ui/theme.json from lithokraft
+[15:48:05.811] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[15:48:05.814]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[15:48:05.816]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[15:48:05.816]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[15:48:05.819]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[15:48:05.820]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[15:48:05.824]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[15:48:05.827]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[15:48:05.830]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+[15:48:05.852] audio: muted (--mute)
+[15:48:05.856] input: bindings from /config/input.json
+ERR: [15:48:05.999] WARN software: PBR transparency tiers are not implemented on the CPU path; PBR fragments shade opaque (tier selection still enables the PBR fragment path)
+[15:48:06.788] sim: tick area radius 8, round (dx^2+dz^2 <= r^2+r), 225 chunk columns
+[15:48:06.790] timing handshake: ON (phases/cycle 4; applies at this world load)
+[15:48:07.121] dimension 'wafer' loaded: 256 columns, 833 sub-chunks, 1117.5 ms
+[15:48:07.124] spawn: granted the starting item (the Fragment)
+ERR: [15:48:07.147] ERROR [script]  (0,0) error: Failed in call to function 'RegisterGlobalFunction' with 'void log(const string &in)' (Code: asNOT_SUPPORTED, -7)
+ERR: [15:48:07.180] ERROR [script] binding registration failed: 'void log(const string &in)' (-7)
+ERR: [15:48:07.182] ERROR AngelScript: register log failed (-7)
+[15:48:07.184] LithoKraft Alpha 0.0.2.52 (nogit) Release built Oct 19 2026 14:21:22 | renderer: Software scalar x2 threads
+[15:48:07.192] present: framebuffer (swap-interval-0) (software)
+[15:48:07.292] software renderer: Pass 2 mask 0x7 (LL_SW_P2), texture layout linear, 372 layers
+ERR: software renderer: SIMD path scalar
+ERR: software renderer: hardware_concurrency=2, render bands=2 (1 spawned workers + caller)
+[15:48:07.332] software renderer: hardware_concurrency=2, render bands=2 (1 spawned workers + caller)
+[15:48:08.527] perf fps=3 frame=333.21/567.4ms tps=223.9/256 tick=3.072/116.555ms budget=81.53% dropped=62 chunks=256 meshes=128/833 dim=wafer p99=567.44ms hitches=0
+[15:48:08.537] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=3.072 ms, ram=0.0 MB
+[15:48:09.438] perf fps=3 frame=369.87/484.1ms tps=232.2/256 tick=2.305/72.845ms budget=71.99% dropped=62 chunks=256 meshes=231/833 dim=wafer p99=484.12ms hitches=0
+[15:48:09.440] bench-sec frame: input=0.000 update=0.000 upload=0.000 render=0.000 present=0.000 ms, upload=0 B/frame, tick=2.305 ms, ram=0.0 MB
+[15:48:10.284] stream: +4 columns around chunk (4, 3); 260 loaded
+[15:48:10.588] stream: +4 columns around chunk (4, 3); 264 loaded
+ERR: [15:48:10.630] WARN timing-handshake: component 'signal.mark' (id 2) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[15:48:11.080] perf fps=2 frame=362.82/401.7ms tps=257.5/256 tick=2.469/44.020ms budget=79.45% dropped=84 chunks=264 meshes=371/860 dim=wafer p99=401.74ms hitches=0
+[15:48:11.087] bench-sec frame: input=0.260 update=147.125 upload=12.765 render=205.215 present=14.260 ms, upload=2860992 B/frame, tick=2.469 ms, ram=0.0 MB
+[15:48:11.096] stream: +4 columns around chunk (4, 3); 268 loaded
+[15:48:11.392] stream: +4 columns around chunk (4, 3); 272 loaded
+[15:48:11.687] stream: +4 columns around chunk (4, 3); 276 loaded
+[15:48:11.983] perf fps=1 frame=295.05/295.0ms tps=261.7/256 tick=2.830/52.000ms budget=86.25% dropped=84 chunks=276 meshes=492/898 dim=wafer p99=295.05ms hitches=0
+[15:48:11.992] bench-sec frame: input=2.610 update=9.255 upload=2.945 render=275.825 present=4.395 ms, upload=3124608 B/frame, tick=2.830 ms, ram=0.0 MB
+[15:48:11.999] stream: +4 columns around chunk (4, 4); 280 loaded
+[15:48:12.588] stream: +4 columns around chunk (3, 4); 284 loaded
+[15:48:13.084] stream: +4 columns around chunk (3, 4); 288 loaded
+[15:48:13.336] perf fps=2 frame=498.03/578.3ms tps=250.4/256 tick=3.467/40.010ms budget=97.17% dropped=84 chunks=288 meshes=610/938 dim=wafer p99=578.31ms hitches=0
+[15:48:13.339] bench-sec frame: input=1.000 update=11.445 upload=11.967 render=453.647 present=18.963 ms, upload=2996704 B/frame, tick=3.467 ms, ram=0.0 MB
+[15:48:13.343] stream: +4 columns around chunk (3, 4); 292 loaded
+[15:48:13.619] stream: +4 columns around chunk (3, 4); 296 loaded
+[15:48:13.902] stream: +4 columns around chunk (3, 4); 300 loaded
+[15:48:14.188] stream: +4 columns around chunk (3, 4); 304 loaded
+[15:48:14.419] perf fps=3 frame=296.41/347.8ms tps=254.8/256 tick=3.593/37.070ms budget=92.83% dropped=84 chunks=304 meshes=775/995 dim=wafer p99=347.81ms hitches=0
+[15:48:14.424] bench-sec frame: input=0.741 update=29.163 upload=4.324 render=251.401 present=9.160 ms, upload=3065648 B/frame, tick=3.593 ms, ram=0.0 MB
+[15:48:14.428] bench renderer=software present=framebuffer (swap-interval-0) path=orbit seconds=4 frames=9 rthreads=2 avg=345.188ms p50=295.050ms p99=578.305ms max=578.305ms input=0.882 update=34.851 upload=7.065 render=289.511 present=10.848 ms upload=3032363 B/frame tick=3.090/3.593ms gen=0.0 cols/s (0.00/0.00ms) mesh=0.0 subs/s (0.000/0.000ms) ram=0.0->0.0 MB (peak 0.0)
+BENCH software present=framebuffer (swap-interval-0) display=windowed path=orbit frames=9 avg=345.188 ms p99=578.305 ms
+[15:48:14.697] exit

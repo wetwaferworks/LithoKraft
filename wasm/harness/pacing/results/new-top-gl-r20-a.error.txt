@@ -1,0 +1,4 @@
+Error: Attempted to use detached Frame 'D4DB6042963522753C7683E291CCA2DD'.
+    at CdpFrame.<anonymous> (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:99:23)
+    at logOf (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:65:14)
+    at async main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:99:15)

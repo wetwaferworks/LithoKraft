@@ -1,0 +1,5 @@
+TargetCloseError: Protocol error (Input.dispatchKeyEvent): Session closed. Most likely the page has been closed.
+    at CdpCDPSession.send (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/CdpSession.js:69:35)
+    at CdpKeyboard.down (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Input.js:33:28)
+    at CdpKeyboard.press (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/cdp/Input.js:143:20)
+    at main (/home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/pacing/cast_driver.js:70:23)

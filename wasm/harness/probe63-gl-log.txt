@@ -1,0 +1,125 @@
+[07:07:37.319] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[07:07:37.324] LithoKraft Alpha 0.0.3.4 (nogit) Release built Oct 20 2026 06:57:47
+[07:07:37.326] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m1[0m.[38;2;168;158;146m2[0m
+[07:07:37.347] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[07:07:37.350] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[07:07:37.351] input: emscripten-html5 backend live (transport: main-thread listeners; ring drains at step cadence, legacy queue per frame; debug echo ON (?debuginput=1))
+[07:07:37.352] input: memory-mapped ring LIVE (records at wasm+853888; legacy queue on standby until first record)
+[07:07:37.355] input: mapped ring drain at STEP cadence (256/s, dedicated thread; frames no longer gate input)
+[07:07:37.356] window: emscripten window 1280x720 (api gl33)
+[07:07:37.380] window: WebGL antialias off (?aa=off)
+[07:07:37.651] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[07:07:37.652] gl33: chunk meshes in one VBO + VAO per sub-chunk
+ERR: [07:07:37.719] ERROR built-in shader 'chunk_pbr' failed:
+ERR: fragment: ERROR: 0:36: 'samplerBuffer' : Illegal use of reserved word
+ERR: ERROR: 0:36: 'samplerBuffer' : syntax error
+ERR: 
+ERR: [07:07:37.727] ERROR gl33: chunk_pbr unavailable - PBR/BinaryQuad path disabled, classic path only
+[07:07:37.788] renderer: OpenGL 3.3 core | WebKit | WebKit WebGL | OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium))
+[07:07:37.835] materials: 17 materials from /assets/materials/lithokraft.materials
+[07:07:37.844] mods: game 'lithokraft' 0.1.0
+[07:07:37.860] mods: no mods/ directory — continuing with zero mods (seal decision still applies)
+[07:07:37.862] mods: registry sealed (release build (fail closed: no verified hot-swap mod))
+[07:07:39.311]   resources: worldgen/wafer.json from lithokraft
+[07:07:39.315]   resources: worldgen/organic.json from lithokraft
+[07:07:39.318]   resources: ui/theme.json from lithokraft
+[07:07:39.318] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[07:07:39.319]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[07:07:39.319]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[07:07:39.320]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[07:07:39.320]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[07:07:39.320]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[07:07:39.320]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[07:07:39.321]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[07:07:39.323]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+[07:07:39.448] shader 'chunk_pbr': not in any pack, using the built-in copy
+ERR: [07:07:39.452] ERROR built-in shader 'chunk_pbr' failed:
+ERR: fragment: ERROR: 0:36: 'samplerBuffer' : Illegal use of reserved word
+ERR: ERROR: 0:36: 'samplerBuffer' : syntax error
+ERR: 
+[07:07:39.463] shader 'sprite': not in any pack, using the built-in copy
+ERR: [07:07:39.718] ERROR gl33: chunk_pbr unavailable - PBR/BinaryQuad path disabled, classic path only
+[07:07:39.720] audio: muted (--mute)
+[07:07:39.727] input: bindings from /config/input.json
+[07:07:39.916] world clock: tick 0, day 0 00:00
+[07:07:40.790] sim: tick area radius 8, round (dx^2+dz^2 <= r^2+r), 225 chunk columns
+[07:07:40.791] timing handshake: ON (phases/cycle 4; applies at this world load)
+[07:07:41.135] dimension 'wafer' loaded: 256 columns, 833 sub-chunks, 1215.4 ms
+[07:07:41.136] spawn: granted the starting item (the Fragment)
+ERR: [07:07:41.153] ERROR [script]  (0,0) error: Failed in call to function 'RegisterGlobalFunction' with 'void log(const string &in)' (Code: asNOT_SUPPORTED, -7)
+ERR: [07:07:41.180] ERROR [script] binding registration failed: 'void log(const string &in)' (-7)
+ERR: [07:07:41.184] ERROR AngelScript: register log failed (-7)
+[07:07:41.187] LithoKraft Alpha 0.0.3.4 (nogit) Release built Oct 20 2026 06:57:47 | renderer: GL33
+[07:07:41.190] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[07:07:41.192] present: swap-interval-0 (OpenGL 3.3 core)
+[07:07:41.192] web present: interactive loop via emscripten_set_main_loop (task boundary per frame)
+[07:07:41.736] hitch: frame 321.9 ms (avg 67.24 ms)
+[07:07:42.280] hitch: frame 544.0 ms (avg 79.97 ms)
+[07:07:42.307] perf fps=6 frame=175.49/544.0ms tps=0.9/256 tick=61.810/61.810ms budget=5.84% dropped=342 chunks=256 meshes=231/833 dim=wafer p99=543.97ms hitches=2
+[07:07:42.792] hitch: frame 259.8 ms (avg 103.17 ms)
+[07:07:42.798] stream: +4 columns around chunk (3, 2); 260 loaded
+[07:07:43.108] hitch: frame 317.0 ms (avg 111.00 ms)
+[07:07:43.113] stream: +4 columns around chunk (3, 2); 264 loaded
+[07:07:43.124] stream: +4 columns around chunk (3, 2); 268 loaded
+[07:07:43.444] hitch: frame 321.3 ms (avg 115.92 ms)
+[07:07:43.449] stream: +4 columns around chunk (3, 2); 272 loaded
+[07:07:43.481] perf fps=3 frame=227.93/321.3ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=725 chunks=272 meshes=408/887 dim=wafer p99=321.25ms hitches=3
+[07:07:44.028] stream: +4 columns around chunk (3, 2); 276 loaded
+[07:07:44.439] stream: +4 columns around chunk (3, 2); 280 loaded
+[07:07:44.902] hitch: frame 467.2 ms (avg 126.19 ms)
+[07:07:44.905] stream: +4 columns around chunk (3, 2); 284 loaded
+[07:07:44.912] perf fps=1 frame=467.17/467.2ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1314 chunks=284 meshes=535/929 dim=wafer p99=467.17ms hitches=1
+[07:07:45.511] stream: +4 columns around chunk (3, 2); 288 loaded
+[07:07:46.388] stream: +4 columns around chunk (3, 2); 292 loaded
+[07:07:46.420] perf fps=0 frame=0.00/0.0ms tps=0.0/256 tick=0.000/0.000ms budget=0.00% dropped=1967 chunks=292 meshes=610/956 dim=wafer p99=0.00ms hitches=0
+[page] keydown Enter
+[07:07:47.084] input> KeyDown Enter (code Enter)
+[07:07:47.088] input> KeyUp Enter
+[07:07:47.407] menu: play - creative/testing
+[07:07:47.524] stream: +4 columns around chunk (3, 2); 296 loaded
+[07:07:47.544] input: pointer lock engaged
+[07:07:47.545] perf fps=0 frame=0.00/0.0ms tps=7.6/256 tick=3.294/19.275ms budget=2.75% dropped=2436 chunks=296 meshes=655/970 dim=wafer p99=0.00ms hitches=0
+[07:07:48.238] stream: +4 columns around chunk (3, 2); 300 loaded
+[07:07:48.292] stream: +4 columns around chunk (3, 2); 304 loaded
+ERR: [07:07:48.320] WARN timing-handshake: component 'signal.mark' (id 2) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[07:07:49.920] hitch: frame 1673.8 ms (avg 143.23 ms)
+[07:07:49.924] stream: +4 columns around chunk (3, 2); 308 loaded
+[07:07:49.934] perf fps=0 frame=1673.84/1673.8ms tps=256.1/256 tick=1.455/28.855ms budget=54.62% dropped=2436 chunks=308 meshes=775/1010 dim=wafer p99=1673.84ms hitches=1
+[07:07:52.800] stream: +4 columns around chunk (3, 2); 312 loaded
+[07:07:52.824] perf fps=0 frame=0.00/0.0ms tps=256.0/256 tick=1.943/30.145ms budget=60.14% dropped=2436 chunks=312 meshes=813/1022 dim=wafer p99=0.00ms hitches=0
+[07:07:54.404] stream: +4 columns around chunk (3, 2); 316 loaded
+[07:07:54.417] perf fps=0 frame=0.00/0.0ms tps=256.0/256 tick=2.185/28.465ms budget=61.28% dropped=2436 chunks=316 meshes=849/1036 dim=wafer p99=0.00ms hitches=0
+[07:07:56.395] stream: +4 columns around chunk (3, 2); 320 loaded
+[07:07:56.408] perf fps=0 frame=0.00/0.0ms tps=255.4/256 tick=2.493/29.355ms budget=66.02% dropped=2436 chunks=320 meshes=889/1048 dim=wafer p99=0.00ms hitches=0
+[07:07:58.755] stream: +4 columns around chunk (3, 2); 324 loaded
+[07:07:58.800] perf fps=0 frame=0.00/0.0ms tps=255.9/256 tick=2.117/28.550ms budget=62.02% dropped=2436 chunks=324 meshes=928/1061 dim=wafer p99=0.00ms hitches=0
+[07:08:01.713] stream: +4 columns around chunk (3, 2); 328 loaded
+[07:08:01.732] perf fps=0 frame=0.00/0.0ms tps=256.2/256 tick=2.174/29.245ms budget=60.94% dropped=2436 chunks=328 meshes=961/1074 dim=wafer p99=0.00ms hitches=0
+[07:08:04.956] stream: +4 columns around chunk (3, 2); 332 loaded
+[07:08:04.992] perf fps=0 frame=0.00/0.0ms tps=255.6/256 tick=2.101/27.065ms budget=57.47% dropped=2436 chunks=332 meshes=998/1086 dim=wafer p99=0.00ms hitches=0
+[07:08:08.351] stream: +4 columns around chunk (3, 2); 336 loaded
+[07:08:08.395] perf fps=0 frame=0.00/0.0ms tps=255.9/256 tick=1.579/27.750ms budget=64.00% dropped=2436 chunks=336 meshes=1033/1099 dim=wafer p99=0.00ms hitches=0
+[07:08:11.995] stream: +4 columns around chunk (3, 2); 340 loaded
+[07:08:12.022] perf fps=0 frame=0.00/0.0ms tps=257.8/256 tick=2.116/28.035ms budget=62.47% dropped=2436 chunks=340 meshes=1063/1112 dim=wafer p99=0.00ms hitches=0
+ERR: [07:08:14.713] WARN timing-handshake: component 'signal.components' (id 1) is a repeat overrun offender (3 overruns; own work within one cycle exceeded the cycle budget)
+[07:08:16.024] stream: +4 columns around chunk (3, 2); 344 loaded
+[07:08:16.063] perf fps=0 frame=0.00/0.0ms tps=257.7/256 tick=2.361/28.935ms budget=66.01% dropped=2436 chunks=344 meshes=1091/1124 dim=wafer p99=0.00ms hitches=0
+[page] keydown KeyW
+[07:08:16.203] input> KeyDown W (code KeyW)
+[07:08:16.804] input> KeyUp W
+[07:08:23.131] stream: +4 columns around chunk (3, 2); 348 loaded
+[07:08:23.196] perf fps=0 frame=0.00/0.0ms tps=254.7/256 tick=2.378/29.275ms budget=63.98% dropped=2565 chunks=348 meshes=1123/1136 dim=wafer p99=0.00ms hitches=0
+[page] mousedown button 0
+[07:08:23.207] input> MouseDown Left
+[07:08:23.217] input> MouseUp Left
+[07:08:24.432] input: pointer lock released
+[07:08:30.918] stream: +4 columns around chunk (3, 2); 352 loaded
+[07:08:30.945] perf fps=0 frame=0.00/0.0ms tps=255.9/256 tick=0.883/25.215ms budget=37.00% dropped=2565 chunks=352 meshes=1136/1149 dim=wafer p99=0.00ms hitches=0
+[07:08:30.945] input: pointer lock engaged
+[07:08:38.089] stream: +4 columns around chunk (3, 2); 356 loaded
+[page] mousedown button 0
+[07:08:38.121] perf fps=0 frame=0.00/0.0ms tps=256.8/256 tick=0.891/23.740ms budget=46.62% dropped=2565 chunks=356 meshes=1149/1161 dim=wafer p99=0.00ms hitches=0
+[07:08:38.124] input> MouseDown Left
+[07:08:38.131] input> MouseUp Left

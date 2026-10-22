@@ -1,0 +1,24 @@
+[09:20:25.488] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[09:20:25.495] LithoKraft Alpha 0.0.2.49 (nogit) Release built Oct 19 2026 09:15:04
+[09:20:25.499] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m46[0m
+[09:20:25.527] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[09:20:25.527] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[09:20:25.528] window: emscripten stub window 1280x720 (api gl33)
+[09:20:25.956] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[09:20:25.961] gl33: chunk meshes in one VBO + VAO per sub-chunk
+ERR: [09:20:26.008] ERROR built-in shader 'chunk' failed:
+ERR: vertex: ERROR: 0:1: 'core' : invalid version directive
+ERR: ERROR: 0:4: 'layout' : syntax error
+ERR: fragment: ERROR: 0:1: 'core' : invalid version directive
+ERR: ERROR: 0:5: 'in' : storage qualifier supported in GLSL ES 3.00 and above only
+ERR: ERROR: 0:5: '' : No precision specified for (float)
+ERR: ERROR: 0:5: 'in' : storage qualifier supported in GLSL ES 3.00 and above only
+ERR: ERROR: 0:5: '' : No precision specified for (float)
+ERR: ERROR: 0:5: 'in' : storage qualifier supported in GLSL ES 3.00 and above only
+ERR: ERROR: 0:5: '' : No precision specified for (float)
+ERR: ERROR: 0:5: 'in' : storage qualifier supported in GLSL ES 3.00 and above only
+ERR: ERROR: 0:5: '' : No precision specified for (float)
+ERR: ERROR: 0:6: 'flat' : Illegal use of reserved word
+ERR: 

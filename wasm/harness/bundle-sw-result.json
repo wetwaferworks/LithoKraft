@@ -1,0 +1,17 @@
+{
+  "url": "http://localhost:8934/index.html",
+  "finished": true,
+  "status": "Running...",
+  "audit": {
+    "via": "cdp-screenshot-clip",
+    "rect": {
+      "x": -81,
+      "y": 130,
+      "w": 962,
+      "h": 542
+    },
+    "distinctSampledColors": 7692,
+    "nonBlackFrac": 0.7164,
+    "colorfulFrac": 0.5822
+  }
+}

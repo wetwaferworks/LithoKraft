@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LithoKraft — Full Test (GL / WebGL2 path)</title>
+<style>
+  body { background:#0A0A12; color:#E8E4F8; font-family: system-ui, sans-serif;
+         display:flex; flex-direction:column; align-items:center; padding:24px; margin:0; }
+  h1 { color:#A970FF; font-size:20px; margin:0 0 4px; }
+  p.sub { color:#9a93b8; margin:0 0 12px; font-size:13px; max-width:900px; text-align:center; }
+  .ab { font:13px ui-monospace, monospace; margin-bottom:12px; }
+  .ab a { color:#A970FF; } .ab b { color:#FF6F00; }
+  canvas { width:960px; height:540px; background:#000;
+           border:1px solid #2c2748; border-radius:6px; }
+  #status { margin-top:12px; font:13px ui-monospace, monospace; color:#FF6F00; }
+  #log { margin-top:8px; width:960px; max-height:260px; overflow:auto; white-space:pre-wrap;
+         font:11px ui-monospace, monospace; color:#b9b3d6; background:#0d0d18;
+         border:1px solid #2c2748; border-radius:6px; padding:8px; box-sizing:border-box; }
+</style>
+</head>
+<body>
+<h1>LITHOKRAFT &mdash; FULL TEST</h1>
+<p class="sub">The full engine + game in WebAssembly. This page boots the
+<b>GL33 renderer on WebGL2</b> (shaders: the pack carries GLSL ES 3.00
+translations; the renderer logs per-shader verdicts; chunk meshes run with
+<code>--gl-arena off</code> because WebGL2 has no base-vertex draw &mdash;
+same meshes and pixels, per-mesh VAOs instead of one arena). Same build,
+same world seed, same bench as the software page.</p>
+<div class="ab">A/B present path: <a href="index.html">&larr; SOFTWARE</a> &nbsp;|&nbsp; <b>GL (WebGL2)</b></div>
+<canvas id="canvas" width="1280" height="720" oncontextmenu="event.preventDefault()"></canvas>
+<div id="status">booting&hellip;</div>
+<div id="log"></div>
+<script>
+  // Module (with print + boot arguments) is defined BEFORE LithoKraft.js
+  // loads — the runtime reads its callbacks at init completion, so a
+  // Module assigned afterwards races the runtime (web-spike lesson #8).
+  const logEl = document.getElementById('log');
+  const statusEl = document.getElementById('status');
+  function toLog(s) { logEl.textContent += s + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    arguments: ['--renderer', 'gl33', '--gl-arena', 'off',
+                '--bench', '4', '--bench-path', 'orbit',
+                '--seed', '20261019',
+                '--scripts', 'exe', '--mute',
+                '--ui-shot', '/ui-gl.png',
+                '--bench-json', '/bench-gl.json'],
+    print: (s) => toLog(s),
+    printErr: (s) => toLog('ERR: ' + s),
+    onExit: (code) => { statusEl.textContent = 'run finished (exit ' + code + ') — bench summary in the log above'; },
+    setStatus: (s) => { if (s) statusEl.textContent = s; },
+  };
+  window.addEventListener('error', (e) => { statusEl.textContent = 'error: ' + e.message; });
+</script>
+<script src="LithoKraft.js"></script>
+</body>
+</html>

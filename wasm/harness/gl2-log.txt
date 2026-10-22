@@ -1,0 +1,13 @@
+[09:26:22.678] LithoKraft 0.1.0 (LithoLattice engine), log file /logs/lithokraft.log (previous run: .prev.log)
+[09:26:22.689] LithoKraft Alpha 0.0.2.50 (nogit) Release built Oct 19 2026 09:24:45
+[09:26:22.695] rolling build counter: [38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m0[0m.[38;2;167;155;196m0[0m.[38;2;168;158;146m47[0m
+[09:26:22.761] sim tick radius 8 chunks (from settings.json), round area (from settings.json)
+[09:26:22.763] scripts: /scripts (--scripts exe; the F10 editor saves here)
+[09:26:22.766] window: emscripten stub window 1280x720 (api gl33)
+[09:26:22.860] window: WebGL2 context current on #canvas
+ERR: GL loader: missing glDrawElementsBaseVertex
+ERR: GL loader: missing glTexBuffer
+[09:26:22.867] gl33: chunk meshes in one VBO + VAO per sub-chunk
+ERR: [09:26:22.916] ERROR built-in shader 'chunk' failed:
+ERR: fragment: ERROR: 0:9: 'sampler2DArray' : No precision specified
+ERR: 

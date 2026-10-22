@@ -1,0 +1,5 @@
+TIMEOUT waiting for menu play after Enter ("menu: play")
+HARNESS FAIL Error: Attempted to use detached Frame 'CFDA54098B6AF4D626AE87A38B839FE2'.
+    at CdpFrame.<anonymous> (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:99:23)
+    at CdpPage.evaluate (file:///home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:43)
+    at /home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/harness/interactive.js:159:29

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="works.wetwafer.lithokraft.shell"
+    android:versionCode="9"
+    android:versionName="1.8">
+
+    <uses-sdk
+        android:minSdkVersion="26"
+        android:targetSdkVersion="34" />
+
+    <!-- The shell serves its bundled web package from an in-app HTTPS
+         server on 127.0.0.1 (see MainActivity.LocalHttpsServer); socket
+         use wants the INTERNET permission even though nothing leaves
+         the loopback interface. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- WebGL2 in WebView maps to GLES3; not hard-required so the shell
+         still installs on lesser devices (it just won't render GL there). -->
+    <uses-feature
+        android:glEsVersion="0x00030000"
+        android:required="false" />
+
+    <application
+        android:label="LithoKraft Shell"
+        android:hardwareAccelerated="true"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:allowBackup="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Shell v1.6, Leg B: the WebViewAssetLoader (appassets
+             origin) entry point. Shell v1.8 (build 80, JD's call): ONE
+             launcher icon for the shell — this activity no longer
+             carries the LAUNCHER category, so it shows no icon; it
+             stays exported and reachable by explicit intent for the
+             Leg B experiment (e.g. adb shell am start -n
+             works.wetwafer.lithokraft.shell/.AssetsActivity).
+             See AssetsActivity's header for the honest prior on this
+             origin class. -->
+        <activity
+            android:name=".AssetsActivity"
+            android:exported="true"
+            android:label="LithoKraft (appassets)"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
