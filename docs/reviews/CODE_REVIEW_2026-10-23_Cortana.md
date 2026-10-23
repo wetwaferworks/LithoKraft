@@ -173,6 +173,7 @@ Approved by JD: diamond for both the sim area and the stream area, plus the rema
 
 ### B8: intermittent engine_sim hang (fixed)
 
+- **Severity: CRITICAL (safety).** The failure is silent: a submitted job never dispatches while input and the rest of the engine keep running. On a robot, a time-critical action (for example, moving an arm to catch a falling object) would simply never happen.
 - **Symptom:** `litholattice_tests.exe sim` (and once `core`) sometimes hung forever at about 0 % CPU. Pre-fix Release hung at run 13. An earlier Release ctest round sat in engine_core for 28+ minutes until it was killed.
 - **Location (real tree):** `engine/src/core/include/litholattice/core/job_system.h`
   - `JobSystem::submit` (line 195): the empty lock at line 219.
@@ -203,6 +204,9 @@ Approved by JD: diamond for both the sim area and the stream area, plus the rema
   - Setting `LITHO_THREAD_LOG_STDERR=1` also echoes each line live.
   - Files: thread_debug.h/.cpp, job_system.h.
   - After the instrumentation, the flag-OFF Release build passes ctest 48/48 x3 (44 s).
+
+- **Follow-up (proposed, not implemented):** a deadline/liveness watchdog for critical jobs. A job submitted with a deadline that is not picked up by a worker within it raises a critical log (and a counter), so a stalled dispatch is never silent again.
+- **Safety watchlist:** recorded as entry #1 in [docs/safety/SAFETY_WATCHLIST.md](../safety/SAFETY_WATCHLIST.md).
 
 ### R-PG-2: dungeon feature is a silent no-op (made loud, not implemented)
 
