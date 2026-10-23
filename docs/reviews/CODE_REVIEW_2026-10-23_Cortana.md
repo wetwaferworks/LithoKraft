@@ -232,3 +232,31 @@ Approved by JD: diamond for both the sim area and the stream area, plus the rema
 - Release ctest -j8: 48/48 x3 after the final edits.
 - ASan ctest 48/48 and the 200-run engine_sim loop were run after the B8 fix, before the flag-gated instrumentation and R-PG-2 edits. The instrumentation compiles out when the flag is OFF.
 - GL boot OK: counter `0.0.0.0.0.0.1.19`, AngelScript ready, hello script ran.
+
+## Safety review: concurrency and silent failures (2026-10-23, read-only, JD t2346u)
+
+The main tree was read for lost wakeups, condition-variable waits without predicates, races, unbounded blocking and silent failures, in the spirit of [SAFETY_WATCHLIST.md](../safety/SAFETY_WATCHLIST.md). **Nothing was changed in code.** Every condition-variable wait and notify site in engine/src and game/LithoKraft/src was checked, as were the swallow-all `catch (...)` blocks, detached threads and sleep/poll loops. Line numbers are from main at `8e8fa0c` plus the B8 comment commit.
+
+- **R-SAFE-1 (High): unbounded retry in a JobSystem worker.** `job_system.h` `workerLoop`, around lines 436 and 441: when `findJob` throws (the throwing-copy path), the worker logs, sleeps 1 ms and retries the same job with no bound or escalation. If the throw is deterministic, for example a job whose copy always throws, that job never runs, the worker livelocks, and the log grows by one error per millisecond. This is a non-dispatch with a noisy but unhelpful signal. It needs a retry cap, then a critical log and failing the job, so the fence/waitIdle caller still completes.
+- **R-SAFE-2 (High, pattern): completion waits with no deadline.** Each of these blocks forever if one job never finishes or is never dispatched (the B8 class). Only the flag-ON debug build has a watchdog, and only in JobSystem.
+  - JobSystem (`job_system.h`): `waitIdle` at line 248 and `JobFence::wait` at line 596.
+  - `threading.h`: `JobPool::waitIdle` at line 80 and `JobBatch::wait` at line 143.
+  - Callers that wait on completion: `ai_world.cpp:195`, `dimension.cpp:20`.
+  - Storage: `storage.cpp:459` and `:491`, `async_io.cpp:122` and `:209`.
+  - Software renderer: `software_renderer.cpp` lines 292, 323, 346 and 362.
+  - The game render thread: `main.cpp` lines 563, 623 and 700.
+  - Proposed: the deadline/liveness watchdog from B8, plus a release-build "waited longer than N" critical log at each of these sites.
+- **R-SAFE-3 (Medium): `ai_world.cpp` lines 175-195.** If `pool_->submit` throws partway through the loop (allocation), `left` never reaches 0 and `cv.wait` hangs. If the function unwinds instead, the jobs already queued still hold references to the stack-local `mx`, `cv` and `left`, which is a use after scope. Submission should be all-or-nothing, or the count should only cover what was actually submitted.
+- **R-SAFE-4 (Medium): `WorldStore::flush()` / `load()` wait for global quiescence.** `storage.cpp:459` and `:491` wait for `jobs_.empty() && !busy_` rather than for their own job. While other code keeps posting (streaming saves), a synchronous `load()` can be starved for an unbounded time. In JobSystem pump mode, a call from inside an I/O-thread job would deadlock. I did not check whether any caller does this. Waiting on a per-request completion would fix both.
+- **R-SAFE-5 (Medium, silent): `entity.cpp:71`.** A throwing entity behaviour is caught with `catch (...)` and the entity is marked dead, with no log. An agent silently disappears. It needs at least one error line naming the entity and behaviour, plus a counter.
+- **R-SAFE-6 (Low, silent): `software_renderer.cpp:432`.** An exception from the detached-frame completion callback is swallowed with no log (`catch (...) {}`).
+- **R-SAFE-7 (Low, silent):**
+  - `settings_cvars.cpp:342`: a throwing setter silently drops the setting change (the comment says it "never throws in practice").
+  - `game.cpp` lines 2580 and 2589: the MCP pilot cvars silently fall back to their defaults on a parse failure, every frame.
+  - Both should log once.
+- **R-SAFE-8 (Low): `sim_thread.cpp` lines 645-648.** `LL_SIM_STALL_MS` sleeps while holding the block lock. It is a measurement hook and is fine as a diagnostic, but it must not be settable in a robot or production build. It should be compile-gated or refused outside debug builds.
+- **Checked and OK:**
+  - Notifiers that change the predicate under the waiter's mutex: JobPool, JobBatch, IoFence/IoScheduler, the software renderer pool, `sim_thread` `notifyWake`, `WorldStore`, and the main.cpp render thread.
+  - `timing_handshake.cpp` `stop()` stores `stop_` without the lock, but every wait is a 1 ms `wait_for`, so the worst case is 1 ms of latency, not a hang. The predicate-less `barrierCv_.wait_for` at line 571 sits inside a loop that re-checks.
+  - MCP accept uses a timeout. The stdio stop is bounded at 2 s and logged. The chunk streamer drain is bounded and logged.
+- **New watchlist patterns:** entries 2-5 in [SAFETY_WATCHLIST.md](../safety/SAFETY_WATCHLIST.md).

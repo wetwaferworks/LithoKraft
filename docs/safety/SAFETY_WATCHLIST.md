@@ -45,6 +45,38 @@ the fix, the rule, how to test for it, and its status.
   jobs. A job submitted with a deadline that is not picked up by a worker within that
   deadline raises a critical log (and a counter), so a stalled dispatch can never be silent.
 
+## 2. Completion waits with no deadline
+
+- **Status:** Documented (review R-SAFE-2). Not fixed.
+- **Pattern:** a caller blocks on "all my jobs are done" (a fence, waitIdle, batch wait, flush or join) with no deadline.
+- **Why it is dangerous:** one stuck or never-dispatched job freezes the caller silently, and the rest of the system looks alive.
+- **Rule:** every cross-thread completion wait in a safety path either has a deadline that raises a critical log, or is covered by the liveness watchdog.
+- **Test:** inject a job that never completes and require a critical log within the deadline.
+
+## 3. Unbounded retry on a persistent failure
+
+- **Status:** Documented (R-SAFE-1). Not fixed.
+- **Pattern:** "log, back off, retry" with no cap.
+- **Why it is dangerous:** if the failure is deterministic, the work never happens and the thread livelocks, and the only signal is a log flood.
+- **Rule:** cap retries, then escalate (critical log, fail the job so its waiters complete).
+- **Test:** inject a failure that always repeats and require a bounded outcome.
+
+## 4. Silent containment
+
+- **Status:** Documented (R-SAFE-5/6/7). Not fixed.
+- **Pattern:** a `catch (...)` that removes an agent, drops a command or uses a default value without logging.
+- **Why it is dangerous:** containment is right, but silence hides it. A robot behaviour that throws simply stops existing.
+- **Rule:** every containment logs at least once, naming the component, and counts the event.
+- **Test:** throw from each contained boundary and require the log line.
+
+## 5. Waiting for global quiescence instead of your own result
+
+- **Status:** Documented (R-SAFE-4). Not fixed.
+- **Pattern:** a synchronous call waits for "the whole queue is empty" rather than for its own request.
+- **Why it is dangerous:** steady background work starves it for an unbounded time, and a call from inside the pool it waits on deadlocks.
+- **Rule:** wait on a per-request completion, and never block a pool thread on that same pool.
+- **Test:** run a synchronous call under continuous background posting and require it to finish within a bound.
+
 ## Requirements
 
 ### R1. Black Box Mystery Solved (JD): a replayable, tamper-evident decision log
