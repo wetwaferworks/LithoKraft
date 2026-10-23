@@ -25,5 +25,7 @@
   "vkBloomStrength": 1,
   "vkHeartbeatGlow": 1.75,
   "vkFarLod": true,
-  "roundSimArea": true
+  "roundSimArea": true,
+  "diamondSimArea": true,
+  "diamondStreamArea": true
 }

@@ -65,6 +65,9 @@ class ChunkStreamer {
   /// outlives the streamer finishes into orphaned queues safely.
   ~ChunkStreamer();
 
+  /// Diamond (Manhattan) footprint for the wanted set + eviction (JD 2026-10-23).
+  void setDiamond(bool d) { diamond_ = d; }
+
   /// Main thread, once per frame: request missing columns within the radius of
   /// the player's chunk, nearest first, bounded by the in-flight cap.
   void update(int playerCx, int playerCz);
@@ -125,6 +128,7 @@ class ChunkStreamer {
   WorldSave* save_;  // null = generate-only (tests, --no-save)
   std::string dimensionId_;
   int radius_;
+  bool diamond_ = false;  ///< diamond (Manhattan) stream footprint (JD 2026-10-23)
   size_t initialCount_ = 0;
   std::unordered_set<uint64_t> requested_;  // loaded or in flight (failures are erased by update(), B-L7)
   std::unordered_map<uint64_t, Retry> retries_;  // failed keys: attempt count + backoff deadline (main thread)
@@ -147,6 +151,12 @@ class ChunkStreamer {
 /// dimension's column keys each pump; hysteresis/budget values are the
 /// caller's policy (JD-DECISION parameters, see game.cpp).
 std::vector<uint64_t> selectEvictionCandidates(const std::vector<uint64_t>& residentKeys, int centerCx, int centerCz,
-                                               int streamRadius, int hysteresisChunks, size_t budget);
+                                               int streamRadius, int hysteresisChunks, size_t budget, bool diamond = false);
+
+/// Fix 3b (JD 2026-10-23, t2279u): request priority of a column at offset (dx, dz) from
+/// the player chunk. Smaller loads first. Diamond streams rank by |dx|+|dz| (then dx^2+dz^2);
+/// square/round streams rank by dx^2+dz^2. The streamer sorts (priority, key) pairs, so ties
+/// break by chunk key: deterministic and independent of the input order.
+int streamRequestPriority(int dx, int dz, bool diamond);
 
 }  // namespace lithokraft

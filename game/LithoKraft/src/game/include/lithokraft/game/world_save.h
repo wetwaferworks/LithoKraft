@@ -20,6 +20,7 @@
 #include "litholattice/core/math.h"
 #include "litholattice/storage/block_names.h"
 #include "litholattice/storage/storage.h"
+#include "litholattice/sim/area_shape.h"  // Fix run 3: level.json v3 area
 #include "litholattice/world/chunk_map.h"
 
 namespace lithokraft {
@@ -151,7 +152,18 @@ class WorldSave {
   /// a double and cannot hold every uint64 seed exactly.
   /// v2 (Cortana 2026-10-16): adds the world clock, "worldTick" (sim ticks ever run in this world)
   /// and "worldTime" (world_clock.h units), both decimal strings. v1 files simply have no clock.
-  static constexpr int kWorldMetaVersion = 2;
+  /// v3 (Fix run 3, 2026-10-23): the sim/stream area the world runs with,
+  /// "simAreaShape" / "streamAreaShape" (square|round|diamond) and
+  /// "tickRadius" (number). v1/v2 files have none: readWorldArea returns
+  /// nullopt with err empty and the caller keeps its configured area.
+  static constexpr int kWorldMetaVersion = 3;
+  struct WorldAreaMeta {
+    litholattice::AreaShape sim = litholattice::kDefaultAreaShape;
+    litholattice::AreaShape stream = litholattice::kDefaultAreaShape;
+    int tickRadius = 8;
+  };
+  void setWorldArea(const WorldAreaMeta& a) { area_ = a; hasArea_ = true; }
+  static std::optional<WorldAreaMeta> readWorldArea(const std::filesystem::path& root, std::string* err);
   void setSeed(uint64_t seed) { seed_ = seed; hasSeed_ = true; }
   struct WorldClockMeta { uint64_t tick = 0, time = 0; };
   /// The clock the next level.json write carries (Game sets it before each save).
@@ -225,6 +237,8 @@ class WorldSave {
   bool hasSeed_ = false;
   std::atomic<uint64_t> clockTick_{0}, clockTime_{0};  ///< Cortana 2026-10-16: world clock for level.json v2
   std::atomic<bool> hasClock_{false};
+  WorldAreaMeta area_;    ///< Fix run 3: level.json v3 area (set once by Game before any save)
+  bool hasArea_ = false;
   bool lastSaveOk_ = true;  ///< outcome of the last saveDimension (see above)
   std::string lastSaveError_;
   // Cached block-name remap for loadColumn (the table is written by the first

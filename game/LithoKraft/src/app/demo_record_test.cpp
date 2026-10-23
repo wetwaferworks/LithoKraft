@@ -510,6 +510,45 @@ bool readFileBytes(const std::string& path, std::vector<uint8_t>& out) {
 
 }  // namespace
 
+// Fix run 3 (2026-10-23): the sim/stream area rides in the preamble area
+// word; old files (word 0) are "not recorded"; a replay uses the recorded
+// area even when the replayer's settings disagree.
+static void testDemoArea(const std::vector<ControlEvent>& script) {
+  std::printf("== demo record: area word (fix run 3)\n");
+  DemoAreaInfo rec{};
+  rec.known = true; rec.simShape = AreaShape::Round; rec.streamShape = AreaShape::Diamond; rec.tickRadius = 12;
+  check(unpackDemoArea(packDemoArea(rec)) == rec && !unpackDemoArea(0).known && packDemoArea(DemoAreaInfo{}) == 0,
+        "demo area: pack/unpack round-trips; word 0 (pre-fix-3 file) is not recorded");
+  ControlStream cs;
+  DemoRecorder r;
+  DemoSessionInfo si = unitSession();
+  si.area = rec;
+  r.begin(cs, si);
+  cs.submitStamped(script);
+  cs.prePhase(0);
+  std::vector<ControlEvent> out;
+  cs.extractDue(125, out);
+  r.finish(kUnitFinalHash, 125);
+  const auto& b = r.bytes();
+  const DemoParseResult p = parseDemo(b.data(), b.size());
+  check(p.complete && p.area == rec && p.session.area == rec, "demo area: recorded area parses back from a complete demo");
+  std::vector<uint8_t> old = b;
+  old[6] = 0; old[7] = 0;  // what a pre-fix-3 recorder wrote (reserved 0)
+  recomputeTrailerChecksum(old);
+  const DemoParseResult po = parseDemo(old.data(), old.size());
+  check(po.complete && !po.area.known, "demo area: an old (v1, reserved-0) demo still parses complete, area not recorded");
+  DemoAreaInfo cur{};
+  cur.known = true; cur.simShape = AreaShape::Diamond; cur.streamShape = AreaShape::Square; cur.tickRadius = 8;
+  bool mismatch = false;
+  const DemoAreaInfo used = resolveReplayArea(p.area, cur, &mismatch);
+  check(mismatch && used == rec, "demo area: replay with mismatched settings uses the RECORDED area (and flags it)");
+  const DemoAreaInfo usedOld = resolveReplayArea(po.area, cur, &mismatch);
+  check(!mismatch && usedOld == cur, "demo area: an old demo replays with the configured area (previous behaviour)");
+  std::vector<uint8_t> torn(b.begin(), b.begin() + 7);
+  const DemoParseResult pt = parseDemo(torn.data(), torn.size());
+  check(pt.truncated && !pt.area.known, "demo area: a preamble torn inside the area word is a truncated demo, area unknown");
+}
+
 int runDemoSelfTest() {
   const int before = gFails;
   const std::vector<ControlEvent> script = sampleEvents();
@@ -517,6 +556,7 @@ int runDemoSelfTest() {
   testNonPerturbation(script);
   testRecoveryMatrix(bytes, script);
   testAnalysis(bytes, script);
+  testDemoArea(script);
   return gFails - before;
 }
 

@@ -155,6 +155,11 @@ bool WorldSave::writeWorldMeta(std::string* err) const {
     j.add("worldTick", litholattice::Json::string(std::to_string(clockTick_.load())));
     j.add("worldTime", litholattice::Json::string(std::to_string(clockTime_.load())));
   }
+  if (hasArea_) {  // Fix run 3 (v3): the area this world runs with
+    j.add("simAreaShape", litholattice::Json::string(litholattice::areaShapeName(area_.sim)));
+    j.add("streamAreaShape", litholattice::Json::string(litholattice::areaShapeName(area_.stream)));
+    j.add("tickRadius", litholattice::Json::number(double(area_.tickRadius)));
+  }
   const std::string text = j.dump(2);
   return storage::writeFileAtomic(root_ / "level.json", reinterpret_cast<const uint8_t*>(text.data()), text.size(), err);
 }
@@ -209,6 +214,41 @@ std::optional<WorldSave::WorldClockMeta> WorldSave::readWorldClock(const std::fi
     return std::nullopt;
   }
   return c;
+}
+
+std::optional<WorldSave::WorldAreaMeta> WorldSave::readWorldArea(const std::filesystem::path& root, std::string* err) {
+  // Fix run 3. Called after readWorldSeed (crash recovery already ran on level.json).
+  const auto path = root / "level.json";
+  std::error_code ec;
+  if (!std::filesystem::exists(path, ec)) return std::nullopt;
+  storage::Bytes all;
+  if (!storage::readFileAll(path, &all, err)) return std::nullopt;
+  litholattice::Json j;
+  std::string jerr;
+  if (!litholattice::Json::parse(std::string(all.begin(), all.end()), j, &jerr)) {
+    if (err) *err = path.string() + ": " + jerr;
+    return std::nullopt;
+  }
+  const litholattice::Json* sa = j.get("simAreaShape");
+  const litholattice::Json* st = j.get("streamAreaShape");
+  const litholattice::Json* tr = j.get("tickRadius");
+  if (!sa && !st && !tr) return std::nullopt;  // v1/v2 metadata: no area (err stays empty)
+  WorldAreaMeta a;
+  std::string warn;
+  if (sa && sa->type == litholattice::Json::Type::String) {
+    bool ok = true;
+    a.sim = litholattice::parseAreaShape(sa->str, &ok);
+    if (!ok) warn += " unknown simAreaShape '" + sa->str + "' (using diamond);";
+  } else if (sa) warn += " simAreaShape is not a string (using diamond);";
+  if (st && st->type == litholattice::Json::Type::String) {
+    bool ok = true;
+    a.stream = litholattice::parseAreaShape(st->str, &ok, /*allowRound=*/false);
+    if (!ok) warn += " unknown streamAreaShape '" + st->str + "' (using diamond);";
+  } else if (st) warn += " streamAreaShape is not a string (using diamond);";
+  if (tr && tr->type == litholattice::Json::Type::Number && tr->num >= 0 && tr->num <= 512) a.tickRadius = int(tr->num);
+  else if (tr) warn += " unusable tickRadius (using 8);";
+  if (!warn.empty() && err) *err = path.string() + ":" + warn;
+  return a;
 }
 
 storage::WorldStore& WorldSave::store(const std::string& dim) {

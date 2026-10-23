@@ -1,5 +1,5 @@
-// 2026-10-16 (JD): LithoKraft build version "Alpha a.b.c.d". The counter lives in the tracked file
-// build_counter.txt at the tree root and is bumped on every build (cmake/bump_build_counter.cmake).
+// LithoKraft build version. Since 2026-10-23 (JD, fix run 2) the counter is a rolling decimal integer in
+// LITHOKRAFT_BUILD_COUNTER.txt (tree root), bumped per build; public label from LITHOKRAFT_VERSION.txt.
 // Display / log only: never part of the determinism hash.
 #pragma once
 #include <array>
@@ -17,7 +17,7 @@ inline std::array<int, 4> bumpBuildVersion(std::array<int, 4> v) {
   return v;  // 63.63.63.63 wraps to 0.0.0.0
 }
 
-/// "Alpha a.b.c.d" of this build (generated header).
+/// "<public label> build N" of this build, e.g. "Alpha 0.0.1 build 7" (generated header).
 const char* buildVersion();
 /// "LithoKraft Alpha a.b.c.d (commit) Release|Debug built <date time>".
 std::string buildInfo();

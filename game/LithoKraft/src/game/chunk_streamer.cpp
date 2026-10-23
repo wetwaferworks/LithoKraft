@@ -111,7 +111,7 @@ void ChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
   // Nearest-first: when something crosses into ungenerated territory the
   // ground underfoot streams in before the horizon does.
   constexpr int kMaxInFlight = 32;  // leave pool capacity for meshing
-  std::sort(want.begin(), want.end());
+  std::sort(want.begin(), want.end());  // (priority, key): nearest first, key tiebreak (fix 3b)
   for (const auto& [dist2, key] : want) {
     (void)dist2;
     if (inFlight_->load(std::memory_order_relaxed) >= kMaxInFlight) break;
@@ -160,6 +160,11 @@ void ChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
   }
 }
 
+int streamRequestPriority(int dx, int dz, bool diamond) {
+  const int e2 = dx * dx + dz * dz;  // < 2^20 for any radius the streamer accepts (<= 512)
+  return diamond ? ((std::abs(dx) + std::abs(dz)) << 20) | e2 : e2;
+}
+
 void ChunkStreamer::update(int playerCx, int playerCz) {
   if (!gen_) return;
   if (!centreInRange(playerCx, playerCz)) {  // B-L2: refuse out-of-packPos-range centres
@@ -175,8 +180,9 @@ void ChunkStreamer::update(int playerCx, int playerCz) {
   std::vector<std::pair<int, uint64_t>> want;  // (distance^2 in chunks, key)
   for (int dz = -radius_; dz <= radius_; ++dz)
     for (int dx = -radius_; dx <= radius_; ++dx) {
+      if (diamond_ && std::abs(dx) + std::abs(dz) > radius_) continue;  // diamond footprint (JD 2026-10-23)
       const uint64_t key = litholattice::ChunkKey::make(playerCx + dx, playerCz + dz);
-      if (requestable(key, now)) want.emplace_back(dx * dx + dz * dz, key);
+      if (requestable(key, now)) want.emplace_back(streamRequestPriority(dx, dz, diamond_), key);  // fix 3b: diamond-nearest first
     }
   pumpRequests(std::move(want));
 }
@@ -189,8 +195,9 @@ void ChunkStreamer::updateAround(int cx, int cz, int radiusChunks) {
   std::vector<std::pair<int, uint64_t>> want;
   for (int dz = -r; dz <= r; ++dz)
     for (int dx = -r; dx <= r; ++dx) {
+      if (diamond_ && std::abs(dx) + std::abs(dz) > r) continue;  // diamond footprint (JD 2026-10-23)
       const uint64_t key = litholattice::ChunkKey::make(cx + dx, cz + dz);
-      if (requestable(key, now)) want.emplace_back(dx * dx + dz * dz, key);
+      if (requestable(key, now)) want.emplace_back(streamRequestPriority(dx, dz, diamond_), key);  // fix 3b: diamond-nearest first
     }
   pumpRequests(std::move(want));
 }
@@ -213,12 +220,13 @@ void ChunkStreamer::forgetColumn(int cx, int cz) {
 }
 
 std::vector<uint64_t> selectEvictionCandidates(const std::vector<uint64_t>& residentKeys, int centerCx, int centerCz,
-                                               int streamRadius, int hysteresisChunks, size_t budget) {
+                                               int streamRadius, int hysteresisChunks, size_t budget, bool diamond) {
   const int limit = streamRadius + hysteresisChunks;
   std::vector<std::pair<int, uint64_t>> far;  // (distance, key)
   for (uint64_t key : residentKeys) {
     const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
-    const int d = std::max(std::abs(cx - centerCx), std::abs(cz - centerCz));
+    const int d = diamond ? std::abs(cx - centerCx) + std::abs(cz - centerCz)  // Manhattan (JD 2026-10-23)
+                          : std::max(std::abs(cx - centerCx), std::abs(cz - centerCz));
     if (d > limit) far.emplace_back(d, key);
   }
   std::sort(far.begin(), far.end(), [](const auto& a, const auto& b) {

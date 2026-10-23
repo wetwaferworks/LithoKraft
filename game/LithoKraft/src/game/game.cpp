@@ -1,4 +1,5 @@
 #include <string_view>
+#include "litholattice/script/script_generic.h"
 #include <thread>
 #include <unordered_set>  // Cortana 2026-10-15 1455
 // Cortana 2026-10-15 0825/0935/1020: CHUNK-STALL, ALT-TAB, GAME-H1
@@ -47,6 +48,25 @@
 #include "litholattice/camera/camera.h"    // engine camera system: cvars + manager types
 #include "litholattice/procgen/ramp_shape.h"  // Highway Ramp walk surface
 #include "litholattice/world/raycast.h"    // voxel DDA for Game::cameraRaycast
+#include "litholattice/sim/area_shape.h"  // Fix run 3: shared area shapes + containment
+
+namespace {
+// Fix run 3 (2026-10-23, JD t2262u): shape views of the config bools, and
+// the stream radius that always CONTAINS the sim area, so no ticking chunk
+// is ever outside the resident footprint. A square stream over any sim area
+// gives max(tick, stream): exactly the pre-fix-3 radius.
+litholattice::AreaShape simAreaShapeOf(const lithokraft::GameConfig& c) {
+  return c.diamondSimArea ? litholattice::AreaShape::Diamond
+         : c.roundSimArea ? litholattice::AreaShape::Round
+                          : litholattice::AreaShape::Square;
+}
+litholattice::AreaShape streamAreaShapeOf(const lithokraft::GameConfig& c) {
+  return c.diamondStreamArea ? litholattice::AreaShape::Diamond : litholattice::AreaShape::Square;
+}
+int effectiveStreamRadius(const lithokraft::GameConfig& c) {
+  return std::max(c.streamRadius, litholattice::minStreamRadiusCovering(simAreaShapeOf(c), c.tickRadius, streamAreaShapeOf(c)));
+}
+}  // namespace
 
 #include <cstdlib>
 static int llP2PerfOff() { static const int v = [] { const char* e = std::getenv("LL_P2_PERF_OFF"); return e ? int(std::strtol(e, nullptr, 0)) : 0; }(); return v; }  // Cortana 2026-10-16 1520: A/B perf switch (render/display only)
@@ -714,6 +734,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceMa
   if (!cfg_.saveDir.empty()) {
     save_ = std::make_unique<WorldSave>(cfg_.saveDir, cfg_.materials);
     save_->setSeed(cfg_.seed);  // SV-H2: cfg.seed already carries the persisted-seed override (main.cpp)
+    save_->setWorldArea({simAreaShapeOf(cfg_), streamAreaShapeOf(cfg_), cfg_.tickRadius});  // Fix run 3: level.json v3 (main.cpp applies the saved area)
     std::string err;
     savedPlayer = save_->readPlayer(&err);
     if (!err.empty()) logError("save: %s (starting at spawn)", err.c_str());
@@ -853,8 +874,7 @@ void Game::initScripts() {
   consoleScriptCtx_ =
       litholattice::console::bindConsoleToScripts(scripts_, consoleRegistry_, "lithokraft");
   if (!consoleScriptCtx_) logError("game: console script bindings refused (allowlist/permissions)");
-  scripts_.bindGlobalFunction("string currentDimension()", asFUNCTION(scriptCurrentDimension),
-                              asCALL_CDECL_OBJLAST, this);
+  scripts_.bindFunction("string currentDimension()", LL_SCRIPT_FN_OBJLAST(scriptCurrentDimension), this);  // fix 3c: generic on web
   if (uiScripts_.registerApi()) ui_.root().setScriptHost(&uiScripts_);
   if (scripts_.loadDirectory(cfg_.scriptsDir)) scripts_.callHook("void onLoad()");
   editor_ = std::make_unique<ScriptEditor>(ui_.root(), scripts_, cfg_.scriptsDir, [this] { scripts_.callHook("void onLoad()"); });
@@ -1035,18 +1055,33 @@ void Game::loadActive() {
              active_->id.c_str());
   ++epoch_; totalSubs_ = 0; meshesReceived_ = 0;
   chunkColumns_ = active_->chunks.columns().size();  // read here: the sim thread owns the map later
-  for (auto& [k, col] : active_->chunks.columns())
-    for (int sy = 0; sy < kSubChunks; ++sy)
-      if (col->subs[sy]) { ++totalSubs_; submitMesh_(snapshotForMeshing(active_->chunks, blockRegistry(), col->cx, sy, col->cz, epoch_, ++initSeq_, active_->belowWorldFill)); }
+  {  // fix 3b (JD t2279u): mesh the loaded columns nearest-first around the spawn chunk, not in
+     // unordered_map order, so the world fills in from the player outwards (same rule as the streamer).
+    const int scx = int(std::floor(sp.x / 16)), scz = int(std::floor(sp.z / 16));
+    std::vector<std::pair<int, uint64_t>> order;
+    order.reserve(active_->chunks.columns().size());
+    for (const auto& [k, col] : active_->chunks.columns())
+      order.emplace_back(streamRequestPriority(col->cx - scx, col->cz - scz, cfg_.diamondStreamArea), k);
+    std::sort(order.begin(), order.end());
+    for (const auto& [pri, k] : order) {
+      (void)pri;
+      const auto& col = active_->chunks.columns().at(k);
+      for (int sy = 0; sy < kSubChunks; ++sy)
+        if (col->subs[sy]) { ++totalSubs_; submitMesh_(snapshotForMeshing(active_->chunks, blockRegistry(), col->cx, sy, col->cz, epoch_, ++initSeq_, active_->belowWorldFill)); }
+    }
+  }
   player_.pos = {sp.x, sp.y, sp.z}; player_.yaw = sp.yaw; player_.pitch = sp.pitch;
   spawnPoint_ = player_.pos;
   SimConfig sc;
   sc.tickRate = cfg_.tps; sc.radiusChunks = cfg_.tickRadius; sc.epoch = epoch_; sc.belowWorldFill = active_->belowWorldFill;
   sc.roundArea = cfg_.roundSimArea;  // F56-7 (Proposed by JD; co-implemented by JD and Cortana)
+  sc.diamondArea = cfg_.diamondSimArea;  // diamond (JD 2026-10-23)
   {  // F56-6 (Cortana 2026-10-17): effective sim area (after scene clamps), logged at every sim start
     const int r = cfg_.tickRadius; long long n = 0;
-    for (int dz = -r; dz <= r; ++dz) for (int dx = -r; dx <= r; ++dx) n += (!cfg_.roundSimArea || dx * dx + dz * dz <= r * r + r) ? 1 : 0;
-    logInfo("sim: tick area radius %d, %s, %lld chunk columns", r, cfg_.roundSimArea ? "round (dx^2+dz^2 <= r^2+r)" : "square", n);
+    for (int dz = -r; dz <= r; ++dz) for (int dx = -r; dx <= r; ++dx)
+      n += (cfg_.diamondSimArea ? (std::abs(dx) + std::abs(dz) <= r) : (!cfg_.roundSimArea || dx * dx + dz * dz <= r * r + r)) ? 1 : 0;
+    logInfo("sim: tick area radius %d, %s, %lld chunk columns", r,
+            cfg_.diamondSimArea ? "diamond (|dx|+|dz| <= r)" : cfg_.roundSimArea ? "round (dx^2+dz^2 <= r^2+r)" : "square", n);
   }
   sc.randomTicksPerSection = active_->randomTicksPerSection;
   sc.domains.push_back({"EUV", kMaxDomainHz, cfg_.euv});  // lithographed EUV-tier chips (stub)
@@ -1127,7 +1162,8 @@ void Game::loadActive() {
     initial.reserve(active_->chunks.columns().size());
     for (const auto& [k, col] : active_->chunks.columns()) initial.insert(k);
     streamer_ = std::make_unique<ChunkStreamer>(pool_, active_->generator, save_.get(), active_->id,
-                                                std::max(cfg_.tickRadius, cfg_.streamRadius), initial);
+                                                effectiveStreamRadius(cfg_) /* fix3: sim area always inside stream */, initial);
+    streamer_->setDiamond(cfg_.diamondStreamArea);  // diamond stream footprint (JD 2026-10-23)
   }
   // AiWorld host (B6): bind to THIS dimension's live map + registry +
   // pool while the game thread still owns the map (before sim start).
@@ -1378,8 +1414,8 @@ void Game::evictFarColumns() {
   std::vector<uint64_t> residentKeys;
   residentKeys.reserve(active_->chunks.columns().size());
   for (const auto& [k, col] : active_->chunks.columns()) residentKeys.push_back(k);
-  const std::vector<uint64_t> candidates = selectEvictionCandidates(residentKeys, pcx, pcz, std::max(cfg_.tickRadius, cfg_.streamRadius),
-                                                                    kEvictHysteresisChunks, kEvictBudgetPerPump);
+  const std::vector<uint64_t> candidates = selectEvictionCandidates(residentKeys, pcx, pcz, effectiveStreamRadius(cfg_) /* fix3: sim area always inside stream */,
+                                                                    kEvictHysteresisChunks, kEvictBudgetPerPump, cfg_.diamondStreamArea);
   if (candidates.empty()) return;
   // Same hold discipline as insertion (P0a + build 80): nothing is
   // evicted under a running sim, and a refused hold defers the whole
@@ -2647,9 +2683,17 @@ void Game::playSounds() {
       const uint64_t id = entities_.spawn(kEntityItem, e.x + 0.5, e.y + 0.5, e.z + 0.5);
       if (litholattice::Entity* en = entities_.get(id)) {
         en->data = uint32_t(e.value);
-        en->vx = (rand() / double(RAND_MAX) - 0.5) * 2.0;
+        // Cortana review 2026-10-23 (R-DET-1): was rand() - global, unseeded,
+        // non-reproducible. Toss now derives from the event itself (splitmix64),
+        // so replays and lockstep peers see the same item motion.
+        uint64_t h = (uint64_t(uint32_t(e.x)) * 0x9E3779B97F4A7C15ull) ^ (uint64_t(uint32_t(e.y)) << 21) ^
+                     (uint64_t(uint32_t(e.z)) * 0xC2B2AE3D27D4EB4Full) ^ (uint64_t(uint32_t(e.value)) << 42);
+        auto mix = [](uint64_t z) { z += 0x9E3779B97F4A7C15ull; z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull; z = (z ^ (z >> 27)) * 0x94D049BB133111EBull; return z ^ (z >> 31); };
+        h = mix(h); const double rx = double(h >> 11) * (1.0 / 9007199254740992.0);
+        h = mix(h); const double rz = double(h >> 11) * (1.0 / 9007199254740992.0);
+        en->vx = (rx - 0.5) * 2.0;
         en->vy = 2.5;
-        en->vz = (rand() / double(RAND_MAX) - 0.5) * 2.0;
+        en->vz = (rz - 0.5) * 2.0;
       }
       continue;
     }

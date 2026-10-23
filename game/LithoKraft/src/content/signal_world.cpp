@@ -264,6 +264,7 @@ void SignalWorldSimulation::onHsCommit(uint64_t phase, uint64_t /*cycleTick*/, u
 
 void SignalWorldSimulation::tickHandshake(ChunkMap& world, const TickArea& area, const DirtyFn& dirty) {
   signal_.setRoundArea(area.round);  // F56-7
+  signal_.setDiamondArea(area.diamond);  // diamond (JD 2026-10-23)
   const int p = hsAuthority_->phasesPerCycle();
   if (p < 4) {  // the four sub-steps need four phase slots; fall back to the legacy cycle
     if (!hsLegacyFallbackLogged_) {

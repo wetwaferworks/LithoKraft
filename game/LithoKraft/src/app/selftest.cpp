@@ -173,6 +173,20 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
             "fps cap: cvar set clamps to 1000 through the apply path");
       check(reg.setCVar("render.fps_cap", "0") && applied.fpsCap == 0,
             "fps cap: cvar set 0 turns the cap off through the apply path");
+      // Fix run 3: diamond is the default for both footprints; shape cvars are
+      // case-insensitive and an unknown value falls back to diamond (never square).
+      const auto* sa = reg.findCVar("sim.area_shape");
+      const auto* ss = reg.findCVar("render.stream_shape");
+      check(sa && sa->value == "diamond" && ss && ss->value == "diamond" && GameSettings{}.diamondSimArea && GameSettings{}.diamondStreamArea,
+            "area shape (fix run 3): sim.area_shape and render.stream_shape default to diamond (settings + config)");
+      check(reg.setCVar("sim.area_shape", "ROUND") && applied.roundSimArea && !applied.diamondSimArea &&
+                reg.setCVar("sim.area_shape", "Square") && !applied.roundSimArea && !applied.diamondSimArea,
+            "area shape (fix run 3): sim.area_shape parses case-insensitively");
+      check(reg.setCVar("sim.area_shape", "hexagon") && applied.diamondSimArea && !applied.roundSimArea,
+            "area shape (fix run 3): an unknown sim.area_shape falls back to diamond (warning logged)");
+      check(reg.setCVar("render.stream_shape", "SQUARE") && !applied.diamondStreamArea &&
+                reg.setCVar("render.stream_shape", "round") && applied.diamondStreamArea,
+            "area shape (fix run 3): render.stream_shape is case-insensitive; unknown/round falls back to diamond");
     }
   }
   fails += runAiHostSelfTest();
@@ -652,6 +666,32 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         const auto seedBack = WorldSave::readWorldSeed(sdir, &serr);
         check(std::filesystem::exists(sdir / "level.json") && seedBack && *seedBack == kSeed,
               "save (SV-H2): the world seed persists in level.json and reads back exactly (uint64) with no CLI seed");
+        std::string aerr;
+        check(!WorldSave::readWorldArea(sdir, &aerr) && aerr.empty(),
+              "save (fix run 3): a save with no area (as v1/v2 wrote) reads back nullopt, no error -> configured area stands");
+      }
+      {  // fix run 3: level.json v3 persists the sim/stream area + tick radius
+        const auto adir = dir / "p0b_area";
+        WorldSave::WorldAreaMeta am;
+        am.sim = litholattice::AreaShape::Round; am.stream = litholattice::AreaShape::Square; am.tickRadius = 11;
+        { WorldSave save(adir); save.setSeed(7); save.setWorldArea(am); save.saveDimension("wafer", wafer->chunks, sig, true); }
+        std::string aerr;
+        const auto back = WorldSave::readWorldArea(adir, &aerr);
+        check(back && aerr.empty() && back->sim == am.sim && back->stream == am.stream && back->tickRadius == 11,
+              "save (fix run 3): the sim/stream area and tick radius persist in level.json v3 and read back exactly");
+        const auto odir = dir / "p0b_area_old";
+        std::filesystem::create_directories(odir);
+        { std::ofstream f(odir / "level.json", std::ios::binary); f << "{\"saveFormatVersion\": 2, \"seed\": \"5\"}"; }
+        std::string oerr;
+        check(!WorldSave::readWorldArea(odir, &oerr) && oerr.empty(),
+              "save (fix run 3): a v2 level.json (no area) is backward-compatible: nullopt, no error");
+        const auto bdir = dir / "p0b_area_bad";
+        std::filesystem::create_directories(bdir);
+        { std::ofstream f(bdir / "level.json", std::ios::binary); f << "{\"saveFormatVersion\": 3, \"seed\": \"5\", \"simAreaShape\": \"HEX\", \"streamAreaShape\": \"Diamond\", \"tickRadius\": 6}"; }
+        std::string berr;
+        const auto bad = WorldSave::readWorldArea(bdir, &berr);
+        check(bad && bad->sim == litholattice::AreaShape::Diamond && bad->stream == litholattice::AreaShape::Diamond && bad->tickRadius == 6 && !berr.empty(),
+              "save (fix run 3): an unknown saved shape warns and falls back to diamond; parsing is case-insensitive");
       }
       {  // SV-H1: a failed region flush surfaces as failure, and the pending
          // records kept by RegionFile land on the retry. Injection: a
@@ -1005,6 +1045,30 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       ChunkStreamer fs(pool, wafer->generator, nullptr, "wafer", 0, {ChunkKey::make(50, 50)});
       fs.forgetColumn(50, 50);
       check(fs.requestedCount() == 0, "evict (A2): ChunkStreamer::forgetColumn removes the requested_ entry (re-streamable)");
+      {  // fix 3b (JD t2279u): requests go nearest-first by diamond distance, ties deterministic
+        std::vector<std::pair<int, uint64_t>> order;
+        for (int dz = -6; dz <= 6; ++dz)
+          for (int dx = -6; dx <= 6; ++dx)
+            if (std::abs(dx) + std::abs(dz) <= 6) order.emplace_back(streamRequestPriority(dx, dz, true), ChunkKey::make(dx, dz));
+        std::sort(order.begin(), order.end());
+        bool mono = true;
+        int prev = -1;
+        for (const auto& [p, k] : order) {
+          const int d = std::abs(int(int32_t(k >> 32))) + std::abs(int(int32_t(k & 0xffffffffu)));
+          if (d < prev) mono = false;
+          prev = d;
+        }
+        check(order.front().second == ChunkKey::make(0, 0) && mono,
+              "stream order: diamond requests go nearest-first by |dx|+|dz| from the player chunk");
+        check(streamRequestPriority(3, 0, true) < streamRequestPriority(2, 2, true),
+              "stream order: diamond distance ranks (3,0) before (2,2)");
+        check(streamRequestPriority(2, 2, false) < streamRequestPriority(3, 0, false),
+              "stream order: square/round streams keep Euclidean nearest-first");
+        auto again = order;
+        std::reverse(again.begin(), again.end());
+        std::sort(again.begin(), again.end());
+        check(again == order, "stream order: ties break by chunk key (deterministic, input-order independent)");
+      }
     }
     std::filesystem::remove_all(edir);
   }
@@ -1264,6 +1328,20 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     auto face = [&](BlockId b, FaceSlot f, bool active) { return tex.texture(TextureId{mats->face(b, f, active).layer}).name; };
     check(ok && tex.textures().size() > 80 && tex.missingNames().empty() && rm.models().size() >= 24,
           "pack_64 resources.json: every texture loads into the registry, 24+ block models");
+    {  // fix 3c (JD t2288u): stacked vias draw the model's connected side variants (tinted)
+      auto cs = [&](BlockId b, int v) { const FaceMaterial* m = mats->connectedSide(b, v, false); return m ? tex.texture(TextureId{m->layer}).name : std::string(); };
+      bool tinted = true;
+      for (int v = 0; v < kConnectedSideCount; ++v)
+        for (BlockId b : {kBlueVia, kRedVia})
+          tinted = tinted && mats->connectedSide(b, v, false) && mats->tintSlot(mats->connectedSide(b, v, false)->layer) != 0;
+      check(ok && cs(kBlueVia, kConnectedSideBottom) == "via_side_bottom_neutral" && cs(kBlueVia, kConnectedSideMid) == "via_side_mid_neutral" &&
+                cs(kBlueVia, kConnectedSideTop) == "via_side_top_neutral" && cs(kBlueVia, kConnectedSideSingle) == "via_side_single_neutral" &&
+                !cs(kRedVia, kConnectedSideMid).empty() && tinted && !mats->connectedSide(kRepeator, kConnectedSideMid, false),
+            "vias: models' side_bottom/mid/top/single load as tinted connected side materials");
+      check(viaSideVariant(true, false) == kConnectedSideBottom && viaSideVariant(true, true) == kConnectedSideMid &&
+                viaSideVariant(false, true) == kConnectedSideTop && viaSideVariant(false, false) == kConnectedSideSingle,
+            "vias: run rule (lowest = bottom, between = mid, highest = top, lone = single)");
+    }
     check(ok && face(kRepeator, FaceSlot::Front, false) == "repeator_front_base" && face(kRepeator, FaceSlot::Top, true) == "repeator_top_d2_base" &&
               face(kThresholdor, FaceSlot::Left, false) == "thresholdor_low" && face(kThresholdor, FaceSlot::Right, false) == "thresholdor_high" &&
               face(kSwitch, FaceSlot::Bottom, false) == "switch_side" && face(kSiliconSlab, FaceSlot::Bottom, false) == "silicon_slab_top" &&

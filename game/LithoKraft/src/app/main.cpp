@@ -738,6 +738,7 @@ struct FrameCtx {
   std::unique_ptr<InputSystem> input;
   std::unique_ptr<litholattice::mcp::McpServer> mcpServer;
   std::thread mcpThread;
+  std::shared_ptr<std::atomic<bool>> mcpDone;  // set by the MCP thread as it exits (R-RACE-1)
 #if !defined(_WIN32)
   std::unique_ptr<McpStdioTransport> mcpTransport;
   int mcpSavedStdoutFd = -1;
@@ -780,6 +781,7 @@ int main(int argc, char** argv) {
   int renderThreadsArg = 0;  // Cortana 2026-10-15 1156: --render-threads N
   int fpsCapArg = -2; bool noVsync = false; bool noOverlay = false;  // Cortana 2026-10-15 1440: --no-overlay (A/B)  // Cortana 2026-10-15 1610: --fps-cap 30|60|off|auto (-2 = not given), --no-vsync
   bool tpsGiven = false, radiusGiven = false, displayGiven = false, streamGiven = false; int streamingArg = -1;  // CLI wins over settings.json
+  bool simAreaGiven = false, streamAreaGiven = false;  // diamond (JD 2026-10-23)
   int vkFxArg = -1;  // JD Vulkan push
   DisplayDesc display0;
   std::string vkArena = "device";
@@ -841,6 +843,20 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--radius")) { cfg.tickRadius = int(num(0, 512)); radiusGiven = true; }
     else if (!std::strcmp(argv[i], "--vkfx")) { vkFxArg = int(num(0, 127)); }  // JD Vulkan push: effect bits for this run
     else if (!std::strcmp(argv[i], "--stream-radius")) { cfg.streamRadius = int(num(1, 64)); streamGiven = true; }  // JD 2026-10-16
+    else if (!std::strcmp(argv[i], "--sim-area") && i + 1 < argc) {
+      const std::string a = argv[++i];
+      bool ok = true;  // Fix run 3: case-insensitive; unknown -> WARN + diamond (never square)
+      const litholattice::AreaShape sh = litholattice::parseAreaShape(a, &ok);
+      if (!ok) std::fprintf(stderr, "WARN --sim-area '%s' unknown (square|round|diamond); using diamond\n", a.c_str());
+      cfg.diamondSimArea = sh == litholattice::AreaShape::Diamond; cfg.roundSimArea = sh == litholattice::AreaShape::Round; simAreaGiven = true;
+    }  // diamond (JD 2026-10-23)
+    else if (!std::strcmp(argv[i], "--stream-area") && i + 1 < argc) {
+      const std::string a = argv[++i];
+      bool ok = true;  // Fix run 3: case-insensitive; unknown -> WARN + diamond
+      const litholattice::AreaShape sh = litholattice::parseAreaShape(a, &ok, /*allowRound=*/false);
+      if (!ok) std::fprintf(stderr, "WARN --stream-area '%s' unknown (square|diamond); using diamond\n", a.c_str());
+      cfg.diamondStreamArea = sh == litholattice::AreaShape::Diamond; streamAreaGiven = true;
+    }  // diamond (JD 2026-10-23)
     else if (!std::strcmp(argv[i], "--streaming") && i + 1 < argc) {
       const char* v = argv[++i];
       if (!std::strcmp(v, "on")) streamingArg = 1;
@@ -1008,9 +1024,25 @@ int main(int argc, char** argv) {
   if (!tpsGiven) cfg.tps = settings.tps;  // load() only yields valid modes
   if (!radiusGiven) cfg.tickRadius = settings.tickRadius;
   const char* radiusSource = radiusGiven ? "--radius" : "settings.json";  // F56-6 (logged once the log file is open)
-  cfg.roundSimArea = settings.roundSimArea;  // F56-7 (Proposed by JD; co-implemented by JD and Cortana): round sim area
-  const char* roundSource = "settings.json";
-  if (const char* e = std::getenv("LL_SIM_ROUND_AREA"); e && *e) { cfg.roundSimArea = e[0] != '0'; roundSource = "LL_SIM_ROUND_AREA"; }
+  if (!simAreaGiven) cfg.roundSimArea = settings.roundSimArea;  // F56-7 (Proposed by JD; co-implemented by JD and Cortana): round sim area (CLI --sim-area wins)
+  if (!simAreaGiven) cfg.diamondSimArea = settings.diamondSimArea;  // diamond (JD 2026-10-23)
+  if (!streamAreaGiven) cfg.diamondStreamArea = settings.diamondStreamArea;  // diamond (JD 2026-10-23)
+  // fix 3b: report where each area value came from; the CLI wins over the env vars (like --radius).
+  const char* roundSource = simAreaGiven ? "--sim-area" : "settings.json";
+  const char* streamSource = streamAreaGiven ? "--stream-area" : "settings.json";
+  if (const char* e = std::getenv("LL_SIM_ROUND_AREA"); e && *e && !simAreaGiven) { cfg.roundSimArea = e[0] != '0'; roundSource = "LL_SIM_ROUND_AREA"; }
+  if (const char* e = std::getenv("LL_SIM_AREA"); e && *e && !simAreaGiven) {  // diamond (JD 2026-10-23); fix run 3: shared parser
+    bool ok = true;
+    const litholattice::AreaShape sh = litholattice::parseAreaShape(e, &ok);
+    if (!ok) std::fprintf(stderr, "WARN LL_SIM_AREA '%s' unknown (square|round|diamond); using diamond\n", e);
+    cfg.diamondSimArea = sh == litholattice::AreaShape::Diamond; cfg.roundSimArea = sh == litholattice::AreaShape::Round; roundSource = "LL_SIM_AREA";
+  }
+  if (const char* e = std::getenv("LL_STREAM_AREA"); e && *e && !streamAreaGiven) {  // diamond (JD 2026-10-23); fix run 3: shared parser
+    bool ok = true;
+    const litholattice::AreaShape sh = litholattice::parseAreaShape(e, &ok, /*allowRound=*/false);
+    if (!ok) std::fprintf(stderr, "WARN LL_STREAM_AREA '%s' unknown (square|diamond); using diamond\n", e);
+    cfg.diamondStreamArea = sh == litholattice::AreaShape::Diamond; streamSource = "LL_STREAM_AREA";
+  }
   // Cortana 2026-10-16 2335 F55-5 (JD): LL_SIM_TICK_RADIUS overrides settings.json (CLI --radius still wins).
   if (const char* e = std::getenv("LL_SIM_TICK_RADIUS"); e && *e && !radiusGiven) {
     cfg.tickRadius = std::clamp(std::atoi(e), 0, 512);
@@ -1096,9 +1128,13 @@ int main(int argc, char** argv) {
   }
   optOutOfBackgroundThrottling();  // 0.0.1.57 F57-1 (R21; Discovered by Cortana, Fixed by Cortana)
   logInfo("%s", lithokraft::buildInfo().c_str());  // 2026-10-16 (JD): Alpha build counter + Release/Debug + date (renderer logged at init)
-  logInfo("rolling build counter: %s", jdCounterDisplay().c_str());  // 2026-10-18 (JD): 8 wheels, base 64, every build rolls it; wheel-inked on terminals (jdCounterDisplay)
-  logInfo("sim tick radius %d chunks (from %s), %s area (from %s)", cfg.tickRadius, radiusSource,
-          cfg.roundSimArea ? "round" : "square", roundSource);  // F56-6 (Cortana 2026-10-17)
+  // fix 3b (Elfie P3): the log line is always the plain counter (no raw ANSI escapes in log files /
+  // web consoles); the wheel ink is printed to a real terminal only.
+  logInfo("rolling build counter: %s", kJdBuildCounterDisplay);
+  if (jdConsoleColor()) std::printf("rolling build counter (ink): %s\n", jdCounterDisplay().c_str());  // 2026-10-18 (JD): 8 wheels, base 64, every build rolls it; wheel-inked on terminals (jdCounterDisplay)
+  logInfo("sim tick radius %d chunks (from %s), %s area (from %s), %s stream area (from %s)", cfg.tickRadius, radiusSource,
+          cfg.diamondSimArea ? "diamond" : cfg.roundSimArea ? "round" : "square", roundSource,
+          cfg.diamondStreamArea ? "diamond" : "square", streamSource);  // F56-6 (Cortana 2026-10-17) + diamond
   // SV-H2 seed precedence: an existing world's persisted seed (level.json in
   // the save dir) WINS over --seed and over the default. This must run here —
   // before Game construction — because Game's constructor builds the
@@ -1120,6 +1156,24 @@ int main(int argc, char** argv) {
       logError("save: world metadata in '%s' is unreadable (%s); falling back to %s seed %llu", cfg.saveDir.c_str(), seedErr.c_str(),
                seedGiven ? "the --seed" : "the default", (unsigned long long)cfg.seed);
     }
+  }
+  // Fix run 3 (2026-10-23): a saved world's area (level.json v3) WINS, like
+  // its seed: the world keeps the sim/stream footprint it was played with.
+  // v1/v2 saves carry none and keep the configured area (old behaviour).
+  if (!cfg.saveDir.empty()) {
+    std::string areaErr;
+    if (const auto wa = WorldSave::readWorldArea(cfg.saveDir, &areaErr)) {
+      const bool simD = wa->sim == litholattice::AreaShape::Diamond, simR = wa->sim == litholattice::AreaShape::Round;
+      const bool strD = wa->stream == litholattice::AreaShape::Diamond;
+      if (simD != cfg.diamondSimArea || (!simD && simR != cfg.roundSimArea) || strD != cfg.diamondStreamArea || wa->tickRadius != cfg.tickRadius)
+        logWarn("save: configured area (sim %s r%d, stream %s) differs from the saved world's (sim %s r%d, stream %s) in '%s'; using the SAVED area",
+                cfg.diamondSimArea ? "diamond" : cfg.roundSimArea ? "round" : "square", cfg.tickRadius, cfg.diamondStreamArea ? "diamond" : "square",
+                litholattice::areaShapeName(wa->sim), wa->tickRadius, litholattice::areaShapeName(wa->stream), cfg.saveDir.c_str());
+      cfg.diamondSimArea = simD; cfg.roundSimArea = simR; cfg.diamondStreamArea = strD; cfg.tickRadius = wa->tickRadius;
+      logInfo("sim tick radius %d chunks, %s area, %s stream area (from the saved world's level.json)", cfg.tickRadius,
+              litholattice::areaShapeName(wa->sim), litholattice::areaShapeName(wa->stream));  // fix 3b
+    }
+    if (!areaErr.empty()) logWarn("save: world area: %s", areaErr.c_str());
   }
   if (scripts.dir.empty()) logError("scripts: no scripts/ folder (%s)", scripts.reason.c_str());
   else logInfo("scripts: %s (%s; the F10 editor saves here)", scripts.dir.c_str(), scripts.reason.c_str());
@@ -1209,7 +1263,11 @@ int main(int argc, char** argv) {
       // the thread is detached at shutdown — process exit ends it. The
       // poll-based clean join above is the POSIX path this build targets.
       litholattice::mcp::McpServer* srv = mcpServer.get();
-      mcpThread = std::thread([srv] { srv->runStdio(); });
+      // Fix run 2 (R-RACE-1): the thread flags its exit so shutdown can cancel
+      // the blocking stdin read and JOIN it before the server is freed.
+      F.mcpDone = std::make_shared<std::atomic<bool>>(false);
+      auto done = F.mcpDone;
+      mcpThread = std::thread([srv, done] { srv->runStdio(); done->store(true, std::memory_order_release); });
 #endif
       logWarn("mcp: stdio server running (agent starts with NO permissions; approve with `mcp grant <perm...>` in the console)");
     }
@@ -1662,7 +1720,16 @@ static void lkShutdownTail(FrameCtx& F) {
       if (mcpTransport) mcpTransport->requestStop();
       if (mcpThread.joinable()) mcpThread.join();
 #else
-      if (mcpThread.joinable()) mcpThread.detach();
+      // Fix run 2 (2026-10-23, R-RACE-1): was detach() + reset(), a use-after-free
+      // while the thread sat in the blocking stdin read. Now: cancel the read,
+      // join, THEN free. If the read cannot be cancelled in time the server is
+      // leaked on purpose (the stop flag guarantees no further dispatch).
+      if (mcpThread.joinable() && F.mcpDone &&
+          !litholattice::mcp::stopStdioThread(mcpThread, *F.mcpDone, std::chrono::milliseconds(2000))) {
+        logError("mcp: stdin reader did not stop within 2 s; leaking the server instead of freeing it under a live thread");
+        mcpThread.detach();
+        (void)mcpServer.release();
+      }
 #endif
       mcpServer.reset();
 #if !defined(_WIN32)

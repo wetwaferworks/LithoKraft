@@ -357,7 +357,7 @@ void SignalSim::hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius) {
   // at cycle end, in both modes (D12; see signal.h).
   if (area_.pcx != pcx || area_.pcz != pcz || area_.radius != radius) { fullPass_ = true; netsValid_ = false; }
   if (w.columns().size() != netColumns_) netsValid_ = false;  // columns loaded / dropped: cached pointers stale
-  area_ = {pcx, pcz, radius, roundArea_};  // F56-7
+  area_ = {pcx, pcz, radius, roundArea_, diamondArea_};  // F56-7 + diamond
   changedSrc_.clear(); extraLamps_.clear();
   if (tickNo_ >= nextHoldExpiry_) {  // afterglows ending this tick need a recompute; find the next end
     nextHoldExpiry_ = UINT64_MAX;

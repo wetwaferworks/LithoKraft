@@ -1,6 +1,7 @@
 #include "lithokraft/game/ui_script_bindings.h"
 #include <string>
 #include "litholattice/core/log.h"
+#include "litholattice/script/script_generic.h"
 #include "litholattice/ui/controls.h"
 #include "litholattice/ui/lists.h"
 #include "litholattice/ui/text_edit.h"
@@ -104,22 +105,22 @@ bool UiScriptBindings::registerApi() {
   // (the game sets those on the ScriptEngine before calling registerApi()).
   struct Fn {
     const char* decl;
-    asSFuncPtr ptr;
+    ScriptEngine::ScriptFn fn;  // fix 3c: native + generic forms
   };
   const Fn fns[] = {
-      {"string ui_text(const string &in)", asFUNCTION(uiText)},
-      {"void ui_setText(const string &in, const string &in)", asFUNCTION(uiSetText)},
-      {"bool ui_checked(const string &in)", asFUNCTION(uiChecked)},
-      {"void ui_setChecked(const string &in, bool)", asFUNCTION(uiSetChecked)},
-      {"float ui_value(const string &in)", asFUNCTION(uiValue)},
-      {"void ui_setValue(const string &in, float)", asFUNCTION(uiSetValue)},
-      {"void ui_setVisible(const string &in, bool)", asFUNCTION(uiSetVisible)},
-      {"void ui_setEnabled(const string &in, bool)", asFUNCTION(uiSetEnabled)},
-      {"bool ui_show(const string &in)", asFUNCTION(uiShow)},
-      {"void ui_close(const string &in)", asFUNCTION(uiClose)},
+      {"string ui_text(const string &in)", LL_SCRIPT_FN_OBJLAST(uiText)},
+      {"void ui_setText(const string &in, const string &in)", LL_SCRIPT_FN_OBJLAST(uiSetText)},
+      {"bool ui_checked(const string &in)", LL_SCRIPT_FN_OBJLAST(uiChecked)},
+      {"void ui_setChecked(const string &in, bool)", LL_SCRIPT_FN_OBJLAST(uiSetChecked)},
+      {"float ui_value(const string &in)", LL_SCRIPT_FN_OBJLAST(uiValue)},
+      {"void ui_setValue(const string &in, float)", LL_SCRIPT_FN_OBJLAST(uiSetValue)},
+      {"void ui_setVisible(const string &in, bool)", LL_SCRIPT_FN_OBJLAST(uiSetVisible)},
+      {"void ui_setEnabled(const string &in, bool)", LL_SCRIPT_FN_OBJLAST(uiSetEnabled)},
+      {"bool ui_show(const string &in)", LL_SCRIPT_FN_OBJLAST(uiShow)},
+      {"void ui_close(const string &in)", LL_SCRIPT_FN_OBJLAST(uiClose)},
   };
   for (const Fn& f : fns)
-    if (scripts_.bindGlobalFunction(f.decl, f.ptr, asCALL_CDECL_OBJLAST, this) < 0) {
+    if (scripts_.bindFunction(f.decl, f.fn, this) < 0) {
       logError("AngelScript: registering %s failed (allowlist or permissions)", f.decl);
       return false;
     }

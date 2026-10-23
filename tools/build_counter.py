@@ -55,6 +55,10 @@ def inked_display(wheels, wrapped):
 
 
 def parse_state(text):
+    # 2026-10-23 (JD/Cortana fix run 2): tolerate an optional "Litho Engine " label.
+    text = text.strip()
+    if text.startswith("Litho Engine "):
+        text = text[len("Litho Engine "):]
     parts = text.strip().split(".")
     if len(parts) != WHEELS:
         raise ValueError(f"expected {WHEELS} dot-separated wheels, got {len(parts)}")
@@ -135,6 +139,9 @@ def main():
     ap.add_argument("--state", required=True, help="BUILD_COUNTER.txt path")
     ap.add_argument("--header", required=True, help="generated build_counter.h path")
     ap.add_argument("--log", required=True, help="BUILD_COUNTER.log ledger path")
+    # 2026-10-23 (JD, fix run 2): builds no longer roll the engine counter. With
+    # --no-bump the state is only READ (never written) and the header is regenerated.
+    ap.add_argument("--no-bump", action="store_true", help="read-only: do not roll or write state/log")
     args = ap.parse_args()
 
     if os.path.exists(args.state):
@@ -142,17 +149,20 @@ def main():
             wheels = parse_state(f.read())
     else:
         wheels = list(SEED)
-    wheels, wrapped = increment(wheels)
-
-    atomic_write(args.state, display(wheels) + "\n")
+    if args.no_bump:
+        wrapped = [False] * WHEELS
+    else:
+        wheels, wrapped = increment(wheels)
+        atomic_write(args.state, display(wheels) + "\n")
 
     header_dir = os.path.dirname(os.path.abspath(args.header))
     os.makedirs(header_dir, exist_ok=True)
     atomic_write(args.header, header_text(wheels, wrapped))
 
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    with open(args.log, "a") as f:
-        f.write(f"{ts} {display(wheels)} {total_count(wheels)}\n")
+    if not args.no_bump:
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(args.log, "a") as f:
+            f.write(f"{ts} {display(wheels)} {total_count(wheels)}\n")
 
     # Build-console display surface: inked on a real terminal, byte-identical
     # plain text when captured (build logs, CI) so log scrapers see no change.

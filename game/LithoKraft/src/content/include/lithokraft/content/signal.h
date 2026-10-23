@@ -182,6 +182,7 @@ class SignalSim {
   void hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius);  // tick() bookkeeping (no flips)
   /// F56-7: round tick area (set by SignalWorldSimulation from TickArea::round). A change forces a full pass.
   void setRoundArea(bool r) { if (r != roundArea_) { roundArea_ = r; fullPass_ = true; netsValid_ = false; } }
+  void setDiamondArea(bool d) { if (d != diamondArea_) { diamondArea_ = d; fullPass_ = true; netsValid_ = false; } }  // JD 2026-10-23
   void hsFlipAndTorches(ChunkMap& w, const DirtyFn& dirty);      // collectMountPowered + tickTorches
   void hsComponents(ChunkMap& w, const DirtyFn& dirty);          // == tickComponents (timed)
   void hsMark(ChunkMap& w);                                      // wake sets + net marking + sorted work lists
@@ -284,9 +285,11 @@ class SignalSim {
   struct TickArea {  // components outside the player's ticking radius are frozen
     int pcx = 0, pcz = 0, radius = 0;
     bool round = false;  // F56-7 (Proposed by JD, Built by Cortana): same disc rule as litholattice::TickArea
+    bool diamond = false;  // diamond (Manhattan), JD 2026-10-23: same rule as litholattice::TickArea
     bool contains(int x, int z) const {
       const int dx = (x >> 4) - pcx, dz = (z >> 4) - pcz;
       if (std::abs(dx) > radius || std::abs(dz) > radius) return false;
+      if (diamond) return std::abs(dx) + std::abs(dz) <= radius;
       return !round || int64_t(dx) * dx + int64_t(dz) * dz <= int64_t(radius) * radius + radius;
     }
   };
@@ -332,6 +335,7 @@ class SignalSim {
   std::unordered_set<int64_t> mountPowered_;                   // rebuilt before torches and after components        // torches ticked this tick (key, lit)
   TickArea area_;
   bool roundArea_ = false;  // F56-7
+  bool diamondArea_ = false;  // diamond (Manhattan) tick area (JD 2026-10-23)
   // Incremental re-flood. Wires and lamps are a pure function of torch / component outputs,
   // attached-switch power and the block layout. Wires are grouped into networks (connected runs,
   // same link rules as the flood). Each tick only the networks within 2 blocks of a source whose

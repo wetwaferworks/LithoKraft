@@ -129,7 +129,12 @@ std::optional<FaceMaterial> LithoKraftAppearance::faceMaterial(const CustomBlock
   };
   if (isVia(cell.id) && slot != FaceSlot::Top && slot != FaceSlot::Bottom) {
     const bool up = cell.neighbor(0, 1, 0) == cell.id, dn = cell.neighbor(0, -1, 0) == cell.id;
-    return named(tex + (up && dn ? "_side_mid" : dn ? "_side_top" : up ? "_side_bottom" : "_side_single"));
+    // fix 3c (JD t2288u): the model's own side_* faces (tinted neutral art) first; the legacy
+    // coloured `<via>_side_*` textures only for packs whose model lacks them.
+    const int v = viaSideVariant(up, dn);
+    if (const FaceMaterial* m = cell.materials.connectedSide(cell.id, v, active)) return *m;
+    static constexpr const char* kLegacy[kConnectedSideCount] = {"_side_bottom", "_side_mid", "_side_top", "_side_single"};
+    return named(tex + kLegacy[v]);
   }
   if (roleOf(def) == SimRole::Redirector && (stAux(cell.state) & 4)) {  // split mode
     if (slot == FaceSlot::Top) return named(tex + "_top_split");

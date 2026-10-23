@@ -8,6 +8,8 @@
 #include <string>
 
 #include "litholattice/console/concmd.h"
+#include "litholattice/core/log.h"
+#include "litholattice/sim/area_shape.h"  // Fix run 3: shared, case-insensitive shape parser
 
 namespace lithokraft {
 namespace {
@@ -76,6 +78,24 @@ void SettingsCvars::registerOn(ConsoleRegistry& r) {
        [](const GameSettings& s) { return std::to_string(s.tickRadius); },
        [](GameSettings& s, const std::string& v) { s.tickRadius = toInt(v); },
        CVarType::Int},
+      {"sim.area_shape",
+       [](const GameSettings& s) { return s.diamondSimArea ? "diamond" : s.roundSimArea ? "round" : "square"; },
+       // Tick-area footprint (JD 2026-10-23): "square" | "round" (F56-7 disc)
+       // | "diamond" (Manhattan |dx|+|dz| <= r). Pairs with sim.tickradius
+       // the way render.stream_shape pairs with render.stream_radius: the
+       // distances are decoupled engine properties, each with its shape.
+       // Applies on world load, not live (the sim area is fixed at scene
+       // setup, like sim.timing_handshake). Archived via GameSettings.
+       // AngelScript: consoleCvar / consoleSetCvar.
+       // Fix run 3: case-insensitive; unknown -> WARN + diamond (never square).
+       [](GameSettings& s, const std::string& v) {
+         bool ok = true;
+         const litholattice::AreaShape a = litholattice::parseAreaShape(v, &ok);
+         if (!ok) litholattice::logWarn("sim.area_shape: unknown value '%s' (square|round|diamond); using diamond", v.c_str());
+         s.diamondSimArea = a == litholattice::AreaShape::Diamond;
+         s.roundSimArea = a == litholattice::AreaShape::Round;
+       },
+       CVarType::String},
       {"sim.euv",
        [](const GameSettings& s) { return s.euv ? "1" : "0"; },
        [](GameSettings& s, const std::string& v) { s.euv = toBool(v); },
@@ -90,6 +110,28 @@ void SettingsCvars::registerOn(ConsoleRegistry& r) {
        [](const GameSettings& s) { return std::to_string(s.handshakePhases); },
        [](GameSettings& s, const std::string& v) { s.handshakePhases = std::clamp(toInt(v), 1, 16); },
        CVarType::Int},
+      {"render.stream_radius",
+       [](const GameSettings& s) { return std::to_string(s.streamRadius); },
+       // Render / stream distance in chunks (JD 2026-10-23): an engine
+       // property of its own, DECOUPLED from sim.tickradius — the streamer
+       // keeps max(tick, stream) columns resident. 0 = auto (Vulkan 64,
+       // others 32); clamped 0..64. Applies on world load, not live (the
+       // streamer's radius is fixed at construction). Archived.
+       // AngelScript: consoleCvar / consoleSetCvar.
+       [](GameSettings& s, const std::string& v) { s.streamRadius = std::clamp(toInt(v), 0, 64); },
+       CVarType::Int},
+      {"render.stream_shape",
+       [](const GameSettings& s) { return s.diamondStreamArea ? "diamond" : "square"; },
+       // Stream footprint (JD 2026-10-23): "square" | "diamond" (Manhattan
+       // |dx|+|dz| <= r). Applies on world load, not live. Archived.
+       // Fix run 3: case-insensitive; unknown (incl. "round") -> WARN + diamond.
+       [](GameSettings& s, const std::string& v) {
+         bool ok = true;
+         const litholattice::AreaShape a = litholattice::parseAreaShape(v, &ok, /*allowRound=*/false);
+         if (!ok) litholattice::logWarn("render.stream_shape: unknown value '%s' (square|diamond); using diamond", v.c_str());
+         s.diamondStreamArea = a == litholattice::AreaShape::Diamond;
+       },
+       CVarType::String},
       {"render.mesher",
        [](const GameSettings& s) { return std::to_string(s.mesher); },
        [](GameSettings& s, const std::string& v) { s.mesher = toInt(v); },

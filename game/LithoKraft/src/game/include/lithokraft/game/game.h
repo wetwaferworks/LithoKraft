@@ -78,6 +78,8 @@ struct GameConfig {
   uint64_t seed = 0;        // world seed (--seed): worldgen noise, per-chunk features
   int worldChunks = 16, tps = kDefaultTps, tickRadius = 8;
   bool roundSimArea = false;  ///< F56-7 (Proposed by JD, Built by Cortana): disc dx^2+dz^2 <= r^2+r instead of the square
+  bool diamondSimArea = true;  ///< diamond (Manhattan) sim area (JD 2026-10-23); wins over roundSimArea. DEFAULT since fix run 3 (JD t2262u)
+  bool diamondStreamArea = true;  ///< diamond (Manhattan) stream/residency footprint (JD 2026-10-23). DEFAULT since fix run 3
   int vkFxOverride = -1;  // 0.0.1.51: --vkfx for this run only (never saved); -1 = settings
   int streamRadius = 32;  // JD 2026-10-16: render / procgen stream distance (chunks, max 64)
   bool streaming = true;  // false: no player-centred streaming (fixed pre-baked world only)

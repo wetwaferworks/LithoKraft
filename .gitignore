@@ -24,3 +24,9 @@ out/
 
 # dependencies: restore with npm install
 node_modules/
+
+# Boardroom seat tokens (2026-10-22): never tracked
+_private/
+
+# Local edit backups (*.orig, *.orig2, *.orig-<date>-fixN); never commit them.
+*.orig*

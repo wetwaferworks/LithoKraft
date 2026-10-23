@@ -62,6 +62,8 @@ GameSettings GameSettings::load(const std::string& path) {
   s.vkHeartbeatGlow = std::clamp(float(json.getNum("vkHeartbeatGlow", s.vkHeartbeatGlow)), 0.f, 4.f);  // [C53-3]
   s.vkFarLod = json.getBool("vkFarLod", s.vkFarLod);  // [C54-1]
   s.roundSimArea = json.getBool("roundSimArea", s.roundSimArea);  // F56-7
+  s.diamondSimArea = json.getBool("diamondSimArea", s.diamondSimArea);  // diamond (JD 2026-10-23)
+  s.diamondStreamArea = json.getBool("diamondStreamArea", s.diamondStreamArea);  // diamond (JD 2026-10-23)
   return s;
 }
 
@@ -99,6 +101,8 @@ bool GameSettings::save(const std::string& path) const {
   json.add("vkHeartbeatGlow", litholattice::Json::number(vkHeartbeatGlow));  // [C53-3]
   json.add("vkFarLod", litholattice::Json::boolean(vkFarLod));  // [C54-1]
   json.add("roundSimArea", litholattice::Json::boolean(roundSimArea));  // F56-7
+  json.add("diamondSimArea", litholattice::Json::boolean(diamondSimArea));  // diamond (JD 2026-10-23)
+  json.add("diamondStreamArea", litholattice::Json::boolean(diamondStreamArea));  // diamond (JD 2026-10-23)
   out << json.dump(2) << "\n";
   return bool(out);
 }

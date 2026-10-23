@@ -9,14 +9,16 @@ project(LithoKraft VERSION 0.1.0 LANGUAGES C CXX)
 if(NOT DEFINED LITHOKRAFT_MODELS_DIR_PATH)
   set(LITHOKRAFT_MODELS_DIR_PATH "${LithoKraft_SOURCE_DIR}/assets/models")
 endif()
-# 2026-10-16 (JD): build counter "Alpha a.b.c.d", bumped on EVERY build (Debug or Release) by an
-# always-out-of-date target; persisted in the tracked <tree>/build_counter.txt; the generated header
-# lands in the build dir. Display/log only (never in the determinism hash).
-set(LK_BUILD_COUNTER_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../../build_counter.txt")
+# 2026-10-23 (JD, fix run 2): LithoKraft has its OWN rolling decimal counter, bumped on EVERY
+# build: <tree>/LITHOKRAFT_BUILD_COUNTER.txt. The public label lives in <tree>/LITHOKRAFT_VERSION.txt.
+# (Was <tree>/build_counter.txt, which on Windows is the same file as the engine BUILD_COUNTER.txt.)
+# Display/log only (never in the determinism hash). See docs/versioning/COUNTERS.md.
+set(LK_BUILD_COUNTER_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../../LITHOKRAFT_BUILD_COUNTER.txt")
+set(LK_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../../LITHOKRAFT_VERSION.txt")
 set(LK_BUILD_COUNTER_HEADER_DIR "${CMAKE_BINARY_DIR}/generated/lithokraft")
 file(MAKE_DIRECTORY "${LK_BUILD_COUNTER_HEADER_DIR}")
 add_custom_target(lk_build_counter ALL
-  COMMAND ${CMAKE_COMMAND} -DCOUNTER=${LK_BUILD_COUNTER_FILE} -DHEADER=${LK_BUILD_COUNTER_HEADER_DIR}/lithokraft_build_counter.h
+  COMMAND ${CMAKE_COMMAND} -DCOUNTER=${LK_BUILD_COUNTER_FILE} -DHEADER=${LK_BUILD_COUNTER_HEADER_DIR}/lithokraft_build_counter.h -DVERSION_FILE=${LK_VERSION_FILE}
           -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bump_build_counter.cmake
   BYPRODUCTS ${LK_BUILD_COUNTER_HEADER_DIR}/lithokraft_build_counter.h
   COMMENT "LithoKraft build counter bump"

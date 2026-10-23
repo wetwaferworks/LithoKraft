@@ -120,6 +120,8 @@ struct GameSettings {
   int fpsCap = -1;         ///< render.fps_cap: frame-rate cap in FPS for the
   bool fpsCounter = false;  ///< Cortana 2026-10-15 1610; F56-4 (2026-10-17): perf readout on every backend (FPS, avg/p99 ms, update ms, GPU ms; off by default)
   bool roundSimArea = true;  ///< F56-7 (Proposed by JD, Built by Cortana): round sim area (disc r^2+r); boot-only; env LL_SIM_ROUND_AREA
+  bool diamondSimArea = true;  ///< diamond (Manhattan) sim area (JD 2026-10-23); boot-only; env LL_SIM_AREA=diamond. DEFAULT since fix run 3 (JD t2262u)
+  bool diamondStreamArea = true;  ///< diamond (Manhattan) stream footprint (JD 2026-10-23); boot-only; env LL_STREAM_AREA=diamond
                           ///< main loop's FramePacer (D-M3; game-side wiring
                           ///< 2026-10-13). 0 = OFF (default: vsync-only
                           ///< pacing, JD perf doctrine 2026-10-12), else

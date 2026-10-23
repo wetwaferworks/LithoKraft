@@ -20,6 +20,12 @@ class LithoKraftAppearance final : public IBlockAppearance {
   void bindMaterials(const BlockDef& def, const BlockModel& model, MaterialBindings& bindings) const override;
 };
 
+/// Fix 3c: connected via side variant (kConnectedSide*) from same-colour vias directly above /
+/// below (MODDING.md: lowest of a run = bottom, highest = top, between = mid, lone = single).
+inline int viaSideVariant(bool sameAbove, bool sameBelow) {
+  return sameAbove && sameBelow ? kConnectedSideMid : sameBelow ? kConnectedSideTop : sameAbove ? kConnectedSideBottom : kConnectedSideSingle;
+}
+
 /// The shared instance (stateless, safe on mesh worker threads).
 const IBlockAppearance& blockAppearance();
 
