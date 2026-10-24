@@ -179,7 +179,7 @@ void SignalSim::onBlockChanged(int x, int y, int z, BlockId now) {
   if (r == SimRole::Torch) torches_.insert(k);
   else if (r == SimRole::Wire) wires_.insert(k);
   else if (r == SimRole::Lamp || r == SimRole::ColorLamp) lamps_.insert(k);
-  else if (const ComponentBehavior* b = BehaviorCatalog::get().component(now)) comps_[k] = Comp{b, {}};
+  else if (const cCompBehavior* b = BehaviorCatalog::get().component(now)) comps_[k] = Comp{b, {}};
 }
 
 // Minecraft-style strong power: a lit torch (either colour) powers the solid opaque block above it.
@@ -631,7 +631,7 @@ uint32_t ratePhaseFor(int64_t key, uint32_t divide) {
 }
 }  // namespace
 
-litholattice::TickRate SignalSim::classTickRate(BlockId block, const ComponentBehavior* behavior) const {
+litholattice::TickRate SignalSim::classTickRate(BlockId block, const cCompBehavior* behavior) const {
   // An installed override was admitted only when valid and non-neutral
   // (setClassTickRate), so it needs no re-validation here.
   if (const auto it = classRates_.find(block); it != classRates_.end()) return it->second;

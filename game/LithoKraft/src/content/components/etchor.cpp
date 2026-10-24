@@ -8,7 +8,7 @@
 // chip's name ("wafer in, Chipor out, bearing the name-field value"; the
 // name overwrites the chip's def name).
 //
-// Why a plain describe-only BlockBehavior, mirroring the certificate
+// Why a plain describe-only cBlockBehavior, mirroring the certificate
 // table's seam: the etch itself is an inventory operation (consume a
 // wafer blank, produce a named Chipor stack), and inventory lives on the
 // game side, not in the signal sim. The wired flow therefore lives in
@@ -22,7 +22,7 @@
 namespace lithokraft::components {
 namespace {
 
-class EtchorBehavior final : public BlockBehavior {
+class EtchorBehavior final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState /*s*/) const override { return std::string(d.name); }
 };

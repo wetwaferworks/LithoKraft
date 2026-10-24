@@ -7,7 +7,7 @@
 
 namespace lithokraft::components {
 
-using Registrar = std::function<void(std::string_view name, std::unique_ptr<BlockBehavior>)>;
+using Registrar = std::function<void(std::string_view name, std::unique_ptr<cBlockBehavior>)>;
 
 void registerPassive(const Registrar& add);  // wire, torch, lamp, color lamp (readout only)
 void registerLogic(const Registrar& add);    // repeator, thresholder, redirector, pulsor, memory cell, fast latch

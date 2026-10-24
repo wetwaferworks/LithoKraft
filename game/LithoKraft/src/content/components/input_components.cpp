@@ -8,7 +8,7 @@ namespace lithokraft::components {
 namespace {
 
 /// Right-click toggles a steady 64 on every side.
-class Switch final : public ComponentBehavior {
+class Switch final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory&) const override {
     const int out = stOn(st) ? kMaxSignal : 0;
@@ -25,7 +25,7 @@ class Switch final : public ComponentBehavior {
 };
 
 /// Right-click gives a kButtonTicks-long 64 pulse on every side.
-class cInputButton final : public ComponentBehavior {
+class cInputButton final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory& m) const override {
     const int out = m.timer > 0 ? kMaxSignal : 0;
@@ -45,7 +45,7 @@ class cInputButton final : public ComponentBehavior {
 
 /// Typing terminal. Right-click toggles capture (state "on"); the game queues one pulse per key:
 /// SIXBIT code + 1 out the front, control codes (Enter 1, Backspace 2) out the right side.
-class Keyboard final : public ComponentBehavior {
+class Keyboard final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory& m) const override {
     int out = 0, out2 = 0;

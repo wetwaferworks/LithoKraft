@@ -35,8 +35,8 @@ Namespaces: engine = `litholattice::` (sub-namespaces `procgen::`, `ui::`, `stor
   - `randomTick(world, area, tickIndex, dirty)`: **stub**, default no-op
   - `activeCount()`, `takeEvents()`
 - **[EXISTS]** `SimThread`: fixed-step loop and `ClockDomain`s. A clock domain is a game-named rate (power of two, up to 512 Hz) with a `step` callback. It also handles edits from the main thread, remesh snapshots, and `takeChangedColumns()` for partial saves.
-- **[EXISTS, game side]** LithoKraft's `BlockBehavior` / `ComponentBehavior` (`tick(inputs, state, mem) -> ComponentStep`, `emitToward`, `use`, `describe`) and `BehaviorCatalog` (name -> behaviour, bound through `BlockDef::behavior`). These live in `lithokraft::`, so the engine has no notion of "component".
-- **[PROPOSED]** Promote a generic `IBlockBehavior` / `BehaviorRegistry` into the SDK (`sdk/sim/behavior.h`) so that script and native mods can add components without patching LithoKraft's catalog. LithoKraft's `ComponentBehavior` becomes one *kind* of behavior registered by mod #1.
+- **[EXISTS, game side]** LithoKraft's `cBlockBehavior` / `cCompBehavior` (`tick(inputs, state, mem) -> ComponentStep`, `emitToward`, `use`, `describe`) and `BehaviorCatalog` (name -> behaviour, bound through `BlockDef::behavior`). These live in `lithokraft::`, so the engine has no notion of "component".
+- **[PROPOSED]** Promote a generic `IBlockBehavior` / `BehaviorRegistry` into the SDK (`sdk/sim/behavior.h`) so that script and native mods can add components without patching LithoKraft's catalog. LithoKraft's `cCompBehavior` becomes one *kind* of behavior registered by mod #1.
 - **[PROPOSED] Random ticks** (decided in the brief): the engine picks **8 random cells per 16x16x16 section per world tick** around the player. This is configurable per dimension, runs at the world TPS only, and is not scaled by beacons. Each chosen cell goes to `IRandomTickHandler::onRandomTick(world, x, y, z, rng, dirty)`, registered per block id. Cells changed through `dirty` are marked for saves (this mechanism exists). The existing `randomTick` hook stays as the low-level, whole-area escape hatch.
 
 ### 2.3 Dimensions, procgen generators and noise nodes (`world`, `procgen`)
@@ -304,7 +304,7 @@ Today (**[EXISTS]** path, inside mod #1's source tree): this is how LithoKraft a
 2. **Texture**: add `blink_lamp.png` to each pack under `LithoKraft/assets/packs/<pack>/` and a `"block": "blink_lamp"` entry in its `manifest.json` (update `file_count`).
 3. **Component**: in `LithoKraft/src/content/components/logic_components.cpp`:
 ```cpp
-class BlinkLamp final : public ComponentBehavior {
+class BlinkLamp final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState s, ComponentMemory& mem) const override {
     if (++mem.timer >= 16) mem.timer = 0;          // toggles every 16 world ticks
@@ -330,7 +330,7 @@ mods/blinklamp/scripts/blink.as
 ```
 ```angelscript
 // sim-thread script behaviour (proposed binding)
-class Blink : ll::ComponentBehavior {
+class Blink : ll::cCompBehavior {
   void tick(const ll::Inputs &in, ll::Cell &cell, ll::Memory &mem) {
     mem.timer = (mem.timer + 1) % 16;
     cell.on = in.anyPowered && mem.timer < 8;

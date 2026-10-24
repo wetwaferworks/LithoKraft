@@ -13,7 +13,7 @@ const BehaviorCatalog& BehaviorCatalog::get() {
 }
 
 BehaviorCatalog::BehaviorCatalog() {
-  const components::Registrar add = [this](std::string_view name, std::unique_ptr<BlockBehavior> b) {
+  const components::Registrar add = [this](std::string_view name, std::unique_ptr<cBlockBehavior> b) {
     this->add(name, std::move(b));
   };
   components::registerPassive(add);
@@ -30,22 +30,22 @@ BehaviorCatalog::BehaviorCatalog() {
   for (size_t id = 0; id < reg.size(); ++id) {
     const std::string_view name = reg.def(BlockId(id)).behavior;
     if (name.empty()) continue;
-    if (const BlockBehavior* b = byName(name)) {
+    if (const cBlockBehavior* b = byName(name)) {
       behaviors_[id] = b;
-      components_[id] = dynamic_cast<const ComponentBehavior*>(b);
+      components_[id] = dynamic_cast<const cCompBehavior*>(b);
     }
   }
 }
 
-void BehaviorCatalog::add(std::string_view name, std::unique_ptr<BlockBehavior> behavior) {
+void BehaviorCatalog::add(std::string_view name, std::unique_ptr<cBlockBehavior> behavior) {
   named_.emplace_back(name, std::move(behavior));
 }
 
-const BlockBehavior& BehaviorCatalog::behavior(BlockId b) const {
+const cBlockBehavior& BehaviorCatalog::behavior(BlockId b) const {
   return b < behaviors_.size() ? *behaviors_[b] : plain_;
 }
 
-const BlockBehavior* BehaviorCatalog::byName(std::string_view name) const {
+const cBlockBehavior* BehaviorCatalog::byName(std::string_view name) const {
   for (const auto& [n, b] : named_)
     if (n == name) return b.get();
   return nullptr;

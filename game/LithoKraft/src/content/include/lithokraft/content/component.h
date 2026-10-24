@@ -3,8 +3,8 @@
 // A block opts into a behaviour by name in the block registry (BlockDef::behavior, e.g. "repeator").
 // BehaviorCatalog resolves those names to instances once, so neither the sim nor the HUD switches
 // on block types; a new block is one class plus one registry line.
-//  - BlockBehavior: describe() for the look-at readout (wire, torch, lamps, every component).
-//  - ComponentBehavior: also ticks, emits signal and reacts to right-click (repeator, pulsor, ...).
+//  - cBlockBehavior: describe() for the look-at readout (wire, torch, lamps, every component).
+//  - cCompBehavior: also ticks, emits signal and reacts to right-click (repeator, pulsor, ...).
 // Behaviours are stateless and shared; per-cell runtime data lives in ComponentMemory.
 #pragma once
 #include <array>
@@ -61,16 +61,16 @@ struct ComponentStep {
 };
 
 /// Readout of a block type. Implementations must be stateless (one instance serves every cell).
-class BlockBehavior {
+class cBlockBehavior {
  public:
-  virtual ~BlockBehavior() = default;
+  virtual ~cBlockBehavior() = default;
 
   /// One-line HUD readout of a cell, e.g. "Repeator | delay 4 | out 64 | facing E".
   virtual std::string describe(const BlockDef& def, CellState /*state*/) const { return std::string(def.name); }
 };
 
 /// Logic of one signal component type.
-class ComponentBehavior : public BlockBehavior {
+class cCompBehavior : public cBlockBehavior {
  public:
 
   /// Computes this tick's outputs from the previous tick's inputs; may update `mem`.
@@ -114,22 +114,22 @@ class BehaviorCatalog {
   static const BehaviorCatalog& get();
 
   /// Behaviour of block `b` (a plain name-only readout for blocks without one).
-  const BlockBehavior& behavior(BlockId b) const;
+  const cBlockBehavior& behavior(BlockId b) const;
   /// Component logic of block `b`, or nullptr if it is not a ticking component.
-  const ComponentBehavior* component(BlockId b) const { return b < components_.size() ? components_[b] : nullptr; }
+  const cCompBehavior* component(BlockId b) const { return b < components_.size() ? components_[b] : nullptr; }
   /// Behaviour registered under `name`, or nullptr.
-  const BlockBehavior* byName(std::string_view name) const;
+  const cBlockBehavior* byName(std::string_view name) const;
   /// HUD readout of a cell: the block's behaviour describes its state.
   std::string describe(BlockId b, CellState state) const { return behavior(b).describe(blockRegistry().def(b), state); }
 
  private:
   BehaviorCatalog();
-  void add(std::string_view name, std::unique_ptr<BlockBehavior> behavior);
+  void add(std::string_view name, std::unique_ptr<cBlockBehavior> behavior);
 
-  BlockBehavior plain_;
-  std::vector<std::pair<std::string_view, std::unique_ptr<BlockBehavior>>> named_;
-  std::vector<const BlockBehavior*> behaviors_;
-  std::vector<const ComponentBehavior*> components_;
+  cBlockBehavior plain_;
+  std::vector<std::pair<std::string_view, std::unique_ptr<cBlockBehavior>>> named_;
+  std::vector<const cBlockBehavior*> behaviors_;
+  std::vector<const cCompBehavior*> components_;
 };
 
 /// Compass name of a facing (N, E, S, W).

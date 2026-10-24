@@ -10,7 +10,7 @@ namespace {
 
 /// Back in -> front out, one-way. Re-boosts any input to a full 64 after a 2 / 4 / 8 / 16 tick delay.
 /// Cortana 2026-10-15 2215 (JD D4): was 1..8; encoding + lazy legacy migration in content/repeator.h.
-class Repeator final : public ComponentBehavior {
+class Repeator final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), idx = repeator::delayIndex(st), delay = repeator::kDelays[idx];
@@ -37,7 +37,7 @@ std::string describeOutput(const BlockDef& d, CellState s) {
 
 /// Back = input, left = LOW reference, right = HIGH reference; output = input when it passes.
 /// One reference: threshold (in >= ref). Both: window comparator (refs sorted). None: pass-through.
-class Thresholdor final : public ComponentBehavior {
+class Thresholdor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory&) const override {
     // SW-H2: pass-through outputs copy the input value — clamp it here (and at
@@ -59,7 +59,7 @@ class Thresholdor final : public ComponentBehavior {
 /// red lane's front, aux bits 0-1 the blue lane's; either lane can be switched off (state bits 13 /
 /// 14). A colourless input (Catchor) feeds both lanes. Using an adjacent red / blue trace switches
 /// to split and cycles that colour's front; using the block then cycles the red front.
-class Redirector final : public ComponentBehavior {
+class Redirector final : public cCompBehavior {
  public:
   static bool split(CellState s) { return (stAux(s) & 4) != 0; }
   static int blueFront(CellState s) { return stAux(s) & 3; }
@@ -118,7 +118,7 @@ class Redirector final : public ComponentBehavior {
 
 /// Back = data, left/right = clock. A rising clock edge with data > 0 fires a 1-tick pulse of the
 /// data strength that travels the connected wire run without decay.
-class Pulsor final : public ComponentBehavior {
+class Pulsor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), data = std::min(in.back(f), kMaxSignal), clock = std::max(in.left(f), in.right(f));  // SW-H2: data is passed through as the pulse strength
@@ -136,7 +136,7 @@ class Pulsor final : public ComponentBehavior {
 };
 
 /// Back = write, front = stored value (continuous), sides = clear on a rising edge. 0 = empty.
-class Memor final : public ComponentBehavior {
+class Memor final : public cCompBehavior {
  public:
   bool quiescent(CellState, const ComponentMemory&) const override { return true; }  // pure in inputs + edges
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
@@ -164,7 +164,7 @@ class Memor final : public ComponentBehavior {
 /// State: value = match (1-64, 0 = disarmed), facing = direction of travel (input is behind it),
 /// aux bits 0-1 = output (0 centre, 1 left, 2 right, 3 = not wired yet), aux bit 2 = blue input.
 /// Use cycles the output (centre -> left -> right); sneak + use steps the match value.
-class Catchor final : public ComponentBehavior {
+class Catchor final : public cCompBehavior {
  public:
   static bool wired(CellState s) { return (stAux(s) & 3) != 3; }
   // Same inputs and nothing fired last tick: prevIn already equals the match result, out stays 0.
@@ -211,7 +211,7 @@ class Catchor final : public ComponentBehavior {
   }
 };
 /// T flip-flop: each rising edge at the back toggles; the front outputs 64 while on.
-class FastLatch final : public ComponentBehavior {
+class FastLatch final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st);
@@ -233,7 +233,7 @@ class FastLatch final : public ComponentBehavior {
 /// sneak+use cycles the radio channel. First trace touching a side binds the input colour.
 /// Broadcasts (mem.out = strength, mem.out2 = colour); the sim publishes after the tick.
 /// Never drives wire (emitToward = 0).
-class SignalTransmittor final : public ComponentBehavior {
+class SignalTransmittor final : public cCompBehavior {
  public:
   static bool wired(CellState s) { return (stAux(s) & 3) != 3; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
@@ -272,7 +272,7 @@ class SignalTransmittor final : public ComponentBehavior {
 /// Wireless signal sink: radio in, trace out. The sim fills in.radioIn / in.radioCol from the
 /// radio registry (1-tick latency). sneak+use cycles the listen channel. Outputs on the front,
 /// on the received colour.
-class SignalReceivor final : public ComponentBehavior {
+class SignalReceivor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int v = std::min(in.radioIn, kMaxSignal);  // SW-H2: received strength is passed through to the wire
@@ -296,7 +296,7 @@ class SignalReceivor final : public ComponentBehavior {
 /// The Dish: a long-range receivor. The sim queries with kDishSensitivity, so it hears
 /// far beyond a plain receivor. Listens on its set channel; channel 0 (the Daemon) is
 /// monitored when the lore pipeline exists. Single block for v1; multiblock later.
-class Dish final : public ComponentBehavior {
+class Dish final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int v = std::min(in.radioIn, kMaxSignal);  // SW-H2: received strength is passed through to the wire
@@ -321,7 +321,7 @@ class Dish final : public ComponentBehavior {
 /// Accepts items through its interface; the jammer item enables jamming mode: all radio
 /// channels except its own are blocked within kJammerRadius. use toggles the jammer item
 /// (v1 placeholder for the item UI); sneak+use cycles the jam channel.
-class Overclockor final : public ComponentBehavior {
+class Overclockor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& /*in*/, CellState st, ComponentMemory& /*m*/) const override {
     return {0, 0, st};
@@ -347,7 +347,7 @@ class Overclockor final : public ComponentBehavior {
 /// adjacent Trace (like Catchor). When the Lithographer prints a chip, each
 /// Portor maps to one face. 6 faces = 6 bits = 64 configurations.
 /// State: aux bit 0 = output (1) or input (0), aux bit 2 = blue (like Catchor).
-class Portor final : public ComponentBehavior {
+class Portor final : public cCompBehavior {
  public:
   bool quiescent(CellState, const ComponentMemory&) const override { return true; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
@@ -383,7 +383,7 @@ class Portor final : public ComponentBehavior {
 /// State: value = trip threshold (1-64), aux bit 0 = tripped.
 /// Use cycles threshold? No — sneak+use sets threshold (like Catchor match).
 /// Use toggles reset (untrip).
-class Fusor final : public ComponentBehavior {
+class Fusor final : public cCompBehavior {
  public:
   bool quiescent(CellState s, const ComponentMemory& m) const override {
     return (stAux(s) & 1) != 0;  // tripped = quiescent (no output)

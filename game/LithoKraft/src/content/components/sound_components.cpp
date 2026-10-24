@@ -9,7 +9,7 @@ namespace {
 /// Back input strength = pitch (1..64 -> C2 upward in semitones), 0 = silent. Consumes the
 /// signal (no output). Reports a Tone cue whenever the pitch changes; the game plays it on a
 /// SID3 voice.
-class ToneBlock final : public ComponentBehavior {
+class ToneBlock final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory&) const override {
     const int f = stFacing(st), v = in.back(f);

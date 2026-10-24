@@ -879,7 +879,7 @@ void testRateGameLayer() {
     return ticked;
   };
   uint64_t hash8N = 0;
-  {  // Arm N (neutral): the repeator is the only placed ComponentBehavior.
+  {  // Arm N (neutral): the repeator is the only placed cCompBehavior.
     Mini n; buildMini(n);
     const uint64_t ticked = tick8(n);
     hash8N = hashWorld(n.w, n.sim, 8);
@@ -933,7 +933,7 @@ void testRateGameLayer() {
 void testRateInvalidClassRates() {
   std::printf("== handshake rate A-H2 (invalid class-declared rates refused, logged once, neutral substituted)\n");
   using litholattice::TickRate;
-  class DeclaredRateBehavior final : public ComponentBehavior {
+  class DeclaredRateBehavior final : public cCompBehavior {
    public:
     explicit DeclaredRateBehavior(TickRate r) : rate_(r) {}
     ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory&) const override { return {0, 0, st}; }
@@ -992,18 +992,18 @@ void testRateInvalidClassRates() {
      // Memor-delegating behaviour declaring {0,1,0}. With the validated
      // (neutral) rate the loop runs once and the store lands; with the
      // raw rate it would run zero times and publish state 0.
-    const ComponentBehavior* memor = BehaviorCatalog::get().component(kMemor);
+    const cCompBehavior* memor = BehaviorCatalog::get().component(kMemor);
     check(memor != nullptr, "RATE/A-H2: Memor behaviour is catalog-bound for the no-wipe composition");
     if (memor) {
-      class MemorWithBadRate final : public ComponentBehavior {
+      class MemorWithBadRate final : public cCompBehavior {
        public:
-        explicit MemorWithBadRate(const ComponentBehavior* inner) : inner_(inner) {}
+        explicit MemorWithBadRate(const cCompBehavior* inner) : inner_(inner) {}
         ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
           return inner_->tick(in, st, m);
         }
         TickRate tickRate() const override { return TickRate{0, 1, 0}; }
        private:
-        const ComponentBehavior* inner_;
+        const cCompBehavior* inner_;
       };
       MemorWithBadRate beh{memor};
       SignalSim sim;

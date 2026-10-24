@@ -6,7 +6,7 @@
 namespace lithokraft::components {
 namespace {
 
-class Wire final : public BlockBehavior {
+class Wire final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState s) const override {
     return std::format("{} | strength {}", d.name, stValue(s));
@@ -14,14 +14,14 @@ class Wire final : public BlockBehavior {
 };
 
 /// Torches and plain lamps: state 1 = lit.
-class OnOff final : public BlockBehavior {
+class OnOff final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState s) const override {
     return std::format("{} | {}", d.name, (s & 1) ? "ON" : "off");
   }
 };
 
-class ColorLamp final : public BlockBehavior {
+class ColorLamp final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState s) const override {
     const int v = stValue(s);

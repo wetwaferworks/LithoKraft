@@ -7,7 +7,7 @@
 //     pulses travel the connected run without decay, up to 64 blocks),
 //  4) lamps light / color lamps take the strongest adjacent signal. Lamps terminate signals.
 // Only component cells are visited; plain terrain costs nothing. Roles come from the BlockRegistry;
-// component logic lives in one ComponentBehavior class per block type (litholattice/sim/component.h).
+// component logic lives in one cCompBehavior class per block type (litholattice/sim/component.h).
 #pragma once
 #include <atomic>
 #include <map>
@@ -217,7 +217,7 @@ class SignalSim {
   void setComponentSleep(bool on) { compSleep_ = on; allAwake_ = true; }
   /// Per-class tick-rate override (JD 2026-10-14 rate scaling): when set
   /// for a block id it replaces the class's declared
-  /// ComponentBehavior::tickRate() for every placed component of that
+  /// cCompBehavior::tickRate() for every placed component of that
   /// class. This is the seam lithography (and tests) drive; shipped
   /// content sets NO overrides and every class declares the neutral
   /// rate, so the shipped behaviour is exactly the pre-scaling one.
@@ -240,7 +240,7 @@ class SignalSim {
   /// publish the default step (wiping cell state), an oversized multiply
   /// would hang the sim thread inside one firing, and a non-pow2 or
   /// oversized divide would silently starve the component.
-  litholattice::TickRate classTickRate(BlockId block, const ComponentBehavior* behavior) const;
+  litholattice::TickRate classTickRate(BlockId block, const cCompBehavior* behavior) const;
   size_t lastTickedComponents() const { return lastTicked_; }
   // Keyboard: queue a 1-tick pulse (front = SIXBIT code + 1, control = right-port code; 0 = none).
   void keyPulse(int x, int y, int z, int front, int control);
@@ -271,7 +271,7 @@ class SignalSim {
 
  private:
   struct Comp {
-    const ComponentBehavior* behavior;  // shared, owned by BehaviorCatalog
+    const cCompBehavior* behavior;  // shared, owned by BehaviorCatalog
     ComponentMemory mem;
     bool rateHeld = false;  ///< divided-gated on an earlier tick: component sleep must not swallow its due tick (rate scaling)
     // Input fast path (filled by buildNets, valid while the networks are): per side 0 = reads
