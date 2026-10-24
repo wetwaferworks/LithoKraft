@@ -156,8 +156,8 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "interchange_capture: no wafer generator\n");
     return 1;
   }
-  const litholattice::BlockRegistry& blocks = lithokraft::blockRegistry();
-  litholattice::JobPool pool(4);
+  const litholattice::cBlockReg& blocks = lithokraft::blockRegistry();
+  litholattice::cJobPool pool(4);
   wafer->load(pool, kWorldChunks);
   litholattice::ChunkMap& map = wafer->chunks;
   const int extent = kWorldChunks * 16;
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
   rm.reload();
   const auto materialsPtr = rm.materials();
   litholattice::MeshContext mctx{blocks, *materialsPtr, nullptr};
-  const litholattice::TextureRegistry& texRegistry = rm.textures();
+  const litholattice::cTextureReg& texRegistry = rm.textures();
   const uint32_t layerCount = uint32_t(texRegistry.textures().size());
   std::vector<uint32_t> texBuffer(size_t(layerCount) * 256, 0xFFFF00FFu);
   for (uint32_t layer = 0; layer < layerCount; ++layer) {

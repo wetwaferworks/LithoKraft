@@ -24,7 +24,7 @@ struct Acc {
   uint64_t quads = 0, leafQuads = 0, verts = 0;
 };
 
-Acc meshBox(const litholattice::ChunkMap& map, const litholattice::BlockRegistry& reg,
+Acc meshBox(const litholattice::ChunkMap& map, const litholattice::cBlockReg& reg,
             const litholattice::MeshContext& ctx, int cx0, int cz0, int cx1, int cz1) {
   Acc a;
   for (int cx = cx0; cx <= cx1; ++cx)
@@ -57,7 +57,7 @@ void printRow(const char* name, const Acc& a, const Acc* base) {
 int main(int argc, char** argv) {
   using namespace litholattice;
   const int farOff = argc > 1 ? std::atoi(argv[1]) : 8;
-  const BlockRegistry& reg = lithokraft::blockRegistry();
+  const cBlockReg& reg = lithokraft::blockRegistry();
   const BlockMaterials mats(reg.size());
 
   ChunkMap map;

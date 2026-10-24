@@ -35,7 +35,7 @@ namespace {
 
 struct Fixture {
   // Fixture floor map (own registry): 8x8 columns, solid y=9, walk y=10.
-  BlockRegistry blocks;
+  cBlockReg blocks;
   ChunkMap map;
   // Declaration order is a lifetime contract: `world` (declared last)
   // destructs FIRST, so its mob brains unregister from `dir` while the

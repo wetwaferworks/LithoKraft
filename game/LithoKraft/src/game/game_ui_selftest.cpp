@@ -89,7 +89,7 @@ void testHudRenderer(Checker& check) {
 }
 
 void testScriptBindings(Checker& check) {
-  ScriptEngine scripts;
+  cScriptEngine scripts;
   ui::cUiRoot ui;
   cUiScriptBindings bindings(scripts, ui);
   const bool ready = [&] {
@@ -137,7 +137,7 @@ void testScriptEditor(Checker& check) {
   fs::create_directories(dir, ec);
   writeFile(dir / "a.as", "void onLoad() { log(\"v1\"); }\n");
   writeFile(dir / "b.as", "int helper() { return 1; }\n");
-  ScriptEngine scripts;
+  cScriptEngine scripts;
   scripts.init();
   scripts.loadDirectory(dir.string());
   scripts.callHook("void onLoad()");

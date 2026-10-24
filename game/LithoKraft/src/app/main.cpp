@@ -735,7 +735,7 @@ struct FrameCtx {
   // Owned by the context: constructed during main()'s setup (through the
   // aliases there), destroyed after the shutdown tail runs.
   std::unique_ptr<Game> game;
-  std::unique_ptr<InputSystem> input;
+  std::unique_ptr<cInputSystem> input;
   std::unique_ptr<litholattice::mcp::cMcpServer> mcpServer;
   std::thread mcpThread;
   std::shared_ptr<std::atomic<bool>> mcpDone;  // set by the MCP thread as it exits (R-RACE-1)
@@ -1017,7 +1017,7 @@ int main(int argc, char** argv) {
     }
   }
   if (badArg) return 2;
-  // Player settings (config/settings.json next to config/input.json): CLI flags win.
+  // cPlayer settings (config/settings.json next to config/input.json): CLI flags win.
   const std::string settingsPath = (dataRoot(argv[0]) / "config" / "settings.json").lexically_normal().string();
   GameSettings settings = GameSettings::load(settingsPath);
   if (!hsGiven) { cfg.timingHandshake = settings.timingHandshake; cfg.handshakePhases = settings.handshakePhases; }
@@ -1220,8 +1220,8 @@ int main(int argc, char** argv) {
   }
   {
     auto lkFOwner = std::make_unique<FrameCtx>(); FrameCtx& F = *lkFOwner;  // build 50: frame-loop state on the heap (survives the Emscripten main-loop unwind; see FrameCtx)
-    JobPool pool(std::max(1u, std::max(2u, std::thread::hardware_concurrency()) - 2));
-    F.input = std::make_unique<InputSystem>(loadBindings(argv[0]), inputContexts()); InputSystem& input = *F.input;
+    cJobPool pool(std::max(1u, std::max(2u, std::thread::hardware_concurrency()) - 2));
+    F.input = std::make_unique<cInputSystem>(loadBindings(argv[0]), inputContexts()); cInputSystem& input = *F.input;
     window->loadGamepadMappings((dataRoot(argv[0]) / "config" / "gamecontrollerdb.txt").string());  // optional
     cWindowClipboard clipboard(*window);  // UI text fields copy / paste through the OS; outlives the game
     F.game = std::make_unique<Game>(cfg, *renderer, pool, resources, audio, input); Game& game = *F.game;
@@ -1426,7 +1426,7 @@ static bool lkStepFrame(FrameCtx& F) {
   IRenderer* renderer = F.renderer;
   Display& display = *F.display;
   Game& game = *F.game;
-  InputSystem& input = *F.input;
+  cInputSystem& input = *F.input;
   RenderWorker& rw = F.rw;
   SwRenderWorker& sw = F.sw;
   const bool& threewayOn = F.threewayOn;

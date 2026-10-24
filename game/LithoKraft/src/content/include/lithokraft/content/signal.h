@@ -6,7 +6,7 @@
 //     colour, components and torch-powered blocks into either colour; -1 per block; Pulsor
 //     pulses travel the connected run without decay, up to 64 blocks),
 //  4) lamps light / color lamps take the strongest adjacent signal. Lamps terminate signals.
-// Only component cells are visited; plain terrain costs nothing. Roles come from the BlockRegistry;
+// Only component cells are visited; plain terrain costs nothing. Roles come from the cBlockReg;
 // component logic lives in one cCompBehavior class per block type (litholattice/sim/component.h).
 #pragma once
 #include <atomic>
@@ -167,7 +167,7 @@ class cSignalSim {
   /// Number of indexed cells in the column (tests / diagnostics).
   size_t indexedCellCount(int cx, int cz) const;
   void onBlockChanged(int x, int y, int z, BlockId now);
-  // Player chunk + radius: components outside the radius are frozen.
+  // cPlayer chunk + radius: components outside the radius are frozen.
   void tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty);
 
   // ---- Timing Handshake surface (hs-design §3.2) ----

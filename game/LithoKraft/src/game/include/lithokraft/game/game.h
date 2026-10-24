@@ -108,15 +108,15 @@ class Game {
   /// `resources` (block materials for meshing and HUD swatches; F9 reloads them), `audio` and
   /// `input` must outlive the game. The game pushes / pops input contexts (inventory, keyboard
   /// typing) on `input`.
-  Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceMgr& resources, cAudioEngine& audio,
-       InputSystem& input);
+  Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResourceMgr& resources, cAudioEngine& audio,
+       cInputSystem& input);
   ~Game();
   /// Saves the active dimension and the player (F5, autosave, exit, dimension switch). `wait`
   /// blocks until it is on disk. No-op without a save directory.
   bool saveWorld(const char* reason, bool wait);  // true when a save was actually written
   bool ok() const { return active_ != nullptr; }
 
-  /// Reads this frame's actions (the app updated the InputSystem first), turns them into sim
+  /// Reads this frame's actions (the app updated the cInputSystem first), turns them into sim
   /// commands (applied by the sim thread at its next tick boundary), uploads meshes, plays sounds.
   void update(float dt, int width, int height);
   FrameParams frameParams(int width, int height) const;
@@ -390,7 +390,7 @@ class Game {
   enum class MenuState { cMenu, Playing };
 
   GameConfig cfg_;
-  ScriptEngine scripts_;
+  cScriptEngine scripts_;
   cGameUi ui_;                          // before uiScripts_ / editor_, which reference it
   cUiScriptBindings uiScripts_;
   std::unique_ptr<cScriptEditor> editor_;  // F10; only with a scripts folder
@@ -447,10 +447,10 @@ class Game {
   Clock::time_point lastSave_ = Clock::now();
   bool benchSet_ = false;
   std::vector<SoundEvent> soundBuf_;
-  JobPool& pool_;
+  cJobPool& pool_;
   cDimensionReg registry_;
   Dimension* active_ = nullptr;
-  Player player_;
+  cPlayer player_;
   // --- IPlayer integration (player_adapter.h) ---
   cGamePlayerAdapter playerAdapter_;  ///< engine IPlayer view of player_: vitals + stats
   uint64_t lastVitalsTick_ = 0;      ///< sim worldTick the vitals last advanced to
@@ -535,14 +535,14 @@ class Game {
   mutable std::vector<litholattice::AnalyticLight> pbrLightsCache_;
   mutable int pbrLightsCamCx_ = 0, pbrLightsCamCz_ = 0;
   mutable bool pbrLightsValid_ = false;
-  SimThread::SubmitMesh submitMesh_;
-  std::unique_ptr<SimThread> sim_;               // owns active_->chunks while alive
+  cSimThread::SubmitMesh submitMesh_;
+  std::unique_ptr<cSimThread> sim_;               // owns active_->chunks while alive
   uint32_t epoch_ = 0;
   uint64_t initSeq_ = 0;
   int totalSubs_ = 0, meshesReceived_ = 0;
   size_t chunkColumns_ = 0;
 
-  InputSystem& input_;
+  cInputSystem& input_;
   cAudioEngine& audio_;
   // cCamera system: owns the engine cCameraMgr (player/orbit/follow/free
   // view cameras + MCP pilot cameras). Presentation only — declared before

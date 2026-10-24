@@ -5,8 +5,8 @@
 //                       level non-perturbation, the fail-closed /
 //                       recovery matrix, and the analysis queries
 //                       (summarizeDemo / demoEventsInTickRange).
-//   runDemoTests()    — --demo-test: the SimThread proofs. A scripted
-//                       session is recorded while the real SimThread
+//   runDemoTests()    — --demo-test: the cSimThread proofs. A scripted
+//                       session is recorded while the real cSimThread
 //                       (paused + stepped) drives it, proven not to
 //                       perturb the world, then replayed bit-identically
 //                       in legacy and handshake modes.
@@ -370,12 +370,12 @@ struct DrivenResult {
   uint64_t eventsRecorded = 0;
 };
 
-// Drives the circuit scenario through the real SimThread (paused +
+// Drives the circuit scenario through the real cSimThread (paused +
 // stepped, 512-tick chunks). Exactly one input source is used per arm:
 // `script` (submitStamped), `player` (cDemoPlayer::submitInto), or
 // neither. When `recorder` is given it is attached BEFORE start(),
 // pumped after each 512-tick chunk, and finished (with the outcome
-// hash) before the SimThread is destroyed — its stream reference must
+// hash) before the cSimThread is destroyed — its stream reference must
 // never outlive the thread's stream.
 DrivenResult driveDemo(int ticks, bool handshake, int workers, const std::vector<ControlEvent>* script,
                        cDemoPlayer* player, cDemoRecorder* recorder, const DemoSessionInfo* recSession) {
@@ -390,7 +390,7 @@ DrivenResult driveDemo(int ticks, bool handshake, int workers, const std::vector
   cfg.timingHandshake = handshake;
   cfg.handshakePhasesPerCycle = 4;
   cfg.handshakeWorkerThreads = workers;
-  SimThread st(w, blockRegistry(), std::move(sc.ws), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
+  cSimThread st(w, blockRegistry(), std::move(sc.ws), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
   cSignalWorldSim& sig = static_cast<cSignalWorldSim&>(st.simulation());
 
   if (recorder) recorder->begin(st.controlStream(), *recSession);  // attached BEFORE start
@@ -468,7 +468,7 @@ void testSimThreadProofs() {
               (unsigned long long)bare.stats.applied);
   check(bare.hash == recorded.hash, "demo-proof: non-perturbation — no-recorder hash is identical to the recorded hash");
 
-  // REPLAY (legacy): a fresh SimThread fed only from the saved record.
+  // REPLAY (legacy): a fresh cSimThread fed only from the saved record.
   cDemoPlayer playerLegacy;
   const bool loadedLegacy = playerLegacy.loadFile("./demo_record_proof.lldemo");
   check(loadedLegacy && playerLegacy.parsed().complete && playerLegacy.parsed().trailer.present &&

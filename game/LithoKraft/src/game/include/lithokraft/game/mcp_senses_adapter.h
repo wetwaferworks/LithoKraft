@@ -107,7 +107,7 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   };
 
   /// `snapshot` returns the piloted player's pose (cMcpPlayerView::GameState:
-  /// x/y/z feet, yaw/pitch in RADIANS like Player::forward); `tick` returns
+  /// x/y/z feet, yaw/pitch in RADIANS like cPlayer::forward); `tick` returns
   /// the sim world tick for frame/chunk stamping (0 when the sim is down).
   /// `rig` carries the per-pilot engine cameras (owned by the game's
   /// cGameCameraController, which is constructed before this adapter).

@@ -40,7 +40,7 @@ litholattice::MeshContext makeCtx(const litholattice::BlockMaterials& mats) {
 size_t meshViewportDirect(litholattice::BlockId above, std::string_view modelName,
                           const litholattice::BlockMaterials& mats) {
   litholattice::MeshInput in = makeInput(lithokraft::kChiporViewport, above);
-  const litholattice::BlockRegistry& reg = lithokraft::blockRegistry();
+  const litholattice::cBlockReg& reg = lithokraft::blockRegistry();
   const litholattice::CustomBlock cell{in, reg, mats, lithokraft::kChiporViewport, 0, 8, 8, 8};
   std::vector<litholattice::PackedVertex> verts;
   litholattice::MeshWriter writer(verts);
@@ -52,7 +52,7 @@ size_t meshViewportDirect(litholattice::BlockId above, std::string_view modelNam
 int main() {
   using namespace lithokraft;
   using namespace litholattice;
-  const BlockRegistry& reg = blockRegistry();
+  const cBlockReg& reg = blockRegistry();
 
   // 1. Registration: ids 51/52, append-only, no collision, no renumbering.
   // Size guard is registry-derived (P2b-2, review G-M3): the registry must

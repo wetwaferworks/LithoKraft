@@ -19,14 +19,14 @@ class cUiScriptBindings final : public ui::IScriptHost {
  public:
   /// `scripts` and `ui` must outlive this object. Call registerApi() after scripts.init() and
   /// before loading script files. The caller must first set the mod's permissions on the
-  /// ScriptEngine (the ui_* bindings require kPermUI); anything unlisted is refused.
-  cUiScriptBindings(ScriptEngine& scripts, ui::cUiRoot& ui) : scripts_(scripts), ui_(ui) {}
+  /// cScriptEngine (the ui_* bindings require kPermUI); anything unlisted is refused.
+  cUiScriptBindings(cScriptEngine& scripts, ui::cUiRoot& ui) : scripts_(scripts), ui_(ui) {}
   bool registerApi();
   bool callHandler(std::string_view functionDecl, std::string_view widgetId) override;
   ui::cUiRoot& ui() { return ui_; }
 
  private:
-  ScriptEngine& scripts_;
+  cScriptEngine& scripts_;
   ui::cUiRoot& ui_;
 };
 

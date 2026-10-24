@@ -12,7 +12,7 @@ namespace lithokraft {
 namespace {
 /// SW-H3: RAII in-flight accounting for one streamer job. The counter is
 /// decremented on EVERY exit from the job lambda — normal return, early
-/// return, and exception unwinding alike (JobPool catches the exception
+/// return, and exception unwinding alike (cJobPool catches the exception
 /// outside the lambda, after this destructor has run). Unless the job marks
 /// success, the key is also reported on the failure queue so update() can
 /// un-request it and schedule a retry (B-L7); a throwing job can therefore
@@ -34,7 +34,7 @@ struct JobGuard {
 };
 }  // namespace
 
-cChunkStreamer::cChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, cWorldSave* save,
+cChunkStreamer::cChunkStreamer(litholattice::cJobPool& pool, std::shared_ptr<const litholattice::cColumnGen> gen, cWorldSave* save,
                              std::string dimensionId, int radiusChunks, const std::unordered_set<uint64_t>& initial)
     : pool_(pool),
       gen_(std::move(gen)),
@@ -71,7 +71,7 @@ cChunkStreamer::~cChunkStreamer() {
   // log, no silent detach): after kDrainTimeout we log loudly and return;
   // the orphaned job still only touches shared_ptr-owned state and the
   // generator (shared_ptr), and in every Game teardown path the cWorldSave
-  // and the JobPool outlive the streamer, so it finishes harmlessly.
+  // and the cJobPool outlive the streamer, so it finishes harmlessly.
   const auto deadline = std::chrono::steady_clock::now() + kDrainTimeout;
   while (inFlight_->load(std::memory_order_relaxed) > 0) {
     if (std::chrono::steady_clock::now() >= deadline) {

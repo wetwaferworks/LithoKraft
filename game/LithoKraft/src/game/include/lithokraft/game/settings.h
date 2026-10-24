@@ -73,7 +73,7 @@ struct GameSettings {
   bool timingHandshake = true;   ///< sim.timing_handshake (default ON since
                           ///< 2026-10-14, JD's promotion): pull-tick
                           ///< phase scheduling for the circuit domains. Applies
-                          ///< at world (re)load — registration is a SimThread
+                          ///< at world (re)load — registration is a cSimThread
                           ///< construction-time act, never live-swapped.
   int renderThreads = 0;        ///< Cortana 2026-10-15 1156: software raster threads (0 = auto: pow2 <= logical cores - 2, clamped 2..16 [JD 14:41, Cortana 1450]; N = override, powers of two 1..64)
   int handshakePhases = 4;       ///< sim.handshake_phases: phases per cycle, 1..16

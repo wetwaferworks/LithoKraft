@@ -96,7 +96,7 @@ int runInterchangeSelfTest() {
   // placeInterchanges during load(8); running it again must build 0 and
   // change nothing (and likewise at size 6, the app selftest's world).
   {
-    JobPool pool(2);
+    cJobPool pool(2);
     cDimensionReg reg = createDimensions();
     Dimension* wafer = reg.find("wafer");
     check(wafer != nullptr, "wafer dimension exists");
@@ -114,7 +114,7 @@ int runInterchangeSelfTest() {
   // 4) A real 24-chunk Wafer (384x384) grows at least one interchange
   // via the production setup path, with the expected blocks in place.
   {
-    JobPool pool(2);
+    cJobPool pool(2);
     cDimensionReg reg = createDimensions();
     Dimension* wafer = reg.find("wafer");
     wafer->load(pool, 24);

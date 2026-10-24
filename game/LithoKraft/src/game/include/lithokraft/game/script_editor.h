@@ -1,6 +1,6 @@
 // Debug in-game script editor (F10): a modal dialog with a menu bar, the scripts/*.as files on
 // the left and a cTextEditor on the right. Save (Ctrl+S) writes the file and hot-reloads all
-// scripts through the ScriptEngine (on a compile error the previous scripts stay active and the
+// scripts through the cScriptEngine (on a compile error the previous scripts stay active and the
 // caret jumps to the first error). Only files listed from the scripts folder can be opened or
 // written: the editor never takes a path from the user.
 #pragma once
@@ -24,7 +24,7 @@ namespace lithokraft {
 class cScriptEditor {
  public:
   /// `afterReload` runs after a successful hot reload (e.g. re-run the onLoad hook).
-  cScriptEditor(ui::cUiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload = {});
+  cScriptEditor(ui::cUiRoot& ui, cScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload = {});
   void toggle();
   void open();
   /// Closes (asks first when there are unsaved changes, unless `force`).
@@ -47,7 +47,7 @@ class cScriptEditor {
   void setStatus(std::string s);
 
   ui::cUiRoot& ui_;
-  ScriptEngine& scripts_;
+  cScriptEngine& scripts_;
   std::filesystem::path dir_;
   std::function<void()> afterReload_;
   std::vector<std::string> files_;

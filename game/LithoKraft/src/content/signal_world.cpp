@@ -171,7 +171,7 @@ void cSignalWorldSim::takeEvents(std::vector<SimEvent>& out) {
 // CycleHead at their phase offsets), then W net shards and W lamp shards
 // (pull workers). All Signal work is once per world tick: one cycle of P
 // phases executes inside this tick() call frame (D2 corollary), so
-// TimedSimulation / SimThread tick timings measure the same thing in both
+// TimedSimulation / cSimThread tick timings measure the same thing in both
 // modes. Pull workers NEVER receive the real DirtyFn: net floods do not
 // dirty at all, and lamp batches write into per-shard collectors that the
 // sim thread replays through the real dirty fn at the phase commit, in
@@ -197,7 +197,7 @@ void cSignalWorldSim::registerHandshake(litholattice::cTimingHandshakeAuthority&
     d.phaseOffset = uint32_t(offset);
     d.threadAffine = affine;
     d.tickCritical = true;
-    d.group = 1;  // signal group; SimThread's clock domains use group 2
+    d.group = 1;  // signal group; cSimThread's clock domains use group 2
     authority.registerComponent(d, std::move(fn));
   };
   authority.setCommitFn([this](uint64_t phase, uint64_t cycle, uint32_t group) { onHsCommit(phase, cycle, group); });

@@ -36,7 +36,7 @@ int64_t chunkKey(int cx, int cz) {
 }  // namespace
 
 struct WaferPulseCache::Impl {
-  std::shared_ptr<const litholattice::ColumnGenerator> gen;
+  std::shared_ptr<const litholattice::cColumnGen> gen;
   std::mutex mutex;
   // chunkKey -> blended pulse (freq, sharp, amp, tintR, G, B) followed by
   // blended traces (density, speed, amp, dirMix, tintR, G, B): one weight
@@ -83,7 +83,7 @@ struct WaferPulseCache::Impl {
   }
 };
 
-WaferPulseCache::WaferPulseCache(std::shared_ptr<const litholattice::ColumnGenerator> waferGen)
+WaferPulseCache::WaferPulseCache(std::shared_ptr<const litholattice::cColumnGen> waferGen)
     : impl_(std::make_unique<Impl>()) {
   impl_->gen = std::move(waferGen);
 }

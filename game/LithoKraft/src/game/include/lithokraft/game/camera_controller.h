@@ -17,7 +17,7 @@
 //   - a third-person orbit camera: mouse Look orbits, the wheel zooms,
 //     pitch is clamped by the engine, and the spring arm collides against
 //     the world through a GameCameraWorld adapter fed by Game's race-free
-//     raycast hook (SimThread::runBetweenTicks + the engine voxel raycast,
+//     raycast hook (cSimThread::runBetweenTicks + the engine voxel raycast,
 //     one ray per frame, third person only). A follow camera (velocity-
 //     driven chase, wheel sets its distance) binds the same target.
 //   - a free camera for spectate/debug (Free mode): Look turns it, the
@@ -62,7 +62,7 @@
 #include "lithokraft/game/mcp_player_control.h"  // McpPlayerView::GameState
 
 namespace litholattice {
-class InputSystem;
+class cInputSystem;
 namespace console {
 class cConsoleReg;
 }  // namespace console
@@ -73,10 +73,10 @@ struct CameraCvarValues;  // camera/camera.h — full definition in the .cpp
 
 namespace lithokraft {
 
-struct Player;
+struct cPlayer;
 
 /// The view Game::frameParams renders from. Angles are radians in the
-/// Player::forward convention; fovRad is the vertical FOV handed to
+/// cPlayer::forward convention; fovRad is the vertical FOV handed to
 /// litholattice::perspective (1.2 rad = the value frameParams hardcoded
 /// before the camera system, so FirstPerson renders numerically identical).
 struct CameraViewPose {
@@ -96,7 +96,7 @@ const char* gameCameraModeName(GameCameraMode m);
 std::optional<GameCameraMode> parseGameCameraMode(std::string_view name);
 
 /// World + player access the controller needs from Game, as hooks so the
-/// controller never touches SimThread / Dimension directly (the same
+/// controller never touches cSimThread / Dimension directly (the same
 /// pattern cGameWorldQuery and the entity behaviors use).
 struct GameCameraHooks {
   /// MCP pilot snapshot (the piloted player's pose; yaw/pitch radians).
@@ -104,7 +104,7 @@ struct GameCameraHooks {
   /// like cMcpSensesAdapter's tracking path always has.
   std::function<cMcpPlayerView::GameState()> pilotSnapshot;
   /// Race-free raycast against the active world (Game implements it with
-  /// SimThread::runBetweenTicks + litholattice::raycast). Returns true and
+  /// cSimThread::runBetweenTicks + litholattice::raycast). Returns true and
   /// sets `hitDist` (a conservative distance from `origin` that is safe to
   /// place a camera at) when a solid cell blocks the ray within maxDist.
   /// Called at most once per frame, and only in third person.
@@ -167,10 +167,10 @@ class cPilotCameraRig {
 
 /// The game's camera-system front end. Game owns one, constructs it with
 /// the local player + hooks, calls update() once per frame after
-/// Player::update, and renders from viewPose().
+/// cPlayer::update, and renders from viewPose().
 class cGameCameraController {
  public:
-  cGameCameraController(Player& player, GameCameraHooks hooks);
+  cGameCameraController(cPlayer& player, GameCameraHooks hooks);
   ~cGameCameraController();
 
   void setMode(GameCameraMode m);
@@ -190,12 +190,12 @@ class cGameCameraController {
   /// next update().
   void syncCvars(const litholattice::camera::CameraCvarValues& v);
 
-  /// One frame of camera work (game thread, after Player::update).
-  /// `lookEnabled` is the same gate Game passes to Player::update (cursor
+  /// One frame of camera work (game thread, after cPlayer::update).
+  /// `lookEnabled` is the same gate Game passes to cPlayer::update (cursor
   /// captured, playing, no modal UI): orbit/free input only applies while
   /// it holds. `playing` is MenuState::Playing (menu/bench drive the
   /// player pose directly; the attached camera just follows).
-  void update(const litholattice::InputSystem& in, float dt, bool lookEnabled, bool playing,
+  void update(const litholattice::cInputSystem& in, float dt, bool lookEnabled, bool playing,
               int frameWidth, int frameHeight);
 
   /// The pose Game::frameParams renders from. FirstPerson resolves live
@@ -228,7 +228,7 @@ class cGameCameraController {
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
-  Player& player_;
+  cPlayer& player_;
   GameCameraMode mode_ = GameCameraMode::FirstPerson;
   CameraViewPose cachedPose_{};  ///< third/follow/free view pose from the last update()
   // Free-camera flight state (the engine Free camera holds a pose; the

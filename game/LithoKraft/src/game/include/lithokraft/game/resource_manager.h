@@ -38,7 +38,7 @@ class cResourceMgr {
   /// Current materials, safe to call from any thread (mesh jobs are submitted by the sim
   /// thread); a job keeps the set it started with alive across a reload.
   std::shared_ptr<const BlockMaterials> materials() const;
-  const TextureRegistry& textures() const { return resources_.textures; }
+  const cTextureReg& textures() const { return resources_.textures; }
   const BlockModelSet& models() const { return resources_.models; }
   const ShaderLibrary& shaders() const { return shaders_; }
   /// Hotbar / inventory icon of `b` (textures/ui/icons/<name>.png from the highest pack, box-

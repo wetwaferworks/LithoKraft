@@ -186,10 +186,10 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
     std::vector<ChunkMesh> meshes;
     int surfY = -1;
     if (sceneOk) {
-      const BlockRegistry& blocks = blockRegistry();
+      const cBlockReg& blocks = blockRegistry();
       ChunkMap map;
       map.setRegistry(&blocks);
-      const ColumnGenerator& gen = *wafer->generator;
+      const cColumnGen& gen = *wafer->generator;
       for (int dx = -1; dx <= 1; ++dx)
         for (int dz = -1; dz <= 1; ++dz)
           if (auto col = gen.generate(dx, dz)) map.insert(std::move(col));

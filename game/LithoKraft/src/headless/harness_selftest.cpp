@@ -341,7 +341,7 @@ void testPickBlockInFlight(Checker& check) {
   const int sy = waitForSurface(hg, g, 8, 8);
   using T = litholattice::InputEvent::Type;
   auto middleClick = [&] {
-    // The harness has no backend (no InputSystem::update), so feed the frame directly.
+    // The harness has no backend (no cInputSystem::update), so feed the frame directly.
     const litholattice::InputEvent ev[] = {litholattice::InputEvent::mouse(T::MouseDown, litholattice::MouseButton::Middle, 0.0),
                                            litholattice::InputEvent::mouse(T::MouseUp, litholattice::MouseButton::Middle, 0.0)};
     hg.input().processFrame(ev);

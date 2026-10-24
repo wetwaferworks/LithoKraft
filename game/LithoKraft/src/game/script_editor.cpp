@@ -24,7 +24,7 @@ int firstErrorLine(const std::vector<std::string>& errors, const std::string& fi
 
 }  // namespace
 
-cScriptEditor::cScriptEditor(ui::cUiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload)
+cScriptEditor::cScriptEditor(ui::cUiRoot& ui, cScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload)
     : ui_(ui), scripts_(scripts), dir_(std::move(dir)), afterReload_(std::move(afterReload)) {}
 
 void cScriptEditor::toggle() {

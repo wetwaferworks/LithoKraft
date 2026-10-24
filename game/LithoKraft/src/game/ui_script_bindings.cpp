@@ -102,10 +102,10 @@ void uiClose(const std::string& id, cUiScriptBindings* b) {
 bool cUiScriptBindings::registerApi() {
   // Every binding goes through the script binding allowlist: the engine
   // refuses anything not allowlisted, or not covered by the mod's permissions
-  // (the game sets those on the ScriptEngine before calling registerApi()).
+  // (the game sets those on the cScriptEngine before calling registerApi()).
   struct Fn {
     const char* decl;
-    ScriptEngine::ScriptFn fn;  // fix 3c: native + generic forms
+    cScriptEngine::ScriptFn fn;  // fix 3c: native + generic forms
   };
   const Fn fns[] = {
       {"string ui_text(const string &in)", LL_SCRIPT_FN_OBJLAST(uiText)},

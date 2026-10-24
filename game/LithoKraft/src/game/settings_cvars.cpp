@@ -71,7 +71,7 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
       {"sim.tickrate",
        [](const GameSettings& s) { return std::to_string(s.tps); },
        // Clamp to a valid pow2 mode: a raw 0 here used to reach
-       // SimThread::setTickRate(0) and SIGFPE the process (audit HIGH).
+       // cSimThread::setTickRate(0) and SIGFPE the process (audit HIGH).
        [](GameSettings& s, const std::string& v) { s.tps = nearestTps(toInt(v)); },
        CVarType::Int},
       {"sim.tickradius",

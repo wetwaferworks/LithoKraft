@@ -1,5 +1,5 @@
 // LithoKraft kharge: first IStat. electrical-charge morality for programs.
-// Player spawns neutral (0). Actions shift toward negative (-64, red) or
+// cPlayer spawns neutral (0). Actions shift toward negative (-64, red) or
 // positive (+64, blue). Visible in UI. Exposed by engine, optional for mods.
 #pragma once
 #include <cstdint>

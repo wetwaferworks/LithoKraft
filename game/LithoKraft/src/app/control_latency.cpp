@@ -24,7 +24,7 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-struct LatencySim final : litholattice::IWorldSimulation {
+struct LatencySim final : litholattice::IWorldSim {
   std::vector<int64_t>* applyNs = nullptr;  // indexed by SimCommand::a
   std::atomic<int>* applied = nullptr;
   void scan(const litholattice::ChunkMap&) override {}
@@ -80,7 +80,7 @@ int runControlLatency() {
   cfg.tickRate = 512;
   cfg.radiusChunks = 1;
   cfg.randomTicksPerSection = 0;
-  SimThread st(w, blockRegistry(), std::move(sim), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
+  cSimThread st(w, blockRegistry(), std::move(sim), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
   st.setPlayerChunk(0, 0);
   st.start();
   std::this_thread::sleep_for(std::chrono::milliseconds(100));  // let the loop reach steady pace

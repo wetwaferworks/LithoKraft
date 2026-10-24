@@ -4,7 +4,7 @@
 // Everything here is deterministic in (world state, rnd): the engine hands each
 // random tick a per-pick `rnd` (deterministic per tick+section+pick), and every
 // decision below derives from it. Spread and growth NEVER run on the per-tick
-// path -- only through IWorldSimulation::onRandomTick, which the engine calls for
+// path -- only through IWorldSim::onRandomTick, which the engine calls for
 // the 8 picked cells per section per world tick (kDefaultRandomTicksPerSection).
 #include "lithokraft/content/silica.h"
 
@@ -30,7 +30,7 @@ constexpr int kNbr[8][2] = {{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, 
 
 CellState grassState(int stage) { return withAttach(makeState(stage), 1); }  // mounted on the soil below
 
-bool supported(const ChunkMap& w, const BlockRegistry& reg, int x, int y, int z) {
+bool supported(const ChunkMap& w, const cBlockReg& reg, int x, int y, int z) {
   return reg.has(w.get(x, y - 1, z), kSolid);
 }
 
@@ -43,8 +43,8 @@ bool silicaLightOk(const ChunkMap& w, int x, int y, int z, const SilicaLightQuer
   return w.surfaceY(x, z) <= y;
 }
 
-bool silicaOnRandomTick(ChunkMap& w, const BlockRegistry& reg, int x, int y, int z, uint32_t rnd,
-                        const litholattice::IWorldSimulation::DirtyFn& dirty, const SilicaLightQuery& light, SilicaDropSink drop) {
+bool silicaOnRandomTick(ChunkMap& w, const cBlockReg& reg, int x, int y, int z, uint32_t rnd,
+                        const litholattice::IWorldSim::DirtyFn& dirty, const SilicaLightQuery& light, SilicaDropSink drop) {
   if (w.get(x, y, z) != kSilicaGrass) return false;  // defensive: only grass ticks here
   const int stage = silicaGrowthStage(w.getState(x, y, z));
   if (!supported(w, reg, x, y, z)) {
@@ -81,20 +81,20 @@ bool silicaCanPlant(const ChunkMap& w, int x, int y, int z) {
   return w.get(x, y, z) == kAir && w.get(x, y - 1, z) == kSilicaTilledSoil;
 }
 
-void silicaDoPlant(ChunkMap& w, int x, int y, int z, const litholattice::IWorldSimulation::DirtyFn& dirty) {
+void silicaDoPlant(ChunkMap& w, int x, int y, int z, const litholattice::IWorldSim::DirtyFn& dirty) {
   w.set(x, y, z, kSilicaGrass);
   w.setState(x, y, z, grassState(kSilicaStageSprout));
   dirty(x, y, z);
 }
 
-bool silicaTill(ChunkMap& w, int x, int y, int z, const litholattice::IWorldSimulation::DirtyFn& dirty) {
+bool silicaTill(ChunkMap& w, int x, int y, int z, const litholattice::IWorldSim::DirtyFn& dirty) {
   if (!silicaIsTillableSoil(w.get(x, y, z))) return false;  // dead zones stay dead
   w.set(x, y, z, kSilicaTilledSoil);
   dirty(x, y, z);
   return true;
 }
 
-int silicaHarvest(ChunkMap& w, int x, int y, int z, uint32_t rnd, const litholattice::IWorldSimulation::DirtyFn& dirty) {
+int silicaHarvest(ChunkMap& w, int x, int y, int z, uint32_t rnd, const litholattice::IWorldSim::DirtyFn& dirty) {
   if (w.get(x, y, z) != kSilicaGrass) return 0;
   if (silicaGrowthStage(w.getState(x, y, z)) < kSilicaStageMature) return 0;  // not ripe: nothing
   const int n = silicaDropCount(rnd, kSilicaStageMature);

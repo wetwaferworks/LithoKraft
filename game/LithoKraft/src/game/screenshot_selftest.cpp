@@ -57,7 +57,7 @@ class FakeGrabber : public litholattice::IRenderer {
 
  private:
   struct FakeTA : litholattice::ITextureArray {
-    bool upload(const litholattice::TextureRegistry&) override { return true; }
+    bool upload(const litholattice::cTextureReg&) override { return true; }
     int layerCount() const override { return 0; }
     int tileSize() const override { return 16; }
   } ta_;

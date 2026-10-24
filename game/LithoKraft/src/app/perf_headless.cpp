@@ -1,7 +1,7 @@
 // --perf-headless [json]: windowless measurements. (1) Worldgen and mesh throughput at
 // 1 / 2 / 4 / all threads. (2) Save and load: ms, bytes on disk and the autosave hitch (the
 // main-thread encode while the sim is paused) for 16 / 32 / 64-chunk worlds. (3) Stress circuits
-// (clock grid, wire meshes, repeator chains) on the real SimThread at 32..512 TPS: tick ms
+// (clock grid, wire meshes, repeator chains) on the real cSimThread at 32..512 TPS: tick ms
 // avg / p99, components, remeshes per second.
 #include "litholattice/ai/ai_world.h"
 #include "perf_headless.h"
@@ -54,10 +54,10 @@ double pct(std::vector<double> v, double q) {
 }
 double avg(const std::vector<double>& v) { double s = 0; for (double x : v) s += x; return v.empty() ? 0 : s / double(v.size()); }
 
-/// Times every tick() of the wrapped simulation (SimThread calls it on the sim thread only).
-class cTimedSim final : public IWorldSimulation {
+/// Times every tick() of the wrapped simulation (cSimThread calls it on the sim thread only).
+class cTimedSim final : public IWorldSim {
  public:
-  explicit cTimedSim(std::unique_ptr<IWorldSimulation> s) : s_(std::move(s)) {}
+  explicit cTimedSim(std::unique_ptr<IWorldSim> s) : s_(std::move(s)) {}
   void scan(const ChunkMap& w) override { s_->scan(w); }
   bool canPlace(const ChunkMap& w, int x, int y, int z, BlockId b) const override { return s_->canPlace(w, x, y, z, b); }
   bool stillSupported(const ChunkMap& w, int x, int y, int z) const override { return s_->stillSupported(w, x, y, z); }
@@ -79,7 +79,7 @@ class cTimedSim final : public IWorldSimulation {
   }
   std::vector<double> take() { std::lock_guard l(m_); return std::move(ticks_); }
  private:
-  std::unique_ptr<IWorldSimulation> s_;
+  std::unique_ptr<IWorldSim> s_;
   std::mutex m_;
   std::vector<double> ticks_;
 };
@@ -89,7 +89,7 @@ class cTimedSim final : public IWorldSimulation {
 class cPerfNullRenderer final : public IRenderer {
  public:
   struct NullTextures final : ITextureArray {
-    bool upload(const TextureRegistry&) override { return true; }
+    bool upload(const cTextureReg&) override { return true; }
     int layerCount() const override { return 0; }
     int tileSize() const override { return 0; }
   };
@@ -130,7 +130,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   const BlockMaterials mats(blockRegistry().size());
   for (size_t ci = 0; ci < counts.size(); ++ci) {
     const unsigned n = counts[ci];
-    JobPool pool(n);
+    cJobPool pool(n);
     constexpr int kSide = 16;  // 256 columns
     cHandoffQueue<std::unique_ptr<ChunkColumn>> out;
     auto t0 = Clock::now();
@@ -167,7 +167,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   // (2) Save / load
   std::printf("== save / load (wafer, all threads)\n");
   json += "  \"save_load\": [";
-  JobPool pool(all);
+  cJobPool pool(all);
   const int sizes[] = {16, 32, 64};
   for (size_t si = 0; si < std::size(sizes); ++si) {
     const int size = sizes[si];
@@ -318,7 +318,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   }
   json += "\n  ],\n";
 
-  // (3) Stress circuits on the real SimThread (or the requested --bench-scene)
+  // (3) Stress circuits on the real cSimThread (or the requested --bench-scene)
   const bool useBenchScene = bench.scene != "default" && bench.scene != "circuits";
   std::printf("== stress %s, 3 s per rate\n", useBenchScene ? bench.scene.c_str() : "circuits (clock grid + wire meshes + repeator chains)");
   json += "  \"circuits\": [";
@@ -355,7 +355,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
     SimConfig sc;
     sc.tickRate = rates[ri]; sc.radiusChunks = 8; sc.belowWorldFill = wafer->belowWorldFill;
     sc.timingHandshake = bench.timingHandshake; sc.handshakePhasesPerCycle = bench.handshakePhases;
-    SimThread sim(wafer->chunks, blockRegistry(), std::move(timed), std::move(sc), [&](std::shared_ptr<MeshInput>) { ++remesh; });
+    cSimThread sim(wafer->chunks, blockRegistry(), std::move(timed), std::move(sc), [&](std::shared_ptr<MeshInput>) { ++remesh; });
     sim.setPlayerChunk(4, 4);
     sim.start();
     std::this_thread::sleep_for(std::chrono::milliseconds(500));

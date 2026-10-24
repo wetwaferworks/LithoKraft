@@ -39,7 +39,7 @@ ActionMap defaultActionMap();
 
 /// In priority order (higher = consulted first).
 enum class InputContext : uint8_t { Gameplay, Inventory, KeyboardTyping, UiText, Debug, Count };
-/// The rules of every InputContext, in enum order (for InputSystem).
+/// The rules of every InputContext, in enum order (for cInputSystem).
 std::vector<ContextRules> inputContexts();
 
 }  // namespace lithokraft

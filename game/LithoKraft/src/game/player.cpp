@@ -5,11 +5,11 @@
 
 namespace lithokraft {
 
-Vec3 Player::forward() const {
+Vec3 cPlayer::forward() const {
   return {std::cos(pitch) * std::cos(yaw), std::sin(pitch), std::cos(pitch) * std::sin(yaw)};
 }
 
-void Player::updateLook(const InputSystem& in, float dt, bool lookEnabled) {
+void cPlayer::updateLook(const cInputSystem& in, float dt, bool lookEnabled) {
   if (!lookEnabled) return;
   const AxisValue look = in.axis(Action::Look, dt);
   yaw += look.x;

@@ -7,7 +7,7 @@
 
 namespace lithokraft {
 /// --handshake-test mode (hs-design §6): WAIT + FREEZE policy proofs on a
-/// bare authority, the end-to-end SimThread freeze/save/reload proof, and
+/// bare authority, the end-to-end cSimThread freeze/save/reload proof, and
 /// the determinism scenario summary. Returns the number of failed checks.
 int runHandshakeTests();
 /// Determinism scenario (hs-design §6.4): build the circuit scene, run
@@ -19,7 +19,7 @@ int runHandshakeScenario(int ticks, const std::string& mode, int workers, int ph
 int runHandshakeSelfTest();
 
 /// The §6.4 scenario world, exported for the control-serialization
-/// harness (which drives the same world through the real SimThread and
+/// harness (which drives the same world through the real cSimThread and
 /// the serialized control stream instead of in-process tick calls).
 struct ControlScenarioWorld {
   cDimensionReg reg;

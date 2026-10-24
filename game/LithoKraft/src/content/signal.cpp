@@ -70,7 +70,7 @@ bool cSignalSim::importState(const std::vector<uint8_t>& b) {
 
 namespace {
 // Index every signal cell of ONE column (shared by scan() and scanColumn()).
-void scanOneColumn(cSignalSim& sim, const ChunkColumn& col, const BlockRegistry& reg) {
+void scanOneColumn(cSignalSim& sim, const ChunkColumn& col, const cBlockReg& reg) {
   std::vector<BlockId> lut;  // StableId palette -> BlockId, resolved once per sub-chunk
   for (int sy = 0; sy < kSubChunks; ++sy) {
     const SubChunk* s = col.subs[sy].get();
@@ -95,7 +95,7 @@ void scanOneColumn(cSignalSim& sim, const ChunkColumn& col, const BlockRegistry&
 
 void cSignalSim::scan(const ChunkMap& w) {
   torches_.clear(); wires_.clear(); lamps_.clear(); comps_.clear();
-  const BlockRegistry& reg = blockRegistry();
+  const cBlockReg& reg = blockRegistry();
   for (const auto& [k, col] : w.columns()) scanOneColumn(*this, *col, reg);
 }
 

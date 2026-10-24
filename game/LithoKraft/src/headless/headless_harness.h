@@ -38,7 +38,7 @@ class Game;
 class cNullRenderer final : public litholattice::IRenderer {
  public:
   struct NullTextures final : public litholattice::ITextureArray {
-    bool upload(const litholattice::TextureRegistry&) override { return true; }
+    bool upload(const litholattice::cTextureReg&) override { return true; }
     int layerCount() const override { return 0; }
     int tileSize() const override { return 0; }
   };
@@ -62,8 +62,8 @@ class cNullRenderer final : public litholattice::IRenderer {
 };
 
 /// Owns everything a Game needs and constructs it headless, in main.cpp's order:
-/// JobPool, cNullRenderer, cResourceMgr (no packs; built-in worldgen fallbacks),
-/// cAudioEngine (no output device; commands queue harmlessly), InputSystem (default action
+/// cJobPool, cNullRenderer, cResourceMgr (no packs; built-in worldgen fallbacks),
+/// cAudioEngine (no output device; commands queue harmlessly), cInputSystem (default action
 /// map, no backend). Members declare in construction order; destruction runs in reverse,
 /// so the Game dies before the things that must outlive it.
 class cHeadlessGame {
@@ -86,16 +86,16 @@ class cHeadlessGame {
   const Game& game() const { return *game_; }
   cNullRenderer& renderer() { return renderer_; }
   /// BUG-0002: stage raw device events (e.g. a middle click) for the next frame.
-  litholattice::InputSystem& input() { return input_; }
+  litholattice::cInputSystem& input() { return input_; }
   /// Advance the game one frame on a dummy 1280x720 viewport (no window).
   void frame(float dt = 1.f / 60.f, int w = 1280, int h = 720);
 
  private:
-  litholattice::JobPool pool_;
+  litholattice::cJobPool pool_;
   cNullRenderer renderer_;
   cResourceMgr resources_;
   litholattice::cAudioEngine audio_;
-  litholattice::InputSystem input_;
+  litholattice::cInputSystem input_;
   std::unique_ptr<Game> game_;
 };
 

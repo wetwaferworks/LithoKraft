@@ -12,7 +12,7 @@
 //
 // Weights are >= 0 and sum to 1 per column; ColumnMaps::biome holds the dominant
 // (nearest) biome. Sibling workstreams query all of this deterministically through
-// ColumnGenerator::generate(cx, cz, &maps):
+// cColumnGen::generate(cx, cz, &maps):
 //
 //   procgen::ColumnMaps maps;
 //   gen->generate(cx, cz, &maps);

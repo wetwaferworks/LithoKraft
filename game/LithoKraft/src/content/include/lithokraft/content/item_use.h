@@ -9,7 +9,7 @@
 // Failed, never a silent fake success. Handlers run on the SIM thread
 // (cSignalWorldSim::command, kCmdItemUse) because they mutate the
 // world; Game::handleWorldActions routes the player's Use press there
-// through SimThread::edit, exactly like block Use.
+// through cSimThread::edit, exactly like block Use.
 #pragma once
 #include <cstdint>
 #include "litholattice/sim/world_simulation.h"  // IWorldSimulation::DirtyFn
@@ -22,7 +22,7 @@ enum class ItemUseResult : uint8_t { Handled, Failed };
 struct ItemUseContext {
   litholattice::ChunkMap& world;
   int x = 0, y = 0, z = 0;  ///< targeted cell (the looked-at block)
-  const litholattice::IWorldSimulation::DirtyFn& dirty;
+  const litholattice::IWorldSim::DirtyFn& dirty;
 };
 
 using ItemUseHandler = std::function<ItemUseResult(const ItemUseContext&)>;

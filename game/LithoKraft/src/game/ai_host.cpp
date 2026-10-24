@@ -10,7 +10,7 @@ namespace lithokraft {
 
 using namespace litholattice;
 
-ai::NavRules gameNavRules(const BlockRegistry& blocks) {
+ai::NavRules gameNavRules(const cBlockReg& blocks) {
   // P0 (2026-10-14): real classification from the game's own content data,
   // replacing the B6 defaults (solidity only). The predicates capture the
   // registry by reference; the registry outlives every cWalkCache built
@@ -24,7 +24,7 @@ ai::NavRules gameNavRules(const BlockRegistry& blocks) {
   return rules;
 }
 
-void cAiHost::bindWorld(ChunkMap& chunks, const BlockRegistry& blocks, JobPool* pool,
+void cAiHost::bindWorld(ChunkMap& chunks, const cBlockReg& blocks, cJobPool* pool,
                        ai::Cell centre) {
   unbindWorld();
   chunks_ = &chunks;

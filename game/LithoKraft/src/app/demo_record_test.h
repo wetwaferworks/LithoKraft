@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <string>
 namespace lithokraft {
-/// --demo-test mode: IDemoRecord proofs (record a scripted SimThread
+/// --demo-test mode: IDemoRecord proofs (record a scripted cSimThread
 /// session, non-perturbation, bit-identical replay in legacy and
 /// handshake modes). Returns 0 on success, 1 on failure.
 int runDemoTests();

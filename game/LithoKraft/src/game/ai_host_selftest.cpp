@@ -37,7 +37,7 @@ int runAiHostSelfTest() {
 
   // Fixture live map: 4x4 columns (x,z in 0..63), solid floor at y=9,
   // walkable at y=10 — the engine AI tests' floor arrangement.
-  BlockRegistry blocks;
+  cBlockReg blocks;
   const BlockId rock = blocks.add({"Rock", kSolid | kOpaque, Shape::Cube, "rock"});
   ChunkMap w;
   w.setRegistry(&blocks);
@@ -93,7 +93,7 @@ int runAiHostSelfTest() {
     // block (SimRole::Wire), a climbable block (kGameClimbable) and a fluid
     // block (kGameFluid). Game content carries no climb/fluid blocks yet,
     // so the fixture defines its own -- the predicates are what is tested.
-    BlockRegistry fb;
+    cBlockReg fb;
     const BlockId rockB = fb.add({"Rock", kSolid | kOpaque, Shape::Cube, "rock"});
     BlockDef wireDef{"Trace", kTransparent, Shape::Custom, "trace"};
     wireDef.role = uint16_t(SimRole::Wire);
@@ -156,7 +156,7 @@ int runAiHostSelfTest() {
   // ---- B-H1 (2026-10-15): the invalidation queue is bounded by ZERO
   // while ai.enabled is off (the default), and still feeds when on ----
   {
-    BlockRegistry rb;
+    cBlockReg rb;
     const BlockId rockC = rb.add({"Rock", kSolid | kOpaque, Shape::Cube, "rock"});
     ChunkMap rw;
     rw.setRegistry(&rb);

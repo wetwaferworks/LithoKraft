@@ -11,9 +11,9 @@ namespace lithokraft {
 namespace {
 // Mutable handle to the registry for mod registration. The public blockRegistry()
 // exposes it const; this one is for registerBlock() during single-threaded mod init.
-BlockRegistry& mutableRegistry() {
-  static BlockRegistry reg = [] {
-    BlockRegistry r;
+cBlockReg& mutableRegistry() {
+  static cBlockReg reg = [] {
+    cBlockReg r;
     r.reserve(64);
     constexpr uint32_t kTerrain = kSolid | kOpaque | kPowerable | kCutsWire;
     constexpr uint32_t kComp = kSolid | kOpaque | kCutsWire;          // full-cube component (not powerable)
@@ -278,20 +278,20 @@ void ensureItemsRegistered() {
 }
 }  // namespace
 
-const BlockRegistry& blockRegistry() {
-  BlockRegistry& r = mutableRegistry();
+const cBlockReg& blockRegistry() {
+  cBlockReg& r = mutableRegistry();
   ensureItemsRegistered();
   return r;
 }
-BlockRegistry& mutableBlockRegistry() {
-  BlockRegistry& r = mutableRegistry();
+cBlockReg& mutableBlockRegistry() {
+  cBlockReg& r = mutableRegistry();
   ensureItemsRegistered();
   return r;
 }
 
 // Resolve a block's numeric id from its string id. Fails loudly (not silently) if the
 // string id isn't registered -- a missing block is a programming error, not a runtime condition.
-static BlockId resolveId(const BlockRegistry& reg, std::string_view sid) {
+static BlockId resolveId(const cBlockReg& reg, std::string_view sid) {
   auto id = reg.findById(sid);
   if (!id) {
     std::fprintf(stderr, "blockRegistry: string id '%.*s' not registered\n", int(sid.size()), sid.data());

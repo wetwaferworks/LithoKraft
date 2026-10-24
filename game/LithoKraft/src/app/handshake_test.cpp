@@ -96,10 +96,10 @@ uint64_t hashWorld(const ChunkMap& world, const cSignalSim& sig, uint64_t ticks)
 //   tick 100: break the first red trace (packPos order) + onBlockChanged
 //   tick 120: use() the first repeator (cycles its delay)
 //   tick 150: replace the trace + onBlockChanged
-// (The §6.4 text routes inputs through SimThread::edit; edits there are
+// (The §6.4 text routes inputs through cSimThread::edit; edits there are
 // stamped at drain time by wall clock, which would make the *input itself*
 // differ between runs. Tick-indexed direct inputs are the deterministic
-// equivalent; the SimThread path is exercised by the freeze proof below
+// equivalent; the cSimThread path is exercised by the freeze proof below
 // and by --perf-headless.)
 struct Scenario {
   cDimensionReg reg;
@@ -112,7 +112,7 @@ Scenario buildScenario() {
   Scenario sc;
   sc.reg = createDimensions();
   sc.wafer = sc.reg.find("wafer");
-  JobPool pool(2);
+  cJobPool pool(2);
   sc.wafer->load(pool, 8);
   ChunkMap& w = sc.wafer->chunks;
   sc.y = w.surfaceY(8, 8) + 1;
@@ -132,7 +132,7 @@ Scenario buildScenario() {
 uint64_t runScenario(int ticks, bool handshake, int workers, int phases) {
   Scenario sc = buildScenario();
   ChunkMap& w = sc.wafer->chunks;
-  const litholattice::IWorldSimulation::DirtyFn noDirty = [](int, int, int) {};
+  const litholattice::IWorldSim::DirtyFn noDirty = [](int, int, int) {};
   // F56-7 (Cortana 2026-10-17): LL_HS_RADIUS / LL_HS_ROUND_AREA vary the scenario's tick area for the
   // round-area baselines. Unset = the historical square radius 8 (cb32c824f8b3ea98 / e015e51cf1559089).
   litholattice::TickArea area{4, 4, 8};
@@ -385,7 +385,7 @@ void testFreezeBare() {
   check(hHang == hClean, "FREEZE: pre-freeze committed hash equals the clean run's hash");
 }
 
-// ---- §6.3 FREEZE end-to-end (real SimThread + save/reload while frozen) ----
+// ---- §6.3 FREEZE end-to-end (real cSimThread + save/reload while frozen) ----
 void testFreezeEndToEnd() {
   std::printf("== handshake FREEZE end-to-end (SimThread -> paused -> save/reload)\n");
   Scenario sc = buildScenario();
@@ -402,7 +402,7 @@ void testFreezeEndToEnd() {
   cfg.handshakePhasesPerCycle = 4;
   cfg.handshakeWorkerThreads = 2;
   cfg.handshakeWatchdogMs = 50;
-  auto sim = std::make_unique<litholattice::SimThread>(w, blockRegistry(), std::move(sc.ws), std::move(cfg),
+  auto sim = std::make_unique<litholattice::cSimThread>(w, blockRegistry(), std::move(sc.ws), std::move(cfg),
                                                        [](std::shared_ptr<litholattice::MeshInput>) {});
   litholattice::cTimingHandshakeAuthority* auth = sim->handshakeAuthority();
   check(auth != nullptr, "FREEZE e2e: authority constructed in handshake mode");
@@ -435,7 +435,7 @@ void testFreezeEndToEnd() {
   // P0a/C2: stop() with the hang worker stuck must FAIL loudly (no detach).
   // The snapshot below reads committed state while that worker is parked
   // on the test latch (not executing); production save-completion gates
-  // on this return value (see SimThread::stop()).
+  // on this return value (see cSimThread::stop()).
   check(!sim->stop(), "FREEZE e2e: stop() with a stuck worker fails loudly instead of detaching (C2)");
   const auto dir = std::filesystem::temp_directory_path() / "lithokraft_hs_freeze_e2e";
   std::filesystem::remove_all(dir);
@@ -1083,7 +1083,7 @@ void testRateMemorChaining() {
   check(fast2 == 64 && fast4 == 64, "RATE/A-H3: Memor x2 and x4 store the same 64 x1 stores (fast path; the store is not discarded)");
 }
 
-// ---- rate scaling: perf-headless style snapshot on the real SimThread ----
+// ---- rate scaling: perf-headless style snapshot on the real cSimThread ----
 void testRatePerfSnapshot() {
   std::printf("== handshake rate perf snapshot (512 TPS SimThread, div8 + mul4 components)\n");
   Scenario sc = buildScenario();
@@ -1100,7 +1100,7 @@ void testRatePerfSnapshot() {
   litholattice::ClockDomain domDiv16;
   domDiv16.name = "perf.div16"; domDiv16.hz = 32; domDiv16.enabled = true;
   cfg.domains = {domDiv4, domDiv16};
-  auto sim = std::make_unique<litholattice::SimThread>(w, blockRegistry(), std::move(sc.ws), std::move(cfg),
+  auto sim = std::make_unique<litholattice::cSimThread>(w, blockRegistry(), std::move(sc.ws), std::move(cfg),
                                                        [](std::shared_ptr<litholattice::MeshInput>) {});
   std::atomic<uint64_t> counterDiv{0}, counterMul{0};
   uint32_t idDiv = UINT32_MAX, idMul = UINT32_MAX;

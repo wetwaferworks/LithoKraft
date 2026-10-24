@@ -11,9 +11,9 @@
 
 namespace lithokraft {
 
-Vec3 playerEyePos(const Player& p) { return playerEyePos(p, kPlayerEyeHeight); }
+Vec3 playerEyePos(const cPlayer& p) { return playerEyePos(p, kPlayerEyeHeight); }
 
-Vec3 playerEyePos(const Player& p, float eyeHeight) { return {p.pos.x, p.pos.y + eyeHeight, p.pos.z}; }
+Vec3 playerEyePos(const cPlayer& p, float eyeHeight) { return {p.pos.x, p.pos.y + eyeHeight, p.pos.z}; }
 
 bool blockIsLiquid(BlockId id) {
   if (id == kAir) return false;
@@ -21,7 +21,7 @@ bool blockIsLiquid(BlockId id) {
   return def.behavior == "water" || def.behavior == "liquid" || def.behavior == "lava";
 }
 
-cGamePlayerAdapter::cGamePlayerAdapter(Player& gamePlayer) : game_(gamePlayer) {
+cGamePlayerAdapter::cGamePlayerAdapter(cPlayer& gamePlayer) : game_(gamePlayer) {
   // Standard vitals first (health/oxygen/stamina, 0..64, default 64, on
   // the IVitals registry), then the engine's standard stat (xp) and
   // LithoKraft's own stats (kharge, static) on IStat. Registration is

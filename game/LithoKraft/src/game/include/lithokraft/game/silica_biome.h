@@ -5,7 +5,7 @@
 // "blended" biome selector, so every generated column carries a weight vector --
 // ColumnMaps::biomeWeight, row-major `columns * biomeCount`, indexed by
 // WaferBiome (TraceForest=0 .. DeadZones=4). Sibling systems query it
-// deterministically through ColumnGenerator::generate(cx, cz, &maps).
+// deterministically through cColumnGen::generate(cx, cz, &maps).
 //
 // The weights are worldgen-static per column, so the blend happens ONCE per
 // chunk and is cached: SilicaShadeCache averages the chunk's columns into one
@@ -19,7 +19,7 @@
 #include "lithokraft/content/silica.h"
 
 namespace litholattice {
-class ColumnGenerator;
+class cColumnGen;
 namespace procgen {
 struct ColumnMaps;
 }  // namespace procgen
@@ -31,7 +31,7 @@ namespace lithokraft {
 /// Thread-safe; deterministic (same seed -> same weights -> same shade).
 class SilicaShadeCache {
  public:
-  explicit SilicaShadeCache(std::shared_ptr<const litholattice::ColumnGenerator> waferGen);
+  explicit SilicaShadeCache(std::shared_ptr<const litholattice::cColumnGen> waferGen);
   ~SilicaShadeCache();
 
   /// Blended shade for chunk column (cx, cz). Pure function of the worldgen

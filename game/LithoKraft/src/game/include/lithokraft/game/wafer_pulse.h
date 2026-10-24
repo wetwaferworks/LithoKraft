@@ -5,7 +5,7 @@
 // "blended" biome selector, so every generated column carries a weight vector -
 // ColumnMaps::biomeWeight, row-major `columns * biomeCount`, indexed by
 // WaferBiome (TraceForest=0 .. DeadZones=4). Sibling systems query it
-// deterministically through ColumnGenerator::generate(cx, cz, &maps).
+// deterministically through cColumnGen::generate(cx, cz, &maps).
 //
 // The weights are worldgen-static per column, so the blend happens ONCE per
 // chunk and is cached: WaferPulseCache blends the chunk's columns into one
@@ -18,7 +18,7 @@
 #include <memory>
 
 namespace litholattice {
-class ColumnGenerator;
+class cColumnGen;
 }
 
 namespace lithokraft {
@@ -27,7 +27,7 @@ namespace lithokraft {
 /// Thread-safe.
 class WaferPulseCache {
  public:
-  explicit WaferPulseCache(std::shared_ptr<const litholattice::ColumnGenerator> waferGen);
+  explicit WaferPulseCache(std::shared_ptr<const litholattice::cColumnGen> waferGen);
   ~WaferPulseCache();
 
   /// Blended params for chunk column (cx, cz) as two shader-ready vec4s:

@@ -33,7 +33,7 @@ struct MsSamples {
 
 class cBenchStreamer {
  public:
-  cBenchStreamer(IRenderer& renderer, JobPool& pool, std::shared_ptr<const ColumnGenerator> gen, int worldChunks, BlockId belowWorld,
+  cBenchStreamer(IRenderer& renderer, cJobPool& pool, std::shared_ptr<const cColumnGen> gen, int worldChunks, BlockId belowWorld,
                 int radiusChunks);
   ~cBenchStreamer();  ///< waits for its jobs, removes its meshes
   /// Main thread, once per frame: request / drop columns around (x, z), take finished work,
@@ -73,8 +73,8 @@ class cBenchStreamer {
  private:
   bool inFixedWorld(int cx, int cz) const { return cx >= 0 && cz >= 0 && cx < world_ && cz < world_; }
   IRenderer& renderer_;
-  JobPool& pool_;
-  std::shared_ptr<const ColumnGenerator> gen_;
+  cJobPool& pool_;
+  std::shared_ptr<const cColumnGen> gen_;
   int world_, radius_;
   BlockId below_;
   ChunkMap map_;

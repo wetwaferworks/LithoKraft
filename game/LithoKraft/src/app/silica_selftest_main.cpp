@@ -1,7 +1,7 @@
 // lithokraft_silica_selftest: headless Silica workstream tests (no window, no GL).
 // Workstream 5 (JD-locked 2026-10-11). Exit code = failure count. LF line endings.
 //
-// Everything runs against a TEST-LOCAL BlockRegistry (never the global one):
+// Everything runs against a TEST-LOCAL cBlockReg (never the global one):
 // the registry is built with exactly the rows silica_registry.inc specifies, so
 // the snippets the coordinator appends to blocks.cpp/blocks.h are verified here
 // before they land.
@@ -28,8 +28,8 @@ using namespace lithokraft;
 
 // Test-local registry mirroring blocks.cpp's layout: row 0 = Air, then the real
 // soil ids, then the two Silica rows EXACTLY as silica_registry.inc specifies.
-BlockRegistry makeSilicaTestRegistry() {
-  BlockRegistry r;
+cBlockReg makeSilicaTestRegistry() {
+  cBlockReg r;
   auto def = [](std::string_view id, std::string_view name, uint32_t flags, Shape shape,
                 std::string_view tex) {
     return BlockDef{name, flags, shape, tex, {}, 0, 0, 0, 0.8f, false, 0, id};
@@ -72,7 +72,7 @@ struct Drop {
 };
 
 // Soil patch at y=10, x/z in [6..10]; returns a world with mature grass at (8,11,8).
-ChunkMap makeGrassPatch(const BlockRegistry& reg, BlockId soil) {
+ChunkMap makeGrassPatch(const cBlockReg& reg, BlockId soil) {
   ChunkMap w = makeWorld();
   w.setRegistry(&reg);
   for (int x = 6; x <= 10; ++x)
@@ -82,12 +82,12 @@ ChunkMap makeGrassPatch(const BlockRegistry& reg, BlockId soil) {
   return w;
 }
 
-const IWorldSimulation::DirtyFn kNoDirty = [](int, int, int) {};
+const IWorldSim::DirtyFn kNoDirty = [](int, int, int) {};
 
 }  // namespace
 
 int main() {
-  const BlockRegistry reg = makeSilicaTestRegistry();
+  const cBlockReg reg = makeSilicaTestRegistry();
   const SilicaLightQuery kDay = [](int, int, int) { return uint8_t(64); };
   const SilicaLightQuery kDark = [](int, int, int) { return uint8_t(0); };
 

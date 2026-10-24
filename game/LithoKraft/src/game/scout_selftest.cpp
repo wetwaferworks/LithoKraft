@@ -46,14 +46,14 @@ bool pngDims(const std::vector<uint8_t>& png, int& w, int& h) {
 }
 
 /// The real Wafer generator (built-in JSON + code surface rules), fixed seed.
-std::shared_ptr<const litholattice::ColumnGenerator> makeWaferGen(uint64_t seed) {
+std::shared_ptr<const litholattice::cColumnGen> makeWaferGen(uint64_t seed) {
   const char* json = builtinWorldgenSource("wafer");
   if (!json) return nullptr;
   std::string err;
   // The ModelResolver is REQUIRED (P2b-2, review G-M4): wafer.json's
   // lithoform_stamp features fail creation without one. Production
   // (dimensions.cpp) passes makeLithoStampModelResolver(); the test must too.
-  auto gen = litholattice::ColumnGenerator::create(json, seed, "wafer", blockRegistry(), err,
+  auto gen = litholattice::cColumnGen::create(json, seed, "wafer", blockRegistry(), err,
                                                    waferSurfaceRules(),
                                                    model::makeLithoStampModelResolver());
   if (!gen) std::printf("  wafer generator failed: %s\n", err.c_str());
@@ -351,7 +351,7 @@ void testStructures() {
     }
   const std::string stripped = parsed.dump();
   std::string err;
-  auto genNoStruct = litholattice::ColumnGenerator::create(
+  auto genNoStruct = litholattice::cColumnGen::create(
       stripped, seed, "wafer", blockRegistry(), err, waferSurfaceRules(),
       model::makeLithoStampModelResolver());  // same resolver as makeWaferGen (G-M4 latent site)
   check(genNoStruct != nullptr, "structures: feature-stripped generator builds");

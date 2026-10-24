@@ -3,10 +3,10 @@
 //
 // The controller translates a game-agnostic ControlFrame into synthetic
 // InputEvents using the CURRENT ActionMap (user remaps respected) and
-// stages them into the InputSystem, where they merge with the backend's
+// stages them into the cInputSystem, where they merge with the backend's
 // events at the next update() — the exact point keyboard input enters.
 // The model therefore plays by the same rules as a keyboard player: the
-// same physics in Player::update, the same reach/interact checks in
+// same physics in cPlayer::update, the same reach/interact checks in
 // Game::handleWorldActions, the same sim-thread marshaling for world edits.
 //
 // MULTI-PILOT (locked 2026-10-11): shadow input state is per pilot id.
@@ -14,7 +14,7 @@
 // is registering another id here — no MCP module changes.
 //
 // Threading: submitFrame()/releaseAll()/pilotIds() run on the MCP server
-// thread. All shared state is mutex-guarded; staging into the InputSystem
+// thread. All shared state is mutex-guarded; staging into the cInputSystem
 // is thread-safe by engine contract.
 #pragma once
 
@@ -38,7 +38,7 @@ class cMcpPlayerController : public litholattice::mcp::IPlayerController {
   /// `pilotIds`: ids to wire (v1: {"player"}). `controllable`: true when the
   /// local player exists to drive (Playing state, not paused, no inventory
   /// open). Called on the MCP thread.
-  cMcpPlayerController(litholattice::InputSystem& input,
+  cMcpPlayerController(litholattice::cInputSystem& input,
                       std::vector<std::string> pilotIds,
                       std::function<bool()> controllable);
   std::vector<std::string> pilotIds() const override;
@@ -60,7 +60,7 @@ class cMcpPlayerController : public litholattice::mcp::IPlayerController {
                std::vector<litholattice::InputEvent>& out);
   void pressOnce(Action a, std::vector<litholattice::InputEvent>& out);
 
-  litholattice::InputSystem& input_;
+  litholattice::cInputSystem& input_;
   std::vector<std::string> pilotIds_;
   std::function<bool()> controllable_;
   mutable std::mutex mutex_;

@@ -4,7 +4,7 @@
 // behaviour is describe-only and signing does not exist yet.
 //
 // Why a plain cBlockBehavior and not a cCompBehavior: the standard use path
-// (Game -> IWorldSimulation::use -> cSignalSim::use) only reaches blocks that
+// (Game -> IWorldSim::use -> cSignalSim::use) only reaches blocks that
 // sit in cSignalSim's component map, and that map is fed inconsistently for a
 // SimRole::None block -- onBlockChanged (placement) admits any block whose
 // behaviour is a cCompBehavior, but scan() (world load) pre-filters to

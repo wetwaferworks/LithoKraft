@@ -125,7 +125,7 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
   const float yawDeg = float(res.yaw * kRadToDeg), pitchDeg = float(res.pitch * kRadToDeg);
   const float fovDeg = float(res.fovRad * kRadToDeg);
   const float yawR = res.yaw, pitchR = res.pitch;
-  // The engine camera's forward (Player::forward convention, radians).
+  // The engine camera's forward (cPlayer::forward convention, radians).
   const litholattice::Vec3 eye{float(ex), float(ey), float(ez)};
   const litholattice::Vec3 fwd = res.forward;
   const litholattice::Mat4 vp =

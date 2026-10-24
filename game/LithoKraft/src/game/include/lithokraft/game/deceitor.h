@@ -133,7 +133,7 @@ struct DeceitorDrop {
 /// selftest fills them from fixtures. All calls happen on the game
 /// thread, inside cAiWorld::advance (brains tick there).
 struct DeceitorHooks {
-  /// Player eye/feet position (x,y,z = feet) + XZ facing (unit). False
+  /// cPlayer eye/feet position (x,y,z = feet) + XZ facing (unit). False
   /// when no player pose is available (brain then idles safely).
   std::function<bool(double& x, double& y, double& z, double& fx, double& fz)> playerPose;
   /// Nearest ground drop within `radius` of (x, y, z) — nullopt when

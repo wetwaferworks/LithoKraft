@@ -12,7 +12,7 @@
 // The constants live here until that hookup; then they move to blocks.h and the
 // matching lines below are deleted (the .inc file says exactly where).
 //
-// All functions below take the caller's BlockRegistry: the game passes
+// All functions below take the caller's cBlockReg: the game passes
 // blockRegistry(), the self-tests pass a test-local registry. Nothing here reads
 // the global registry, so silica logic is testable before the hookup lands.
 #pragma once
@@ -69,21 +69,21 @@ bool silicaLightOk(const ChunkMap& w, int x, int y, int z, const SilicaLightQuer
 
 /// One random tick for the silica grass at (x, y, z): uproot check, growth, then
 /// spread when mature. Deterministic in (world state, rnd); never runs on the
-/// per-tick path, only via IWorldSimulation::onRandomTick (8 picks/section/tick).
+/// per-tick path, only via IWorldSim::onRandomTick (8 picks/section/tick).
 /// Changed cells go to `dirty`; seed drops go to `drop`. Returns true on change.
-bool silicaOnRandomTick(ChunkMap& w, const BlockRegistry& reg, int x, int y, int z, uint32_t rnd,
-                        const litholattice::IWorldSimulation::DirtyFn& dirty, const SilicaLightQuery& light = {},
+bool silicaOnRandomTick(ChunkMap& w, const cBlockReg& reg, int x, int y, int z, uint32_t rnd,
+                        const litholattice::IWorldSim::DirtyFn& dirty, const SilicaLightQuery& light = {},
                         SilicaDropSink drop = nullptr);
 
 // --- the farming loop -----------------------------------------------------
 /// A seed may be planted at (x, y, z): the cell is air and the soil below is tilled.
 bool silicaCanPlant(const ChunkMap& w, int x, int y, int z);
 /// Plant: stage-0 grass attached to the tilled soil below. Precondition: silicaCanPlant.
-void silicaDoPlant(ChunkMap& w, int x, int y, int z, const litholattice::IWorldSimulation::DirtyFn& dirty);
+void silicaDoPlant(ChunkMap& w, int x, int y, int z, const litholattice::IWorldSim::DirtyFn& dirty);
 /// Till silicon soil into farmland. False when the block is not tillable (dead stays dead).
-bool silicaTill(ChunkMap& w, int x, int y, int z, const litholattice::IWorldSimulation::DirtyFn& dirty);
+bool silicaTill(ChunkMap& w, int x, int y, int z, const litholattice::IWorldSim::DirtyFn& dirty);
 /// Harvest mature grass: clears the cell, returns seeds granted (0 when immature).
-int silicaHarvest(ChunkMap& w, int x, int y, int z, uint32_t rnd, const litholattice::IWorldSimulation::DirtyFn& dirty);
+int silicaHarvest(ChunkMap& w, int x, int y, int z, uint32_t rnd, const litholattice::IWorldSim::DirtyFn& dirty);
 /// Seed yield for breaking grass at `stage` with per-pick randomness `rnd`.
 /// Mature: 2-3 (the farmable loop: plant 1, reap 2-3); young: 0-1.
 int silicaDropCount(uint32_t rnd, int stage);

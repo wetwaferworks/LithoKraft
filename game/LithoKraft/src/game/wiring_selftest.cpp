@@ -81,7 +81,7 @@ int runWiringSelfTest() {
 
   // ---------- B6: Etchor block + role + behaviour seam -------------------
   {
-    const BlockRegistry& reg = blockRegistry();
+    const cBlockReg& reg = blockRegistry();
     check(reg.def(kEtchor).id == "lithokraft:etchor", "B6: Etchor block registered as lithokraft:etchor");
     check(uint32_t(kEtchor) == uint32_t(kCertificateTable) + 1,
           "B6: Etchor id appends directly after the certificate table (append-only, no renumber)");

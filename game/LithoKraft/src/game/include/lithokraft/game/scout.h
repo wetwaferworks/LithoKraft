@@ -9,7 +9,7 @@
 #include <string>
 
 namespace litholattice {
-class ColumnGenerator;
+class cColumnGen;
 }  // namespace litholattice
 
 namespace lithokraft {
@@ -27,7 +27,7 @@ struct BiomeLocateResult {
 /// refining the best sample to the nearest matching column in its 48-block neighborhood.
 /// Searches out to `maxDistanceBlocks` (default 4096); beyond that reports not-found.
 /// The message reads e.g. "trace_forest: nearest at (1234, -567), 312 blocks away".
-BiomeLocateResult locateBiome(const litholattice::ColumnGenerator& gen, uint8_t biomeIndex,
+BiomeLocateResult locateBiome(const litholattice::cColumnGen& gen, uint8_t biomeIndex,
                              double px, double pz, int maxDistanceBlocks = 4096);
 
 }  // namespace lithokraft

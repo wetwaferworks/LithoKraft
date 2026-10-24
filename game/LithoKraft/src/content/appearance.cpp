@@ -211,7 +211,7 @@ void meshRamp(const CustomBlock& cell, MeshWriter& out) {
   const uint32_t st = uint32_t(cell.state) & 0x1fu;
   const bool hang = rp::hangingOf(st);
   const FaceMaterial fm = cell.materials.face(cell.id, FaceSlot::Top, false);
-  const BlockRegistry& reg = cell.blocks;
+  const cBlockReg& reg = cell.blocks;
   auto opaque = [&](int dx, int dy, int dz) { return reg.has(cell.neighbor(dx, dy, dz), kOpaque); };
   // Corner (xi, zi) in order around the top: (0,0) (1,0) (1,1) (0,1).
   constexpr int kCx[4] = {0, 1, 1, 0}, kCz[4] = {0, 0, 1, 1};
@@ -290,7 +290,7 @@ void meshHighwayRamp(const CustomBlock& cell, MeshWriter& out) {
   namespace hw = litholattice::procgen::ramp::highway;
   const uint32_t st = uint32_t(cell.state) & 0x7u;
   const FaceMaterial fm = cell.materials.face(cell.id, FaceSlot::Top, false);
-  const BlockRegistry& reg = cell.blocks;
+  const cBlockReg& reg = cell.blocks;
   auto opaque = [&](int dx, int dy, int dz) { return reg.has(cell.neighbor(dx, dy, dz), kOpaque); };
   constexpr int kCx[4] = {0, 1, 1, 0}, kCz[4] = {0, 0, 1, 1};
   int H[4];
@@ -346,7 +346,7 @@ void meshHighwayRamp(const CustomBlock& cell, MeshWriter& out) {
 
 // Wire: one flat piece on the cell floor, chosen from its connections and tinted by strength.
 void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out) const {
-  const BlockRegistry& reg = cell.blocks;
+  const cBlockReg& reg = cell.blocks;
   const BlockDef def = cell.def();
   if (cell.id == kAluminumRamp) { meshRamp(cell, out); return; }  // Cortana 2026-10-16
   if (cell.id == kHighwayRamp) { meshHighwayRamp(cell, out); return; }  // Proposed by JD, Built by Cortana

@@ -39,7 +39,7 @@ std::shared_ptr<MeshInput> lodInput(const MeshInput& in, int f) {
   std::fill(std::begin(out->id), std::end(out->id), kAir);
   std::fill(std::begin(out->st), std::end(out->st), CellState{});
   std::fill(std::begin(out->mat), std::end(out->mat), uint8_t(0));
-  const BlockRegistry& reg = blockRegistry();
+  const cBlockReg& reg = blockRegistry();
   const int n = kChunkSize / f;
   for (int b = 0; b < n; ++b)
     for (int c = 0; c < n; ++c)
@@ -101,7 +101,7 @@ double MsSamples::pct(std::vector<double> v, double q) {
   return v[std::min(v.size() - 1, size_t(q * double(v.size() - 1) + 0.5))];
 }
 
-cBenchStreamer::cBenchStreamer(IRenderer& renderer, JobPool& pool, std::shared_ptr<const ColumnGenerator> gen, int worldChunks,
+cBenchStreamer::cBenchStreamer(IRenderer& renderer, cJobPool& pool, std::shared_ptr<const cColumnGen> gen, int worldChunks,
                              BlockId belowWorld, int radiusChunks)
     : renderer_(renderer), pool_(pool), gen_(std::move(gen)), world_(worldChunks), radius_(radiusChunks), below_(belowWorld) {}
 

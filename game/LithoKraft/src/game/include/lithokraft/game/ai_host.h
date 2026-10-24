@@ -2,8 +2,8 @@
 // (litholattice::ai) — brief B6 wiring, 2026-10-13.
 //
 // WHAT: Game owns one cAiHost. loadActive() binds it to the ACTIVE
-//   dimension's live ChunkMap + the game block registry + the game JobPool
-//   (before the SimThread starts, while the game thread still owns the
+//   dimension's live ChunkMap + the game block registry + the game cJobPool
+//   (before the cSimThread starts, while the game thread still owns the
 //   map). When the `ai.enabled` cvar is on, the host constructs a
 //   cWalkCache over that live map and an cAiWorld on top of it; Game::update
 //   then drives it from elapsed sim world ticks via
@@ -54,7 +54,7 @@
 //   Beyond that, first-compute is prewarm-only (B-H3, 2026-10-15):
 //   cAiWorld::tick prewarms every column inside each pending search's
 //   plan box on the tick (game) thread BEFORE submitting the search to
-//   the JobPool, so a pool worker never computes a column -- workers
+//   the cJobPool, so a pool worker never computes a column -- workers
 //   only read already-cached, immutable columns. Dimension switch
 //   unbinds the host BEFORE the old dimension unloads (the cache holds
 //   a map reference).
@@ -84,8 +84,8 @@ class cAiHost {
   /// starts). Rebinding destroys any previous cAiWorld/cWalkCache first.
   /// `centre` is the spawn/player cell: its 3x3 columns are prewarmed
   /// when (and only when) the cAiWorld is constructed.
-  void bindWorld(litholattice::ChunkMap& chunks, const litholattice::BlockRegistry& blocks,
-                 litholattice::JobPool* pool, litholattice::ai::Cell centre);
+  void bindWorld(litholattice::ChunkMap& chunks, const litholattice::cBlockReg& blocks,
+                 litholattice::cJobPool* pool, litholattice::ai::Cell centre);
   /// Destroy the cAiWorld + cWalkCache and forget the world. Safe anytime.
   void unbindWorld();
 
@@ -126,8 +126,8 @@ class cAiHost {
   void drainInvalidations();              // game thread, from advance()
 
   litholattice::ChunkMap* chunks_ = nullptr;
-  const litholattice::BlockRegistry* blocks_ = nullptr;
-  litholattice::JobPool* pool_ = nullptr;
+  const litholattice::cBlockReg* blocks_ = nullptr;
+  litholattice::cJobPool* pool_ = nullptr;
   litholattice::ai::Cell centre_{};
   std::unique_ptr<litholattice::ai::cWalkCache> nav_;
   std::unique_ptr<litholattice::ai::cAiWorld> world_;
@@ -148,7 +148,7 @@ class cAiHost {
 /// climbable / fluid from the kGameClimbable / kGameFluid content flags.
 /// The predicates read the PASSED registry (no globals), so tests can build
 /// rules over fixture registries.
-litholattice::ai::NavRules gameNavRules(const litholattice::BlockRegistry& blocks);
+litholattice::ai::NavRules gameNavRules(const litholattice::cBlockReg& blocks);
 
 /// Smoke self-test (app selftest section): disabled = no construction /
 /// no effect; enabled = cAiWorld constructed over a fixture live map

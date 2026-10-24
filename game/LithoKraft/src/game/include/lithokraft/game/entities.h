@@ -85,7 +85,7 @@ class cDeceitorVisualBehavior final : public litholattice::IEntityBehavior {
 };
 
 /// Factory for game entity behaviors. The game passes its solidity callback so items
-/// collide with the real world (thread-safe via SimThread::getBlock).
+/// collide with the real world (thread-safe via cSimThread::getBlock).
 inline std::unique_ptr<litholattice::IEntityBehavior> makeEntityBehavior(
     uint32_t type, cItemBehavior::SolidFn isSolid, cItemBehavior::FrictionFn friction,
     cFallingBlockBehavior::PlaceFn place = {}) {

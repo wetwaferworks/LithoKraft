@@ -43,7 +43,7 @@ int runContentSelfTest() {
     check(ok, "SFX place / break / click / pulsar fire: audible at once, silent within 300 ms");
   }
   {
-    const BlockRegistry& reg = blockRegistry();
+    const cBlockReg& reg = blockRegistry();
     // Registry is append-only: every named id must resolve inside it, and ids must be dense.
     const bool idsDense = kSilicaTilledSoil < reg.size() && reg.idOf(kSilicaTilledSoil) == "lithokraft:tilled_silicon";
     check(idsDense && reg.def(kAir).flags == kTransparent && reg.def(kStone).tex == "stone" &&
@@ -55,7 +55,7 @@ int runContentSelfTest() {
     // JD materials blocks (2026-10-14): appended after the formula
     // shrubs, dense and in order, string ids round-trip, registry ends
     // at the last appended block.
-    const BlockRegistry& reg = blockRegistry();
+    const cBlockReg& reg = blockRegistry();
     const bool appended = kCopperBlock == kFormulaShrub314 + 1 &&
                           kAluminumBlock == kCopperBlock + 1 &&
                           kGravityBlock == kAluminumBlock + 1 &&

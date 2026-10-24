@@ -160,7 +160,7 @@ int runLocomotionSelfTest() {
 
   // --- Adapter: true velocity + teleport guard -----------------------------
   {
-    Player p;
+    cPlayer p;
     PlayerLocomotion loco;
     loco.place({4.5, kFloorTop, 28.5});
     p.pos = loco.position();
@@ -184,7 +184,7 @@ int runLocomotionSelfTest() {
     check(tp.vx == 0.0 && tp.vy == 0.0 && tp.vz == 0.0 && near(tp.x, 200.0, 1e-9),
           "locomotion: a teleport tick reports zero velocity once (position still mirrors)");
     // The legacy derived-velocity sync (init-time path) still derives.
-    Player p2;
+    cPlayer p2;
     p2.pos = {0.f, float(kFloorTop), 0.f};
     cGamePlayerAdapter adapter2(p2);
     p2.pos.x += 0.05f;
@@ -199,7 +199,7 @@ int runLocomotionSelfTest() {
     // TPS: 16 s at 32 TPS = 512 world ticks; 16 s at 512 TPS = 8192.
     // Pre-fix, tickVitals counted raw ticks, so the 512 TPS player
     // drained 16x faster (and drowned 16x sooner).
-    Player pA, pB;
+    cPlayer pA, pB;
     cGamePlayerAdapter a(pA), b(pB);
     a.tickVitals(512, true, false, 32);
     b.tickVitals(8192, true, false, 512);
@@ -210,7 +210,7 @@ int runLocomotionSelfTest() {
     check(a.oxygen() == 0,
           "vitals (PLY-1): 32 TPS calibration unchanged (full 64-point bar drains in 512 ticks)");
     // Refill is normalised too: 4 s surfaced refills the same at both rates.
-    Player pC, pD;
+    cPlayer pC, pD;
     cGamePlayerAdapter c(pC), d(pD);
     c.tickVitals(512, true, false, 32);   // empty the bar at 32 TPS
     d.tickVitals(8192, true, false, 512); // empty the bar at 512 TPS
@@ -220,7 +220,7 @@ int runLocomotionSelfTest() {
           "vitals (PLY-1): equal wall-clock oxygen refill at 32 vs 512 TPS");
     // Many small calls (the per-frame pattern) carry the fractional
     // remainder exactly: 8192 x 1 tick at 512 TPS == one 8192-tick call.
-    Player pE;
+    cPlayer pE;
     cGamePlayerAdapter e(pE);
     for (int i = 0; i < 8192; ++i) e.tickVitals(1, true, false, 512);
     check(e.oxygen() == b.oxygen(),

@@ -5,7 +5,7 @@
 //                           recording tap, the v1 format round-trip and its
 //                           fail-closed parse.
 //   runControlTests()     — --control-test: the determinism scenario driven
-//                           through the REAL SimThread + the serialized
+//                           through the REAL cSimThread + the serialized
 //                           stream (paused + stepped, tick-indexed stamped
 //                           events) in legacy and handshake modes, plus the
 //                           20,000-tick scripted-input soak.
@@ -276,7 +276,7 @@ DrivenResult driveScenario(int ticks, bool handshake, int workers, const std::ve
   cfg.timingHandshake = handshake;
   cfg.handshakePhasesPerCycle = 4;
   cfg.handshakeWorkerThreads = workers;
-  SimThread st(w, blockRegistry(), std::move(sc.ws), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
+  cSimThread st(w, blockRegistry(), std::move(sc.ws), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
   cSignalWorldSim& sig = static_cast<cSignalWorldSim&>(st.simulation());
 
   st.controlStream().setRecording(true);

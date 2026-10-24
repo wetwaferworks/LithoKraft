@@ -1,7 +1,7 @@
 // cGameWorldQuery: the IWorldQuery backend for LithoKraft (v1).
 //
 // THREADING (the critical design point): while the sim runs, the sim thread
-// OWNS the chunks (SimThread::getBlock's own header: "fine for a handful of
+// OWNS the chunks (cSimThread::getBlock's own header: "fine for a handful of
 // queries per frame, not for bulk scans"). A region scan therefore runs under
 // a brief, explicit sim pause:
 //

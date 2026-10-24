@@ -1,6 +1,6 @@
 // Cortana 2026-10-15 0750: PORT portable sourceRoot()
 // biome_capture: headless 3D screenshots of the 5 Wafer biomes.
-// Uses the REAL game worldgen (ColumnGenerator + wafer.json pipeline), the REAL mesher,
+// Uses the REAL game worldgen (cColumnGen + wafer.json pipeline), the REAL mesher,
 // and the software renderer. No window, no GPU. Fixed seed for reproducibility.
 // Output: PNGs in the directory given as argv[1] (default: ./biome-shots).
 // LF line endings.
@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   const auto& gen = *wafer->generator;
-  const litholattice::BlockRegistry& blocks = lithokraft::blockRegistry();
+  const litholattice::cBlockReg& blocks = lithokraft::blockRegistry();
 
   // Load the real resources exactly like the game (engine base < game pack <
   // pack_64). Previously this tool built a default BlockMaterials (every face =
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
   // packed 0xAARRGGBB -- R at >>16, matching basicFragmentShader's extraction and
   // this file's framebuffer unpacking below). Box-downsample each registry
   // texture (64x64 RGBA8 in pack_64; Image pixels are R,G,B,A bytes) to 16x16.
-  const litholattice::TextureRegistry& texRegistry = rm.textures();
+  const litholattice::cTextureReg& texRegistry = rm.textures();
   const uint32_t layerCount = uint32_t(texRegistry.textures().size());
   std::vector<uint32_t> texBuffer(size_t(layerCount) * 256, 0xFFFF00FFu);
   for (uint32_t layer = 0; layer < layerCount; ++layer) {

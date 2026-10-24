@@ -21,9 +21,9 @@ namespace {
 
 using T = InputEvent::Type;
 
-/// Drives an InputSystem one frame at a time from scripted events.
+/// Drives an cInputSystem one frame at a time from scripted events.
 struct Rig {
-  InputSystem input{defaultActionMap(), inputContexts()};
+  cInputSystem input{defaultActionMap(), inputContexts()};
   cReplayInputBackend backend;
   double t = 0.0;
 
@@ -201,7 +201,7 @@ int runGameInputSelfTest() {
       seen.push_back(live.input.pressed(Action::HotbarNext));
     }
     const std::vector<InputEvent> rec = live.input.stopRecording();
-    InputSystem replayed{defaultActionMap(), inputContexts()};
+    cInputSystem replayed{defaultActionMap(), inputContexts()};
     cReplayInputBackend backend(rec);
     std::vector<bool> again;
     for (int i = 1; i <= 3; ++i) {

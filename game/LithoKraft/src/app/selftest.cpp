@@ -92,7 +92,7 @@ static std::filesystem::path uniqueTempDir(const char* base) {
 int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesystem::path>& packDirs, bool timingHandshake) {
   int fails = runSignalSelfTest() + runContentSelfTest() + runAudioSelfTest() + runInputSelfTest() + runGameInputSelfTest() + runAssetsSelfTest();
   auto check = [&](bool ok, const char* what) { std::printf("  [%s] %s\n", ok ? "PASS" : "FAIL", what); if (!ok) ++fails; };
-  JobPool pool(2);
+  cJobPool pool(2);
   {
     std::printf("  (the next two job errors are expected)\n"); std::fflush(stdout);
     std::atomic<int> ran{0};
@@ -518,7 +518,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     {
       // Worldgen determinism: same seed -> identical columns at any thread count and on a fresh load.
       auto genWith = [&](unsigned threads) {
-        JobPool p(threads);
+        cJobPool p(threads);
         cHandoffQueue<std::unique_ptr<ChunkColumn>> out;
         {
           JobBatch b(p);
@@ -558,7 +558,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         a->chunks.set(5, 100, 5, kAir);        // undo in (0,0), new edit in (1,3)
         a->chunks.set(20, 95, 50, kLamp);
         changed = {ChunkKey::make(0, 0), ChunkKey::make(1, 3)};
-        // Signal ticks change wire / lamp states: their columns get marked, as SimThread does.
+        // Signal ticks change wire / lamp states: their columns get marked, as cSimThread does.
         const auto mark = [&](int x, int, int z) { changed.insert(ChunkKey::make(x >> 4, z >> 4)); };
         for (int i = 0; i < 30; ++i) sa.tick(a->chunks, 2, 2, 12, mark);
         written += save.saveDimension("wafer", a->chunks, sa, true, &changed);
@@ -723,7 +723,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
        // scanColumn/importState, the exact calls Game::pumpStreaming makes on
        // insertion, plus a cChunkStreamer pass through the real job pool —
        // must come back alive with its component memory intact. (The full
-       // Game-level loop is NOT driven here: no Game/SimThread is constructed
+       // Game-level loop is NOT driven here: no Game/cSimThread is constructed
        // in this test, so mesh submission and the stop/start seam itself are
        // covered only by the in-game path, not by this check.)
       const auto pdirS = dir / "p1_stream";
@@ -1025,7 +1025,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         auto c = std::make_unique<ChunkColumn>(); c->cx = cx; c->cz = cz; big.insert(std::move(c));
         keys.push_back(ChunkKey::make(cx, cz));
       }
-      // Player at (0,0), stream radius 8, hysteresis +2 (JD-DECISION values):
+      // cPlayer at (0,0), stream radius 8, hysteresis +2 (JD-DECISION values):
       // resident count must converge to the (2*10+1)^2 = 441 in-band columns.
       size_t guard = 0, maxBatch = 0;
       while (big.columns().size() > 441 && guard++ < 500) {
@@ -1082,7 +1082,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     { auto c = std::make_unique<ChunkColumn>(); c->cx = 0; c->cz = 0; iw.insert(std::move(c)); }
     iw.set(5, 64, 5, kWaferSilicon);
     iw.set(7, 64, 5, kDeadSilicon);
-    const IWorldSimulation::DirtyFn noMark = [](int, int, int) {};
+    const IWorldSim::DirtyFn noMark = [](int, int, int) {};
     check(hasItemUseHandler(kItemSeedor) && hasItemUseHandler(kItemSilicaSeed) && hasItemUseHandler(kItemFragment) &&
           !hasItemUseHandler(kItemBashor) && !hasItemUseHandler(999999),
           "item-use (A3/B1a): handlers registered for defined items only (Seedor, silica seed, Fragment stub)");
@@ -1105,7 +1105,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
      // flows from the content table into engine projectile behavior through
      // the exact seam Game wires in production (registry solidity+density).
     using namespace litholattice;
-    const BlockRegistry& reg5 = blockRegistry();
+    const cBlockReg& reg5 = blockRegistry();
     check(reg5.def(kDirt).density == 20 && reg5.def(kStone).density == 50 && reg5.def(kCeramic).density == 80 &&
           reg5.def(kGlass).density == 10 && reg5.def(kChipor).density == 70 && reg5.def(kRedTrace).density == 0,
           "density (A5): material-class table values land in BlockDef (earth 20, stone 50, ceramic 80, glass 10, Chipor 70)");
@@ -1323,7 +1323,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       r.drawImage({0, 0, 32, 32}, "block:4", {1, 1, 1, 1});
       check(hud.draws.size() > 4, "hotbar: a block icon paints as pixel rects, not a single swatch");
     }
-    const TextureRegistry& tex = rm.textures();
+    const cTextureReg& tex = rm.textures();
     const auto mats = rm.materials();
     auto face = [&](BlockId b, FaceSlot f, bool active) { return tex.texture(TextureId{mats->face(b, f, active).layer}).name; };
     check(ok && tex.textures().size() > 80 && tex.missingNames().empty() && rm.models().size() >= 24,
@@ -1389,7 +1389,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
           "look-at readout: describe() per block behaviour (repeator, wire, color lamp, tone, plain)");
   }
   {  // AngelScript: hello.as loads, onLoad() runs and logs through our API
-    ScriptEngine se;
+    cScriptEngine se;
     bool ok = se.init();
     se.setModPermissions(kPermWorldRead);  // currentDimension() needs world-read
     ok = ok && se.bindGlobalFunction("string currentDimension()", asFUNCTION(stubDimension), asCALL_CDECL) >= 0;
@@ -1398,11 +1398,11 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
           "AngelScript: scripts/hello.as loads and onLoad() logs");
   }
   {  // sandbox: no unregistered functions; runaway loops are aborted
-    ScriptEngine se;
+    cScriptEngine se;
     se.init();
     std::printf("  (the next script error is expected)\n");
     check(!se.loadSource("sandbox", "void onLoad() { system(\"calc\"); }"), "AngelScript sandbox: unregistered system() call does not compile");
-    ScriptEngine se2;
+    cScriptEngine se2;
     se2.init();
     check(se2.loadSource("loop", "void onLoad() { while (true) {} }") && !se2.callHook("void onLoad()"),
           "AngelScript sandbox: infinite loop aborted by time budget");

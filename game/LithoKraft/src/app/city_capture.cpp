@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
   litholattice::cDimensionReg reg = lithokraft::createDimensions(settings);
   litholattice::Dimension* wafer = reg.find("wafer");
   if (!wafer || !wafer->generator) { std::fprintf(stderr, "city_capture: no wafer generator\n"); return 1; }
-  litholattice::JobPool pool(2);
+  litholattice::cJobPool pool(2);
   wafer->load(pool, kWorldChunks);
   litholattice::ChunkMap& map = wafer->chunks;
 
@@ -139,9 +139,9 @@ int main(int argc, char** argv) {
   lithokraft::cResourceMgr rm({engineAssets, gameAssets, fs::path(gameAssets) / "packs" / "pack_64"});
   rm.reload();
   const auto materialsPtr = rm.materials();
-  const litholattice::BlockRegistry& blocks = lithokraft::blockRegistry();
+  const litholattice::cBlockReg& blocks = lithokraft::blockRegistry();
   litholattice::MeshContext mctx{blocks, *materialsPtr, &lithokraft::blockAppearance()};
-  const litholattice::TextureRegistry& texReg = rm.textures();
+  const litholattice::cTextureReg& texReg = rm.textures();
   const uint32_t layers = uint32_t(texReg.textures().size());
   std::vector<uint32_t> tex(size_t(layers) * 256, 0xFFFF00FFu);
   for (uint32_t layer = 0; layer < layers; ++layer) {

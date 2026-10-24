@@ -93,7 +93,7 @@ struct GameCommandBindings {
   std::function<std::string(const std::string& biomeName)> locateBiome;
   /// Render an overview map per `req` and write the PNG. Returns the message.
   std::function<std::string(const GenMapRequest& req)> genmap;
-  /// Apply staged block-definition updates via SimThread::runBetweenTicks.
+  /// Apply staged block-definition updates via cSimThread::runBetweenTicks.
   /// Debug-only (the command registers #ifndef NDEBUG). Returns a message.
   std::function<std::string()> hotswapRefresh;
   /// Etch one Chipor from a blank wafer, bearing `name` as its name field

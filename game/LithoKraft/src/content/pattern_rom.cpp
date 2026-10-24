@@ -57,7 +57,7 @@ int writeFrame(ChunkMap& w, const PatternRomScreen& s, int f, int prev, Fn&& dir
 }
 }  // namespace
 
-void tickPatternRom(ChunkMap& w, PatternRomScreen& s, const litholattice::IWorldSimulation::DirtyFn& dirty) {
+void tickPatternRom(ChunkMap& w, PatternRomScreen& s, const litholattice::IWorldSim::DirtyFn& dirty) {
   if (s.rom.frames.empty()) return;
   uint64_t loop = 0;
   for (int t : s.rom.ticks) loop += uint64_t(t < 1 ? 1 : t);

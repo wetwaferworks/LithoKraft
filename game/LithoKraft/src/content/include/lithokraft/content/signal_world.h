@@ -1,5 +1,5 @@
-// LithoKraft's world simulation for the engine's SimThread: the signal sim plus the game's
-// placement rules and sound cues (place / break / click), behind litholattice::IWorldSimulation.
+// LithoKraft's world simulation for the engine's cSimThread: the signal sim plus the game's
+// placement rules and sound cues (place / break / click), behind litholattice::IWorldSim.
 #pragma once
 #include "litholattice/core/tick_profile.h"  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
 #include <memory>
@@ -13,7 +13,7 @@
 
 namespace lithokraft {
 
-/// SimCommand codes LithoKraft sends through SimThread::edit (EditCmd::Kind::Command).
+/// SimCommand codes LithoKraft sends through cSimThread::edit (EditCmd::Kind::Command).
 enum SimCommandCode : uint16_t {
   kCmdAltUse = 2,    ///< sneak + use on the component at (x, y, z)
   kCmdKeyPulse = 1,  ///< keyboard block at (x, y, z): a = front (SIXBIT code + 1), b = control code
@@ -28,7 +28,7 @@ enum SimCommandCode : uint16_t {
 /// SimEvent kinds above the SoundCue range (SoundCue is uint8_t).
 constexpr uint16_t kEvItemDrop = 0x0100;  ///< value = BlockId dropped; the game spawns an item entity
 
-class cSignalWorldSim final : public IWorldSimulation {
+class cSignalWorldSim final : public IWorldSim {
  public:
   void scan(const ChunkMap& world) override { signal_.scan(world); }
   bool canPlace(const ChunkMap& world, int x, int y, int z, BlockId block) const override;
@@ -56,14 +56,14 @@ class cSignalWorldSim final : public IWorldSimulation {
     for (PatternRomScreen& s : romScreens_) tickPatternRom(world, s, dirty);
     if (tpS) { auto& w = ::litholattice::tickprof::worldSub(); w.signalNs = tpR - tpS; w.romNs = ::litholattice::tickprof::nowNs() - tpR; }
   }
-  /// Add a Pattern ROM screen (before the SimThread starts; the sim thread owns it afterwards).
+  /// Add a Pattern ROM screen (before the cSimThread starts; the sim thread owns it afterwards).
   void addPatternRom(PatternRomScreen s) { romScreens_.push_back(std::move(s)); }
   /// True when the last handshake tick was frozen by the watchdog mid-cycle.
   bool handshakeFrozenCycle() const { return hsFrozenCycle_; }
   size_t activeCount() const override { return signal_.componentCount(); }
   void takeEvents(std::vector<SimEvent>& out) override;
 
- cSignalSim& signal() { return signal_; }  ///< only while the SimThread is stopped (save / load)
+ cSignalSim& signal() { return signal_; }  ///< only while the cSimThread is stopped (save / load)
 
  private:
   void tickHandshake(ChunkMap& world, const TickArea& area, const DirtyFn& dirty);

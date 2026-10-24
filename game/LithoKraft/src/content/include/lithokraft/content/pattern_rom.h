@@ -41,7 +41,7 @@ PatternRom smileyRom(int tier);
 int paletteYellowStrength(int tier);
 
 /// Advance one sim tick; on a frame change rewrites the screen's lamps (dirty-marking them).
-void tickPatternRom(ChunkMap& w, PatternRomScreen& s, const litholattice::IWorldSimulation::DirtyFn& dirty);
+void tickPatternRom(ChunkMap& w, PatternRomScreen& s, const litholattice::IWorldSim::DirtyFn& dirty);
 /// Paint frame `f` now (scene build, before the sim starts). Returns lamps written.
 int paintPatternRom(ChunkMap& w, const PatternRomScreen& s, int f);
 

@@ -21,7 +21,7 @@ int64_t floorDiv64(int64_t a, int64_t b) {
 
 }  // namespace
 
-BiomeLocateResult locateBiome(const litholattice::ColumnGenerator& gen, uint8_t biomeIndex,
+BiomeLocateResult locateBiome(const litholattice::cColumnGen& gen, uint8_t biomeIndex,
                              double px, double pz, int maxDistanceBlocks) {
   BiomeLocateResult out;
   constexpr int kStep = 8;  // sample grid spacing in blocks

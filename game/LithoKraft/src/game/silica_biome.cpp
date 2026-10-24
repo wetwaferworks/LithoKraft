@@ -18,7 +18,7 @@ int64_t chunkKey(int cx, int cz) {
 }  // namespace
 
 struct SilicaShadeCache::Impl {
-  std::shared_ptr<const litholattice::ColumnGenerator> gen;
+  std::shared_ptr<const litholattice::cColumnGen> gen;
   std::mutex mutex;
   std::unordered_map<int64_t, SilicaShade> cache;  // chunkKey -> blended shade
 
@@ -42,7 +42,7 @@ struct SilicaShadeCache::Impl {
   }
 };
 
-SilicaShadeCache::SilicaShadeCache(std::shared_ptr<const litholattice::ColumnGenerator> waferGen)
+SilicaShadeCache::SilicaShadeCache(std::shared_ptr<const litholattice::cColumnGen> waferGen)
     : impl_(std::make_unique<Impl>()) {
   impl_->gen = std::move(waferGen);
 }

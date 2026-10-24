@@ -1,13 +1,13 @@
 // cGamePlayerAdapter: presents LithoKraft's local player as an engine IPlayer.
 //
-// The game keeps its own Player (creative-flight camera + inventory, player.h).
+// The game keeps its own cPlayer (creative-flight camera + inventory, player.h).
 // The engine's player system (litholattice/player: cPlayerMgr, IPlayer,
 // the IVitals/IStat/IAbility peer registries) is the integration surface
 // the rest of the engine speaks — MCP snapshots, saves, future net sync.
 // This adapter owns the cPlayerMgr for the local player and mirrors the
 // game player into it once per frame (syncFromGame), so engine consumers
 // always read current state. The direction is game -> engine: gameplay
-// movement stays in Player::update (MCP control also enters through the
+// movement stays in cPlayer::update (MCP control also enters through the
 // real input path), nothing engine-side moves the game player.
 //
 // Vitals vs stats: the constructor registers the engine's standard vitals
@@ -21,7 +21,7 @@
 // JD design 2026-10-12. It gets the XP range, not the 64 pool scale,
 // because it accumulates and is spent in XP-sized amounts).
 //
-// Threading: game thread only, like Player itself. Not thread-safe.
+// Threading: game thread only, like cPlayer itself. Not thread-safe.
 #pragma once
 
 #include <cstdint>
@@ -40,17 +40,17 @@
 namespace lithokraft {
 
 /// Eye height above the player's feet position. Matches the MCP senses
-/// adapter's kEyeHeight (mcp_senses_adapter.cpp): Player::pos is the feet,
+/// adapter's kEyeHeight (mcp_senses_adapter.cpp): cPlayer::pos is the feet,
 /// the senses camera sits this far above it.
 inline constexpr float kPlayerEyeHeight = 1.62f;
 
 /// The world position of the player's eyes; head-in-liquid tests sample the
 /// block cell here. Uses the standing eye height (kPlayerEyeHeight).
-Vec3 playerEyePos(const Player& p);
+Vec3 playerEyePos(const cPlayer& p);
 /// Pose-aware overload: the eye rides at the locomotion controller's
 /// current eye height (Stand 1.62 / Sneak 1.27 / Crawl 0.4), so the
 /// head-in-liquid cell follows the view when sneaking or crawling.
-Vec3 playerEyePos(const Player& p, float eyeHeight);
+Vec3 playerEyePos(const cPlayer& p, float eyeHeight);
 
 /// True when `id` is a liquid cell for vitals purposes. Liquids are
 /// game-defined (the worldgen <-> fluid seam in procgen/water.h identifies
@@ -70,7 +70,7 @@ class cGamePlayerAdapter {
   static constexpr uint64_t kStaminaDrainTicks = 16;  ///< sprinting: 1 point / 0.5 s
   static constexpr uint64_t kStaminaRegenTicks = 8;   ///< otherwise: 1 point / 0.25 s
 
-  explicit cGamePlayerAdapter(Player& gamePlayer);
+  explicit cGamePlayerAdapter(cPlayer& gamePlayer);
 
   /// The engine view of the local player (id = the manager's local id).
   litholattice::IPlayer& enginePlayer();
@@ -171,13 +171,13 @@ class cGamePlayerAdapter {
   /// (see kTeleportSpeed); also refreshes the delta baseline.
   bool teleportTripped(float dtSeconds);
 
-  Player& game_;
+  cPlayer& game_;
   litholattice::cPlayerMgr manager_;
   litholattice::StandardVitals vitals_;
   litholattice::StandardStats standardStats_;
   uint32_t kharge_ = 0;
   uint32_t static_ = 0;  ///< "static" stat id (the XP analogue; `static` is a keyword)
-  // Velocity derivation: the game Player integrates position directly and
+  // Velocity derivation: the game cPlayer integrates position directly and
   // tracks no velocity, so syncFromGame differences consecutive positions.
   Vec3 prevPos_{};
   bool hasPrevPos_ = false;

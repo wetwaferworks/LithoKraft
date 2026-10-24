@@ -43,7 +43,7 @@ constexpr float kBlendSeconds = 0.35f;  ///< mode-switch blend (manager ease)
 
 Vec3 sub(Vec3 a, Vec3 b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
 float length(Vec3 a) { return litholattice::sqrtFast(litholattice::dot(a, a)); }  // Carmack sqrt (view math)
-/// Player::forward convention: forward from yaw/pitch (radians).
+/// cPlayer::forward convention: forward from yaw/pitch (radians).
 Vec3 dirFromYawPitch(float yaw, float pitch) {
   return {std::cos(pitch) * std::cos(yaw), std::sin(pitch), std::cos(pitch) * std::sin(yaw)};
 }
@@ -82,8 +82,8 @@ struct VelocitySampler {
   }
 };
 
-/// ICameraTarget over the game Player. Anchor = the body's FEET position
-/// (Player.pos is feet since the locomotion wiring); the eye rides in
+/// ICameraTarget over the game cPlayer. Anchor = the body's FEET position
+/// (cPlayer.pos is feet since the locomotion wiring); the eye rides in
 /// eyeOffset at the locomotion controller's current eye height (via the
 /// GameCameraHooks::playerEyeHeight hook), so first person dips when
 /// sneaking and drops inside a crawl tunnel. Third person orbits the
@@ -92,7 +92,7 @@ struct VelocitySampler {
 /// FOV kick and follow behaviour).
 class cPlayerCameraTarget final : public cam::ICameraTarget {
  public:
-  cPlayerCameraTarget(const Player& p, std::function<float()> eyeHeight)
+  cPlayerCameraTarget(const cPlayer& p, std::function<float()> eyeHeight)
       : player_(p), eyeHeight_(std::move(eyeHeight)) {}
   Vec3 anchorPosition() const override { return player_.pos; }
   Vec3 eyeOffset() const override {
@@ -107,7 +107,7 @@ class cPlayerCameraTarget final : public cam::ICameraTarget {
   void sampleVelocity(float dt) { sampler_.sample(player_.pos, dt); }
 
  private:
-  const Player& player_;
+  const cPlayer& player_;
   std::function<float()> eyeHeight_;
   VelocitySampler sampler_;
 };
@@ -267,7 +267,7 @@ struct cGameCameraController::Impl {
   bool cvarsDirty = true;
 };
 
-cGameCameraController::cGameCameraController(Player& player, GameCameraHooks hooks)
+cGameCameraController::cGameCameraController(cPlayer& player, GameCameraHooks hooks)
     : impl_(std::make_unique<Impl>(hooks)), player_(player) {
   impl_->pilotSnapshot = hooks.pilotSnapshot;
   impl_->playerTarget = std::make_shared<cPlayerCameraTarget>(player, hooks.playerEyeHeight);
@@ -330,7 +330,7 @@ void cGameCameraController::syncCvars(const cam::CameraCvarValues& v) {
   impl_->cvarsDirty = true;
 }
 
-void cGameCameraController::update(const litholattice::InputSystem& in, float dt, bool lookEnabled,
+void cGameCameraController::update(const litholattice::cInputSystem& in, float dt, bool lookEnabled,
                                   bool playing, int frameWidth, int frameHeight) {
   Impl& im = *impl_;
 
@@ -368,7 +368,7 @@ void cGameCameraController::update(const litholattice::InputSystem& in, float dt
     const float wheel = in.devices().wheel();
     switch (mode_) {
       case GameCameraMode::ThirdPerson:
-        // Pitch sign matches Player::update (mouse up = look up).
+        // Pitch sign matches cPlayer::update (mouse up = look up).
         im.orbitCam->addLookInput(look.x, -look.y);
         if (wheel != 0.f) im.orbitCam->addZoomInput(wheel);  // up = closer
         break;
@@ -389,7 +389,7 @@ void cGameCameraController::update(const litholattice::InputSystem& in, float dt
         break;
       }
       case GameCameraMode::FirstPerson:
-        break;  // Player::update owns the look; the FP camera is synced below
+        break;  // cPlayer::update owns the look; the FP camera is synced below
     }
   }
   if (mode_ == GameCameraMode::Free)

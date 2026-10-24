@@ -105,8 +105,8 @@ static int resolvedTwinkle(const GameSettings& s) {
   return resolvedLeavesFancy(s) ? 2 : 1;
 }
 
-Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceMgr& resources, cAudioEngine& audio,
-           InputSystem& input)
+Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResourceMgr& resources, cAudioEngine& audio,
+           cInputSystem& input)
     : cfg_(cfg),
       ui_({[this](int slot) { hot_ = slot; }, [this](BlockId b, bool shift) { pickInventoryBlock(b, shift); },
            [this] { setInventoryOpen(false); }, [this] { if (menuState_ == MenuState::Playing) setPaused(false); },
@@ -1092,7 +1092,7 @@ void Game::loadActive() {
   clockSynced_ = false;   // 2026-10-16: a new sim's worldTick must not be diffed against the old one's
   auto worldSim = std::make_unique<cSignalWorldSim>();
   for (PatternRomScreen& r : roms) worldSim->addPatternRom(std::move(r));  // before the sim thread owns it
-  sim_ = std::make_unique<SimThread>(active_->chunks, blockRegistry(), std::move(worldSim), std::move(sc),
+  sim_ = std::make_unique<cSimThread>(active_->chunks, blockRegistry(), std::move(worldSim), std::move(sc),
                                      submitMesh_);
   // Measure-only windowed determinism probe (LL_HASH_AT_TICK=<world tick>; Proposed by JD; co-implemented by JD and Cortana).
   // At exactly that world tick, on the sim thread inside its mutation window, hash every loaded column
@@ -1103,7 +1103,7 @@ void Game::loadActive() {
     const uint64_t at = std::strtoull(hashAt, nullptr, 10);
     ChunkMap* cm = &active_->chunks;
     cSignalSim* sig = &static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
-    SimThread* simp = sim_.get();
+    cSimThread* simp = sim_.get();
     int rcx = 3, rcz = 2;  // LL_HASH_REGION=cx,cz (default: the test world's spawn / circuit chunk)
     if (const char* e = std::getenv("LL_HASH_REGION")) std::sscanf(e, "%d,%d", &rcx, &rcz);
     sim_->setTickHook([at, cm, sig, simp, rcx, rcz](uint64_t tick) {
@@ -1151,7 +1151,7 @@ void Game::loadActive() {
   // The pattern wall lights each pixel once per colour sweep, so it holds a lamp for > one sweep.
   static_cast<cSignalWorldSim&>(sim_->simulation()).signal().setLampHoldTicks(
       cfg_.benchScene == "pattern-wall" ? 600 : cfg_.tps >= 256 ? cfg_.tps / 30 : 0);
-  // Player-centered chunk streaming: the pre-bake above only covers the fixed
+  // cPlayer-centered chunk streaming: the pre-bake above only covers the fixed
   // [0, worldChunks)^2 square at the origin; the streamer generates/loads the
   // columns around the player from here on (see chunk_streamer.h).
   streamer_.reset();
@@ -1181,7 +1181,7 @@ bool Game::switchDimension(const std::string& id) {
   if (!next || next == active_) return false;
   saveWorld("dimension switch", false);
   // P0a carry (P2b-2): a poisoned stop (handshake workers outstanding)
-  // ABORTS the switch — destroying the SimThread / unloading the old
+  // ABORTS the switch — destroying the cSimThread / unloading the old
   // dimension under a still-running worker is the C2 use-after-free.
   // The game stays in the current dimension; its sim thread is stopped
   // and the pause machine's state is untouched (still coherent).
@@ -1210,7 +1210,7 @@ bool Game::switchDimension(const std::string& id) {
   active_ = next;
   loadActive();
   // Dimension switch must not silently unpause (audit MEDIUM): loadActive()
-  // builds a fresh, unpaused SimThread; the pause machine re-applies.
+  // builds a fresh, unpaused cSimThread; the pause machine re-applies.
   applySimPause();
   return true;
 }
@@ -1218,7 +1218,7 @@ bool Game::switchDimension(const std::string& id) {
 bool Game::saveWorld(const char* reason, bool wait) {
   if (!save_ || !sim_ || !active_) return false;
   const auto t0 = Clock::now();
-  // P0a carry (P2b-2): SimThread::stop() returns false when handshake pull
+  // P0a carry (P2b-2): cSimThread::stop() returns false when handshake pull
   // workers are still outstanding (poisoned). The snapshot would not be
   // consistent and start() will refuse until a retried stop succeeds, so
   // the save ABORTS here: nothing is written, nothing claims "on disk",
@@ -1482,7 +1482,7 @@ int Game::surfaceYAt(int x, int z) {
 // Runs at most once per frame, only while third person is live (the engine
 // casts only for the orbit boom; the controller disengages otherwise).
 // Cortana 2026-10-15 1900: world + signal reads for the lithography scan. Call only on the sim
-// thread between ticks (inside SimThread::runBetweenTicks): the sim owns the map while ticking.
+// thread between ticks (inside cSimThread::runBetweenTicks): the sim owns the map while ticking.
 LithoReader Game::lithoReader() {
   ChunkMap& ch = active_->chunks;
   const cSignalSim& sig = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
@@ -1678,7 +1678,7 @@ std::string Game::toggleFly(const std::string& arg) {
   else
     return "fly: usage: fly [on|off]";
   locomotion_.setMode(fly ? LocomotionMode::Fly : LocomotionMode::Walk);
-  player_.flying = fly;  // keep the Player flag a faithful mode mirror
+  player_.flying = fly;  // keep the cPlayer flag a faithful mode mirror
   logInfo("fly: locomotion mode -> %s", fly ? "fly" : "walk");
   return std::string("fly: ") + (fly ? "on (locomotion mode: fly)" : "off (locomotion mode: walk)");
 }
@@ -1852,7 +1852,7 @@ void Game::onSettingsChanged(const GameSettings& s) {
     logInfo("settings: EUV domain %s", s.euv ? "on" : "off");
   }
   if (s.timingHandshake != old.timingHandshake || s.handshakePhases != old.handshakePhases) {
-    // Not live-swappable: registration happens at SimThread construction.
+    // Not live-swappable: registration happens at cSimThread construction.
     cfg_.timingHandshake = s.timingHandshake;
     cfg_.handshakePhases = s.handshakePhases;
     logInfo("settings: timing handshake -> %s, %d phases/cycle (applies on world load)",

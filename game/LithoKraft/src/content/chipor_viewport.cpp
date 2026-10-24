@@ -178,7 +178,7 @@ const FaceMaterial& microFaceMaterial(const litholattice::CustomBlock& cell, uin
 
 void meshViewportCell(const litholattice::CustomBlock& cell, litholattice::MeshWriter& out,
                       std::string_view modelName) {
-  const litholattice::BlockRegistry& reg = cell.blocks;
+  const litholattice::cBlockReg& reg = cell.blocks;
   const auto& mats = cell.materials;
   // Body material: the chipor texture when the art pass ships it, else the
   // block's own (missing-tile) face - always safe.

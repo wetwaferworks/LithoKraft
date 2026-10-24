@@ -1,4 +1,4 @@
-// Player-operated components: switch, button, keyboard.
+// cPlayer-operated components: switch, button, keyboard.
 #include <format>
 #include <tuple>
 #include "components.h"

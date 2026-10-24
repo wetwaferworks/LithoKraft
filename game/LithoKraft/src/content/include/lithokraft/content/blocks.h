@@ -1,5 +1,5 @@
 // LithoKraft's blocks: ids, game flags, sim roles and the registry the game hands to the engine.
-// The engine (litholattice::BlockRegistry) only stores these rows; everything they mean is here.
+// The engine (litholattice::cBlockReg) only stores these rows; everything they mean is here.
 #pragma once
 #include <cstdint>
 #include "lithokraft/engine.h"
@@ -179,11 +179,11 @@ constexpr int kJammerRadiusSilver = 64;  ///< Silver cOverclockor
 constexpr int kJammerRadiusViolet = 128; ///< Violet cOverclockor
 
 /// The LithoKraft block registry (built once, thread-safe to read).
-const BlockRegistry& blockRegistry();
+const cBlockReg& blockRegistry();
 /// Mutable registry handle for the seal/hot-swap system. Call single-threaded:
 /// seal() at boot after mods load, stageBlockUpdate()/refreshStaged() via the
-/// debug hot-swap path (SimThread::runBetweenTicks). Never while sealed.
-BlockRegistry& mutableBlockRegistry();
+/// debug hot-swap path (cSimThread::runBetweenTicks). Never while sealed.
+cBlockReg& mutableBlockRegistry();
 /// Mod API: register a new block, returns its numeric id. Call single-threaded during mod
 /// init, before any world loads. Vanilla ids are dense from 1; mod blocks append after.
 /// Namespace contract (F-M4): `def.id` must be a well-formed `<namespace>:<path>`

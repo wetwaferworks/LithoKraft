@@ -1,4 +1,4 @@
-// Player-centered chunk streaming for the real game path.
+// cPlayer-centered chunk streaming for the real game path.
 //
 // Root cause this fixes: Dimension::load() pre-bakes exactly one fixed square of
 // columns, [0, worldChunks) x [0, worldChunks), anchored at the world origin, and
@@ -7,8 +7,8 @@
 // column is air, surfaceY is -1, set() fails).
 //
 // cChunkStreamer closes that hole by reusing the existing machinery, not a
-// parallel system: the dimension's ColumnGenerator (same worldgen the pre-bake
-// uses), the game's JobPool, and cWorldSave (per-column disk loads through the
+// parallel system: the dimension's cColumnGen (same worldgen the pre-bake
+// uses), the game's cJobPool, and cWorldSave (per-column disk loads through the
 // existing cWorldStore / region format — the save format is unchanged). The Game
 // calls update() once per frame with the player position; columns inside the
 // load radius (GameConfig::tickRadius, the same radius the sim ticks) that are
@@ -57,7 +57,7 @@ class cChunkStreamer {
   /// over fresh generation (player edits persist across sessions). Both must
   /// outlive the streamer. `initial`: keys of the columns the pre-bake already
   /// loaded, so they are never re-requested.
-  cChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, cWorldSave* save,
+  cChunkStreamer(litholattice::cJobPool& pool, std::shared_ptr<const litholattice::cColumnGen> gen, cWorldSave* save,
                 std::string dimensionId, int radiusChunks, const std::unordered_set<uint64_t>& initial);
   /// Bounded wait for in-flight jobs (SW-H3): at most kDrainTimeout, then a
   /// loud log and return — never an unbounded busy-wait. Jobs hold shared_ptr
@@ -123,8 +123,8 @@ class cChunkStreamer {
   bool boundWarned_ = false;  ///< B-L2: the out-of-range refusal was logged
   static constexpr auto kDrainTimeout = std::chrono::seconds(5);  // SW-H3 bounded destructor wait
   struct Retry { int attempts = 0; std::chrono::steady_clock::time_point nextTry{}; };
-  litholattice::JobPool& pool_;
-  std::shared_ptr<const litholattice::ColumnGenerator> gen_;
+  litholattice::cJobPool& pool_;
+  std::shared_ptr<const litholattice::cColumnGen> gen_;
   cWorldSave* save_;  // null = generate-only (tests, --no-save)
   std::string dimensionId_;
   int radius_;

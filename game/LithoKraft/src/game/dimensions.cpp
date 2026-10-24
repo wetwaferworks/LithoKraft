@@ -76,7 +76,7 @@ Spawn underwaferSetup(ChunkMap& w, int size) {
 // The Wafer additionally gets its code surface rules (dead-silicon remap, die-grid scribe
 // lines, crystal accents): JSON material names resolve by texture key and cannot name the
 // new biome blocks (40-48), so those rules place BlockIds directly (see wafer_biomes.h).
-std::shared_ptr<const ColumnGenerator> makeGenerator(const WorldgenSettings& settings, const std::string& id) {
+std::shared_ptr<const cColumnGen> makeGenerator(const WorldgenSettings& settings, const std::string& id) {
   std::string err;
   const auto extraSurface = [&]() {
     std::vector<std::unique_ptr<litholattice::procgen::ISurfaceRule>> rules;
@@ -87,14 +87,14 @@ std::shared_ptr<const ColumnGenerator> makeGenerator(const WorldgenSettings& set
   // seed 0 on BOTH the pack and built-in paths; other dimensions (organic) use settings.seed.
   const uint64_t seed = (id == "wafer") ? uint64_t{0} : settings.seed;
   if (const auto it = settings.generators.find(id); it != settings.generators.end()) {
-    if (auto g = ColumnGenerator::create(it->second, seed, id, blockRegistry(), err, extraSurface(),
+    if (auto g = cColumnGen::create(it->second, seed, id, blockRegistry(), err, extraSurface(),
                                      model::makeLithoStampModelResolver()))
       return g;
     logError("worldgen: %s generator from packs is invalid (%s); using the built-in", id.c_str(), err.c_str());
   }
   const char* builtin = builtinWorldgenSource(id);
   auto g =
-      builtin ? ColumnGenerator::create(builtin, seed, id, blockRegistry(), err, extraSurface(),
+      builtin ? cColumnGen::create(builtin, seed, id, blockRegistry(), err, extraSurface(),
                                      model::makeLithoStampModelResolver()) : nullptr;
   if (!g) logError("worldgen: built-in %s generator failed: %s", id.c_str(), err.c_str());
   return g;

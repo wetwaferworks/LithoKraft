@@ -24,7 +24,7 @@ uint8_t dimensionNumber(const std::string& id) {
 
 }  // namespace
 
-cMcpPlayerController::cMcpPlayerController(litholattice::InputSystem& input,
+cMcpPlayerController::cMcpPlayerController(litholattice::cInputSystem& input,
                                          std::vector<std::string> pilotIds,
                                          std::function<bool()> controllable)
     : input_(input), pilotIds_(std::move(pilotIds)), controllable_(std::move(controllable)) {
@@ -64,7 +64,7 @@ void cMcpPlayerController::pressOnce(Action a, std::vector<InputEvent>& out) {
     return;
   }
   // Down+up in one batch: pressed() is true for exactly this frame
-  // (InputSystem::resolveButton: edgeDown feeds s.pressed).
+  // (cInputSystem::resolveButton: edgeDown feeds s.pressed).
   out.push_back(InputEvent::key(InputEvent::Type::KeyDown, k, 0.0));
   out.push_back(InputEvent::key(InputEvent::Type::KeyUp, k, 0.0));
 }
