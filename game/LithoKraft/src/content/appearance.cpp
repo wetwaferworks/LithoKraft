@@ -239,7 +239,7 @@ bool cLithoKraftAppearance::shapedRender(const BlockDef& def) const {
   const SimRole r = roleOf(def);
   return def.shape == Shape::Cube &&
          (r == SimRole::Redirector || r == SimRole::Thresholdor || r == SimRole::Pulsor || r == SimRole::Catchor ||
-          r == SimRole::Keyboard ||
+          r == SimRole::Keyboard || r == SimRole::Memor ||  // 2026-10-24 7:25 PM (JD approved): CloudAtlas Memor partial block
           r == SimRole::FastLatch);  // 2026-10-24 (JD approved placeholder): CloudAtlas fastlatch.json, out N + in S pads  // 2026-10-24 (JD): Keyboard = repeater-size slab (CloudAtlas keyboard.json)
 }
 bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out) const {
@@ -259,6 +259,21 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
   // 2026-10-24 Keyboard (CloudAtlas keyboard.json): out_pad_north [6,2,0]-[10,3,2] (key pulses, front) and
   // ctrl_pad_east [14,2,6]-[16,3,10] (Enter / Backspace, the right side); no back input.
   if (r == SimRole::Keyboard) { pad(14, 6, 16, 10); return true; }
+  if (r == SimRole::Memor) {
+    // CloudAtlas memor_stored.json: slab [0,0,0]-[16,2,16], pads N out / S in / W+E clear, cell_display
+    // bezel [2,2,2]-[14,3,14] whose top is the readout (the stored value, kShadeCells, as before).
+    pad(6, 14, 10, 16); pad(0, 6, 2, 10); pad(14, 6, 16, 10);
+    const int blo[3] = {2, 2, 2}, bhi[3] = {14, 3, 14};
+    const FaceMaterial& topM = cell.materials.face(cell.id, FaceSlot::Top, on);
+    const BlockDef d = cell.def();
+    const FaceLook rl = faceLookAt(d, cell.state, FaceSlot::Top, on, cell.in.cx * 16 + cell.x, cell.in.sy * 16 + cell.y,
+                                   cell.in.cz * 16 + cell.z);
+    for (int fc = 0; fc < 6; ++fc) {
+      if (fc == 3) continue;
+      out.face(cell, fc, blo, bhi, fc == 2 ? topM : frontM, fc == 2 ? rl : FaceLook{}, fc == 2 ? (f & 3) : 0);
+    }
+    return true;
+  }
   pad(6, 14, 10, 16);  // input (back)
   if (r == SimRole::Redirector) { pad(0, 6, 2, 10); pad(14, 6, 16, 10); }
   if (r == SimRole::Thresholdor) {
