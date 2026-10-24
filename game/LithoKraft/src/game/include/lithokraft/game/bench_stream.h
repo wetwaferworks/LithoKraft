@@ -86,8 +86,8 @@ class cBenchStreamer {
   struct ColStat { int cx = 0, cz = 0; size_t verts = 0; int draws = 0; std::vector<uint32_t> sv; };  // [C54-1] sv = per-sub verts
   std::unordered_map<uint64_t, ColStat> colStats_;  // per-ring LOD data (JD 2026-10-16)
   int lastPcx_ = 0, lastPcz_ = 0;   // column -> sub-chunks with a mesh
-  std::shared_ptr<HandoffQueue<GenOut>> genDone_ = std::make_shared<HandoffQueue<GenOut>>();
-  std::shared_ptr<HandoffQueue<MeshOut>> meshDone_ = std::make_shared<HandoffQueue<MeshOut>>();
+  std::shared_ptr<cHandoffQueue<GenOut>> genDone_ = std::make_shared<cHandoffQueue<GenOut>>();
+  std::shared_ptr<cHandoffQueue<MeshOut>> meshDone_ = std::make_shared<cHandoffQueue<MeshOut>>();
   std::deque<MeshOut> pendingUploads_;  ///< 0.0.1.51: meshes waiting for a frame's upload budget
   std::vector<ChunkMesh> tombstoneRetry_;  ///< Design B Stage 2: column-drop tombstones the upload ring refused (full); retried every update and flushed directly at destruction — never dropped
   std::shared_ptr<std::atomic<int>> inFlight_ = std::make_shared<std::atomic<int>>(0);

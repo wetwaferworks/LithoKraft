@@ -13,7 +13,7 @@ int runControlTests();
 /// hash. The no-input baseline prints the same scenario with an empty
 /// stream. Returns 0 on success.
 int runControlScenario(int ticks, const std::string& mode);
-/// Selftest section: pure ControlStream unit checks (stamping, ordering,
+/// Selftest section: pure cControlStream unit checks (stamping, ordering,
 /// accounting, format round-trip). Returns the number of failed checks;
 /// every check prints a [PASS]/[FAIL] line prefixed "control:".
 int runControlSelfTest();

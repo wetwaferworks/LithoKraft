@@ -7,7 +7,7 @@ namespace lithokraft {
 /// handshake modes). Returns 0 on success, 1 on failure.
 int runDemoTests();
 /// Selftest section: pure IDemoRecord unit checks (round trip through a
-/// bare ControlStream, the fail-closed / recovery matrix, the analysis
+/// bare cControlStream, the fail-closed / recovery matrix, the analysis
 /// queries). Returns the number of failed checks; every check prints a
 /// [PASS]/[FAIL] line prefixed "demo:".
 int runDemoSelfTest();

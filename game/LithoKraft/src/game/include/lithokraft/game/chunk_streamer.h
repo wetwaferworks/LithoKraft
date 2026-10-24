@@ -132,10 +132,10 @@ class cChunkStreamer {
   size_t initialCount_ = 0;
   std::unordered_set<uint64_t> requested_;  // loaded or in flight (failures are erased by update(), B-L7)
   std::unordered_map<uint64_t, Retry> retries_;  // failed keys: attempt count + backoff deadline (main thread)
-  std::shared_ptr<litholattice::HandoffQueue<StreamedColumn>> done_ =
-      std::make_shared<litholattice::HandoffQueue<StreamedColumn>>();
-  std::shared_ptr<litholattice::HandoffQueue<uint64_t>> failed_ =
-      std::make_shared<litholattice::HandoffQueue<uint64_t>>();
+  std::shared_ptr<litholattice::cHandoffQueue<StreamedColumn>> done_ =
+      std::make_shared<litholattice::cHandoffQueue<StreamedColumn>>();
+  std::shared_ptr<litholattice::cHandoffQueue<uint64_t>> failed_ =
+      std::make_shared<litholattice::cHandoffQueue<uint64_t>>();
   std::shared_ptr<std::atomic<int>> inFlight_ = std::make_shared<std::atomic<int>>(0);
   std::shared_ptr<std::atomic<int>> readyCount_ = std::make_shared<std::atomic<int>>(0);
   /// B-M2 staging for bounded drains: finished columns moved out of the

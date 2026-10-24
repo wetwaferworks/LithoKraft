@@ -233,7 +233,7 @@ class Game {
   /// sim's block reads and its chunk seam over the cChunkStreamer. No
   /// production code spawns projectiles yet (Ping's item-path projectiles
   /// are explicitly out of scope); spawners use this accessor.
-  litholattice::ProjectileManager& projectiles() { return projectiles_; }
+  litholattice::cProjectileMgr& projectiles() { return projectiles_; }
 
   /// Completes a pending `screenshot` capture: grabs the armed frame from the
   /// renderer, PNG-encodes it (downscaled for lowres), and writes the file or
@@ -455,7 +455,7 @@ class Game {
   cGamePlayerAdapter playerAdapter_;  ///< engine IPlayer view of player_: vitals + stats
   uint64_t lastVitalsTick_ = 0;      ///< sim worldTick the vitals last advanced to
   // --- Locomotion (player_locomotion.h): the local player's Entity body +
-  // the engine LocomotionController stepping it, once per sim tick. ---
+  // the engine cLocomotionController stepping it, once per sim tick. ---
   PlayerLocomotion locomotion_;
   uint64_t lastLocomotionTick_ = 0;  ///< sim worldTick the body last advanced to
   litholattice::LocomotionInput pendingLocomotionInput_{};  ///< frame's intent, consumed per tick
@@ -485,7 +485,7 @@ class Game {
   cAiHost aiHost_;
   uint64_t lastAiTick_ = 0;          ///< sim worldTick the AiWorld last advanced to
   Vec3 spawnPoint_{20.f, 92.f, 20.f};  ///< dimension spawn; `kill` respawns here
-  litholattice::EntityManager entities_{[this](uint32_t type) {
+  litholattice::cEntityMgr entities_{[this](uint32_t type) {
     return makeEntityBehavior(
         type,
         [this](int x, int y, int z) { return sim_ && blockRegistry().has(sim_->getBlock(x, y, z), kSolid); },
@@ -494,7 +494,7 @@ class Game {
         });
   }};  ///< item drops etc. (game thread)
 
-  HandoffQueue<ChunkMesh> meshOut_;              // workers -> render thread
+  cHandoffQueue<ChunkMesh> meshOut_;              // workers -> render thread
   std::unique_ptr<class WaferPulseCache> pulseCache_;  // wafer ground-pulse biome weights (null if no wafer)
   std::unordered_map<uint64_t, std::vector<ChunkMesh>> meshBatches_;  // Cortana 2026-10-15 1350: phase-boundary publish staging
   std::deque<int64_t> pendingOrder_;                    // sub-chunks waiting, oldest first
@@ -503,7 +503,7 @@ class Game {
   // PBR (BinaryQuad) path queues (phase 2, Worker 3): only used when the mesher option
   // selects BinaryQuad. The classic path above keeps serving every non-cube shape even
   // then (the binary mesher's scope is opaque cubes), so both queues drain each frame.
-  HandoffQueue<litholattice::PbrChunkMesh> pbrMeshOut_;              // workers -> render thread
+  cHandoffQueue<litholattice::PbrChunkMesh> pbrMeshOut_;              // workers -> render thread
   std::deque<int64_t> pbrPendingOrder_;                             // sub-chunks waiting, oldest first
   std::unordered_map<int64_t, litholattice::PbrChunkMesh> pbrPendingMesh_;  // newest per sub-chunk
   std::unordered_map<int64_t, uint64_t> pbrMeshSeq_;  // latest uploaded PBR seq per sub-chunk
@@ -527,7 +527,7 @@ class Game {
   // PBR analytic lights (phase 2, Worker 3): the provider scans chunk material bytes
   // around the focus column; the collector reduces to K-nearest per frame for the
   // chunk_pbr uniforms (FrameParams::pbrLights). Null when no material registry.
-  std::unique_ptr<litholattice::ChunkEmissiveProvider> emissiveProvider_;
+  std::unique_ptr<litholattice::cChunkEmissiveProvider> emissiveProvider_;
   litholattice::LightCollector lightCollector_;  // default K = 8 (JD's locked decision)
   // PBR light reduction cache (audit App.A/game-1): frameParams() reuses this
   // vector and skips the emissive-cache walk unless the camera column moved or
@@ -569,7 +569,7 @@ class Game {
   // the constructor (voxel over sim block reads, chunk requests over the
   // active dimension's streamer — both resolve the CURRENT sim/streamer
   // at call time, so dimension switches need no rewiring).
-  litholattice::ProjectileManager projectiles_;
+  litholattice::cProjectileMgr projectiles_;
   std::atomic<bool> mcpControllable_{false};  ///< set per frame in update()
   std::atomic<uint64_t> mcpWorldTick_{0};  ///< Cortana 2026-10-15 1658: F-2 [GAME] sim tick copy for MCP threads, set per frame in update()
   mutable std::mutex mcpStateMutex_;

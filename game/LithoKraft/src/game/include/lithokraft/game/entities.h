@@ -1,5 +1,5 @@
 // Game-side entities: item drops (first entity type).
-// The engine owns storage/ticking (litholattice::EntityManager); the game defines
+// The engine owns storage/ticking (litholattice::cEntityMgr); the game defines
 // types and behaviors. Rendering is TODO (v1 items are sim-functional, invisible).
 #pragma once
 #include <functional>

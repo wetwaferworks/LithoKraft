@@ -20,10 +20,10 @@ namespace {
 /// the kMaxInFlight gate) nor wedge the key in requested_ forever.
 struct JobGuard {
   std::shared_ptr<std::atomic<int>> inFlight;
-  std::shared_ptr<litholattice::HandoffQueue<uint64_t>> failed;
+  std::shared_ptr<litholattice::cHandoffQueue<uint64_t>> failed;
   uint64_t key = 0;
   bool success = false;
-  JobGuard(std::shared_ptr<std::atomic<int>> n, std::shared_ptr<litholattice::HandoffQueue<uint64_t>> f, uint64_t k)
+  JobGuard(std::shared_ptr<std::atomic<int>> n, std::shared_ptr<litholattice::cHandoffQueue<uint64_t>> f, uint64_t k)
       : inFlight(std::move(n)), failed(std::move(f)), key(k) {}
   JobGuard(const JobGuard&) = delete;
   JobGuard& operator=(const JobGuard&) = delete;

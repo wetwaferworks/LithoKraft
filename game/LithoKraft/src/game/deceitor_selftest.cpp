@@ -1,6 +1,6 @@
 // Deceitor self-test (app selftest section): drives the production
 // brain + director against a fixture AiWorld (the ai_host_selftest
-// floor) and a real EntityManager for ground drops. Every scenario is
+// floor) and a real cEntityMgr for ground drops. Every scenario is
 // deterministic: AiWorld RNG is seeded per (world seed, mob id, tick)
 // and the fixture player never moves except as scripted.
 //
@@ -42,7 +42,7 @@ struct Fixture {
   // director is still alive. (Game upholds the same order: the
   // director member precedes aiHost_.)
   cDeceitorDirector dir;
-  EntityManager entities{[](uint32_t) { return std::unique_ptr<IEntityBehavior>{}; }};
+  cEntityMgr entities{[](uint32_t) { return std::unique_ptr<IEntityBehavior>{}; }};
   std::unique_ptr<ai::WalkCache> nav;
   std::unique_ptr<ai::AiWorld> world;
 

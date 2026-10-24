@@ -26,7 +26,7 @@
 // wiring intended — content-free engine, game-owned behaviour. The
 // brain is an ai::IBtNode; everything game-side it needs (player pose,
 // ground item entities, player damage) arrives through
-// cDeceitorDirector::Hooks, which Game fills from its EntityManager /
+// cDeceitorDirector::Hooks, which Game fills from its cEntityMgr /
 // player / adapter. The director also owns the registry the renderer
 // reads (expression per mob) and the mirror-entity sync Game runs.
 //
@@ -120,7 +120,7 @@ struct BarterReturn {
 BarterReturn deceitorBarterReturn(bool liked, litholattice::ai::AiRng& rng);
 
 // ---------------------------------------------------------------- bridge
-/// A ground drop as the brain sees it (an EntityManager kEntityItem).
+/// A ground drop as the brain sees it (an cEntityMgr kEntityItem).
 struct DeceitorDrop {
   uint64_t entityId = 0;
   uint32_t itemId = 0;
@@ -129,7 +129,7 @@ struct DeceitorDrop {
 };
 
 /// Game-side services the brain needs. Game fills these from its live
-/// state (EntityManager, player transform, player adapter); the
+/// state (cEntityMgr, player transform, player adapter); the
 /// selftest fills them from fixtures. All calls happen on the game
 /// thread, inside AiWorld::advance (brains tick there).
 struct DeceitorHooks {

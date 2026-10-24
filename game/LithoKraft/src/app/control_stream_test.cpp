@@ -1,6 +1,6 @@
 // Control-serialization proofs (JD's Timing Handshake x control coupling,
 // 2026-10-13). Three layers:
-//   runControlSelfTest()  — pure ControlStream unit checks (also a --selftest
+//   runControlSelfTest()  — pure cControlStream unit checks (also a --selftest
 //                           section): stamping, ordering, accounting, the
 //                           recording tap, the v1 format round-trip and its
 //                           fail-closed parse.
@@ -48,7 +48,7 @@ ControlEvent editCmd(int32_t a) {
 
 void testStampingAndOrder() {
   std::printf("== control stream: PRE stamping, (tick, seq) order, accounting\n");
-  ControlStream cs;
+  cControlStream cs;
   cs.submit(editCmd(1));
   cs.submit(editCmd(2));
   cs.submit(editCmd(3));
@@ -67,7 +67,7 @@ void testStampingAndOrder() {
 
 void testInjectedMerge() {
   std::printf("== control stream: pre-stamped injection merges by (tick, seq)\n");
-  ControlStream cs;
+  cControlStream cs;
   std::vector<ControlEvent> inj;
   ControlEvent a = editCmd(10); a.seq = 10; a.tick = 5; a.source = ControlSource::Replay;
   ControlEvent b = editCmd(11); b.seq = 11; b.tick = 3; b.source = ControlSource::Replay;
@@ -90,7 +90,7 @@ void testInjectedMerge() {
 
 void testRecordingTap() {
   std::printf("== control stream: recording tap (the IDemoRecord feed)\n");
-  ControlStream cs;
+  cControlStream cs;
   cs.setRecording(true);
   cs.submit(editCmd(1));
   cs.submit(editCmd(2));

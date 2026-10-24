@@ -27,7 +27,7 @@
 
 namespace litholattice {
 class ChunkMap;
-class EntityManager;
+class cEntityMgr;
 }  // namespace litholattice
 
 namespace lithokraft {
@@ -37,7 +37,7 @@ class cGameWorldQuery : public litholattice::console::IWorldQuery {
   struct Hooks {
     /// Chunk storage; valid to read while the sim is paused+settled.
     std::function<litholattice::ChunkMap*()> chunks;
-    std::function<litholattice::EntityManager*()> entities;
+    std::function<litholattice::cEntityMgr*()> entities;
     /// True while the sim thread exists and ticks.
     std::function<bool()> simRunning;
     std::function<void(bool)> setSimPaused;

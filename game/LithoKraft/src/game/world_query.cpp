@@ -90,7 +90,7 @@ WorldQueryResult cGameWorldQuery::queryCount(uint32_t blockId, int x1, int y1, i
 WorldQueryResult cGameWorldQuery::queryEntities(const std::string& type, double cx, double cy,
                                               double cz, double radius, std::string* err) {
   WorldQueryResult r;
-  litholattice::EntityManager* em = hooks_.entities ? hooks_.entities() : nullptr;
+  litholattice::cEntityMgr* em = hooks_.entities ? hooks_.entities() : nullptr;
   if (!em) {
     if (err) *err = "no world loaded";
     return r;

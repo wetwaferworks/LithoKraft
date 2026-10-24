@@ -111,11 +111,11 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   fails += runSpriteHostSelfTest(packDirs);
   fails += runLocomotionSelfTest();
   {  // render.fps_cap (A4 / brief B7, 2026-10-13): the game-side wiring of
-     // the engine FramePacer — Settings field, JSON persistence, the
+     // the engine cFramePacer — Settings field, JSON persistence, the
      // render.fps_cap cvar flow, and pacer drive semantics. Deterministic
      // by construction: the pacer's returned sleep is computed from
      // explicit time points; the single measured check is bounded wide.
-    using litholattice::FramePacer;
+    using litholattice::cFramePacer;
     check(GameSettings{}.fpsCap == -1, "fps cap: Settings default is -1 (auto 60/30; Cortana 2026-10-15 1610)");
     {  // JSON round-trip + load-side clamp (0..1000).
       const auto dir = uniqueTempDir("lithokraft-fpscap");
@@ -137,24 +137,24 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     {  // Pacer semantics: off = zero wait; cap clamps; on-time frame waits
        // the computed remainder of its interval; overrun waits nothing.
-      FramePacer off;
-      const auto t0 = FramePacer::Clock::now();
+      cFramePacer off;
+      const auto t0 = cFramePacer::Clock::now();
       off.beginFrame(t0);
-      check(!off.enabled() && off.capFps() == 0 && off.endFrameAndWait(t0) == FramePacer::Clock::duration::zero(),
+      check(!off.enabled() && off.capFps() == 0 && off.endFrameAndWait(t0) == cFramePacer::Clock::duration::zero(),
             "fps cap: pacer default off — endFrameAndWait is a no-op");
-      FramePacer p;
+      cFramePacer p;
       p.setCapFps(5000);
       check(p.capFps() == 1000 && p.enabled(), "fps cap: pacer clamps cap to 1000");
       p.setCapFps(60);
-      const auto start = FramePacer::Clock::now();
+      const auto start = cFramePacer::Clock::now();
       p.beginFrame(start);
       const auto slept = p.endFrameAndWait(start);
       const double sleptMs = std::chrono::duration<double, std::milli>(slept).count();
-      const double elapsedMs = std::chrono::duration<double, std::milli>(FramePacer::Clock::now() - start).count();
+      const double elapsedMs = std::chrono::duration<double, std::milli>(cFramePacer::Clock::now() - start).count();
       check(sleptMs > 10.0 && sleptMs < 25.0 && elapsedMs >= 10.0 && elapsedMs < 100.0,
             "fps cap: a 60 FPS cap holds a fresh frame to its ~16.7 ms interval (bounded measured check)");
       p.beginFrame(start);
-      check(p.endFrameAndWait(start + std::chrono::seconds(1)) == FramePacer::Clock::duration::zero(),
+      check(p.endFrameAndWait(start + std::chrono::seconds(1)) == cFramePacer::Clock::duration::zero(),
             "fps cap: an overrun frame waits nothing (no catch-up debt)");
       p.setCapFps(0);
       check(!p.enabled(), "fps cap: setCapFps(0) disables pacing (live change back to off)");
@@ -519,7 +519,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       // Worldgen determinism: same seed -> identical columns at any thread count and on a fresh load.
       auto genWith = [&](unsigned threads) {
         JobPool p(threads);
-        HandoffQueue<std::unique_ptr<ChunkColumn>> out;
+        cHandoffQueue<std::unique_ptr<ChunkColumn>> out;
         {
           JobBatch b(p);
           for (int z = 0; z < 4; ++z)
@@ -1118,8 +1118,8 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     ChunkMap pw;
     pw.setRegistry(&reg5);
     { auto c = std::make_unique<ChunkColumn>(); c->cx = 0; c->cz = 0; pw.insert(std::move(c)); }
-    ProjectileManager::VoxelQueryFn q5 = [&pw, &reg5](int x, int y, int z) {
-      ProjectileManager::VoxelInfo v;
+    cProjectileMgr::VoxelQueryFn q5 = [&pw, &reg5](int x, int y, int z) {
+      cProjectileMgr::VoxelInfo v;
       const BlockId b = pw.get(x, y, z);
       v.solid = reg5.has(b, kSolid);
       v.density = reg5.def(b).density;
@@ -1127,7 +1127,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     };
     auto shoot = [&](BlockId wall, uint8_t pen, double& maxX, bool& alive) {
       for (int x = 10; x <= 12; ++x) pw.set(x, 100, 0, wall);
-      ProjectileManager pm;
+      cProjectileMgr pm;
       pm.setVoxelQuery(q5);
       Projectile p;
       p.x = 0; p.y = 100.5; p.z = 0.5; p.vx = 2; p.penetration = pen; p.maxRange = 200;

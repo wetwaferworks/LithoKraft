@@ -122,7 +122,7 @@ struct GameSettings {
   bool roundSimArea = true;  ///< F56-7 (Proposed by JD, Built by Cortana): round sim area (disc r^2+r); boot-only; env LL_SIM_ROUND_AREA
   bool diamondSimArea = true;  ///< diamond (Manhattan) sim area (JD 2026-10-23); boot-only; env LL_SIM_AREA=diamond. DEFAULT since fix run 3 (JD t2262u)
   bool diamondStreamArea = true;  ///< diamond (Manhattan) stream footprint (JD 2026-10-23); boot-only; env LL_STREAM_AREA=diamond
-                          ///< main loop's FramePacer (D-M3; game-side wiring
+                          ///< main loop's cFramePacer (D-M3; game-side wiring
                           ///< 2026-10-13). 0 = OFF (default: vsync-only
                           ///< pacing, JD perf doctrine 2026-10-12), else
                           ///< 1..1000. Live: the pacer is reconfigured the

@@ -277,7 +277,7 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
        CVarType::String},
       {"render.fps_cap",
        [](const GameSettings& s) { return std::to_string(s.fpsCap); },
-       // Frame-rate cap (engine FramePacer, D-M3; game-side wiring
+       // Frame-rate cap (engine cFramePacer, D-M3; game-side wiring
        // 2026-10-13, Team A A4): integer FPS, 0 = off (default, vsync-only),
        // clamped 0..1000 like the pacer itself. Archived; the main loop
        // drives the pacer from Settings live (init + on settings change).

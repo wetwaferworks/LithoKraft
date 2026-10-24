@@ -22,7 +22,7 @@ BlockRegistry& mutableRegistry() {
     // `id` is the block's stable, namespaced save id. It is written out explicitly (not derived from
     // the texture) so art renames never change it; changing one needs a save migration.
     // Density (A5 wiring, 2026-10-13): the projectile pierce currency
-    // (engine ProjectileManager: penetration > density pierces, else the
+    // (engine cProjectileMgr: penetration > density pierces, else the
     // projectile stops and despawns). Values are keyed to the registry's
     // material classes below. JD-DECISION (balance review): NO approved
     // density table exists in tree/docs — these are the minimum

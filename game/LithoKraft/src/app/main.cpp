@@ -755,7 +755,7 @@ struct FrameCtx {
   int frames = 0, perfFrames = 0, hitches = 0;
   double worstMs = 0, perfSumMs = 0, perfMaxMs = 0, avgFrameMs = 0;
   bool wasFocused = false;
-  litholattice::FramePacer pacer;
+  litholattice::cFramePacer pacer;
   int appliedFpsCap = 0;
   int autoFrames = 0; double autoRenderSum = 0;
   std::vector<double> ovMs;
@@ -1444,7 +1444,7 @@ static bool lkStepFrame(FrameCtx& F) {
   int &frames = F.frames, &perfFrames = F.perfFrames, &hitches = F.hitches;
   double &worstMs = F.worstMs, &perfSumMs = F.perfSumMs, &perfMaxMs = F.perfMaxMs, &avgFrameMs = F.avgFrameMs;
   bool& wasFocused = F.wasFocused;
-  litholattice::FramePacer& pacer = F.pacer;
+  litholattice::cFramePacer& pacer = F.pacer;
   int& appliedFpsCap = F.appliedFpsCap;
   int& autoFrames = F.autoFrames; double& autoRenderSum = F.autoRenderSum;
   std::vector<double>& ovMs = F.ovMs;

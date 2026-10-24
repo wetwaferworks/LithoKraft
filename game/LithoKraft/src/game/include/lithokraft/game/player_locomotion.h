@@ -6,7 +6,7 @@
 // spaces) and the AABB-vs-voxel sweep it drives (physics.h moveCollide).
 // This host owns the one body the local player moves through the world
 // with: an engine Entity (feet-center position, blocks/s velocity) plus its
-// LocomotionController. Game steps it once per sim tick with a buffered
+// cLocomotionController. Game steps it once per sim tick with a buffered
 // LocomotionInput; everything else (adapter, cameras, HUD) reads the body.
 //
 // Solidity comes from the caller (Game passes the same getBlock-based query
@@ -63,7 +63,7 @@ class PlayerLocomotion {
 
  private:
   litholattice::Entity body_{};
-  litholattice::LocomotionController controller_{};
+  litholattice::cLocomotionController controller_{};
   bool placed_ = false;
 };
 

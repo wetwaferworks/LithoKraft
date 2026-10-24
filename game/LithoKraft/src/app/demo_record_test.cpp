@@ -1,6 +1,6 @@
 // IDemoRecord proofs (the demo recorder / player built on the control
 // serialization layer, 2026-10-13). Three layers:
-//   runDemoSelfTest() — pure unit checks on a bare ControlStream: the
+//   runDemoSelfTest() — pure unit checks on a bare cControlStream: the
 //                       record -> bytes -> parseDemo round trip, stream-
 //                       level non-perturbation, the fail-closed /
 //                       recovery matrix, and the analysis queries
@@ -148,7 +148,7 @@ void recomputeTrailerChecksum(std::vector<uint8_t>& bytes) {
 
 std::vector<uint8_t> testRoundTrip(const std::vector<ControlEvent>& script) {
   std::printf("== demo record: round trip through a bare ControlStream\n");
-  ControlStream cs;
+  cControlStream cs;
   cDemoRecorder rec;
   rec.begin(cs, unitSession());
   check(rec.recording(), "demo: recorder begin turns the stream recording tap on");
@@ -189,7 +189,7 @@ std::vector<uint8_t> testRoundTrip(const std::vector<ControlEvent>& script) {
   cDemoPlayer player;
   check(player.load(bytes.data(), bytes.size()) && player.parsed().complete,
         "demo: DemoPlayer loads the round-trip bytes (complete)");
-  ControlStream cs2;
+  cControlStream cs2;
   std::vector<ControlEvent> replayed;
   const bool submitted = player.submitInto(cs2);
   cs2.prePhase(0);
@@ -201,13 +201,13 @@ std::vector<uint8_t> testRoundTrip(const std::vector<ControlEvent>& script) {
 
 void testNonPerturbation(const std::vector<ControlEvent>& script) {
   std::printf("== demo record: stream-level non-perturbation (attach / detach)\n");
-  ControlStream plain;
+  cControlStream plain;
   plain.submitStamped(script);
   plain.prePhase(0);
   std::vector<ControlEvent> outPlain;
   plain.extractDue(1000, outPlain);
 
-  ControlStream tapped;
+  cControlStream tapped;
   cDemoRecorder rec;
   rec.begin(tapped, unitSession());  // attach: tap on
   rec.abort();                       // detach: tap off, no trailer
@@ -519,7 +519,7 @@ static void testDemoArea(const std::vector<ControlEvent>& script) {
   rec.known = true; rec.simShape = AreaShape::Round; rec.streamShape = AreaShape::Diamond; rec.tickRadius = 12;
   check(unpackDemoArea(packDemoArea(rec)) == rec && !unpackDemoArea(0).known && packDemoArea(DemoAreaInfo{}) == 0,
         "demo area: pack/unpack round-trips; word 0 (pre-fix-3 file) is not recorded");
-  ControlStream cs;
+  cControlStream cs;
   cDemoRecorder r;
   DemoSessionInfo si = unitSession();
   si.area = rec;

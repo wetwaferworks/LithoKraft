@@ -132,7 +132,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
     const unsigned n = counts[ci];
     JobPool pool(n);
     constexpr int kSide = 16;  // 256 columns
-    HandoffQueue<std::unique_ptr<ChunkColumn>> out;
+    cHandoffQueue<std::unique_ptr<ChunkColumn>> out;
     auto t0 = Clock::now();
     {
       JobBatch b(pool);

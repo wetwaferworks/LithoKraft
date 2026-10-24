@@ -140,7 +140,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
   // the engine rule (pierce when penetration > density). Non-solid blocks
   // stay 0 and are never consulted (solid=false above).
   projectiles_.setVoxelQuery([this](int x, int y, int z) {
-    litholattice::ProjectileManager::VoxelInfo v;
+    litholattice::cProjectileMgr::VoxelInfo v;
     if (!sim_) return v;
     const BlockId b = sim_->getBlock(x, y, z);
     v.solid = blockRegistry().has(b, kSolid);
@@ -606,7 +606,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
   {
     cGameWorldQuery::Hooks h;
     h.chunks = [this]() -> litholattice::ChunkMap* { return active_ ? &active_->chunks : nullptr; };
-    h.entities = [this]() -> litholattice::EntityManager* { return &entities_; };
+    h.entities = [this]() -> litholattice::cEntityMgr* { return &entities_; };
     h.simRunning = [this] { return sim_ != nullptr; };
     h.setSimPaused = [this](bool p) {
       if (!sim_) return;
@@ -682,8 +682,8 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
   renderer_.setAsciiValueSpan(settings_.asciiValueSpan);  // JD amendment: full 0-255 span
   pushCullProtoConfig();  // culling-cache prototypes (JD 2026-10-11); all default off
   // PBR analytic lights: the provider scans chunk material bytes around the focus
-  // column (ChunkEmissiveProvider, Worker 2); the game refreshes it per frame below.
-  if (cfg.materials) emissiveProvider_ = std::make_unique<litholattice::ChunkEmissiveProvider>(cfg.materials);
+  // column (cChunkEmissiveProvider, Worker 2); the game refreshes it per frame below.
+  if (cfg.materials) emissiveProvider_ = std::make_unique<litholattice::cChunkEmissiveProvider>(cfg.materials);
   // Called on the main thread at load and on the sim thread afterwards; each job keeps the
   // materials it started with, so a hot reload never pulls them out from under a worker.
   submitMesh_ = [this](std::shared_ptr<MeshInput> in) {
@@ -1924,7 +1924,7 @@ void Game::onSettingsChanged(const GameSettings& s) {
     logInfo("settings: cull prototypes pushed");
   }
   if (s.fpsCap != old.fpsCap) {
-    // No Game-side action: the main loop owns the FramePacer and reads
+    // No Game-side action: the main loop owns the cFramePacer and reads
     // settings().fpsCap every frame (render.fps_cap wiring, 2026-10-13),
     // so the new cap applies on the next frame boundary.
     logInfo("settings: fps cap -> %d FPS (0 = off, vsync-only)", s.fpsCap);
