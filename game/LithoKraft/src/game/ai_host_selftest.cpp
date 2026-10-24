@@ -1,9 +1,9 @@
 // cAiHost smoke self-test (app selftest section): proves the production
-// construction path for AiWorld (brief B6) without a window:
+// construction path for cAiWorld (brief B6) without a window:
 //   * ai.enabled cvar registered, default off;
 //   * a bound-but-disabled host constructs NOTHING and advance() is a
 //     no-op (default behaviour is safe/unchanged);
-//   * enabling constructs the AiWorld over the bound live map through
+//   * enabling constructs the cAiWorld over the bound live map through
 //     the host, with the engine's clamped AI rate;
 //   * advance(simTicks, worldTps) drives AI ticks at that clamped rate
 //     (never per sim tick), and a mob spawned through the host's world
@@ -118,7 +118,7 @@ int runAiHostSelfTest() {
     cAiHost h2;
     h2.bindWorld(fw, fb, nullptr, {2, 10, 2});
     h2.setEnabled(true);
-    const ai::WalkCache* nv = h2.nav();
+    const ai::cWalkCache* nv = h2.nav();
     check(nv && (nv->bits(10, 10, 10) & ai::kNavTrack), "ai host P0: SimRole::Wire cell carries the track bit (real NavRules)");
     check(nv && (nv->bits(12, 10, 10) & ai::kNavClimb), "ai host P0: kGameClimbable cell carries the climb bit");
     check(nv && (nv->bits(14, 10, 10) & ai::kNavFluid), "ai host P0: kGameFluid cell carries the fluid bit");

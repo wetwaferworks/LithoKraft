@@ -197,7 +197,7 @@ ai::BtStatus cDeceitorBrain::tick(ai::AiContext& ctx) {
 cDeceitorDirector::cDeceitorDirector() : walk_(ai::makeLeap()) {}
 cDeceitorDirector::~cDeceitorDirector() = default;
 
-std::optional<uint32_t> cDeceitorDirector::spawn(ai::AiWorld& world, ai::Cell at) {
+std::optional<uint32_t> cDeceitorDirector::spawn(ai::cAiWorld& world, ai::Cell at) {
   return world.spawn(at, walk_.get(), std::make_unique<cDeceitorBrain>(*this));
 }
 
@@ -226,7 +226,7 @@ bool cDeceitorDirector::playerInteract(uint32_t mobId, uint64_t aiTick) {
   return false;  // a Deceitor has NO trading interface — that is the tell
 }
 
-void cDeceitorDirector::playerAttacked(ai::AiWorld& world, uint32_t mobId) {
+void cDeceitorDirector::playerAttacked(ai::cAiWorld& world, uint32_t mobId) {
   const ai::Mob* victim = world.mob(mobId);
   if (!victim) return;
   const ai::Cell v = victim->pos;

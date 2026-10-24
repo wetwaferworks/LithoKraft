@@ -445,10 +445,10 @@ void registerMcpSensesCvars(litholattice::console::cConsoleReg& r) {
   r.setCVarChangeFn("camera.chunk_radius", clampHook(0, 64));
 }
 
-// AiWorld host cvar (brief B6 wiring, 2026-10-13): a host knob, not a
+// cAiWorld host cvar (brief B6 wiring, 2026-10-13): a host knob, not a
 // player preference, so it lives outside GameSettings like the MCP senses
 // knobs above. Game reads it per frame in update() (the same read pattern
-// as mcp.*) and drives cAiHost::setEnabled. Default OFF: no AiWorld is
+// as mcp.*) and drives cAiHost::setEnabled. Default OFF: no cAiWorld is
 // constructed in the live game until the host turns it on. Archived.
 void registerAiCvars(litholattice::console::cConsoleReg& r) {
   std::string err;

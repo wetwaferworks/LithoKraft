@@ -13,7 +13,7 @@ using namespace litholattice;
 ai::NavRules gameNavRules(const BlockRegistry& blocks) {
   // P0 (2026-10-14): real classification from the game's own content data,
   // replacing the B6 defaults (solidity only). The predicates capture the
-  // registry by reference; the registry outlives every WalkCache built
+  // registry by reference; the registry outlives every cWalkCache built
   // from these rules (game registry is process-lifetime; fixture
   // registries in tests outlive their hosts by construction).
   ai::NavRules rules;
@@ -35,7 +35,7 @@ void cAiHost::bindWorld(ChunkMap& chunks, const BlockRegistry& blocks, JobPool* 
   // column here (the listener runs on the mutating thread -- sim thread in
   // play, game thread at load). The listener is installed for the whole
   // bind lifetime, but while ai.enabled is off the sink drops every post
-  // (B-H1): a fresh WalkCache computes from the live map at construct(),
+  // (B-H1): a fresh cWalkCache computes from the live map at construct(),
   // so no pre-enable edit can ever be "missed". The queue is drained by
   // advance(), and cleared once more at construct() (below).
   chunks_->setEditListener([this](int cx, int cz) { postEditedColumn(cx, cz); });
@@ -71,7 +71,7 @@ void cAiHost::setEnabled(bool on) {
 }
 
 void cAiHost::postEditedColumn(int cx, int cz) {
-  // B-H1 primary fix: while the gate is off there is no WalkCache and
+  // B-H1 primary fix: while the gate is off there is no cWalkCache and
   // never will be one that could consume this post (construct() builds
   // fresh from the live map and discards the queue), so drop it here --
   // one atomic load on the mutating thread, no mutex, no growth.
@@ -106,10 +106,10 @@ void cAiHost::drainInvalidations() {
 
 void cAiHost::construct() {
   if (world_ || !chunks_ || !blocks_) return;
-  // Live-world feed: the WalkCache reads the ACTIVE dimension's actual
+  // Live-world feed: the cWalkCache reads the ACTIVE dimension's actual
   // ChunkMap, classified by the game's real NavRules (gameNavRules: wire
   // cells are track, content flags mark climbable/fluid).
-  nav_ = std::make_unique<ai::WalkCache>(*chunks_, *blocks_, gameNavRules(*blocks_));
+  nav_ = std::make_unique<ai::cWalkCache>(*chunks_, *blocks_, gameNavRules(*blocks_));
   // Columns edited between bind and construct: while disabled those
   // posts were dropped at the sink (B-H1); any that raced the enable
   // store are dropped here (the fresh cache computes from the live map
@@ -119,13 +119,13 @@ void cAiHost::construct() {
     std::lock_guard l(invMutex_);
     pendingCols_.clear();
   }
-  // Prewarm the spawn area on this (owner) thread per the WalkCache
+  // Prewarm the spawn area on this (owner) thread per the cWalkCache
   // contract: the 3x3 columns around the bind centre.
   const int ccx = centre_.x >> 4, ccz = centre_.z >> 4;
   for (int dz = -1; dz <= 1; ++dz)
     for (int dx = -1; dx <= 1; ++dx) nav_->prewarm(ccx + dx, ccz + dz);
   ai::AiConfig cfg;  // engine defaults: hz 10 (clamped 8..16), cap 64
-  world_ = std::make_unique<ai::AiWorld>(*nav_, cfg, pool_);
+  world_ = std::make_unique<ai::cAiWorld>(*nav_, cfg, pool_);
   logInfo("ai: AiWorld constructed over the live world (ai.enabled; hz %d, mob cap %d)",
           world_->config().hz, world_->config().mobCap);
 }

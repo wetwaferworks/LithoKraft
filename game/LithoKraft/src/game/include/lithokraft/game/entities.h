@@ -10,7 +10,7 @@ namespace lithokraft {
 
 constexpr uint32_t kEntityItem = 1;         ///< dropped block item (Entity.data = BlockId)
 constexpr uint32_t kEntityFallingBlock = 2;  ///< sand-like falling block (Entity.data = BlockId)
-constexpr uint32_t kEntityDeceitor = 3;      ///< Deceitor visual mirror (Entity.data = AiWorld mob id)
+constexpr uint32_t kEntityDeceitor = 3;      ///< Deceitor visual mirror (Entity.data = cAiWorld mob id)
 
 /// Item physics: gravity + engine AABB-vs-voxel collision, 8-minute despawn.
 /// Magnet + pickup are done by the game (needs the player position).
@@ -74,9 +74,9 @@ class cFallingBlockBehavior final : public litholattice::IEntityBehavior {
 };
 
 /// Deceitor visual mirror: the mob's brain and position live in the
-/// engine AiWorld (game/deceitor.h); this entity is only its body in
+/// engine cAiWorld (game/deceitor.h); this entity is only its body in
 /// the renderer's entity pass. Game::updateDeceitors rewrites its
-/// position from the AiWorld mob every frame, so the behavior does
+/// position from the cAiWorld mob every frame, so the behavior does
 /// nothing (no gravity, no self-motion) — honest placeholder body
 /// until a real mob render path exists.
 class cDeceitorVisualBehavior final : public litholattice::IEntityBehavior {

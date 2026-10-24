@@ -32,9 +32,9 @@ namespace lithokraft {
 /// the settings cvars and archived to config.lth.
 void registerMcpSensesCvars(litholattice::console::cConsoleReg& r);
 
-/// AiWorld host cvar (ai.enabled). A host knob like the MCP senses knobs
+/// cAiWorld host cvar (ai.enabled). A host knob like the MCP senses knobs
 /// above — not a player preference, so not part of GameSettings. Bool,
-/// default 0 (OFF): the production AiWorld is constructed only when the
+/// default 0 (OFF): the production cAiWorld is constructed only when the
 /// player/host turns it on (brief B6 wiring, 2026-10-13). Archived.
 void registerAiCvars(litholattice::console::cConsoleReg& r);
 

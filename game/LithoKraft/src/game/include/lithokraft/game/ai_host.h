@@ -1,27 +1,27 @@
-// cAiHost: LithoKraft's production owner for the engine AiWorld
+// cAiHost: LithoKraft's production owner for the engine cAiWorld
 // (litholattice::ai) — brief B6 wiring, 2026-10-13.
 //
 // WHAT: Game owns one cAiHost. loadActive() binds it to the ACTIVE
 //   dimension's live ChunkMap + the game block registry + the game JobPool
 //   (before the SimThread starts, while the game thread still owns the
 //   map). When the `ai.enabled` cvar is on, the host constructs a
-//   WalkCache over that live map and an AiWorld on top of it; Game::update
+//   cWalkCache over that live map and an cAiWorld on top of it; Game::update
 //   then drives it from elapsed sim world ticks via
-//   AiWorld::advance(simTicks, worldTps) — never tick() per sim tick — so
+//   cAiWorld::advance(simTicks, worldTps) — never tick() per sim tick — so
 //   AI thinks at its own clamped 8..16 Hz, freezes while the sim is
 //   paused, and never rides the circuit clock (code-review ENT-2 fix
-//   direction). The player cell is fed as the AiWorld observer each
+//   direction). The player cell is fed as the cAiWorld observer each
 //   advance, so LOD/senses distance is computed against the live player.
 //
 // P0 WIRING (2026-10-14): two feeds that B6 left as defaults are now real.
-//   (a) NavRules: the WalkCache is built with gameNavRules() below --
+//   (a) NavRules: the cWalkCache is built with gameNavRules() below --
 //   solidity from BlockFlags, track from SimRole::Wire, climbable/fluid
 //   from the kGameClimbable / kGameFluid content flags (no block carries
 //   them yet; see blocks.h). (b) Invalidations: bindWorld installs a
 //   ChunkMap edit listener; every structural edit (set / erase / insert on
 //   the sim or game thread) posts its column to a mutex-guarded queue, and
-//   advance() drains it into WalkCache::invalidate() at the AI-tick
-//   boundary, before the AiWorld plans -- so mobs path on current geometry,
+//   advance() drains it into cWalkCache::invalidate() at the AI-tick
+//   boundary, before the cAiWorld plans -- so mobs path on current geometry,
 //   and the drain point (not wall-clock edit order across threads) is what
 //   keeps the AI history reproducible from the sim-tick stream.
 //   B-H1 (2026-10-15): posts made while the gate is OFF are dropped at
@@ -35,24 +35,24 @@
 //
 // GATE: `ai.enabled` (Bool, default 0 = OFF, archived; registered by
 //   registerAiCvars in settings_cvars.cpp, the registerMcpSensesCvars
-//   pattern for host knobs outside GameSettings). Disabled = no AiWorld
-//   and no WalkCache are constructed, advance() is a no-op, and the edit
+//   pattern for host knobs outside GameSettings). Disabled = no cAiWorld
+//   and no cWalkCache are constructed, advance() is a no-op, and the edit
 //   listener drops every post (see B-H1 above): zero effect on the
 //   game. Default behaviour is therefore unchanged.
 //
 // SCOPE (honest): this is the construction + tick-driving + live-world
 //   feed path. No mob content/definitions and no spawn/lifecycle design
-//   are invented here — the production AiWorld starts EMPTY; what spawns
+//   are invented here — the production cAiWorld starts EMPTY; what spawns
 //   mobs in the live game is JD's scoping call. The smoke selftest
-//   (ai_host_selftest.cpp) spawns through the host's AiWorld directly to
+//   (ai_host_selftest.cpp) spawns through the host's cAiWorld directly to
 //   prove the production path end to end.
 //
 // THREADING: game thread only (bound, enabled and advanced inside
-//   Game::loadActive / Game::update). The WalkCache is constructed over
+//   Game::loadActive / Game::update). The cWalkCache is constructed over
 //   the live map at enable time and the spawn area (3x3 columns around
-//   the bind centre) is prewarmed there, per the WalkCache contract.
+//   the bind centre) is prewarmed there, per the cWalkCache contract.
 //   Beyond that, first-compute is prewarm-only (B-H3, 2026-10-15):
-//   AiWorld::tick prewarms every column inside each pending search's
+//   cAiWorld::tick prewarms every column inside each pending search's
 //   plan box on the tick (game) thread BEFORE submitting the search to
 //   the JobPool, so a pool worker never computes a column -- workers
 //   only read already-cached, immutable columns. Dimension switch
@@ -81,12 +81,12 @@ class cAiHost {
   cAiHost& operator=(const cAiHost&) = delete;
 
   /// Bind to a live dimension's world (game thread, before the sim
-  /// starts). Rebinding destroys any previous AiWorld/WalkCache first.
+  /// starts). Rebinding destroys any previous cAiWorld/cWalkCache first.
   /// `centre` is the spawn/player cell: its 3x3 columns are prewarmed
-  /// when (and only when) the AiWorld is constructed.
+  /// when (and only when) the cAiWorld is constructed.
   void bindWorld(litholattice::ChunkMap& chunks, const litholattice::BlockRegistry& blocks,
                  litholattice::JobPool* pool, litholattice::ai::Cell centre);
-  /// Destroy the AiWorld + WalkCache and forget the world. Safe anytime.
+  /// Destroy the cAiWorld + cWalkCache and forget the world. Safe anytime.
   void unbindWorld();
 
   /// The ai.enabled gate. Enabling constructs (when bound); disabling
@@ -100,7 +100,7 @@ class cAiHost {
     std::lock_guard l(invMutex_);
     return pendingCols_.size();
   }
-  /// True when an AiWorld actually exists (bound + enabled).
+  /// True when an cAiWorld actually exists (bound + enabled).
   bool constructed() const { return world_ != nullptr; }
 
   /// The LOD/senses observer feed: the live player cell, set by Game
@@ -110,15 +110,15 @@ class cAiHost {
     observerSet_ = true;
   }
 
-  /// Drive the AiWorld by elapsed sim world ticks (AiWorld::advance
+  /// Drive the cAiWorld by elapsed sim world ticks (cAiWorld::advance
   /// semantics: AI ticks = simTicks * hz / worldTps, hz clamped 8..16).
   /// First drains the pending column invalidations posted by the ChunkMap
-  /// edit listener into the WalkCache. No-op unless constructed.
+  /// edit listener into the cWalkCache. No-op unless constructed.
   void advance(int simTicks, int worldTps);
 
-  litholattice::ai::AiWorld* world() { return world_.get(); }
-  const litholattice::ai::AiWorld* world() const { return world_.get(); }
-  const litholattice::ai::WalkCache* nav() const { return nav_.get(); }
+  litholattice::ai::cAiWorld* world() { return world_.get(); }
+  const litholattice::ai::cAiWorld* world() const { return world_.get(); }
+  const litholattice::ai::cWalkCache* nav() const { return nav_.get(); }
 
  private:
   void construct();  // requires bound pointers; no-op when already built
@@ -129,8 +129,8 @@ class cAiHost {
   const litholattice::BlockRegistry* blocks_ = nullptr;
   litholattice::JobPool* pool_ = nullptr;
   litholattice::ai::Cell centre_{};
-  std::unique_ptr<litholattice::ai::WalkCache> nav_;
-  std::unique_ptr<litholattice::ai::AiWorld> world_;
+  std::unique_ptr<litholattice::ai::cWalkCache> nav_;
+  std::unique_ptr<litholattice::ai::cAiWorld> world_;
   // Atomic: the edit-listener sink reads the gate on the MUTATING thread
   // (sim thread in play) while setEnabled writes it on the game thread
   // (B-H1). Relaxed would suffice (the flag gates a queue, not data);
@@ -142,7 +142,7 @@ class cAiHost {
   std::vector<uint64_t> pendingCols_;  // packed column keys from the edit listener
 };
 
-/// The game's NavRules for the engine WalkCache (P0): solidity from
+/// The game's NavRules for the engine cWalkCache (P0): solidity from
 /// BlockFlags; track = SimRole::Wire cells (flat trace and vias alike --
 /// the cache only marks passable cells, so solid vias never become track);
 /// climbable / fluid from the kGameClimbable / kGameFluid content flags.
@@ -151,7 +151,7 @@ class cAiHost {
 litholattice::ai::NavRules gameNavRules(const litholattice::BlockRegistry& blocks);
 
 /// Smoke self-test (app selftest section): disabled = no construction /
-/// no effect; enabled = AiWorld constructed over a fixture live map
+/// no effect; enabled = cAiWorld constructed over a fixture live map
 /// through this host, advance() drives it at the clamped Hz, a spawned
 /// mob paths and moves; disable/unbind destroy it. Returns failures.
 int runAiHostSelfTest();

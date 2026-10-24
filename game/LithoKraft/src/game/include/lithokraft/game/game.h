@@ -200,13 +200,13 @@ class Game {
   /// MCP pilot-senses adapter (one object serves both the vision and
   /// audio seams).
   cMcpSensesAdapter& mcpSenses() { return mcpSenses_; }
-  /// The production AiWorld host (B6): bound to the active dimension in
+  /// The production cAiWorld host (B6): bound to the active dimension in
   /// loadActive(), gated by the ai.enabled cvar (default off — nothing
   /// is constructed), advanced from elapsed sim world ticks in update().
   cAiHost& aiHost() { return aiHost_; }
   /// The Deceitor director: owns the mob brains' game-side registry +
   /// hooks (filled in the ctor); mobs themselves live in aiHost_'s
-  /// AiWorld. Spawn/interact/attack are today's explicit test paths
+  /// cAiWorld. Spawn/interact/attack are today's explicit test paths
   /// (the `deceitor` console command, cheat) for the future
   /// click-picking / mob-combat hooks.
   cDeceitorDirector& deceitorDirector() { return deceitorDirector_; }
@@ -355,7 +355,7 @@ class Game {
   void noteBlockEdit() { if (emissiveProvider_) emissiveProvider_->markDirty(); }
   void playSounds();
   void updateEntities();  ///< spawn from sim events, magnet, tick, pickup (worldTick-driven, ENT-3)
-  void updateDeceitors(float dt);  ///< mirror AiWorld Deceitor mobs into render entities (after the AI advance); P2: interpolated legs
+  void updateDeceitors(float dt);  ///< mirror cAiWorld Deceitor mobs into render entities (after the AI advance); P2: interpolated legs
   uint32_t nearestDeceitorMob(double maxDist);  ///< nearest director mob to the player (0 = none)
   void reloadResources();
   /// Spring-arm collision query for the camera controller (its ICameraWorld
@@ -462,12 +462,12 @@ class Game {
   // --- Sprite system integration (sprite_host.h): presentation only ---
   cSpriteHost spriteHost_;            ///< sprite registry + live instances (game thread)
   uint64_t lastSpriteTick_ = 0;      ///< sim worldTick the sprites last advanced to
-  // --- Deceitor director: declared BEFORE aiHost_ so the AiWorld (and
+  // --- Deceitor director: declared BEFORE aiHost_ so the cAiWorld (and
   // the brains it owns) destructs first — brains unregister from the
   // director on destruction, so the director must still be alive then.
   cDeceitorDirector deceitorDirector_;
-  std::map<uint32_t, uint64_t> deceitorMirrors_;  ///< AiWorld mob id -> mirror entity id
-  /// P2 mirror interpolation (presentation only -- the AiWorld cell stays
+  std::map<uint32_t, uint64_t> deceitorMirrors_;  ///< cAiWorld mob id -> mirror entity id
+  /// P2 mirror interpolation (presentation only -- the cAiWorld cell stays
   /// authoritative; this state is never saved and never feeds the sim).
   /// One leg = the glide from the previous cell centre to the current
   /// one over one AI-tick period; kJump/kGap legs add a parabolic arc.
@@ -479,11 +479,11 @@ class Game {
     litholattice::ai::StepTag tag = litholattice::ai::StepTag::kStepStart;  ///< arriving step's tag
   };
   std::map<uint32_t, DeceitorMirrorAnim> deceitorMirrorAnim_;
-  // --- AiWorld integration (ai_host.h): production owner, gated by the
+  // --- cAiWorld integration (ai_host.h): production owner, gated by the
   // ai.enabled cvar (default off). Bound per dimension in loadActive();
   // advanced by elapsed sim world ticks in update() (ENT-2 discipline).
   cAiHost aiHost_;
-  uint64_t lastAiTick_ = 0;          ///< sim worldTick the AiWorld last advanced to
+  uint64_t lastAiTick_ = 0;          ///< sim worldTick the cAiWorld last advanced to
   Vec3 spawnPoint_{20.f, 92.f, 20.f};  ///< dimension spawn; `kill` respawns here
   litholattice::cEntityMgr entities_{[this](uint32_t type) {
     return makeEntityBehavior(

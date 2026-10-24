@@ -186,7 +186,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
   // MCP pilot-senses knobs (mcp.vision_width/height, mcp.audio_tier,
   // camera.chunk_radius): archived host knobs, not player preferences.
   registerMcpSensesCvars(consoleRegistry_);
-  // AiWorld host knob (ai.enabled, default OFF; brief B6, 2026-10-13):
+  // cAiWorld host knob (ai.enabled, default OFF; brief B6, 2026-10-13):
   // archived host cvar, read per frame in update() like the mcp.* knobs.
   registerAiCvars(consoleRegistry_);
   // config.lth: the archived-cvar file the dtor writes via saveArchived().
@@ -970,7 +970,7 @@ Game::~Game() {
     if (cfg.has_parent_path())
       consoleRegistry_.saveArchived((cfg.parent_path() / "config.lth").string());
   }
-  aiHost_.unbindWorld();  // WalkCache references active_->chunks; drop before the registry dies (B6)
+  aiHost_.unbindWorld();  // cWalkCache references active_->chunks; drop before the registry dies (B6)
   sim_.reset();
   pool_.waitIdle();  // mesh jobs reference meshOut_
 }
@@ -1165,9 +1165,9 @@ void Game::loadActive() {
                                                 effectiveStreamRadius(cfg_) /* fix3: sim area always inside stream */, initial);
     streamer_->setDiamond(cfg_.diamondStreamArea);  // diamond stream footprint (JD 2026-10-23)
   }
-  // AiWorld host (B6): bind to THIS dimension's live map + registry +
+  // cAiWorld host (B6): bind to THIS dimension's live map + registry +
   // pool while the game thread still owns the map (before sim start).
-  // Construction of the AiWorld itself waits for the ai.enabled gate.
+  // Construction of the cAiWorld itself waits for the ai.enabled gate.
   aiHost_.bindWorld(active_->chunks, blockRegistry(), &pool_,
                     {int(std::floor(sp.x)), int(std::floor(sp.y)), int(std::floor(sp.z))});
   sim_->start();  // from here the sim thread owns active_->chunks
@@ -1192,7 +1192,7 @@ bool Game::switchDimension(const std::string& id) {
   }
   streamer_.reset();            // its jobs reference the old dimension's generator/save id
   sim_.reset();                 // stop ticking; main thread owns the old chunks again
-  aiHost_.unbindWorld();        // its WalkCache references the old dimension's chunks (B6)
+  aiHost_.unbindWorld();        // its cWalkCache references the old dimension's chunks (B6)
   sound_.stopAll();
   // Design B Stage 2: the store clear is staged on the ring path (in ring
   // order, behind the old dimension's uploads it wipes) and immediate on
@@ -2512,10 +2512,10 @@ void Game::update(float dt, int width, int height) {
       lastSpriteTick_ = wt;
     }
   }
-  // AiWorld (B6 production wiring): the ai.enabled cvar is the gate
+  // cAiWorld (B6 production wiring): the ai.enabled cvar is the gate
   // (default off = cAiHost constructs nothing, zero effect). When on,
   // advance by the same elapsed sim world ticks as vitals/sprites —
-  // AiWorld::advance(simTicks, worldTps), NEVER tick() per sim tick —
+  // cAiWorld::advance(simTicks, worldTps), NEVER tick() per sim tick —
   // so AI thinks at its clamped 8..16 Hz and freezes with the sim
   // (code-review ENT-2). The observer feed is the live player cell.
   {
@@ -2534,7 +2534,7 @@ void Game::update(float dt, int width, int height) {
       }
     }
   }
-  // Deceitor mirrors: sync the render entities to the AiWorld mobs
+  // Deceitor mirrors: sync the render entities to the cAiWorld mobs
   // the advance just moved (and reap mirrors when the world is gone).
   g_split.lap(1);  // [C53-1]
   updateDeceitors(dt);
@@ -3084,9 +3084,9 @@ std::string Game::statusLine(double fps, double worstMs) const {
 
 // ---------------------------------------------------------------- Deceitors
 void Game::updateDeceitors(float dt) {
-  ai::AiWorld* w = aiHost_.world();
+  ai::cAiWorld* w = aiHost_.world();
   if (!w) {
-    // No AiWorld (ai.enabled off / unbound): no population, no mirrors.
+    // No cAiWorld (ai.enabled off / unbound): no population, no mirrors.
     for (auto& [mid, eid] : deceitorMirrors_) entities_.despawn(eid);
     deceitorMirrors_.clear();
     deceitorMirrorAnim_.clear();
@@ -3105,7 +3105,7 @@ void Game::updateDeceitors(float dt) {
   // P2 (2026-10-14): the mirror GLIDES between cell centres over one
   // AI-tick period instead of teleporting each tick; legs that arrived via
   // a kJump / kGap step get a parabolic arc on top of the linear glide.
-  // Presentation only: the AiWorld cell remains the sim truth, mirror
+  // Presentation only: the cAiWorld cell remains the sim truth, mirror
   // state is never saved, and a leg longer than 5 blocks (respawn, surge
   // catch-up, world rebuild) snaps instead of gliding. Arc heights are
   // presentation constants (JD-review-pending): jump 0.25, gap 0.5.
@@ -3162,7 +3162,7 @@ void Game::updateDeceitors(float dt) {
 }
 
 uint32_t Game::nearestDeceitorMob(double maxDist) {
-  ai::AiWorld* w = aiHost_.world();
+  ai::cAiWorld* w = aiHost_.world();
   if (!w) return 0;
   uint32_t best = 0;
   double bestD = maxDist;
@@ -3180,7 +3180,7 @@ uint32_t Game::nearestDeceitorMob(double maxDist) {
 }
 
 std::string Game::spawnDeceitorCmd() {
-  ai::AiWorld* w = aiHost_.world();
+  ai::cAiWorld* w = aiHost_.world();
   if (!w) return "deceitor: no AiWorld - set ai.enabled 1 first (Deceitors live in the AiWorld)";
   const ai::Cell at{int(std::floor(player_.pos.x + std::cos(player_.yaw) * 3.0)),
                     int(std::floor(player_.pos.y)),
@@ -3193,7 +3193,7 @@ std::string Game::spawnDeceitorCmd() {
 }
 
 std::string Game::deceitorInteractCmd() {
-  ai::AiWorld* w = aiHost_.world();
+  ai::cAiWorld* w = aiHost_.world();
   if (!w) return "deceitor: no AiWorld - set ai.enabled 1 first";
   const uint32_t id = nearestDeceitorMob(16.0);
   if (!id) return "deceitor: none within reach";
@@ -3204,7 +3204,7 @@ std::string Game::deceitorInteractCmd() {
 }
 
 std::string Game::deceitorAttackCmd() {
-  ai::AiWorld* w = aiHost_.world();
+  ai::cAiWorld* w = aiHost_.world();
   if (!w) return "deceitor: no AiWorld - set ai.enabled 1 first";
   const uint32_t id = nearestDeceitorMob(16.0);
   if (!id) return "deceitor: none within reach";
@@ -3259,7 +3259,7 @@ void Game::uploadEntities() {
   }
   // Deceitor bodies: upright bipeds (1.8 blocks) from stacked billboards
   // through this same entity-mesh path — the placeholder presentation
-  // until a real mob render path exists (AiWorld mobs had NO renderer
+  // until a real mob render path exists (cAiWorld mobs had NO renderer
   // before this). Presentation is IDENTICAL to a Receiptor's while
   // non-hostile: trace-trunk legs, ceramic torso and head. The head
   // material swaps with the face state the brain publishes — a lit

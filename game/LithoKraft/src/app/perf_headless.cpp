@@ -228,12 +228,12 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
     DimensionRegistry areg = createDimensions();
     Dimension* ad = areg.find("wafer");
     ad->load(pool, 32);
-    ai::WalkCache nav(ad->chunks, blockRegistry(), {});
+    ai::cWalkCache nav(ad->chunks, blockRegistry(), {});
     auto walk = ai::makeWalk();
     int ai_i = 0;
     for (int cap : {64, 128}) {
       ai::AiConfig cfg; cfg.mobCap = cap; cfg.pathsPerTick = 8; cfg.seed = 7;
-      ai::AiWorld aw(nav, cfg, &pool);
+      ai::cAiWorld aw(nav, cfg, &pool);
       for (int i = 0; i < cap; ++i) {
         const int x = 16 * 16 + (i % 16) * 4, z = 16 * 16 + (i / 16) * 4;
         int y = kWorldHeight - 2;

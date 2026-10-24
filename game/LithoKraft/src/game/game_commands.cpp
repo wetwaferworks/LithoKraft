@@ -146,7 +146,7 @@ void registerGameCommands(cConsoleReg& r, GameCommandBindings b) {
 
   // deceitor <spawn|interact|attack> — Deceitor mob test paths
   // (2026-10-14). spawn conjures one in front of the player (needs
-  // ai.enabled 1: the mob lives in the AiWorld); interact/attack drive
+  // ai.enabled 1: the mob lives in the cAiWorld); interact/attack drive
   // the nearest one — today's stand-ins for the click-picking and
   // mob-combat hooks those entries will use. Cheat: it conjures and
   // provokes mobs from the console.

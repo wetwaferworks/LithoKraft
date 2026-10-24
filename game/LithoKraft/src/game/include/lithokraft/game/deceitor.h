@@ -21,7 +21,7 @@
 //   * Pack retaliation: attacking one Deceitor turns every Deceitor
 //     within the pack radius hostile, together ("gang style").
 //
-// ARCHITECTURE: the mob lives in the engine AiWorld (cell position,
+// ARCHITECTURE: the mob lives in the engine cAiWorld (cell position,
 // pathing, deterministic per-mob AiRng) exactly like the B6 cAiHost
 // wiring intended — content-free engine, game-owned behaviour. The
 // brain is an ai::IBtNode; everything game-side it needs (player pose,
@@ -47,14 +47,14 @@
 // mixture in either proportion is representable; the ratio itself is
 // data for JD's interchange placement, not code.
 //
-// GATE: Deceitors exist only when spawned — via cAiHost's AiWorld when
+// GATE: Deceitors exist only when spawned — via cAiHost's cAiWorld when
 // `ai.enabled` is on (console command `deceitor spawn`, cheat), or by
 // tests. Nothing spawns them in the default game, so the default
 // scenario/determinism surface is untouched. Natural spawning at
 // Interchange structures awaits JD's hand-built structures + a
 // structure-tagging decision (JD, 2026-10-14).
 //
-// PERSISTENCE (honest): AiWorld mobs have no save path today (the B6
+// PERSISTENCE (honest): cAiWorld mobs have no save path today (the B6
 // wiring scoped lifecycle as JD's call), so Deceitors are session-only:
 // no save-format change, nothing to migrate, nothing to corrupt.
 //
@@ -77,7 +77,7 @@ namespace lithokraft {
 
 // ---------------------------------------------------------------- tuning
 // All values JD-REVIEW-PENDING placeholders (2026-10-14). AI ticks are
-// the AiWorld's own (10 Hz at the engine default), not sim ticks.
+// the cAiWorld's own (10 Hz at the engine default), not sim ticks.
 struct DeceitorTuning {
   static constexpr double kBarterRadius = 4.0;      ///< scans ground drops within this (blocks)
   static constexpr double kConsumeRadius = 2.0;     ///< close enough to take an offer
@@ -131,7 +131,7 @@ struct DeceitorDrop {
 /// Game-side services the brain needs. Game fills these from its live
 /// state (cEntityMgr, player transform, player adapter); the
 /// selftest fills them from fixtures. All calls happen on the game
-/// thread, inside AiWorld::advance (brains tick there).
+/// thread, inside cAiWorld::advance (brains tick there).
 struct DeceitorHooks {
   /// Player eye/feet position (x,y,z = feet) + XZ facing (unit). False
   /// when no player pose is available (brain then idles safely).
@@ -157,7 +157,7 @@ enum class DeceitorFace : uint8_t { Neutral, Smile, Scowl };
 class cDeceitorDirector;
 
 /// Behaviour-tree brain for one Deceitor (one instance per mob; the
-/// AiWorld owns it). Registers itself with the director on first tick
+/// cAiWorld owns it). Registers itself with the director on first tick
 /// and unregisters on destruction, so the director's registry is always
 /// exactly the live population.
 class cDeceitorBrain final : public litholattice::ai::IBtNode {
@@ -221,8 +221,8 @@ class cDeceitorDirector {
   const DeceitorHooks& hooks() const { return hooks_; }
 
   /// Spawn one Deceitor in `world` at cell `at` (feet cell). Nullopt at
-  /// the AiWorld mob cap. The brain self-registers on its first tick.
-  std::optional<uint32_t> spawn(litholattice::ai::AiWorld& world, litholattice::ai::Cell at);
+  /// the cAiWorld mob cap. The brain self-registers on its first tick.
+  std::optional<uint32_t> spawn(litholattice::ai::cAiWorld& world, litholattice::ai::Cell at);
 
   // Brain registry (attach/detach are called by cDeceitorBrain only).
   void attach(uint32_t mobId, cDeceitorBrain* brain);
@@ -235,15 +235,15 @@ class cDeceitorDirector {
   /// The interaction tell: a Receiptor would open its trading
   /// interface; a Deceitor NEVER does. This always reports "no
   /// interface" (returns false) and starts the failed-click grace
-  /// window on that Deceitor. `aiTick` is the AiWorld's tick counter
-  /// (AiWorld::stats().ticks).
+  /// window on that Deceitor. `aiTick` is the cAiWorld's tick counter
+  /// (cAiWorld::stats().ticks).
   bool playerInteract(uint32_t mobId, uint64_t aiTick);
 
   /// The player attacked Deceitor `mobId`: it and every Deceitor
   /// within kPackRadius of it (mob positions from `world`) turn
-  /// hostile together. (AiWorld mobs carry no health pool today, so
+  /// hostile together. (cAiWorld mobs carry no health pool today, so
   /// this is an aggro event only — no damage is applied to the mob.)
-  void playerAttacked(litholattice::ai::AiWorld& world, uint32_t mobId);
+  void playerAttacked(litholattice::ai::cAiWorld& world, uint32_t mobId);
 
   /// Presentation: the face the renderer should show for `mobId`
   /// (Neutral when unknown). Deceitors present EXACTLY like Receiptors

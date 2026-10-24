@@ -1,7 +1,7 @@
 // Deceitor self-test (app selftest section): drives the production
-// brain + director against a fixture AiWorld (the ai_host_selftest
+// brain + director against a fixture cAiWorld (the ai_host_selftest
 // floor) and a real cEntityMgr for ground drops. Every scenario is
-// deterministic: AiWorld RNG is seeded per (world seed, mob id, tick)
+// deterministic: cAiWorld RNG is seeded per (world seed, mob id, tick)
 // and the fixture player never moves except as scripted.
 //
 //   * liked-items table (titanium oxide liked; plain materials not);
@@ -43,8 +43,8 @@ struct Fixture {
   // director member precedes aiHost_.)
   cDeceitorDirector dir;
   cEntityMgr entities{[](uint32_t) { return std::unique_ptr<IEntityBehavior>{}; }};
-  std::unique_ptr<ai::WalkCache> nav;
-  std::unique_ptr<ai::AiWorld> world;
+  std::unique_ptr<ai::cWalkCache> nav;
+  std::unique_ptr<ai::cAiWorld> world;
 
   // Scripted player.
   double px = 4.5, py = 10.0, pz = 8.5, fx = 0.0, fz = -1.0;  // facing -z
@@ -63,8 +63,8 @@ struct Fixture {
       }
     for (int z = 0; z < 128; ++z)
       for (int x = 0; x < 128; ++x) map.set(x, 9, z, rock);
-    nav = std::make_unique<ai::WalkCache>(map, blocks, ai::NavRules{});
-    world = std::make_unique<ai::AiWorld>(*nav, ai::AiConfig{});
+    nav = std::make_unique<ai::cWalkCache>(map, blocks, ai::NavRules{});
+    world = std::make_unique<ai::cAiWorld>(*nav, ai::AiConfig{});
     world->setObservers({{4, 10, 8}});
 
     DeceitorHooks h;

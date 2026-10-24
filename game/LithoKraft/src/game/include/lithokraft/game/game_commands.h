@@ -110,7 +110,7 @@ struct GameCommandBindings {
   /// List the certificate registry with the player's level/balance (B7).
   std::function<std::string()> listCertificates;
   /// Spawn a Deceitor in front of the player (Deceitor work, 2026-10-14;
-  /// needs ai.enabled — the mob lives in the AiWorld). Cheat: it
+  /// needs ai.enabled — the mob lives in the cAiWorld). Cheat: it
   /// conjures a mob. Returns a message.
   std::function<std::string()> spawnDeceitor;
   /// Interact with the nearest Deceitor: opens NO trade interface (the

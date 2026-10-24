@@ -84,10 +84,10 @@ Namespaces: engine = `litholattice::` (sub-namespaces `procgen::`, `ui::`, `stor
 
 ### 2.11 AI (planned; brief: utility AI plus behavior trees, learned "Daemon" nudge, 8-16 Hz)
 All **[PROPOSED]**: an engine module `ai`, with mobs and NPCs as game code.
-- `IAgent` (body: position, velocity, `MovementMode {Walk, Climb, Swim, Fly, Phase}` for Void entities).
+- `IAgent` (body: position, velocity, `MovementMode {cWalk, cClimb, cSwim, cFly, Phase}` for Void entities).
 - `ISense` (sight cone, hearing via signal and sound events, wire "taste" for virus mobs). Each produces percepts into a blackboard.
 - `IConsideration` (utility curve over blackboard keys, 0..1) and `IAction`. The utility selector picks the top-scored action.
-- Behavior-tree nodes: `IBtNode` (`Sequence`, `Selector`, `Parallel`, `Decorator`, leaf actions), registered by name and authored in JSON.
+- Behavior-tree nodes: `IBtNode` (`cSequence`, `cSelector`, `Parallel`, `Decorator`, leaf actions), registered by name and authored in JSON.
 - **Learned-model hook**: `IScoreModel::adjust(span<const float> features, span<float> scores)`, called after the utility scoring. The Daemon combat model plugs in here. It is optional, with no-op stubs.
 - **Waypoints**: a waypoint block or tag plus `IPathfinder` (A* over the voxel grid, budgeted per tick). Player-built NPCs get direct actions (step, use) and `goTo(waypoint|tag)`.
 - AI runs on its own fixed-rate step (8-16 Hz) inside the sim thread, using a `ClockDomain`-like scheduler.
