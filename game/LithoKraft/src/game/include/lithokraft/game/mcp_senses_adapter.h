@@ -1,7 +1,7 @@
 // cMcpSensesAdapter: game-side adapters for the MCP pilot-senses seams
 // (litholattice::mcp::IVisionCapture / IAudioCapture).
 //
-// VISION: a standalone SoftwareRenderer (flat shading, the JD-locked
+// VISION: a standalone cSoftwareRenderer (flat shading, the JD-locked
 // downgraded path) renders a COPY of the classic chunk-mesh cache from the
 // pilot's camera. The cache is fed on the game thread by noteMesh(), called
 // from Game::uploadMeshes() for every mesh that lands in the GL renderer
@@ -172,8 +172,8 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   std::vector<litholattice::PackedVertex> spriteVerts_;  ///< latest sprite frame (software form)
   litholattice::Vec3 spriteOrigin_{};                    ///< world origin spriteVerts_ are relative to
 
-  std::mutex renderMutex_;  ///< serializes the SoftwareRenderer (MCP thread)
-  litholattice::SoftwareRenderer sw_;
+  std::mutex renderMutex_;  ///< serializes the cSoftwareRenderer (MCP thread)
+  litholattice::cSoftwareRenderer sw_;
 
   // Culling-cache prototype state, one per pilot camera (JD 2026-10-11).
   // Guarded by its own mutex: only the MCP thread touches it, so the game

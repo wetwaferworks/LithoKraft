@@ -1,10 +1,10 @@
 // cGamePlayerAdapter: presents LithoKraft's local player as an engine IPlayer.
 //
 // The game keeps its own Player (creative-flight camera + inventory, player.h).
-// The engine's player system (litholattice/player: PlayerManager, IPlayer,
+// The engine's player system (litholattice/player: cPlayerMgr, IPlayer,
 // the IVitals/IStat/IAbility peer registries) is the integration surface
 // the rest of the engine speaks — MCP snapshots, saves, future net sync.
-// This adapter owns the PlayerManager for the local player and mirrors the
+// This adapter owns the cPlayerMgr for the local player and mirrors the
 // game player into it once per frame (syncFromGame), so engine consumers
 // always read current state. The direction is game -> engine: gameplay
 // movement stays in Player::update (MCP control also enters through the
@@ -75,8 +75,8 @@ class cGamePlayerAdapter {
   /// The engine view of the local player (id = the manager's local id).
   litholattice::IPlayer& enginePlayer();
   const litholattice::IPlayer& enginePlayer() const;
-  litholattice::PlayerManager& manager() { return manager_; }
-  const litholattice::PlayerManager& manager() const { return manager_; }
+  litholattice::cPlayerMgr& manager() { return manager_; }
+  const litholattice::cPlayerMgr& manager() const { return manager_; }
 
   /// Mirror the game player into the engine PlayerState (position, look,
   /// dimension, health field). Call once per frame, after the frame's
@@ -172,7 +172,7 @@ class cGamePlayerAdapter {
   bool teleportTripped(float dtSeconds);
 
   Player& game_;
-  litholattice::PlayerManager manager_;
+  litholattice::cPlayerMgr manager_;
   litholattice::StandardVitals vitals_;
   litholattice::StandardStats standardStats_;
   uint32_t kharge_ = 0;

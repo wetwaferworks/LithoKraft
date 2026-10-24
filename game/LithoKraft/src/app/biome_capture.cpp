@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
                         m.verts.begin() + q, m.verts.begin() + q + 4);
           lm.push_back(std::move(e));
         }
-    litholattice::SoftwareRenderer sw;
+    litholattice::cSoftwareRenderer sw;
     sw.setPerPixelShading(true);
     sw.setTextures(texBuffer.data(), layerCount);
     sw.resize(kImgW, kImgH);
@@ -299,7 +299,7 @@ int main(int argc, char** argv) {
     lctx.appearance = &lk::blockAppearance();
     auto render = [&](litholattice::ChunkMap& map, int w, int h, uint32_t clear, litholattice::Vec3 eye,
                       litholattice::Vec3 target, float farZ, size_t* quads) {
-      litholattice::SoftwareRenderer sw;
+      litholattice::cSoftwareRenderer sw;
       sw.setPerPixelShading(true);
       sw.setTextures(texBuffer.data(), layerCount);
       sw.resize(w, h);
@@ -484,7 +484,7 @@ int main(int argc, char** argv) {
     }
 
     // cCamera: elevated, looking down at the biome center at an angle.
-    litholattice::SoftwareRenderer sw;
+    litholattice::cSoftwareRenderer sw;
     sw.setPerPixelShading(true);  // diffuse-lit with the real pack textures
     sw.setTextures(texBuffer.data(), layerCount);
     sw.resize(kImgW, kImgH);
@@ -568,7 +568,7 @@ int main(int argc, char** argv) {
       std::printf("[FAIL] spawn: no meshes\n");
       ++failures;
     } else {
-      litholattice::SoftwareRenderer sw;
+      litholattice::cSoftwareRenderer sw;
       sw.setPerPixelShading(true);
       sw.setTextures(texBuffer.data(), layerCount);
       sw.resize(kImgW, kImgH);

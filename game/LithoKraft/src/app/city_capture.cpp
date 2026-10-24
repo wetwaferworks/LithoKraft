@@ -72,7 +72,7 @@ struct Mesh { std::vector<litholattice::PackedVertex> verts; float ox, oy, oz; }
 
 bool renderView(const std::vector<Mesh>& meshes, const std::vector<uint32_t>& tex, uint32_t layers, Vec3 eye,
                 Vec3 target, const std::string& path, bool quiet = false) {
-  litholattice::SoftwareRenderer sw;
+  litholattice::cSoftwareRenderer sw;
   sw.setPerPixelShading(true);
   sw.setTextures(tex.data(), layers);
   sw.resize(kImgW, kImgH);

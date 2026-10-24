@@ -91,7 +91,7 @@ class cWorldSave {
   /// `materials`: the PBR material registry (main.cpp owns it; must outlive this). When
   /// non-null the engine's MATS payload is registered, persisting per-voxel material bytes
   /// as string IDs. Null = no material persistence (tests that don't care about materials).
-  explicit cWorldSave(std::filesystem::path root, const litholattice::MaterialRegistry* materials = nullptr);
+  explicit cWorldSave(std::filesystem::path root, const litholattice::cMaterialReg* materials = nullptr);
   const std::filesystem::path& root() const { return root_; }
 
   /// FAIL-CLOSED NAME TABLE (C-4): the semantics every method below follows.

@@ -65,7 +65,7 @@
 #include "lithokraft/game/settings.h"
 #include "lithokraft/game/ui_script_bindings.h"
 
-namespace litholattice { class MaterialRegistry; }  // pbr_materials.h; main.cpp owns the instance
+namespace litholattice { class cMaterialReg; }  // pbr_materials.h; main.cpp owns the instance
 
 namespace lithokraft {
 
@@ -99,7 +99,7 @@ struct GameConfig {
   std::string version = "dev";  // LITHOKRAFT_VERSION, plumbed from main.cpp for the menu footer
   GameSettings settings;        // player preferences (main.cpp loads config/settings.json)
   std::string settingsPath;     // where the settings persist (empty = do not save)
-  const litholattice::MaterialRegistry* materials = nullptr;  // PBR registry (main.cpp loads the
+  const litholattice::cMaterialReg* materials = nullptr;  // PBR registry (main.cpp loads the
       // data file and owns it; must outlive the game). Null = chunk saves skip the MATS payload.
 };
 

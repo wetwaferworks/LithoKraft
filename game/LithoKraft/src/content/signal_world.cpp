@@ -177,7 +177,7 @@ void cSignalWorldSim::takeEvents(std::vector<SimEvent>& out) {
 // sim thread replays through the real dirty fn at the phase commit, in
 // canonical (shard, then ascending key) order (hs-design §3.3).
 
-void cSignalWorldSim::registerHandshake(litholattice::TimingHandshakeAuthority& authority) {
+void cSignalWorldSim::registerHandshake(litholattice::cTimingHandshakeAuthority& authority) {
   hsAuthority_ = &authority;
   const int p = authority.phasesPerCycle();
   const int w = authority.workerCount();
@@ -189,7 +189,7 @@ void cSignalWorldSim::registerHandshake(litholattice::TimingHandshakeAuthority& 
     return hsNames_.back().c_str();
   };
   using litholattice::CadenceClass;
-  auto reg = [&](const char* n, int offset, bool affine, litholattice::TimingHandshakeAuthority::WorkFn fn) {
+  auto reg = [&](const char* n, int offset, bool affine, litholattice::cTimingHandshakeAuthority::WorkFn fn) {
     litholattice::HsComponentDesc d;
     d.name = n;
     d.cadence = CadenceClass::CycleHead;

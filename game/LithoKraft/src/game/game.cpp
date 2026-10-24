@@ -2993,7 +2993,7 @@ std::string Game::rendererInfo() const {
   const std::string n = renderer_.name();
   if (n == "software")
     return "Software " + std::string(litholattice::swsimd::activePath()) + " x" +
-           std::to_string(litholattice::SoftwareRenderer::renderThreads()) + " threads";
+           std::to_string(litholattice::cSoftwareRenderer::renderThreads()) + " threads";
   if (n.rfind("OpenGL", 0) == 0) return "GL33";
   return n;  // "Vulkan"
 }

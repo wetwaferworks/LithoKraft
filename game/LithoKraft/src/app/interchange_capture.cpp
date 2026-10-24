@@ -103,7 +103,7 @@ struct Mesh {
 bool renderView(const std::vector<Mesh>& meshes, const std::vector<uint32_t>& texBuffer,
                 uint32_t layerCount, litholattice::Vec3 eye, litholattice::Vec3 target,
                 const std::string& path) {
-  litholattice::SoftwareRenderer sw;
+  litholattice::cSoftwareRenderer sw;
   sw.setPerPixelShading(true);
   sw.setTextures(texBuffer.data(), layerCount);
   sw.resize(kImgW, kImgH);

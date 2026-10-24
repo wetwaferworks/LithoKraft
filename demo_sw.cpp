@@ -18,7 +18,7 @@ static void savePPM(const char* path, const SoftwareFramebuffer& fb) {
 }
 
 int main() {
-  SoftwareRenderer r;
+  cSoftwareRenderer r;
   r.resize(400, 300);
   r.clear(0xFF1a1a2e);
 

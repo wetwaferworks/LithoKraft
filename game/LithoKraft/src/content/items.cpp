@@ -187,7 +187,7 @@ BlockId placedBlockForItem(uint32_t itemId) {
   if (const ItemDef* d = findItem(itemId)) {
     // Registered item: the unified registry is the authority on whether it
     // places a block (today only the Chipor does, via its stable id).
-    const ContentRegistry& content = blockRegistry().content();
+    const cContentReg& content = blockRegistry().content();
     if (const auto engineId = content.findItem(d->stringId)) {
       const StableId sb = content.itemDef(*engineId).placesBlock;
       if (sb != 0)
@@ -222,7 +222,7 @@ const ItemDef& startingItemDef() {
   return itemRegistry()[1];  // the Fragment row (defensive; unreachable)
 }
 
-void registerGameItems(ContentRegistry& content) {
+void registerGameItems(cContentReg& content) {
   for (const ItemDef& d : itemRegistry()) {
     litholattice::ItemDef ed;
     ed.name = d.name;

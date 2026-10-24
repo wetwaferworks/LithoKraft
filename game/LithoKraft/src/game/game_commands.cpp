@@ -367,7 +367,7 @@ void registerGameCommands(cConsoleReg& r, GameCommandBindings b) {
 
 #ifndef NDEBUG
   // hotswap_refresh — debug builds only (not registered in release). Applies
-  // staged block-definition updates (ContentRegistry::refreshStaged) between
+  // staged block-definition updates (cContentReg::refreshStaged) between
   // sim ticks via the binding. Cheat: mutates content at runtime.
   r.registerCommand(
       "hotswap_refresh", "hotswap_refresh - apply staged block-definition updates (debug only; cheat)",

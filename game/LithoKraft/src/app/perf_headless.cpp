@@ -72,7 +72,7 @@ class cTimedSim final : public IWorldSimulation {
   }
   size_t activeCount() const override { return s_->activeCount(); }
   void takeEvents(std::vector<SimEvent>& out) override { s_->takeEvents(out); }
-  void registerHandshake(litholattice::TimingHandshakeAuthority& a) override { s_->registerHandshake(a); }
+  void registerHandshake(litholattice::cTimingHandshakeAuthority& a) override { s_->registerHandshake(a); }
   cSignalSim* signalSim() {  // phase-split timings for the sweep (hs-design §7)
     auto* sw = dynamic_cast<cSignalWorldSim*>(s_.get());
     return sw ? &sw->signal() : nullptr;

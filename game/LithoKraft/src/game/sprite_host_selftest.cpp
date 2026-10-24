@@ -227,7 +227,7 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
       constexpr int kW = 320, kH = 180;
       const Mat4 vp = mul(perspective(1.2f, float(kW) / float(kH), 0.1f, 400.f), lookDir(eye, fwd));
       auto renderScene = [&](bool withSprite) {
-        SoftwareRenderer sw;
+        cSoftwareRenderer sw;
         sw.setPerPixelShading(false);  // flat: the MCP vision path's mode
         sw.resize(kW, kH);
         sw.clear(0xFF1A1D26);

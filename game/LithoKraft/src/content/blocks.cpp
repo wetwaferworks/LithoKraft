@@ -259,7 +259,7 @@ BlockRegistry& mutableRegistry() {
 }  // namespace
 
 namespace {
-// Items (2026-10-12) join the SAME unified ContentRegistry under the item
+// Items (2026-10-12) join the SAME unified cContentReg under the item
 // kind (Infinite Registry phase 2) -- one catalog for blocks + items. Done
 // here, not inside the build lambda above: registration needs the finished
 // registry (the Chipor item's placesBlock), and the extern-const resolution
@@ -420,7 +420,7 @@ bool isValidBlockNamespaceId(std::string_view id) {
 BlockId registerBlock(BlockDef def) {
   // Single-threaded mod-init only: the sim reads the registry from multiple threads once worlds load.
   // The registry ENFORCES that window (review F-M3): debug builds assert in
-  // ContentRegistry mutators when registration happens off the mod-init
+  // cContentReg mutators when registration happens off the mod-init
   // thread, and registration past the 16-bit BlockId cap is refused with a
   // log (F-M5) rather than silently aliasing onto air.
   //

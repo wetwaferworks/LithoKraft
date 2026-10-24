@@ -32,7 +32,7 @@ std::optional<storage::Bytes> cWorldSave::migrateSignalV1ToV2(const storage::Byt
   return w.out;
 }
 
-cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::MaterialRegistry* materials)
+cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::cMaterialReg* materials)
     : root_(std::move(root)) {
   // Infinite Registry: the BLKS payload translates between the StableId voxel
   // storage and the BlockId disk codec through this registry.

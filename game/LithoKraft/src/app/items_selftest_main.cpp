@@ -40,10 +40,10 @@ int main() {
     check(itemRegistry().size() == 31, "registry: 31 items (seed, Fragment, 6 armory, Firewall, Ping, Callback, Debuggor, Sniffor, Atlas, Titanium Oxide, 15 JD materials, Chipor)");
   }
 
-  // 1b. Unified ContentRegistry: every item is also registered under the
+  // 1b. Unified cContentReg: every item is also registered under the
   //     engine's item kind (Infinite Registry phase 2), Chipor places its block.
   {
-    const ContentRegistry& content = blockRegistry().content();
+    const cContentReg& content = blockRegistry().content();
     bool ok = content.itemCount() == itemRegistry().size();
     for (const ItemDef& d : itemRegistry()) {
       const auto id = content.findItem(d.stringId);

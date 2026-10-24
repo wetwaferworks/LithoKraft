@@ -44,7 +44,7 @@ class cSignalWorldSim final : public IWorldSimulation {
                     const DirtyFn& dirty) override;
   bool use(ChunkMap& world, int x, int y, int z, const DirtyFn& dirty) override;
   void command(ChunkMap& world, const SimCommand& cmd, const DirtyFn& dirty) override;
-  void registerHandshake(litholattice::TimingHandshakeAuthority& authority) override;
+  void registerHandshake(litholattice::cTimingHandshakeAuthority& authority) override;
   void tick(ChunkMap& world, const TickArea& area, const DirtyFn& dirty) override {
     signal_.setRoundArea(area.round);  // F56-7
     const int64_t tpS = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
@@ -70,7 +70,7 @@ class cSignalWorldSim final : public IWorldSimulation {
   void onHsCommit(uint64_t phase, uint64_t cycleTick, uint32_t group);
   cSignalSim signal_;
   // ---- Timing Handshake state (null authority = legacy path) ----
-  litholattice::TimingHandshakeAuthority* hsAuthority_ = nullptr;
+  litholattice::cTimingHandshakeAuthority* hsAuthority_ = nullptr;
   ChunkMap* hsWorld_ = nullptr;   // valid only inside tickHandshake
   TickArea hsArea_{};
   DirtyFn hsDirty_;               // the real dirty fn of the in-flight tick

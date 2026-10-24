@@ -138,12 +138,12 @@ uint64_t runScenario(int ticks, bool handshake, int workers, int phases) {
   litholattice::TickArea area{4, 4, 8};
   if (const char* e = std::getenv("LL_HS_RADIUS"); e && *e) area.radius = std::clamp(std::atoi(e), 0, 64);
   if (const char* e = std::getenv("LL_HS_ROUND_AREA"); e && *e) area.round = e[0] != '0';
-  std::unique_ptr<litholattice::TimingHandshakeAuthority> auth;
+  std::unique_ptr<litholattice::cTimingHandshakeAuthority> auth;
   if (handshake) {
-    litholattice::TimingHandshakeAuthority::Config hc;
+    litholattice::cTimingHandshakeAuthority::Config hc;
     hc.phasesPerCycle = phases;
     hc.workerThreads = workers;
-    auth = std::make_unique<litholattice::TimingHandshakeAuthority>(hc);
+    auth = std::make_unique<litholattice::cTimingHandshakeAuthority>(hc);
     sc.ws->registerHandshake(*auth);
     auth->start();
   }
@@ -217,13 +217,13 @@ void testWait() {
   std::printf("  burn = %llu iters (~40 ms vs 5 ms phase budget / 20 ms cycle budget)\n", (unsigned long long)burnIters);
 
   auto runArm = [&](bool heavy, litholattice::HsStats& statsOut, std::vector<uint64_t>& statesOut) {
-    litholattice::TimingHandshakeAuthority::Config hc;
+    litholattice::cTimingHandshakeAuthority::Config hc;
     hc.phasesPerCycle = 4;
     hc.workerThreads = 2;
     hc.phaseBudget = std::chrono::milliseconds(5);
     hc.watchdogCeiling = std::chrono::seconds(10);
     hc.offenderThreshold = 3;
-    litholattice::TimingHandshakeAuthority auth(hc);
+    litholattice::cTimingHandshakeAuthority auth(hc);
     std::vector<uint64_t> states(4, 0);
     auto filler = [&](int id) {
       return [&states, id](uint64_t phase, uint64_t) { states[size_t(id)] = mixState(states[size_t(id)], uint64_t(id), phase); };
@@ -291,13 +291,13 @@ void testWait() {
 void testOffenderNamePropagation() {
   std::printf("== handshake offender name propagation (flagged offenders are always named)\n");
   const uint64_t burnIters = calibrateBurnIters(10'000'000.0);  // ~10 ms >> 4 ms cycle budget (1 ms x 4)
-  litholattice::TimingHandshakeAuthority::Config hc;
+  litholattice::cTimingHandshakeAuthority::Config hc;
   hc.phasesPerCycle = 4;
   hc.workerThreads = 1;
   hc.phaseBudget = std::chrono::milliseconds(1);
   hc.watchdogCeiling = std::chrono::seconds(10);
   hc.offenderThreshold = 1;
-  litholattice::TimingHandshakeAuthority auth(hc);
+  litholattice::cTimingHandshakeAuthority auth(hc);
   uint32_t ssoId = UINT32_MAX;
   {
     std::string shortName = "test.sso";  // SSO: c_str() points inside this object
@@ -333,12 +333,12 @@ void testFreezeBare() {
   std::printf("== handshake FREEZE policy (hang component; watchdog names it)\n");
   auto runArm = [&](bool withHang, Latch* latch, uint64_t& hashOut, bool& frozeOut, litholattice::HsFreezeInfo& infoOut,
                     double& wallMsOut) {
-    litholattice::TimingHandshakeAuthority::Config hc;
+    litholattice::cTimingHandshakeAuthority::Config hc;
     hc.phasesPerCycle = 4;
     hc.workerThreads = 2;
     hc.phaseBudget = std::chrono::milliseconds(0);
     hc.watchdogCeiling = std::chrono::milliseconds(50);
-    litholattice::TimingHandshakeAuthority auth(hc);
+    litholattice::cTimingHandshakeAuthority auth(hc);
     std::vector<uint64_t> states(2, 0);
     using litholattice::CadenceClass;
     litholattice::HsComponentDesc d;
@@ -404,7 +404,7 @@ void testFreezeEndToEnd() {
   cfg.handshakeWatchdogMs = 50;
   auto sim = std::make_unique<litholattice::SimThread>(w, blockRegistry(), std::move(sc.ws), std::move(cfg),
                                                        [](std::shared_ptr<litholattice::MeshInput>) {});
-  litholattice::TimingHandshakeAuthority* auth = sim->handshakeAuthority();
+  litholattice::cTimingHandshakeAuthority* auth = sim->handshakeAuthority();
   check(auth != nullptr, "FREEZE e2e: authority constructed in handshake mode");
   if (auth) {
     litholattice::HsComponentDesc hd;
@@ -475,11 +475,11 @@ void testFreezeEndToEnd() {
 // ---- P0a soak: repeated stop()/start() + save-pattern + C1 regression ----
 void testStopStartSoak() {
   std::printf("== handshake stop/start soak (200 cycles, C1 regression + save pattern)\n");
-  litholattice::TimingHandshakeAuthority::Config hc;
+  litholattice::cTimingHandshakeAuthority::Config hc;
   hc.phasesPerCycle = 4;
   hc.workerThreads = 2;
   hc.watchdogCeiling = std::chrono::seconds(5);
-  litholattice::TimingHandshakeAuthority auth(hc);
+  litholattice::cTimingHandshakeAuthority auth(hc);
   std::atomic<uint64_t> fires{0};
   litholattice::HsComponentDesc d;
   d.name = "test.counter";
@@ -512,11 +512,11 @@ void testStopStartSoak() {
 void testStuckWorkerStop() {
   std::printf("== handshake stuck-worker stop (C2: fail loudly, poison, retry joins)\n");
   Latch latch;
-  litholattice::TimingHandshakeAuthority::Config hc;
+  litholattice::cTimingHandshakeAuthority::Config hc;
   hc.phasesPerCycle = 4;
   hc.workerThreads = 1;
   hc.watchdogCeiling = std::chrono::milliseconds(50);
-  litholattice::TimingHandshakeAuthority auth(hc);
+  litholattice::cTimingHandshakeAuthority auth(hc);
   std::atomic<uint64_t> fires{0};
   litholattice::HsComponentDesc d;
   d.name = "test.stuck";
@@ -543,11 +543,11 @@ void testRateDivideScheduling() {
   std::printf("== handshake rate divide scheduling (cycle-aligned gating, multiply 1)\n");
   {  // Invalid rate refused pre-start, in a separate tiny authority so the
      // component ids in the main arm below stay clean.
-    litholattice::TimingHandshakeAuthority::Config hc;
+    litholattice::cTimingHandshakeAuthority::Config hc;
     hc.phasesPerCycle = 4;
     hc.workerThreads = 1;
     hc.watchdogCeiling = std::chrono::seconds(10);
-    litholattice::TimingHandshakeAuthority auth(hc);
+    litholattice::cTimingHandshakeAuthority auth(hc);
     litholattice::HsComponentDesc bad;
     bad.name = "rate.invalid";
     bad.rate = litholattice::TickRate{3, 1, 0};  // multiply 3 is not a power of two
@@ -555,11 +555,11 @@ void testRateDivideScheduling() {
     check(badId == UINT32_MAX, "RATE: invalid rate {3,1,0} (non-pow2) refused at registration");
     check(auth.componentCount() == 0, "RATE: refused registration adds no component");
   }
-  litholattice::TimingHandshakeAuthority::Config hc;
+  litholattice::cTimingHandshakeAuthority::Config hc;
   hc.phasesPerCycle = 4;
   hc.workerThreads = 2;
   hc.watchdogCeiling = std::chrono::seconds(10);
-  litholattice::TimingHandshakeAuthority auth(hc);
+  litholattice::cTimingHandshakeAuthority auth(hc);
   std::set<uint64_t> cycDiv0, cycDiv2, cycNeutral;
   uint64_t pullsDiv0 = 0, pullsDiv2 = 0, pullsNeutral = 0;
   auto recorder = [](std::set<uint64_t>& cycles, uint64_t& pulls) {
@@ -598,11 +598,11 @@ void testRateDivideScheduling() {
 // ---- rate scaling: multiply sub-pulls are internal to the phase slot ----
 void testRateMultiplyOrdering() {
   std::printf("== handshake rate multiply ordering (sub-pulls inside the slot, final state past the barrier)\n");
-  litholattice::TimingHandshakeAuthority::Config hc;
+  litholattice::cTimingHandshakeAuthority::Config hc;
   hc.phasesPerCycle = 4;
   hc.workerThreads = 2;
   hc.watchdogCeiling = std::chrono::seconds(10);
-  litholattice::TimingHandshakeAuthority auth(hc);
+  litholattice::cTimingHandshakeAuthority auth(hc);
   uint64_t pulls = 0, internal = 0, published = 0;
   std::vector<uint64_t> subLog, readLog;
   litholattice::HsComponentDesc wd;
@@ -646,12 +646,12 @@ void testRateCrossing() {
   {  // Arm A (fast -> slow): the writer stages 4 per cycle; the /2 reader
      // samples the buffer committed at the previous cycle's barrier.
     Cell cell;
-    litholattice::TimingHandshakeAuthority::Config hc;
+    litholattice::cTimingHandshakeAuthority::Config hc;
     hc.phasesPerCycle = 1;  // each runPhase is one cycle
     hc.workerThreads = 2;
     hc.watchdogCeiling = std::chrono::seconds(10);
     hc.commitFn = [&cell](uint64_t, uint64_t, uint32_t) { cell.readBuf = cell.writeBuf; };
-    litholattice::TimingHandshakeAuthority auth(hc);
+    litholattice::cTimingHandshakeAuthority auth(hc);
     litholattice::HsComponentDesc wd;
     wd.name = "rate.cross.writer"; wd.threadAffine = true; wd.rate = litholattice::TickRate{4, 1, 0};
     auth.registerComponent(wd, [&cell](uint64_t, uint64_t) { cell.writeBuf += 1; });  // 4 sub-pulls per cycle
@@ -670,12 +670,12 @@ void testRateCrossing() {
   {  // Arm B (slow -> fast): the /2 writer stages a value; the neutral reader
      // sees it only from the NEXT cycle's commit boundary.
     Cell cell;
-    litholattice::TimingHandshakeAuthority::Config hc;
+    litholattice::cTimingHandshakeAuthority::Config hc;
     hc.phasesPerCycle = 1;
     hc.workerThreads = 2;
     hc.watchdogCeiling = std::chrono::seconds(10);
     hc.commitFn = [&cell](uint64_t, uint64_t, uint32_t) { cell.readBuf = cell.writeBuf; };
-    litholattice::TimingHandshakeAuthority auth(hc);
+    litholattice::cTimingHandshakeAuthority auth(hc);
     const uint64_t stages[4] = {100, 200, 300, 400};
     uint64_t stageIdx = 0;
     litholattice::HsComponentDesc wd;
@@ -715,11 +715,11 @@ void testRateCrossing() {
 // sub-pull context is the exact ascending (index, count, isFinal) run.
 void testRateSamePhaseCrossing() {
   std::printf("== handshake rate A-H1 (same-phase cross-shard crossing; publish-on-final via the sub-pull query)\n");
-  litholattice::TimingHandshakeAuthority::Config hc;
+  litholattice::cTimingHandshakeAuthority::Config hc;
   hc.phasesPerCycle = 1;  // each runPhase is one phase and one cycle
   hc.workerThreads = 2;
   hc.watchdogCeiling = std::chrono::seconds(10);
-  litholattice::TimingHandshakeAuthority auth(hc);
+  litholattice::cTimingHandshakeAuthority auth(hc);
   check(auth.currentSubPullIndex() == 0 && auth.currentSubPullCount() == 1 && auth.isFinalSubPull(),
         "RATE/A-H1: outside any item the sub-pull query reports the single-pull defaults (0 of 1, final)");
   std::atomic<uint64_t> published{0};
@@ -783,12 +783,12 @@ void testRateShuffleInvariance() {
   };
   auto runArm = [&cases](bool reverse) {
     ShuffleOut out;
-    litholattice::TimingHandshakeAuthority::Config hc;
+    litholattice::cTimingHandshakeAuthority::Config hc;
     hc.phasesPerCycle = 4;
     hc.workerThreads = 2;
     hc.watchdogCeiling = std::chrono::seconds(10);
     std::mutex mapM;  // pull workers share the bookkeeping maps; each name's stream is its own component's
-    litholattice::TimingHandshakeAuthority auth(hc);
+    litholattice::cTimingHandshakeAuthority auth(hc);
     for (int i = 0; i < 6; ++i) {
       const int idx = reverse ? 5 - i : i;
       litholattice::HsComponentDesc d;
@@ -1104,7 +1104,7 @@ void testRatePerfSnapshot() {
                                                        [](std::shared_ptr<litholattice::MeshInput>) {});
   std::atomic<uint64_t> counterDiv{0}, counterMul{0};
   uint32_t idDiv = UINT32_MAX, idMul = UINT32_MAX;
-  litholattice::TimingHandshakeAuthority* auth = sim->handshakeAuthority();
+  litholattice::cTimingHandshakeAuthority* auth = sim->handshakeAuthority();
   check(auth != nullptr, "RATE: perf: authority constructed in handshake mode");
   if (auth) {  // pre-start only: register the rate-scaled components on the production authority
     litholattice::HsComponentDesc dd;

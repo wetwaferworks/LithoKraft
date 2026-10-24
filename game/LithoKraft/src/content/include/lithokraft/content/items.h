@@ -137,7 +137,7 @@ const ItemDef& startingItemDef();
 
 /// The block a held stack places when used, or kAir when it places nothing
 /// (P2b-1 bridge between ItemStacks and block placement). Resolution:
-/// a registered item defers to its unified ContentRegistry entry's
+/// a registered item defers to its unified cContentReg entry's
 /// placesBlock (the Chipor item -> the Chipor block); an unregistered id
 /// that is a live BlockId IS its own item form and places itself; tools,
 /// weapons and the Fragment place nothing.
@@ -150,7 +150,7 @@ std::string itemDisplayName(uint32_t itemId);
 /// "" for an empty stack.
 std::string itemIconRef(uint32_t itemId);
 
-/// Registers every item above into the engine's unified ContentRegistry (the
+/// Registers every item above into the engine's unified cContentReg (the
 /// Infinite Registry's item kind: litholattice::ItemDef with name / maxStack
 /// / id / behavior, plus placesBlock for the block-backed Chipor), so the
 /// canonical catalog, stable ids and content CRCs cover items as well as
@@ -158,6 +158,6 @@ std::string itemIconRef(uint32_t itemId);
 /// single-threaded, before the boot seal. The engine ItemId space is dense
 /// and separate; ItemStack ids keep the game's convention above until the
 /// planned StableId inventory migration (a builder follow-up).
-void registerGameItems(ContentRegistry& content);
+void registerGameItems(cContentReg& content);
 
 }  // namespace lithokraft

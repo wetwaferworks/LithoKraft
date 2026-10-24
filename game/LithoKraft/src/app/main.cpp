@@ -401,7 +401,7 @@ struct Display {
   /// Software backend only: blits the CPU framebuffer into the window's back
   /// buffer before swap(); `software` is the same object as `renderer` then.
   std::unique_ptr<ISoftwarePresenter> presenter;
-  SoftwareRenderer* software = nullptr;
+  cSoftwareRenderer* software = nullptr;
 };
 
 // Window + renderer for `backend` ("software", "gl33" or "vulkan"). Vulkan falls back to
@@ -415,7 +415,7 @@ Display createDisplay(const std::string& backend, bool vsync, bool validation, c
   if (backend == "software") {
     d.window = Window::create({1280, 720, "LithoKraft", vsync, GraphicsApi::OpenGL33, disp});
     if (d.window) {
-      auto sw = std::make_unique<SoftwareRenderer>();
+      auto sw = std::make_unique<cSoftwareRenderer>();
       // The textured, diffuse-lit path (biome_capture does the same on its
       // instance); without it the renderer stays in the flat faceColor mode
       // the MCP vision path deliberately uses. Per-instance state: the MCP
@@ -603,7 +603,7 @@ struct SwFrameSlot {
       enum State : uint8_t { Free, Ready, Presenting, Shown } state = Free;
     };
 struct SwRenderWorker {
-      SoftwareRenderer* r = nullptr;
+      cSoftwareRenderer* r = nullptr;
       std::function<void()> post;     // B61-1 mirror: capture of a finished frame (game state lives on main)
       std::function<bool()> pending;  // B61-1 mirror: a capture is armed (game.screenshotPending())
       bool shotArmed = false;         // B61-1: a capture was armed for the job submitted last
@@ -1067,7 +1067,7 @@ int main(int argc, char** argv) {
   // Cortana 2026-10-15 1156: software raster threads: CLI wins over the
   // settings key; 0 = engine default (4). Engine rounds to a power of two
   // and clamps to hardware threads.
-  SoftwareRenderer::setRenderThreads(unsigned(renderThreadsArg > 0 ? renderThreadsArg : settings.renderThreads));
+  cSoftwareRenderer::setRenderThreads(unsigned(renderThreadsArg > 0 ? renderThreadsArg : settings.renderThreads));
   if (mute) settings.muted = true;
   cfg.vkFxOverride = vkFxArg;  // JD Vulkan push: CLI wins for this run only (0.0.1.51: no longer saved)
   cfg.version = LITHOKRAFT_VERSION;
@@ -1191,7 +1191,7 @@ int main(int argc, char** argv) {
   // (initMaterialRegistry). A missing file is graceful: log + the built-in default, the same
   // degrade-loudly convention as audio's "no output device; continuing muted". The registry
   // outlives the game (chunk saves resolve string IDs through it on the I/O thread).
-  litholattice::MaterialRegistry materials;
+  litholattice::cMaterialReg materials;
   {
     std::string matErr;
     const std::string matPath = assets.engine.empty()
@@ -1346,7 +1346,7 @@ int main(int argc, char** argv) {
     // deep-copied on version change, borrowed pointers repointed at the job's own copies (the
     // exact copy set RenderWorker::submit uses) — plus the mesh-store seal, the renderer's
     // store generation at submit time. Stage 1 executes the job OFF the main thread, on the
-    // band pool's detached executor worker (SoftwareRenderer::renderFrameDetached; JD ruling 2:
+    // band pool's detached executor worker (cSoftwareRenderer::renderFrameDetached; JD ruling 2:
     // the render side rides the pool threads, band count unchanged, no new always-on thread).
     // One job in flight, RenderWorker's own rule: submit() waits only while the previous job
     // is still rendering. The finished frame returns through two pixels-only handoff slots
@@ -1378,7 +1378,7 @@ int main(int argc, char** argv) {
       sw.r = display.software;
       sw.post = [&game] { game.capturePendingScreenshot(); };
       sw.pending = [&game] { return game.screenshotPending(); };
-      SoftwareRenderer::setDetachedPoolMode(true);  // Design B Stage 1: the pool spawns its executor worker (band count unchanged)
+      cSoftwareRenderer::setDetachedPoolMode(true);  // Design B Stage 1: the pool spawns its executor worker (band count unchanged)
       display.software->setUploadRingEnabled(true);  // Design B Stage 2: game uploads stage in the lock-free ring; the executor applies them at the frame seal
       logInfo("threeway: ON (LL_THREEWAY=1): software path, stage 2 async mailbox + upload ring: main = window/input/game + present (newest finished frame), frame job copied and rendered on the band-pool executor, pixels-only slots, uploads lock-free via the ring (no upload guard), sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
     } else if (litholattice::threeway::enabled()) {
@@ -1582,7 +1582,7 @@ static bool lkStepFrame(FrameCtx& F) {
           const bool full = !noOverlay && (kDebugBuild || benchSeconds > 0 || game.creativeMode()) &&
                             (benchSeconds > 0 || game.debugOverlayToggled());
           const bool mini = false;  // F56-4 (Cortana 2026-10-17): the HUD perf readout (every backend) replaces the software-only mini strip
-          const int W = int(fb.width), H = int(fb.height), rows = SoftwareRenderer::stripRows();
+          const int W = int(fb.width), H = int(fb.height), rows = cSoftwareRenderer::stripRows();
           if ((full || mini) && H > rows) {
             char txt[400];
             const auto ssOpt = game.simStats();
@@ -1598,13 +1598,13 @@ static bool lkStepFrame(FrameCtx& F) {
               if (benchSeconds > 0) std::snprintf(benchPart, sizeof benchPart, "  bench %s %.1fs", benchPath.c_str(), secondsBetween(tStart, tNow));
               std::snprintf(txt, sizeof txt, "DEBUG  FPS %.1f  frame %.1f ms (1%% low %.1f)  TPS %.0f/%d  dropped %llu  rthreads %u  meshes %zu  meshQ %zu%s",
                             ovFps, ovFrameMs, low1, tps, ttps, ssOpt ? (unsigned long long)ssOpt->get().droppedTicks : 0ull,
-                            SoftwareRenderer::renderThreads(), swThreewayOn ? sw.lastDrawn.load() : display.software->meshesDrawnLastFrame(), game.meshQueueDepth(), benchPart);
+                            cSoftwareRenderer::renderThreads(), swThreewayOn ? sw.lastDrawn.load() : display.software->meshesDrawnLastFrame(), game.meshQueueDepth(), benchPart);
             } else {
               std::snprintf(txt, sizeof txt, "FPS %.0f  TPS %.0f", ovFps, tps);
             }
             auto& px = const_cast<std::vector<uint32_t>&>(fb.pixels);
             ovSaved.assign(px.begin(), px.begin() + size_t(W) * size_t(rows));
-            SoftwareRenderer::drawStatusStrip(px.data(), W, H, txt);
+            cSoftwareRenderer::drawStatusStrip(px.data(), W, H, txt);
             display.presenter->present(fb.pixels.data(), W, H, w, h);
             std::copy(ovSaved.begin(), ovSaved.end(), px.begin());
           } else {
@@ -1710,7 +1710,7 @@ static void lkShutdownTail(FrameCtx& F) {
               (unsigned long long)game.ringSpillDroppedOnSwitch(), game.ringSpillDepth());
       display.software->setUploadRingEnabled(false);
     }
-    if (swThreewayOn) SoftwareRenderer::setDetachedPoolMode(false);  // pool returns to its pre-split worker shape before teardown
+    if (swThreewayOn) cSoftwareRenderer::setDetachedPoolMode(false);  // pool returns to its pre-split worker shape before teardown
     // MCP shutdown (P2c, F-M9): stop + join the stdio thread and drop the
     // server BEFORE the Game (and its adapters) is destroyed at scope
     // exit; restore the real stdout for the bench summary / exit path.
@@ -1752,7 +1752,7 @@ static void lkShutdownTail(FrameCtx& F) {
       logInfo("bench renderer=%s present=%s path=%s seconds=%.0f frames=%zu rthreads=%u avg=%.3fms p50=%.3fms p99=%.3fms max=%.3fms "
               "input=%.3f update=%.3f upload=%.3f render=%.3f present=%.3f ms upload=%.0f B/frame tick=%.3f/%.3fms gen=%.1f cols/s (%.2f/%.2fms) "
               "mesh=%.1f subs/s (%.3f/%.3fms) ram=%.1f->%.1f MB (peak %.1f)",
-              renderer->name(), present.c_str(), benchPath.c_str(), benchSeconds, benchMs.size(), SoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, mx, avgOf(br.input),
+              renderer->name(), present.c_str(), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, mx, avgOf(br.input),
               avgOf(br.update), avgOf(br.upload), avgOf(br.render), avgOf(br.present), avgOf(br.uploadBytes), avgOf(br.tick), percentile(br.tick, 0.99), genRate,
               genAvg, genP99, meshRate, meshAvg, meshP99, double(br.memStart) / 1048576.0, double(br.memEnd) / 1048576.0,
               double(br.memPeak) / 1048576.0);
@@ -1772,7 +1772,7 @@ static void lkShutdownTail(FrameCtx& F) {
                        "  \"stream\": {\"columns_per_s\": %.2f, \"gen_ms_avg\": %.4f, \"gen_ms_p99\": %.4f, \"subchunks_per_s\": %.2f, "
                        "\"mesh_ms_avg\": %.4f, \"mesh_ms_p99\": %.4f},\n"
                        "  \"ram_mb\": {\"start\": %.1f, \"end\": %.1f, \"peak\": %.1f},\n  \"soak_drift\": {\"frame_ms\": %.4f, \"ram_mb\": %.1f, \"minutes\": %zu}\n}\n",
-                       renderer->name(), present.c_str(), displayModeName(window->display().mode), benchPath.c_str(), benchSeconds, benchMs.size(), SoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, mx, avgOf(br.input),
+                       renderer->name(), present.c_str(), displayModeName(window->display().mode), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, mx, avgOf(br.input),
                        avgOf(br.update), avgOf(br.upload), avgOf(br.render), avgOf(br.present), avgOf(br.uploadBytes), avgOf(br.tick), percentile(br.tick, 0.99),
                        genRate, genAvg, genP99, meshRate, meshAvg, meshP99, double(br.memStart) / 1048576.0, double(br.memEnd) / 1048576.0,
                        double(br.memPeak) / 1048576.0,
