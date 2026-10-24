@@ -17,6 +17,8 @@ class cLithoKraftAppearance final : public IBlockAppearance {
   std::optional<FaceLook> faceLookCell(const CustomBlock& cell, FaceSlot slot, bool active) const override;  // Cortana 2026-10-15 1755
   void meshExtra(const CustomBlock& cell, MeshWriter& out) const override;
   const BoxModel* boxModel(const BlockDef& def) const override;
+  const BoxModel* boxModel(const BlockDef& def, CellState st) const override;  // 2026-10-24: lever on / off
+  int boxModelTurns(const BlockDef& def, CellState st) const override;
   void bindMaterials(const BlockDef& def, const BlockModel& model, MaterialBindings& bindings) const override;
 };
 

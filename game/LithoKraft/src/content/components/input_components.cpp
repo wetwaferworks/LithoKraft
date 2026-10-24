@@ -12,12 +12,12 @@ class cSwitch final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory&) const override {
     const int out = stOn(st) ? kMaxSignal : 0;
-    return {out, 0, withAttach(makeState(out, 0, 0, stOn(st)), stAttach(st))};
+    return {out, 0, withAttach(makeState(out, stFacing(st), 0, stOn(st)), stAttach(st))};  // facing kept (2026-10-24)
   }
   // Free-standing (legacy) switches emit on every side; attached ones power through their support.
   int emitToward(int, CellState st, const ComponentMemory& m) const override { return stAttach(st) ? 0 : m.out; }
   std::optional<CellState> use(CellState st, ComponentMemory&) const override {
-    return withAttach(makeState(stValue(st), 0, 0, !stOn(st)), stAttach(st));
+    return withAttach(makeState(stValue(st), stFacing(st), 0, !stOn(st)), stAttach(st));
   }
   std::string describe(const BlockDef& d, CellState s) const override {
     return std::format("{} | {} (right-click)", d.name, stOn(s) ? "ON" : "off");
@@ -30,13 +30,13 @@ class cInputButton final : public cCompBehavior {
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory& m) const override {
     const int out = m.timer > 0 ? kMaxSignal : 0;
     if (m.timer) --m.timer;
-    return {out, 0, withAttach(makeState(out, 0, 0, m.timer > 0), stAttach(st))};
+    return {out, 0, withAttach(makeState(out, stFacing(st), 0, m.timer > 0), stAttach(st))};
   }
   // Like the switch: free-standing buttons emit on every side, attached ones through their support.
   int emitToward(int, CellState st, const ComponentMemory& m) const override { return stAttach(st) ? 0 : m.out; }
   std::optional<CellState> use(CellState st, ComponentMemory& m) const override {
     m.timer = kButtonTicks;
-    return withAttach(makeState(stValue(st), 0, 0, true), stAttach(st));
+    return withAttach(makeState(stValue(st), stFacing(st), 0, true), stAttach(st));
   }
   std::string describe(const BlockDef& d, CellState s) const override {
     return std::format("{} | {} (right-click)", d.name, stOn(s) ? "pressed" : "up");

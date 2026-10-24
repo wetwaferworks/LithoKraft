@@ -299,6 +299,34 @@ int runSignalSelfTest() {
     check(stValue(w.getState(85, y, 60)) == 0 && stAttach(w.getState(85, y, 60)) == 6 && stAttach(w.getState(82, y + 3, 60)) == 1,
           "wall torch turns off when its support is powered; attach faces survive ticks and toggles");
   }
+  {  // 2026-10-24 lever: on each of the 6 faces (floor / ceiling in all 4 facings) the switch keeps
+     // its attach face and facing through ticks and toggles and powers its support (lamp beside it).
+    const int sup[3] = {4, y + 4, 48};
+    int ok = 0, total = 0;
+    for (int face = 1; face <= 6; ++face)
+      for (int f = 0; f < ((face <= 2) ? 4 : 1); ++f) {
+        const int bx = sup[0] + 4 * total, by = sup[1], bz = sup[2];
+        int dx, dy, dz;
+        attachOffset(face, dx, dy, dz);
+        put(bx, by, bz, kWaferSilicon);
+        const int sx = bx - dx, sy = by - dy, sz = bz - dz;  // the switch cell: support is at +offset
+        w.set(sx, sy, sz, kSwitch); w.setState(sx, sy, sz, withAttach(makeState(0, f), face)); sim.onBlockChanged(sx, sy, sz, kSwitch);
+        const int lx = bx + (dx == 0 ? 1 : 0), lz = bz + (dx == 0 ? 0 : 1);
+        put(lx, by, lz, kLamp);
+        run(2);
+        const bool off = w.getState(lx, by, lz) == 0;
+        sim.use(w, sx, sy, sz, none);
+        run(3);
+        const CellState s = w.getState(sx, sy, sz);
+        ++total;
+        if (off && w.getState(lx, by, lz) == 1 && stOn(s) && stAttach(s) == face && stFacing(s) == f) ++ok;
+      }
+    check(ok == total && total == 12, "lever: all 6 faces (floor + ceiling x 4 facings) power their support, keep attach face + facing");
+    const cLithoKraftAppearance look;
+    const BlockDef& sd = blockRegistry().def(kSwitch);
+    check(look.boxModel(sd, makeState(0, 0, 0, true)) != look.boxModel(sd, makeState(0)) && look.boxModelTurns(sd, makeState(0, 3)) == 3,
+          "lever: separate on / off box models; floor / ceiling turn follows the facing");
+  }
   {  // Attached button (on a wall): pulses its support for kButtonTicks; the lamp beside it follows.
     put(88, y + 2, 60, kWaferSilicon);
     w.set(87, y + 2, 60, kButton); w.setState(87, y + 2, 60, withAttach(0, 6)); sim.onBlockChanged(87, y + 2, 60, kButton);

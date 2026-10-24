@@ -480,10 +480,22 @@ const char* const kTorchModel = R"({"asset": {"version": "ll-box-1"},
   "materials": [{"name": "torch", "slot": "top"}],
   "meshes": [{"name": "stick", "boxes": [{"min": [7, 0, 7], "max": [9, 10, 9], "material": 0}]}],
   "nodes": [{"mesh": 0}]})";
+// 2026-10-24 (CloudAtlas lever, facing north): base [4,0,5]-[12,2,11]; 2x2 handle pivoting at
+// y=1 on the centre line, tilted 45 degrees, drawn as a 3-step staircase (box models have no
+// element rotation). Off leans back (+Z, toward the player who placed it), on leans forward (-Z).
 const char* const kSwitchModel = R"({"asset": {"version": "ll-box-1"},
   "materials": [{"name": "base", "slot": "bottom"}, {"name": "lever", "slot": "top"}],
-  "meshes": [{"name": "base", "boxes": [{"min": [5, 0, 4], "max": [11, 2, 12], "material": 0}]},
-             {"name": "lever", "boxes": [{"min": [7, 2, 7], "max": [9, 9, 9], "material": 1}]}],
+  "meshes": [{"name": "base", "boxes": [{"min": [4, 0, 5], "max": [12, 2, 11], "material": 0}]},
+             {"name": "lever", "boxes": [{"min": [7, 2, 8], "max": [9, 4, 10], "material": 1},
+                                         {"min": [7, 4, 10], "max": [9, 6, 12], "material": 1},
+                                         {"min": [7, 6, 12], "max": [9, 8, 14], "material": 1}]}],
+  "nodes": [{"mesh": 0}, {"mesh": 1}]})";
+const char* const kSwitchOnModel = R"({"asset": {"version": "ll-box-1"},
+  "materials": [{"name": "base", "slot": "bottom"}, {"name": "lever", "slot": "top"}],
+  "meshes": [{"name": "base", "boxes": [{"min": [4, 0, 5], "max": [12, 2, 11], "material": 0}]},
+             {"name": "lever", "boxes": [{"min": [7, 2, 6], "max": [9, 4, 8], "material": 1},
+                                         {"min": [7, 4, 4], "max": [9, 6, 6], "material": 1},
+                                         {"min": [7, 6, 2], "max": [9, 8, 4], "material": 1}]}],
   "nodes": [{"mesh": 0}, {"mesh": 1}]})";
 
 const char* const kButtonModel = R"({"asset": {"version": "ll-box-1"},
@@ -499,6 +511,19 @@ const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def) const {
   if (roleOf(def) == SimRole::Switch) return sw ? &*sw : nullptr;
   if (roleOf(def) == SimRole::cButton) return button ? &*button : nullptr;
   return nullptr;
+}
+
+const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def, CellState st) const {
+  if (roleOf(def) == SimRole::Switch && stOn(st)) {
+    static const std::optional<BoxModel> on = BoxModel::parse(kSwitchOnModel, nullptr);
+    return on ? &*on : nullptr;
+  }
+  return boxModel(def);
+}
+
+int cLithoKraftAppearance::boxModelTurns(const BlockDef& def, CellState st) const {
+  const SimRole r = roleOf(def);
+  return (r == SimRole::Switch || r == SimRole::cButton) ? stFacing(st) : 0;  // 2026-10-24: floor / ceiling facing
 }
 
 }  // namespace lithokraft
