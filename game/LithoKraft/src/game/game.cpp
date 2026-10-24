@@ -132,7 +132,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
   // Projectile seams (P2c, ENT-1): voxel queries ride the sim's
   // race-free getBlock (the same read the entity behaviors use) and the
   // block registry's solidity/density; chunk-ahead requests land on the
-  // active dimension's ChunkStreamer. Both lambdas resolve sim_ /
+  // active dimension's cChunkStreamer. Both lambdas resolve sim_ /
   // streamer_ at call time, so a dimension switch needs no rewiring.
   // NOTE on density: block defs carry per-material-class densities since
   // the A5 wiring pass (blocks.cpp's density table — JD-DECISION balance
@@ -562,7 +562,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
     deceitorDirector_.setHooks(std::move(h));
   }
   // cCamera command (view-only, not a cheat — same standing as `map`):
-  // `camera [first|third|follow|free]` drives the GameCameraController.
+  // `camera [first|third|follow|free]` drives the cGameCameraController.
   {
     CameraCommandBindings cb;
     cb.setModeByName = [this](std::string_view name) {
@@ -877,7 +877,7 @@ void Game::initScripts() {
   scripts_.bindFunction("string currentDimension()", LL_SCRIPT_FN_OBJLAST(scriptCurrentDimension), this);  // fix 3c: generic on web
   if (uiScripts_.registerApi()) ui_.root().setScriptHost(&uiScripts_);
   if (scripts_.loadDirectory(cfg_.scriptsDir)) scripts_.callHook("void onLoad()");
-  editor_ = std::make_unique<ScriptEditor>(ui_.root(), scripts_, cfg_.scriptsDir, [this] { scripts_.callHook("void onLoad()"); });
+  editor_ = std::make_unique<cScriptEditor>(ui_.root(), scripts_, cfg_.scriptsDir, [this] { scripts_.callHook("void onLoad()"); });
 }
 
 void Game::setBenchPath(const std::string& path) {
@@ -1161,7 +1161,7 @@ void Game::loadActive() {
     std::unordered_set<uint64_t> initial;
     initial.reserve(active_->chunks.columns().size());
     for (const auto& [k, col] : active_->chunks.columns()) initial.insert(k);
-    streamer_ = std::make_unique<ChunkStreamer>(pool_, active_->generator, save_.get(), active_->id,
+    streamer_ = std::make_unique<cChunkStreamer>(pool_, active_->generator, save_.get(), active_->id,
                                                 effectiveStreamRadius(cfg_) /* fix3: sim area always inside stream */, initial);
     streamer_->setDiamond(cfg_.diamondStreamArea);  // diamond stream footprint (JD 2026-10-23)
   }
@@ -1638,7 +1638,7 @@ void Game::setMcpServer(litholattice::mcp::McpServer* server) {
 }
 
 // Gameplay context only (contexts already hide these while typing or in the inventory).
-McpPlayerView::GameState Game::snapshotMcpPlayer() const {
+cMcpPlayerView::GameState Game::snapshotMcpPlayer() const {
   std::lock_guard<std::mutex> lk(mcpStateMutex_);
   return mcpPlayerState_;
 }
@@ -2280,7 +2280,7 @@ void Game::capturePendingScreenshot() {
   pendingShot_.reset();
   // Agent-vision fidelity for the lowres variant (mcp.vision_width/height
   // cvars, refreshed once per frame by update()).
-  const McpSensesAdapter::CvarState cs = mcpSenses_.cvars();
+  const cMcpSensesAdapter::CvarState cs = mcpSenses_.cvars();
   const int vw = std::clamp(cs.visionWidth, 16, 1024);
   const int vh = std::clamp(cs.visionHeight, 16, 1024);
   CapturedShot shot;
@@ -2513,7 +2513,7 @@ void Game::update(float dt, int width, int height) {
     }
   }
   // AiWorld (B6 production wiring): the ai.enabled cvar is the gate
-  // (default off = AiHost constructs nothing, zero effect). When on,
+  // (default off = cAiHost constructs nothing, zero effect). When on,
   // advance by the same elapsed sim world ticks as vitals/sprites —
   // AiWorld::advance(simTicks, worldTps), NEVER tick() per sim tick —
   // so AI thinks at its clamped 8..16 Hz and freezes with the sim

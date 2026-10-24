@@ -42,7 +42,7 @@
 // key can represent — before the Void is registered it must be given a
 // finite bound inside the range above, or a windowed/virtualised
 // coordinate scheme that never feeds unbounded coordinates to packPos.
-// Enforcement today: ChunkStreamer refuses out-of-range request centres
+// Enforcement today: cChunkStreamer refuses out-of-range request centres
 // loudly at setup/stream time (chunk_streamer.cpp, B-L2).
 #pragma once
 #include "lithokraft/game/engine.h"

@@ -6,7 +6,7 @@
 // walking away from spawn meant walking into void (ChunkMap::get on a missing
 // column is air, surfaceY is -1, set() fails).
 //
-// ChunkStreamer closes that hole by reusing the existing machinery, not a
+// cChunkStreamer closes that hole by reusing the existing machinery, not a
 // parallel system: the dimension's ColumnGenerator (same worldgen the pre-bake
 // uses), the game's JobPool, and cWorldSave (per-column disk loads through the
 // existing WorldStore / region format — the save format is unchanged). The Game
@@ -50,20 +50,20 @@ struct StreamedColumn {
   bool fromDisk = false;  ///< true = loaded from the save; false = freshly generated
 };
 
-class ChunkStreamer {
+class cChunkStreamer {
  public:
   /// `gen`: the active dimension's generator (shared with worldgen jobs).
   /// `save` / `dimensionId`: when save is non-null, a saved column on disk wins
   /// over fresh generation (player edits persist across sessions). Both must
   /// outlive the streamer. `initial`: keys of the columns the pre-bake already
   /// loaded, so they are never re-requested.
-  ChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, cWorldSave* save,
+  cChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, cWorldSave* save,
                 std::string dimensionId, int radiusChunks, const std::unordered_set<uint64_t>& initial);
   /// Bounded wait for in-flight jobs (SW-H3): at most kDrainTimeout, then a
   /// loud log and return — never an unbounded busy-wait. Jobs hold shared_ptr
   /// copies of the queues/counters and of the generator, so a job that
   /// outlives the streamer finishes into orphaned queues safely.
-  ~ChunkStreamer();
+  ~cChunkStreamer();
 
   /// Diamond (Manhattan) footprint for the wanted set + eviction (JD 2026-10-23).
   void setDiamond(bool d) { diamond_ = d; }

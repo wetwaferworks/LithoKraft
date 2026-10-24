@@ -1,4 +1,4 @@
-// GameCameraController implementation (see camera_controller.h for the
+// cGameCameraController implementation (see camera_controller.h for the
 // architecture, threading model, and mode semantics).
 #include "lithokraft/game/camera_controller.h"
 
@@ -33,7 +33,7 @@ constexpr float kRadToDeg = 180.f / kPi;
 constexpr float kGameFovRad = 1.2f;
 constexpr float kGameFovDeg = kGameFovRad * kRadToDeg;  // 68.7549...
 /// Pilot tracking eye height above the snapshot position — the exact value
-/// McpSensesAdapter's tracking path has always added (kEyeHeight there).
+/// cMcpSensesAdapter's tracking path has always added (kEyeHeight there).
 constexpr float kPilotEyeHeight = 1.62f;
 /// True-velocity clamp: sprint is 60 blocks/s; anything past 4x that in a
 /// single frame is a teleport/respawn snap, not locomotion, and would
@@ -119,10 +119,10 @@ class cPlayerCameraTarget final : public cam::ICameraTarget {
 /// same way as the player's.
 class cSnapshotCameraTarget final : public cam::ICameraTarget {
  public:
-  explicit cSnapshotCameraTarget(std::function<McpPlayerView::GameState()> snap)
+  explicit cSnapshotCameraTarget(std::function<cMcpPlayerView::GameState()> snap)
       : snap_(std::move(snap)) {}
   Vec3 anchorPosition() const override {
-    const McpPlayerView::GameState g = snap_();
+    const cMcpPlayerView::GameState g = snap_();
     return {float(g.x), float(g.y), float(g.z)};
   }
   Vec3 eyeOffset() const override { return {0.f, kPilotEyeHeight, 0.f}; }
@@ -132,7 +132,7 @@ class cSnapshotCameraTarget final : public cam::ICameraTarget {
   void sampleVelocity(float dt) { sampler_.sample(anchorPosition(), dt); }
 
  private:
-  std::function<McpPlayerView::GameState()> snap_;
+  std::function<cMcpPlayerView::GameState()> snap_;
   VelocitySampler sampler_;
 };
 
@@ -178,7 +178,7 @@ struct cPilotCameraRig::State {
 };
 
 cPilotCameraRig::cPilotCameraRig(GameCameraHooks /*hooks*/) : state_(std::make_shared<State>()) {
-  // v1 serves exactly the local player, like McpSensesAdapter::pilotIds().
+  // v1 serves exactly the local player, like cMcpSensesAdapter::pilotIds().
   state_->pilots.emplace("player", State::Pilot{});
 }
 
@@ -249,14 +249,14 @@ void cPilotCameraRig::publishResolved(std::string_view pilot, const CameraViewPo
 }
 
 // ---------------------------------------------------------------------------
-// GameCameraController
+// cGameCameraController
 
-struct GameCameraController::Impl {
+struct cGameCameraController::Impl {
   explicit Impl(GameCameraHooks hooks) : world(std::move(hooks)) {}
 
   cam::cCameraMgr manager;
   cGameCameraWorld world;
-  std::function<McpPlayerView::GameState()> pilotSnapshot;
+  std::function<cMcpPlayerView::GameState()> pilotSnapshot;
   std::shared_ptr<cPlayerCameraTarget> playerTarget;
   std::shared_ptr<cSnapshotCameraTarget> pilotTarget;
   std::shared_ptr<cam::ICamera> playerCam, orbitCam, followCam, freeCam;
@@ -267,7 +267,7 @@ struct GameCameraController::Impl {
   bool cvarsDirty = true;
 };
 
-GameCameraController::GameCameraController(Player& player, GameCameraHooks hooks)
+cGameCameraController::cGameCameraController(Player& player, GameCameraHooks hooks)
     : impl_(std::make_unique<Impl>(hooks)), player_(player) {
   impl_->pilotSnapshot = hooks.pilotSnapshot;
   impl_->playerTarget = std::make_shared<cPlayerCameraTarget>(player, hooks.playerEyeHeight);
@@ -300,9 +300,9 @@ GameCameraController::GameCameraController(Player& player, GameCameraHooks hooks
                  player.pitch, kGameFovRad};
 }
 
-GameCameraController::~GameCameraController() = default;
+cGameCameraController::~cGameCameraController() = default;
 
-void GameCameraController::setMode(GameCameraMode m) {
+void cGameCameraController::setMode(GameCameraMode m) {
   if (m == mode_) return;
   mode_ = m;
   const char* name = "player";
@@ -325,12 +325,12 @@ void GameCameraController::setMode(GameCameraMode m) {
   impl_->manager.setActive(name, kBlendSeconds, cam::CameraBlendEase::EaseInOut);
 }
 
-void GameCameraController::syncCvars(const cam::CameraCvarValues& v) {
+void cGameCameraController::syncCvars(const cam::CameraCvarValues& v) {
   impl_->cvars = v;
   impl_->cvarsDirty = true;
 }
 
-void GameCameraController::update(const litholattice::InputSystem& in, float dt, bool lookEnabled,
+void cGameCameraController::update(const litholattice::InputSystem& in, float dt, bool lookEnabled,
                                   bool playing, int frameWidth, int frameHeight) {
   Impl& im = *impl_;
 
@@ -432,7 +432,7 @@ void GameCameraController::update(const litholattice::InputSystem& in, float dt,
         // (snapshot anchor + eye height), so this pose's position is the
         // same eye, for consistency.
         if (im.pilotSnapshot) {
-          const McpPlayerView::GameState g = im.pilotSnapshot();
+          const cMcpPlayerView::GameState g = im.pilotSnapshot();
           const Vec3 eye{float(g.x), float(g.y) + kPilotEyeHeight, float(g.z)};
           slot->setPose({eye, dirFromYawPitch(g.yaw, g.pitch), {0.f, 1.f, 0.f},
                          slot->config().fovDeg});
@@ -474,7 +474,7 @@ void GameCameraController::update(const litholattice::InputSystem& in, float dt,
   }
 }
 
-std::vector<GameCameraController::ChunkLoadRequest> GameCameraController::chunkLoadRequests() const {
+std::vector<cGameCameraController::ChunkLoadRequest> cGameCameraController::chunkLoadRequests() const {
   std::vector<ChunkLoadRequest> out;
   const auto add = [&out](const cam::ICamera* c) {
     if (!c) return;
@@ -492,7 +492,7 @@ std::vector<GameCameraController::ChunkLoadRequest> GameCameraController::chunkL
   return out;
 }
 
-CameraViewPose GameCameraController::viewPose() const {
+CameraViewPose cGameCameraController::viewPose() const {
   if (mode_ == GameCameraMode::FirstPerson) {
     // Live through the player target: menu-dolly and bench writes to the
     // player pose land between update() and frameParams() and must be

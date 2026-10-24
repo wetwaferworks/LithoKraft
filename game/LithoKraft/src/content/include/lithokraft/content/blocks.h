@@ -137,7 +137,7 @@ extern const BlockId kAluminumRamp;          ///< Aluminum Ramp (slope, corner s
 /// Game flags (BlockDef::flags, above the engine's kFirstGameFlag).
 constexpr uint32_t kPowerable = uint32_t(kFirstGameFlag) << 0;  // can be powered by wire or a torch below (then turns torches on it off)
 constexpr uint32_t kCutsWire = uint32_t(kFirstGameFlag) << 1;   // breaks wire climbing/descending past it
-// Nav classification flags (P0, 2026-10-14): read by AiHost's NavRules
+// Nav classification flags (P0, 2026-10-14): read by cAiHost's NavRules
 // builder (gameNavRules) to feed the engine WalkCache. NO block row carries
 // either flag yet -- there is no ladder/vine or fluid content in the game --
 // so today they classify nothing; they exist so the first climbable/fluid

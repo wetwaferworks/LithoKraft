@@ -1,4 +1,4 @@
-// McpSensesAdapter: game-side adapters for the MCP pilot-senses seams
+// cMcpSensesAdapter: game-side adapters for the MCP pilot-senses seams
 // (litholattice::mcp::IVisionCapture / IAudioCapture).
 //
 // VISION: a standalone SoftwareRenderer (flat shading, the JD-locked
@@ -25,7 +25,7 @@
 // noteMesh() now stores the verts verbatim.
 //
 // CAMERAS (engine camera system, 2026-10-12): pilot cameras are engine
-// cameras now, owned by GameCameraController and shared through
+// cameras now, owned by cGameCameraController and shared through
 // cPilotCameraRig (lithokraft/game/camera_controller.h). This adapter no
 // longer keeps raw CameraPose structs: setCameraPose()/trackPlayer() write
 // rig requests, cameraPose() reads the rig's MCP-side mirror, and
@@ -55,9 +55,9 @@
 //
 // Chunk loading (JD-locked 2026-10-11): cameras CAN load chunks, but in a
 // LIMITED radius only — never the player's view/sim distances. Wired in
-// P2c (2026-10-13, CAM-2): GameCameraController::chunkLoadRequests()
+// P2c (2026-10-13, CAM-2): cGameCameraController::chunkLoadRequests()
 // exposes every non-player camera's centre + camera.chunk_radius budget
-// (default 4) and Game::pumpStreaming() feeds them to the ChunkStreamer
+// (default 4) and Game::pumpStreaming() feeds them to the cChunkStreamer
 // after the player's own requests, inside the same in-flight cap. This
 // adapter itself still only RENDERS loaded chunks (sky beyond them); it
 // issues no requests — the controller/streamer path does.
@@ -86,7 +86,7 @@
 
 namespace lithokraft {
 
-class McpSensesAdapter : public litholattice::mcp::IVisionCapture,
+class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
                          public litholattice::mcp::IAudioCapture {
  public:
   /// Live cvar values, refreshed by the game thread once per frame (the
@@ -95,7 +95,7 @@ class McpSensesAdapter : public litholattice::mcp::IVisionCapture,
     int visionWidth = 160;   ///< mcp.vision_width
     int visionHeight = 90;   ///< mcp.vision_height
     int audioTier = 0;       ///< mcp.audio_tier (the upgrade ramp 0..3)
-    int chunkRadius = 4;     ///< camera.chunk_radius (pilot cameras' streaming budget; consumed via GameCameraController::chunkLoadRequests)
+    int chunkRadius = 4;     ///< camera.chunk_radius (pilot cameras' streaming budget; consumed via cGameCameraController::chunkLoadRequests)
     float frustumMarginDeg = 5.f;  ///< render.frustum_margin_deg (FOV culling margin)
     // Culling-cache prototypes (JD 2026-10-11; all default OFF — see
     // render/cull_prototypes.h). Per-pilot state lives in protoStates_.
@@ -106,15 +106,15 @@ class McpSensesAdapter : public litholattice::mcp::IVisionCapture,
     float twoTierOuterDeg = 10.f;  ///< render.two_tier_outer_deg
   };
 
-  /// `snapshot` returns the piloted player's pose (McpPlayerView::GameState:
+  /// `snapshot` returns the piloted player's pose (cMcpPlayerView::GameState:
   /// x/y/z feet, yaw/pitch in RADIANS like Player::forward); `tick` returns
   /// the sim world tick for frame/chunk stamping (0 when the sim is down).
   /// `rig` carries the per-pilot engine cameras (owned by the game's
-  /// GameCameraController, which is constructed before this adapter).
-  McpSensesAdapter(litholattice::AudioEngine& audio,
-                   std::function<McpPlayerView::GameState()> snapshot,
+  /// cGameCameraController, which is constructed before this adapter).
+  cMcpSensesAdapter(litholattice::AudioEngine& audio,
+                   std::function<cMcpPlayerView::GameState()> snapshot,
                    std::function<uint64_t()> tick, std::shared_ptr<cPilotCameraRig> rig);
-  ~McpSensesAdapter();
+  ~cMcpSensesAdapter();
 
   // -- game thread ---------------------------------------------------------
   /// Feed one landed classic mesh into the vision cache (copies the verts).
@@ -162,7 +162,7 @@ class McpSensesAdapter : public litholattice::mcp::IVisionCapture,
   };
 
   litholattice::AudioEngine& audio_;
-  std::function<McpPlayerView::GameState()> snapshot_;
+  std::function<cMcpPlayerView::GameState()> snapshot_;
   std::function<uint64_t()> tick_;
   std::shared_ptr<cPilotCameraRig> rig_;  ///< per-pilot engine cameras (own mutex inside)
 

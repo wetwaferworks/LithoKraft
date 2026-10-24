@@ -66,7 +66,7 @@ class cNullRenderer final : public litholattice::IRenderer {
 /// AudioEngine (no output device; commands queue harmlessly), InputSystem (default action
 /// map, no backend). Members declare in construction order; destruction runs in reverse,
 /// so the Game dies before the things that must outlive it.
-class HeadlessGame {
+class cHeadlessGame {
  public:
   struct Config {
     int worldChunks = 4;    ///< small world: fast load, plenty for state-machine tests
@@ -76,11 +76,11 @@ class HeadlessGame {
     std::string saveDir;    ///< empty = no saving (default); set for persistence tests
   };
 
-  HeadlessGame();  // default Config{}
-  explicit HeadlessGame(const Config& cfg);
-  ~HeadlessGame();
-  HeadlessGame(const HeadlessGame&) = delete;
-  HeadlessGame& operator=(const HeadlessGame&) = delete;
+  cHeadlessGame();  // default Config{}
+  explicit cHeadlessGame(const Config& cfg);
+  ~cHeadlessGame();
+  cHeadlessGame(const cHeadlessGame&) = delete;
+  cHeadlessGame& operator=(const cHeadlessGame&) = delete;
 
   Game& game() { return *game_; }
   const Game& game() const { return *game_; }

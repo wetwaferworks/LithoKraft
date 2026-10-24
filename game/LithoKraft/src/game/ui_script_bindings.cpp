@@ -11,13 +11,13 @@
 namespace lithokraft {
 namespace {
 
-ui::Widget* find(UiScriptBindings* b, const std::string& id) {
+ui::Widget* find(cUiScriptBindings* b, const std::string& id) {
   ui::Widget* w = b->ui().root().find(id);
   if (!w) logError("[script] ui: no widget '%s'", id.c_str());
   return w;
 }
 
-std::string uiText(const std::string& id, UiScriptBindings* b) {
+std::string uiText(const std::string& id, cUiScriptBindings* b) {
   ui::Widget* w = find(b, id);
   if (auto* l = dynamic_cast<ui::cLabel*>(w)) return l->text();
   if (auto* t = dynamic_cast<ui::Button*>(w)) return t->text();
@@ -27,23 +27,23 @@ std::string uiText(const std::string& id, UiScriptBindings* b) {
   return {};
 }
 
-void uiSetText(const std::string& id, const std::string& text, UiScriptBindings* b) {
+void uiSetText(const std::string& id, const std::string& text, cUiScriptBindings* b) {
   ui::Widget* w = find(b, id);
   if (auto* l = dynamic_cast<ui::cLabel*>(w)) l->setText(text);
   else if (auto* t = dynamic_cast<ui::Button*>(w)) t->setText(text);
   else if (auto* e = dynamic_cast<ui::cTextEditBase*>(w)) e->setText(text);
 }
 
-bool uiChecked(const std::string& id, UiScriptBindings* b) {
+bool uiChecked(const std::string& id, cUiScriptBindings* b) {
   auto* c = dynamic_cast<ui::cCheckbox*>(find(b, id));
   return c && c->checked();
 }
 
-void uiSetChecked(const std::string& id, bool on, UiScriptBindings* b) {
+void uiSetChecked(const std::string& id, bool on, cUiScriptBindings* b) {
   if (auto* c = dynamic_cast<ui::cCheckbox*>(find(b, id))) c->setChecked(on);
 }
 
-float uiValue(const std::string& id, UiScriptBindings* b) {
+float uiValue(const std::string& id, cUiScriptBindings* b) {
   ui::Widget* w = find(b, id);
   if (auto* s = dynamic_cast<ui::cSlider*>(w)) return s->value();
   if (auto* n = dynamic_cast<ui::cNumberField*>(w)) return float(n->value());
@@ -53,7 +53,7 @@ float uiValue(const std::string& id, UiScriptBindings* b) {
   return 0.f;
 }
 
-void uiSetValue(const std::string& id, float v, UiScriptBindings* b) {
+void uiSetValue(const std::string& id, float v, cUiScriptBindings* b) {
   ui::Widget* w = find(b, id);
   if (auto* s = dynamic_cast<ui::cSlider*>(w)) s->setValue(v);
   else if (auto* n = dynamic_cast<ui::cNumberField*>(w)) n->setValue(int(v));
@@ -62,15 +62,15 @@ void uiSetValue(const std::string& id, float v, UiScriptBindings* b) {
   else if (auto* l = dynamic_cast<ui::cListView*>(w)) l->setSelected(int(v));
 }
 
-void uiSetVisible(const std::string& id, bool on, UiScriptBindings* b) {
+void uiSetVisible(const std::string& id, bool on, cUiScriptBindings* b) {
   if (ui::Widget* w = find(b, id)) w->setVisible(on);
 }
 
-void uiSetEnabled(const std::string& id, bool on, UiScriptBindings* b) {
+void uiSetEnabled(const std::string& id, bool on, cUiScriptBindings* b) {
   if (ui::Widget* w = find(b, id)) w->setEnabled(on);
 }
 
-bool uiShow(const std::string& json, UiScriptBindings* b) {
+bool uiShow(const std::string& json, cUiScriptBindings* b) {
   // Hardened path: ModUiFactory::createPanel pre-scans the JSON (depth/node
   // DoS guard), builds via the closed type table, rejects reserved style
   // classes, enforces the widget budget, and wraps everything in a badged
@@ -92,14 +92,14 @@ bool uiShow(const std::string& json, UiScriptBindings* b) {
   return true;
 }
 
-void uiClose(const std::string& id, UiScriptBindings* b) {
+void uiClose(const std::string& id, cUiScriptBindings* b) {
   ui::Widget* w = find(b, id);
   if (w && w->parent()) b->ui().destroyLater(w->parent()->removeChild(*w));  // may be closing itself
 }
 
 }  // namespace
 
-bool UiScriptBindings::registerApi() {
+bool cUiScriptBindings::registerApi() {
   // Every binding goes through the script binding allowlist: the engine
   // refuses anything not allowlisted, or not covered by the mod's permissions
   // (the game sets those on the ScriptEngine before calling registerApi()).
@@ -127,7 +127,7 @@ bool UiScriptBindings::registerApi() {
   return true;
 }
 
-bool UiScriptBindings::callHandler(std::string_view functionDecl, std::string_view widgetId) {
+bool cUiScriptBindings::callHandler(std::string_view functionDecl, std::string_view widgetId) {
   return scripts_.callWithString(std::string(functionDecl), std::string(widgetId));
 }
 

@@ -23,9 +23,9 @@ size_t cNullRenderer::bytes() const {
   return b;
 }
 
-HeadlessGame::HeadlessGame() : HeadlessGame(Config{}) {}
+cHeadlessGame::cHeadlessGame() : cHeadlessGame(Config{}) {}
 
-HeadlessGame::HeadlessGame(const Config& cfg)
+cHeadlessGame::cHeadlessGame(const Config& cfg)
     : pool_(cfg.threads > 0 ? cfg.threads : 1),
       resources_({}),  // no packs: built-in worldgen fallbacks, like the demo
       input_(defaultActionMap(), inputContexts()) {
@@ -39,8 +39,8 @@ HeadlessGame::HeadlessGame(const Config& cfg)
   game_ = std::make_unique<Game>(gc, renderer_, pool_, resources_, audio_, input_);
 }
 
-HeadlessGame::~HeadlessGame() = default;
+cHeadlessGame::~cHeadlessGame() = default;
 
-void HeadlessGame::frame(float dt, int w, int h) { game_->update(dt, w, h); }
+void cHeadlessGame::frame(float dt, int w, int h) { game_->update(dt, w, h); }
 
 }  // namespace lithokraft

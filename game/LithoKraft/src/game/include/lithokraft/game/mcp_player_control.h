@@ -1,4 +1,4 @@
-// McpPlayerController / McpPlayerView: game-side adapters for the MCP
+// cMcpPlayerController / cMcpPlayerView: game-side adapters for the MCP
 // player-control seam (litholattice::mcp::IPlayerController / IPlayerView).
 //
 // The controller translates a game-agnostic ControlFrame into synthetic
@@ -33,12 +33,12 @@
 
 namespace lithokraft {
 
-class McpPlayerController : public litholattice::mcp::IPlayerController {
+class cMcpPlayerController : public litholattice::mcp::IPlayerController {
  public:
   /// `pilotIds`: ids to wire (v1: {"player"}). `controllable`: true when the
   /// local player exists to drive (Playing state, not paused, no inventory
   /// open). Called on the MCP thread.
-  McpPlayerController(litholattice::InputSystem& input,
+  cMcpPlayerController(litholattice::InputSystem& input,
                       std::vector<std::string> pilotIds,
                       std::function<bool()> controllable);
   std::vector<std::string> pilotIds() const override;
@@ -70,7 +70,7 @@ class McpPlayerController : public litholattice::mcp::IPlayerController {
 
 /// Game-side IPlayerView adapter: fills the snapshot from the live game.
 /// Constructed with accessors so the game owns the data.
-class McpPlayerView : public litholattice::mcp::IPlayerView {
+class cMcpPlayerView : public litholattice::mcp::IPlayerView {
  public:
   struct GameState {
     double x = 0, y = 0, z = 0;
@@ -84,7 +84,7 @@ class McpPlayerView : public litholattice::mcp::IPlayerView {
     std::vector<uint16_t> hotbar;
     int selectedSlot = 0;
   };
-  explicit McpPlayerView(std::function<GameState()> snapshot);
+  explicit cMcpPlayerView(std::function<GameState()> snapshot);
   Snapshot localPlayer() override;
 
  private:

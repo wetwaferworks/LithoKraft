@@ -194,39 +194,39 @@ ai::BtStatus cDeceitorBrain::tick(ai::AiContext& ctx) {
 // costs), per JD's 2026-10-14 direction that mobs be "a little bit more
 // tricky to deal with" than Minecraft's. The member keeps its name: it is
 // still "the walking mode" slot, now with the fuller vocabulary.
-DeceitorDirector::DeceitorDirector() : walk_(ai::makeLeap()) {}
-DeceitorDirector::~DeceitorDirector() = default;
+cDeceitorDirector::cDeceitorDirector() : walk_(ai::makeLeap()) {}
+cDeceitorDirector::~cDeceitorDirector() = default;
 
-std::optional<uint32_t> DeceitorDirector::spawn(ai::AiWorld& world, ai::Cell at) {
+std::optional<uint32_t> cDeceitorDirector::spawn(ai::AiWorld& world, ai::Cell at) {
   return world.spawn(at, walk_.get(), std::make_unique<cDeceitorBrain>(*this));
 }
 
-void DeceitorDirector::attach(uint32_t mobId, cDeceitorBrain* brain) { brains_[mobId] = brain; }
-void DeceitorDirector::detach(uint32_t mobId, cDeceitorBrain* brain) {
+void cDeceitorDirector::attach(uint32_t mobId, cDeceitorBrain* brain) { brains_[mobId] = brain; }
+void cDeceitorDirector::detach(uint32_t mobId, cDeceitorBrain* brain) {
   const auto it = brains_.find(mobId);
   if (it != brains_.end() && it->second == brain) brains_.erase(it);
 }
-cDeceitorBrain* DeceitorDirector::brain(uint32_t mobId) {
+cDeceitorBrain* cDeceitorDirector::brain(uint32_t mobId) {
   const auto it = brains_.find(mobId);
   return it == brains_.end() ? nullptr : it->second;
 }
-const cDeceitorBrain* DeceitorDirector::brain(uint32_t mobId) const {
+const cDeceitorBrain* cDeceitorDirector::brain(uint32_t mobId) const {
   const auto it = brains_.find(mobId);
   return it == brains_.end() ? nullptr : it->second;
 }
-std::vector<uint32_t> DeceitorDirector::mobIds() const {
+std::vector<uint32_t> cDeceitorDirector::mobIds() const {
   std::vector<uint32_t> ids;
   ids.reserve(brains_.size());
   for (const auto& [id, b] : brains_) ids.push_back(id);
   return ids;
 }
 
-bool DeceitorDirector::playerInteract(uint32_t mobId, uint64_t aiTick) {
+bool cDeceitorDirector::playerInteract(uint32_t mobId, uint64_t aiTick) {
   if (cDeceitorBrain* b = brain(mobId)) b->provoke(aiTick);
   return false;  // a Deceitor has NO trading interface — that is the tell
 }
 
-void DeceitorDirector::playerAttacked(ai::AiWorld& world, uint32_t mobId) {
+void cDeceitorDirector::playerAttacked(ai::AiWorld& world, uint32_t mobId) {
   const ai::Mob* victim = world.mob(mobId);
   if (!victim) return;
   const ai::Cell v = victim->pos;
@@ -239,7 +239,7 @@ void DeceitorDirector::playerAttacked(ai::AiWorld& world, uint32_t mobId) {
   }
 }
 
-DeceitorFace DeceitorDirector::faceOf(uint32_t mobId) const {
+DeceitorFace cDeceitorDirector::faceOf(uint32_t mobId) const {
   const cDeceitorBrain* b = brain(mobId);
   return b ? b->face() : DeceitorFace::Neutral;
 }

@@ -1,4 +1,4 @@
-// AiHost implementation. See ai_host.h for the wiring contract.
+// cAiHost implementation. See ai_host.h for the wiring contract.
 #include "lithokraft/game/ai_host.h"
 
 #include <algorithm>
@@ -24,7 +24,7 @@ ai::NavRules gameNavRules(const BlockRegistry& blocks) {
   return rules;
 }
 
-void AiHost::bindWorld(ChunkMap& chunks, const BlockRegistry& blocks, JobPool* pool,
+void cAiHost::bindWorld(ChunkMap& chunks, const BlockRegistry& blocks, JobPool* pool,
                        ai::Cell centre) {
   unbindWorld();
   chunks_ = &chunks;
@@ -42,7 +42,7 @@ void AiHost::bindWorld(ChunkMap& chunks, const BlockRegistry& blocks, JobPool* p
   if (enabled_) construct();
 }
 
-void AiHost::unbindWorld() {
+void cAiHost::unbindWorld() {
   if (chunks_) chunks_->setEditListener(nullptr);  // stop the feed before anything dies
   world_.reset();
   nav_.reset();
@@ -54,7 +54,7 @@ void AiHost::unbindWorld() {
   pendingCols_.clear();
 }
 
-void AiHost::setEnabled(bool on) {
+void cAiHost::setEnabled(bool on) {
   if (on == enabled_.load()) return;
   enabled_.store(on);
   if (on) {
@@ -70,7 +70,7 @@ void AiHost::setEnabled(bool on) {
   }
 }
 
-void AiHost::postEditedColumn(int cx, int cz) {
+void cAiHost::postEditedColumn(int cx, int cz) {
   // B-H1 primary fix: while the gate is off there is no WalkCache and
   // never will be one that could consume this post (construct() builds
   // fresh from the live map and discards the queue), so drop it here --
@@ -81,7 +81,7 @@ void AiHost::postEditedColumn(int cx, int cz) {
   pendingCols_.push_back(key);
 }
 
-void AiHost::drainInvalidations() {
+void cAiHost::drainInvalidations() {
   // B-H1 belt-and-braces: with no cache there is nothing to invalidate,
   // but the queue must still be EMPTIED, never left to accumulate behind
   // the early return (the pre-fix bug: this return skipped the clear).
@@ -104,7 +104,7 @@ void AiHost::drainInvalidations() {
   }
 }
 
-void AiHost::construct() {
+void cAiHost::construct() {
   if (world_ || !chunks_ || !blocks_) return;
   // Live-world feed: the WalkCache reads the ACTIVE dimension's actual
   // ChunkMap, classified by the game's real NavRules (gameNavRules: wire
@@ -130,7 +130,7 @@ void AiHost::construct() {
           world_->config().hz, world_->config().mobCap);
 }
 
-void AiHost::advance(int simTicks, int worldTps) {
+void cAiHost::advance(int simTicks, int worldTps) {
   if (!world_ || simTicks <= 0 || worldTps <= 0) return;
   drainInvalidations();  // AI-tick boundary: nav reflects every edit so far
   if (observerSet_) world_->setObservers({observer_});

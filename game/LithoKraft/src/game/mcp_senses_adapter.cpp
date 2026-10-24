@@ -1,4 +1,4 @@
-// McpSensesAdapter: game-side MCP pilot-senses adapters (see the header for
+// cMcpSensesAdapter: game-side MCP pilot-senses adapters (see the header for
 // the threading model, the downgrade ladder, and the chunk-loading note).
 #include "lithokraft/game/mcp_senses_adapter.h"
 
@@ -37,8 +37,8 @@ litholattice::Mat4 translation(float x, float y, float z) {
 
 }  // namespace
 
-McpSensesAdapter::McpSensesAdapter(litholattice::AudioEngine& audio,
-                                   std::function<McpPlayerView::GameState()> snapshot,
+cMcpSensesAdapter::cMcpSensesAdapter(litholattice::AudioEngine& audio,
+                                   std::function<cMcpPlayerView::GameState()> snapshot,
                                    std::function<uint64_t()> tick,
                                    std::shared_ptr<cPilotCameraRig> rig)
     : audio_(audio), snapshot_(std::move(snapshot)), tick_(std::move(tick)), rig_(std::move(rig)) {
@@ -46,9 +46,9 @@ McpSensesAdapter::McpSensesAdapter(litholattice::AudioEngine& audio,
   audio_.setTapEnabled(true);  // arm the mixed-output tap once; the tap hears the pilot's ears
 }
 
-McpSensesAdapter::~McpSensesAdapter() { audio_.setTapEnabled(false); }
+cMcpSensesAdapter::~cMcpSensesAdapter() { audio_.setTapEnabled(false); }
 
-void McpSensesAdapter::noteMesh(const litholattice::ChunkMesh& m) {
+void cMcpSensesAdapter::noteMesh(const litholattice::ChunkMesh& m) {
   const int64_t k = litholattice::packPos(m.cx, m.sy, m.cz);
   std::lock_guard<std::mutex> lk(mutex_);
   if (m.verts.empty()) {
@@ -68,32 +68,32 @@ void McpSensesAdapter::noteMesh(const litholattice::ChunkMesh& m) {
   meshes_[k] = std::move(cm);
 }
 
-void McpSensesAdapter::clearMeshes() {
+void cMcpSensesAdapter::clearMeshes() {
   std::lock_guard<std::mutex> lk(mutex_);
   meshes_.clear();
   spriteVerts_.clear();
 }
 
-void McpSensesAdapter::setSpriteVerts(std::vector<litholattice::PackedVertex> verts,
+void cMcpSensesAdapter::setSpriteVerts(std::vector<litholattice::PackedVertex> verts,
                                        litholattice::Vec3 origin) {
   std::lock_guard<std::mutex> lk(mutex_);
   spriteVerts_ = std::move(verts);
   spriteOrigin_ = origin;
 }
 
-void McpSensesAdapter::syncCvars(const CvarState& s) {
+void cMcpSensesAdapter::syncCvars(const CvarState& s) {
   std::lock_guard<std::mutex> lk(mutex_);
   cvars_ = s;
 }
 
-McpSensesAdapter::CvarState McpSensesAdapter::cvars() const {
+cMcpSensesAdapter::CvarState cMcpSensesAdapter::cvars() const {
   std::lock_guard<std::mutex> lk(mutex_);
   return cvars_;
 }
 
-std::vector<std::string> McpSensesAdapter::pilotIds() const { return {"player"}; }
+std::vector<std::string> cMcpSensesAdapter::pilotIds() const { return {"player"}; }
 
-bool McpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, int height,
+bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, int height,
                                           VisionFrame& out) {
   // The pilot's engine camera (cPilotCameraRig) resolves the capture pose on
   // the game thread; an unknown pilot — or one whose camera has not
@@ -202,7 +202,7 @@ bool McpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, int
   return true;
 }
 
-bool McpSensesAdapter::setCameraPose(std::string_view pilot, const CameraPose& pose) {
+bool cMcpSensesAdapter::setCameraPose(std::string_view pilot, const CameraPose& pose) {
   if (pose.pitch < -90.0f || pose.pitch > 90.0f) return false;
   if (pose.fov < 10.0f || pose.fov > 120.0f) return false;
   // Fix 2026-10-11 (regression): unbounded coords reach the software rasterizer
@@ -217,15 +217,15 @@ bool McpSensesAdapter::setCameraPose(std::string_view pilot, const CameraPose& p
   return rig_ && rig_->setFreePose(pilot, pose);  // false for an unknown pilot
 }
 
-bool McpSensesAdapter::trackPlayer(std::string_view pilot) {
+bool cMcpSensesAdapter::trackPlayer(std::string_view pilot) {
   return rig_ && rig_->trackPlayer(pilot);
 }
 
-bool McpSensesAdapter::cameraPose(std::string_view pilot, CameraPose& out) const {
+bool cMcpSensesAdapter::cameraPose(std::string_view pilot, CameraPose& out) const {
   return rig_ && rig_->mirrorPose(pilot, out);
 }
 
-bool McpSensesAdapter::captureAudioChunk(std::string_view pilot, int tier, AudioChunk& out) {
+bool cMcpSensesAdapter::captureAudioChunk(std::string_view pilot, int tier, AudioChunk& out) {
   if (!rig_ || !rig_->hasPilot(pilot)) return false;  // unknown pilot
   const int t = std::clamp(tier, 0, litholattice::mcp::kAudioTierCount - 1);
   const int rate = litholattice::mcp::kAudioTierRates[t];

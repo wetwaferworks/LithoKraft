@@ -21,10 +21,10 @@ class cTextEditor;
 
 namespace lithokraft {
 
-class ScriptEditor {
+class cScriptEditor {
  public:
   /// `afterReload` runs after a successful hot reload (e.g. re-run the onLoad hook).
-  ScriptEditor(ui::UiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload = {});
+  cScriptEditor(ui::UiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload = {});
   void toggle();
   void open();
   /// Closes (asks first when there are unsaved changes, unless `force`).

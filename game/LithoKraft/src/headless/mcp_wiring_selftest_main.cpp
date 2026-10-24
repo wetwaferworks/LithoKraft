@@ -65,7 +65,7 @@ int main() {
   using namespace lithokraft;
   namespace mcp = litholattice::mcp;
 
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& game = hg.game();
   check(game.ok(), "headless game constructs");
 

@@ -34,7 +34,7 @@ struct JobGuard {
 };
 }  // namespace
 
-ChunkStreamer::ChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, cWorldSave* save,
+cChunkStreamer::cChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, cWorldSave* save,
                              std::string dimensionId, int radiusChunks, const std::unordered_set<uint64_t>& initial)
     : pool_(pool),
       gen_(std::move(gen)),
@@ -57,13 +57,13 @@ ChunkStreamer::ChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const 
   }
 }
 
-bool ChunkStreamer::centreInRange(int cx, int cz) {
+bool cChunkStreamer::centreInRange(int cx, int cz) {
   const int64_t x0 = int64_t(cx) * 16, z0 = int64_t(cz) * 16;
   return x0 >= litholattice::kPackPosCoordMin && x0 + 15 <= litholattice::kPackPosCoordMax &&
          z0 >= litholattice::kPackPosCoordMin && z0 + 15 <= litholattice::kPackPosCoordMax;
 }
 
-ChunkStreamer::~ChunkStreamer() {
+cChunkStreamer::~cChunkStreamer() {
   // Jobs hold shared_ptr copies of the queues/counters, so they can always
   // finish safely; wait them out so no job touches a dead streamer — but
   // BOUNDED (SW-H3): a stuck job must not hang exit / dimension switch.
@@ -85,13 +85,13 @@ ChunkStreamer::~ChunkStreamer() {
   }
 }
 
-bool ChunkStreamer::requestable(uint64_t key, std::chrono::steady_clock::time_point now) {
+bool cChunkStreamer::requestable(uint64_t key, std::chrono::steady_clock::time_point now) {
   if (requested_.count(key)) return false;
   if (const auto it = retries_.find(key); it != retries_.end() && now < it->second.nextTry) return false;
   return true;
 }
 
-void ChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
+void cChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
   // B-L7: collect job failures first — un-request those keys and arm their
   // retry backoff, so a transient fault heals on a later update instead of
   // leaving a permanent hole for the session.
@@ -165,7 +165,7 @@ int streamRequestPriority(int dx, int dz, bool diamond) {
   return diamond ? ((std::abs(dx) + std::abs(dz)) << 20) | e2 : e2;
 }
 
-void ChunkStreamer::update(int playerCx, int playerCz) {
+void cChunkStreamer::update(int playerCx, int playerCz) {
   if (!gen_) return;
   if (!centreInRange(playerCx, playerCz)) {  // B-L2: refuse out-of-packPos-range centres
     if (!boundWarned_) {
@@ -187,7 +187,7 @@ void ChunkStreamer::update(int playerCx, int playerCz) {
   pumpRequests(std::move(want));
 }
 
-void ChunkStreamer::updateAround(int cx, int cz, int radiusChunks) {
+void cChunkStreamer::updateAround(int cx, int cz, int radiusChunks) {
   if (!gen_) return;
   if (!centreInRange(cx, cz)) return;  // B-L2: same refusal as update() (logged there / at setup)
   const int r = std::clamp(radiusChunks, 0, radius_);
@@ -202,7 +202,7 @@ void ChunkStreamer::updateAround(int cx, int cz, int radiusChunks) {
   pumpRequests(std::move(want));
 }
 
-void ChunkStreamer::requestColumn(int cx, int cz) {
+void cChunkStreamer::requestColumn(int cx, int cz) {
   if (!gen_) return;
   if (!centreInRange(cx, cz)) return;  // B-L2: same refusal as update()
   const uint64_t key = litholattice::ChunkKey::make(cx, cz);
@@ -210,7 +210,7 @@ void ChunkStreamer::requestColumn(int cx, int cz) {
   pumpRequests({{0, key}});
 }
 
-void ChunkStreamer::forgetColumn(int cx, int cz) {
+void cChunkStreamer::forgetColumn(int cx, int cz) {
   const uint64_t key = litholattice::ChunkKey::make(cx, cz);
   requested_.erase(key);
   retries_.erase(key);
@@ -240,9 +240,9 @@ std::vector<uint64_t> selectEvictionCandidates(const std::vector<uint64_t>& resi
   return out;
 }
 
-std::vector<StreamedColumn> ChunkStreamer::takeReady() { return takeReadyUpTo(SIZE_MAX); }
+std::vector<StreamedColumn> cChunkStreamer::takeReady() { return takeReadyUpTo(SIZE_MAX); }
 
-std::vector<StreamedColumn> ChunkStreamer::takeReadyUpTo(size_t max) {
+std::vector<StreamedColumn> cChunkStreamer::takeReadyUpTo(size_t max) {
   // Move everything the jobs finished into the main-thread staging buffer
   // first (this is where retry backoff is cleared, exactly as the old
   // unbounded takeReady did), then hand out at most `max`. The remainder

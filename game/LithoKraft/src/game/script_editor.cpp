@@ -24,15 +24,15 @@ int firstErrorLine(const std::vector<std::string>& errors, const std::string& fi
 
 }  // namespace
 
-ScriptEditor::ScriptEditor(ui::UiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload)
+cScriptEditor::cScriptEditor(ui::UiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload)
     : ui_(ui), scripts_(scripts), dir_(std::move(dir)), afterReload_(std::move(afterReload)) {}
 
-void ScriptEditor::toggle() {
+void cScriptEditor::toggle() {
   if (isOpen()) close();
   else open();
 }
 
-void ScriptEditor::refreshFiles() {
+void cScriptEditor::refreshFiles() {
   namespace fs = std::filesystem;
   files_.clear();
   std::error_code ec;
@@ -46,7 +46,7 @@ void ScriptEditor::refreshFiles() {
   }
 }
 
-void ScriptEditor::open() {
+void cScriptEditor::open() {
   if (isOpen()) return;
   ui::Dialog& dlg = ui::Dialog::show(ui_, "Script editor (debug) - " + dir_.generic_string());
   dlg.setId("script-editor");
@@ -106,7 +106,7 @@ void ScriptEditor::open() {
   editor_->focus();
 }
 
-void ScriptEditor::close(bool force) {
+void cScriptEditor::close(bool force) {
   if (!dialog_) return;
   if (!force && modified()) {
     confirmDiscard([this] { close(true); });
@@ -115,9 +115,9 @@ void ScriptEditor::close(bool force) {
   dialog_->close();  // "close" handler clears the pointers
 }
 
-bool ScriptEditor::modified() const { return editor_ && editor_->buffer().revision() != savedRevision_; }
+bool cScriptEditor::modified() const { return editor_ && editor_->buffer().revision() != savedRevision_; }
 
-bool ScriptEditor::openFile(const std::string& name) {
+bool cScriptEditor::openFile(const std::string& name) {
   if (std::find(files_.begin(), files_.end(), name) == files_.end()) return false;  // listed files only
   std::ifstream in(dir_ / name, std::ios::binary);
   if (!in) {
@@ -136,7 +136,7 @@ bool ScriptEditor::openFile(const std::string& name) {
   return true;
 }
 
-bool ScriptEditor::save() {
+bool cScriptEditor::save() {
   if (!editor_ || file_.empty()) return false;
   {
     std::ofstream out(dir_ / file_, std::ios::binary | std::ios::trunc);
@@ -164,7 +164,7 @@ bool ScriptEditor::save() {
   return false;
 }
 
-void ScriptEditor::confirmDiscard(std::function<void()> action) {
+void cScriptEditor::confirmDiscard(std::function<void()> action) {
   if (!modified()) {
     action();
     return;
@@ -175,14 +175,14 @@ void ScriptEditor::confirmDiscard(std::function<void()> action) {
   ask.addButton("Cancel");
 }
 
-void ScriptEditor::updateStatus() {
+void cScriptEditor::updateStatus() {
   if (!editor_) return;
   const ui::TextPos c = editor_->buffer().caret();
   setStatus(file_ + (modified() ? " *" : "") + "  line " + std::to_string(c.line + 1) + ", col " + std::to_string(c.col + 1) +
             "  (Ctrl+S: save + hot reload, Esc: close)");
 }
 
-void ScriptEditor::setStatus(std::string s) {
+void cScriptEditor::setStatus(std::string s) {
   status_ = std::move(s);
   if (statusLabel_) statusLabel_->setText(status_);
 }

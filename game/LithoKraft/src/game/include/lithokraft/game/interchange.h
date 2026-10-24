@@ -39,8 +39,8 @@
 // few DCs, or DC-heavy with a few RCs, plus Netors tidying — JD's
 // both-ways mixture rule, 2026-10-14). The plan is re-derivable from
 // the seed at any time, so the manifest needs no save format: placed
-// blocks persist like any other block, and the population layer (AiHost
-// world + DeceitorDirector::spawn for DC slots, a future Receiptor
+// blocks persist like any other block, and the population layer (cAiHost
+// world + cDeceitorDirector::spawn for DC slots, a future Receiptor
 // director for RC/Netor slots) consumes planInterchange() when it
 // lands. interchangeManifestJson() is the written form of that data.
 #pragma once

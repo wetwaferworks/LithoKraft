@@ -1,7 +1,7 @@
-// AiHost: LithoKraft's production owner for the engine AiWorld
+// cAiHost: LithoKraft's production owner for the engine AiWorld
 // (litholattice::ai) — brief B6 wiring, 2026-10-13.
 //
-// WHAT: Game owns one AiHost. loadActive() binds it to the ACTIVE
+// WHAT: Game owns one cAiHost. loadActive() binds it to the ACTIVE
 //   dimension's live ChunkMap + the game block registry + the game JobPool
 //   (before the SimThread starts, while the game thread still owns the
 //   map). When the `ai.enabled` cvar is on, the host constructs a
@@ -74,11 +74,11 @@
 
 namespace lithokraft {
 
-class AiHost {
+class cAiHost {
  public:
-  AiHost() = default;
-  AiHost(const AiHost&) = delete;
-  AiHost& operator=(const AiHost&) = delete;
+  cAiHost() = default;
+  cAiHost(const cAiHost&) = delete;
+  cAiHost& operator=(const cAiHost&) = delete;
 
   /// Bind to a live dimension's world (game thread, before the sim
   /// starts). Rebinding destroys any previous AiWorld/WalkCache first.

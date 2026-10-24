@@ -91,7 +91,7 @@ void testHudRenderer(Checker& check) {
 void testScriptBindings(Checker& check) {
   ScriptEngine scripts;
   ui::UiRoot ui;
-  UiScriptBindings bindings(scripts, ui);
+  cUiScriptBindings bindings(scripts, ui);
   const bool ready = [&] {
     if (!scripts.init()) return false;
     scripts.setModPermissions(kPermUI);  // the ui_* bindings require the UI permission
@@ -144,7 +144,7 @@ void testScriptEditor(Checker& check) {
   ui::UiRoot ui;
   ui.layout({1280, 720});
   int reloads = 0;
-  ScriptEditor editor(ui, scripts, dir, [&] {
+  cScriptEditor editor(ui, scripts, dir, [&] {
     ++reloads;
     scripts.callHook("void onLoad()");
   });

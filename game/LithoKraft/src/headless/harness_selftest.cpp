@@ -39,7 +39,7 @@ void click(litholattice::ui::UiRoot& ui, litholattice::ui::Vec2 p) {
 
 /// Click a widget by id inside the game's UI (layout must have run: call hg.frame() first).
 /// Searches the root tree, then the top modal (pause / settings dialogs live there).
-bool clickId(HeadlessGame& hg, const char* id) {
+bool clickId(cHeadlessGame& hg, const char* id) {
   auto& ui = hg.game().gameUi().root();
   litholattice::ui::Widget* w = ui.root().find(id);
   if (!w && ui.topModal()) w = ui.topModal()->find(id);
@@ -49,7 +49,7 @@ bool clickId(HeadlessGame& hg, const char* id) {
 }
 
 void testBootToMenu(Checker& check) {
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   check(g.ok(), "boot: the game constructs headless (world loaded, no window/GPU)");
   g.enterMenu();  // main.cpp does this on boot (unless --bench)
@@ -63,7 +63,7 @@ void testBootToMenu(Checker& check) {
 }
 
 void testMenuToPlay(Checker& check) {
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   hg.frame();  // layout, so the buttons are hit-testable
@@ -74,7 +74,7 @@ void testMenuToPlay(Checker& check) {
 }
 
 void testSettingsApply(Checker& check) {
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   hg.frame();
@@ -97,7 +97,7 @@ void testSettingsApply(Checker& check) {
 }
 
 void testPauseFlow(Checker& check) {
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   hg.frame();
@@ -113,7 +113,7 @@ void testPauseFlow(Checker& check) {
 }
 
 void testExitToMenu(Checker& check) {
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   hg.frame();
@@ -126,7 +126,7 @@ void testExitToMenu(Checker& check) {
 }
 
 void testQuitFlow(Checker& check) {
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   hg.frame();
@@ -136,7 +136,7 @@ void testQuitFlow(Checker& check) {
 }
 
 void testFocusLoss(Checker& check) {
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   hg.frame();
@@ -157,7 +157,7 @@ void testFocusLoss(Checker& check) {
 }
 
 void testFramesRunHeadless(Checker& check) {
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   // Run real frames: sim ticks, mesh jobs upload through the null renderer, the UI updates.
@@ -174,7 +174,7 @@ void testFramesRunHeadless(Checker& check) {
 /// Drive frames until world column (x, z) has terrain (surfaceY >= 0) or the
 /// frame budget runs out; returns the surface height or -1. Probing goes
 /// through Game::surfaceYAt (between-ticks read), every few frames.
-int waitForSurface(HeadlessGame& hg, Game& g, int x, int z, int maxFrames = 6000) {
+int waitForSurface(cHeadlessGame& hg, Game& g, int x, int z, int maxFrames = 6000) {
   int y = -1;
   for (int f = 0; f < maxFrames && y < 0; ++f) {
     hg.frame();
@@ -190,7 +190,7 @@ void testChunkStreamingWalk(Checker& check) {
   // 32-block steps to x=392 — 328 blocks past the pre-bake edge — running real
   // frames so the game's chunk streamer must generate on demand, and assert
   // terrain underfoot at every sample.
-  HeadlessGame hg;  // default Config: worldChunks = 4, no save dir
+  cHeadlessGame hg;  // default Config: worldChunks = 4, no save dir
   Game& g = hg.game();
   check(g.loadedColumnCount() == 16, "streaming: boot loads exactly the 4x4 pre-bake (16 columns)");
   g.enterMenu();
@@ -226,11 +226,11 @@ void testInventoryBinding(Checker& check) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "lithokraft_inv_test_save";
   std::error_code ec;
   std::filesystem::remove_all(dir, ec);
-  HeadlessGame::Config cfg;
+  cHeadlessGame::Config cfg;
   cfg.worldChunks = 4;
   cfg.saveDir = dir.string();
   {
-    HeadlessGame hg(cfg);
+    cHeadlessGame hg(cfg);
     Game& g = hg.game();
     const Inventory& inv = g.playerInventory();
     check(inv.hotbar()[0].itemId == kItemFragment && inv.countOf(kItemFragment) == 1,
@@ -252,7 +252,7 @@ void testInventoryBinding(Checker& check) {
     check(g.saveWorld("inv-test", true), "inventory: saveWorld writes the player (v4 inventory block)");
   }
   {
-    HeadlessGame hg(cfg);  // relaunch on the same save dir
+    cHeadlessGame hg(cfg);  // relaunch on the same save dir
     Game& g = hg.game();
     check(g.playerInventory().countOf(kItemFragment) == 1 &&
               g.playerInventory().hotbar()[0].itemId == kItemFragment,
@@ -270,11 +270,11 @@ void testStreamingPersistence(Checker& check) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "lithokraft_stream_test_save";
   std::error_code ec;
   std::filesystem::remove_all(dir, ec);
-  HeadlessGame::Config cfg;
+  cHeadlessGame::Config cfg;
   cfg.worldChunks = 4;
   cfg.saveDir = dir.string();
   {
-    HeadlessGame hg(cfg);
+    cHeadlessGame hg(cfg);
     Game& g = hg.game();
     g.enterMenu();
     hg.frame();
@@ -288,7 +288,7 @@ void testStreamingPersistence(Checker& check) {
     check(g.saveWorld("stream-test", true), "persist: saveWorld writes the world (incl. streamed columns)");
   }  // game destroyed: exit save runs too
   {
-    HeadlessGame hg(cfg);  // same save dir: the player restores at x=200
+    cHeadlessGame hg(cfg);  // same save dir: the player restores at x=200
     Game& g = hg.game();
     g.enterMenu();  // snapshots the restored position; Play hands it back
     hg.frame();
@@ -305,7 +305,7 @@ void testFragmentOwnership(Checker& check) {
   // A3 (brief B1 no-decision subset, 2026-10-13): Game owns the production
   // FragmentState, and Game::renderFragmentText feeds the markdown flag
   // from that state — proven here against the REAL Game.
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   check(g.ok(), "fragment (A3): game constructs for the Fragment ownership test");
   check(!g.fragmentState().markdown_unlocked() && g.fragmentState().tier() == 0,
@@ -332,7 +332,7 @@ void testPickBlockInFlight(Checker& check) {
   // BUG-0002 (Discovered by J.D.): middle click (Pick Block) did nothing
   // while flying in creative. Drive the REAL Game: middle click on the
   // looked-at block walking, then again in Fly mode, and assert both pick.
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   hg.frame();
@@ -376,7 +376,7 @@ void testPickBlockInFlight(Checker& check) {
 void testRepeatorFacing(Checker& check) {
   // BUG-0007 (Discovered by J.D.): each placed Repeator must take its OWN facing from the
   // player's horizontal look (output away from the player), and keep its own delay bits.
-  HeadlessGame hg;
+  cHeadlessGame hg;
   Game& g = hg.game();
   g.enterMenu();
   hg.frame();

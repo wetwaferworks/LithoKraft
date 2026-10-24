@@ -195,21 +195,21 @@ class Game {
   GameUi& gameUi() { return ui_; }
   /// MCP player-control adapters (used by mcpBackends() below; also
   /// directly accessible for tests).
-  McpPlayerController& mcpPlayerController() { return mcpController_; }
-  McpPlayerView& mcpPlayerView() { return mcpView_; }
+  cMcpPlayerController& mcpPlayerController() { return mcpController_; }
+  cMcpPlayerView& mcpPlayerView() { return mcpView_; }
   /// MCP pilot-senses adapter (one object serves both the vision and
   /// audio seams).
-  McpSensesAdapter& mcpSenses() { return mcpSenses_; }
+  cMcpSensesAdapter& mcpSenses() { return mcpSenses_; }
   /// The production AiWorld host (B6): bound to the active dimension in
   /// loadActive(), gated by the ai.enabled cvar (default off — nothing
   /// is constructed), advanced from elapsed sim world ticks in update().
-  AiHost& aiHost() { return aiHost_; }
+  cAiHost& aiHost() { return aiHost_; }
   /// The Deceitor director: owns the mob brains' game-side registry +
   /// hooks (filled in the ctor); mobs themselves live in aiHost_'s
   /// AiWorld. Spawn/interact/attack are today's explicit test paths
   /// (the `deceitor` console command, cheat) for the future
   /// click-picking / mob-combat hooks.
-  DeceitorDirector& deceitorDirector() { return deceitorDirector_; }
+  cDeceitorDirector& deceitorDirector() { return deceitorDirector_; }
   std::string spawnDeceitorCmd();
   std::string deceitorInteractCmd();
   std::string deceitorAttackCmd();
@@ -230,7 +230,7 @@ class Game {
   void setMcpServer(litholattice::mcp::McpServer* server);
   /// The engine projectile manager (P2c 2026-10-13, ENT-1): ticked once
   /// per world tick from updateEntities(), with its voxel seam over the
-  /// sim's block reads and its chunk seam over the ChunkStreamer. No
+  /// sim's block reads and its chunk seam over the cChunkStreamer. No
   /// production code spawns projectiles yet (Ping's item-path projectiles
   /// are explicitly out of scope); spawners use this accessor.
   litholattice::ProjectileManager& projectiles() { return projectiles_; }
@@ -392,8 +392,8 @@ class Game {
   GameConfig cfg_;
   ScriptEngine scripts_;
   GameUi ui_;                          // before uiScripts_ / editor_, which reference it
-  UiScriptBindings uiScripts_;
-  std::unique_ptr<ScriptEditor> editor_;  // F10; only with a scripts folder
+  cUiScriptBindings uiScripts_;
+  std::unique_ptr<cScriptEditor> editor_;  // F10; only with a scripts folder
   litholattice::console::cConsoleReg consoleRegistry_;  // before debugConsole_
   uint64_t lastScriptTick_ = 0;  // sim world-tick counter for the lithoscript `wait` pump
   cFragmentGallery fragmentGallery_;  // the Fragment's screenshots (lore page 5)
@@ -440,7 +440,7 @@ class Game {
   std::string benchPath_ = "orbit";
   FramebufferLayout fb_;  // --bench-scene framebuffer placement (flyover path); size 0 = none
   std::unique_ptr<cBenchStreamer> stream_;
-  std::unique_ptr<ChunkStreamer> streamer_;  // player-centered streaming (real game path)
+  std::unique_ptr<cChunkStreamer> streamer_;  // player-centered streaming (real game path)
   double uploadMs_ = 0;
   size_t uploadBytes_ = 0;
   std::unique_ptr<cWorldSave> save_;
@@ -465,7 +465,7 @@ class Game {
   // --- Deceitor director: declared BEFORE aiHost_ so the AiWorld (and
   // the brains it owns) destructs first — brains unregister from the
   // director on destruction, so the director must still be alive then.
-  DeceitorDirector deceitorDirector_;
+  cDeceitorDirector deceitorDirector_;
   std::map<uint32_t, uint64_t> deceitorMirrors_;  ///< AiWorld mob id -> mirror entity id
   /// P2 mirror interpolation (presentation only -- the AiWorld cell stays
   /// authoritative; this state is never saved and never feeds the sim).
@@ -482,7 +482,7 @@ class Game {
   // --- AiWorld integration (ai_host.h): production owner, gated by the
   // ai.enabled cvar (default off). Bound per dimension in loadActive();
   // advanced by elapsed sim world ticks in update() (ENT-2 discipline).
-  AiHost aiHost_;
+  cAiHost aiHost_;
   uint64_t lastAiTick_ = 0;          ///< sim worldTick the AiWorld last advanced to
   Vec3 spawnPoint_{20.f, 92.f, 20.f};  ///< dimension spawn; `kill` respawns here
   litholattice::EntityManager entities_{[this](uint32_t type) {
@@ -547,16 +547,16 @@ class Game {
   // cCamera system: owns the engine cCameraMgr (player/orbit/follow/free
   // view cameras + MCP pilot cameras). Presentation only — declared before
   // the MCP members because mcpSenses_ borrows its cPilotCameraRig.
-  GameCameraController camera_;
+  cGameCameraController camera_;
   // MCP player control (model pilots the local player through the real input
   // path). Wired into the McpServer by Game::mcpBackends() under
   // main.cpp's --mcp-stdio flag (P2c, F-M9).
-  McpPlayerController mcpController_;
-  McpPlayerView mcpView_;
+  cMcpPlayerController mcpController_;
+  cMcpPlayerView mcpView_;
   // MCP pilot senses (agent vision + agent audio). Fed the mesh cache from
   // uploadMeshes() and cvar values from update(); wired the same way
   // (McpBackends{.vision, .audio}).
-  McpSensesAdapter mcpSenses_;
+  cMcpSensesAdapter mcpSenses_;
   // MCP server wiring (P2c, F-M9): non-owning; main.cpp owns the server
   // and its stdio thread and clears this (setMcpServer(nullptr)) before
   // destroying either. Only the `mcp` console commands read it, on the
@@ -573,8 +573,8 @@ class Game {
   std::atomic<bool> mcpControllable_{false};  ///< set per frame in update()
   std::atomic<uint64_t> mcpWorldTick_{0};  ///< Cortana 2026-10-15 1658: F-2 [GAME] sim tick copy for MCP threads, set per frame in update()
   mutable std::mutex mcpStateMutex_;
-  McpPlayerView::GameState mcpPlayerState_;  ///< refreshed per frame in update()
-  McpPlayerView::GameState snapshotMcpPlayer() const;
+  cMcpPlayerView::GameState mcpPlayerState_;  ///< refreshed per frame in update()
+  cMcpPlayerView::GameState snapshotMcpPlayer() const;
   MenuState menuState_ = MenuState::cMenu;
   GameSettings settings_;
   std::function<void(DisplayMode)> displayApplier_;

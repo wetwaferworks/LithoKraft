@@ -41,7 +41,7 @@ struct Fixture {
   // destructs FIRST, so its mob brains unregister from `dir` while the
   // director is still alive. (Game upholds the same order: the
   // director member precedes aiHost_.)
-  DeceitorDirector dir;
+  cDeceitorDirector dir;
   EntityManager entities{[](uint32_t) { return std::unique_ptr<IEntityBehavior>{}; }};
   std::unique_ptr<ai::WalkCache> nav;
   std::unique_ptr<ai::AiWorld> world;

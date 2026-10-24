@@ -1,4 +1,4 @@
-// McpPlayerController / McpPlayerView: game-side MCP player-control adapters.
+// cMcpPlayerController / cMcpPlayerView: game-side MCP player-control adapters.
 #include "lithokraft/game/mcp_player_control.h"
 
 #include <algorithm>
@@ -24,26 +24,26 @@ uint8_t dimensionNumber(const std::string& id) {
 
 }  // namespace
 
-McpPlayerController::McpPlayerController(litholattice::InputSystem& input,
+cMcpPlayerController::cMcpPlayerController(litholattice::InputSystem& input,
                                          std::vector<std::string> pilotIds,
                                          std::function<bool()> controllable)
     : input_(input), pilotIds_(std::move(pilotIds)), controllable_(std::move(controllable)) {
   for (const auto& id : pilotIds_) pilots_.emplace(id, PilotState{});
 }
 
-std::vector<std::string> McpPlayerController::pilotIds() const {
+std::vector<std::string> cMcpPlayerController::pilotIds() const {
   std::lock_guard<std::mutex> lk(mutex_);
   return pilotIds_;
 }
 
-Key McpPlayerController::keyFor(Action a) const {
+Key cMcpPlayerController::keyFor(Action a) const {
   for (const Binding& b : input_.map().bindings(a)) {
     if (b.source == Binding::Source::Key) return Key(b.code);
   }
   return Key::Count;
 }
 
-void McpPlayerController::setHeld(Action a, bool held, bool& shadow,
+void cMcpPlayerController::setHeld(Action a, bool held, bool& shadow,
                                   std::vector<InputEvent>& out) {
   if (held == shadow) return;
   const Key k = keyFor(a);
@@ -57,7 +57,7 @@ void McpPlayerController::setHeld(Action a, bool held, bool& shadow,
   shadow = held;
 }
 
-void McpPlayerController::pressOnce(Action a, std::vector<InputEvent>& out) {
+void cMcpPlayerController::pressOnce(Action a, std::vector<InputEvent>& out) {
   const Key k = keyFor(a);
   if (k == Key::Count) {
     ++droppedUnbound_;
@@ -69,7 +69,7 @@ void McpPlayerController::pressOnce(Action a, std::vector<InputEvent>& out) {
   out.push_back(InputEvent::key(InputEvent::Type::KeyUp, k, 0.0));
 }
 
-bool McpPlayerController::submitFrame(std::string_view pilot, const ControlFrame& f) {
+bool cMcpPlayerController::submitFrame(std::string_view pilot, const ControlFrame& f) {
   if (controllable_ && !controllable_()) return false;
   std::vector<InputEvent> ev;
   ev.reserve(16);
@@ -101,7 +101,7 @@ bool McpPlayerController::submitFrame(std::string_view pilot, const ControlFrame
   return true;
 }
 
-void McpPlayerController::releaseAll(std::string_view pilot) {
+void cMcpPlayerController::releaseAll(std::string_view pilot) {
   std::vector<InputEvent> ev;
   {
     std::lock_guard<std::mutex> lk(mutex_);
@@ -119,15 +119,15 @@ void McpPlayerController::releaseAll(std::string_view pilot) {
   if (!ev.empty()) input_.stageSyntheticEvents(std::move(ev));
 }
 
-uint64_t McpPlayerController::droppedUnbound() const {
+uint64_t cMcpPlayerController::droppedUnbound() const {
   std::lock_guard<std::mutex> lk(mutex_);
   return droppedUnbound_;
 }
 
-McpPlayerView::McpPlayerView(std::function<GameState()> snapshot)
+cMcpPlayerView::cMcpPlayerView(std::function<GameState()> snapshot)
     : snapshot_(std::move(snapshot)) {}
 
-McpPlayerView::Snapshot McpPlayerView::localPlayer() {
+cMcpPlayerView::Snapshot cMcpPlayerView::localPlayer() {
   GameState g = snapshot_();
   Snapshot s;
   s.x = g.x; s.y = g.y; s.z = g.z;

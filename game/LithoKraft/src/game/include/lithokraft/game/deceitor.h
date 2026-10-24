@@ -22,11 +22,11 @@
 //     within the pack radius hostile, together ("gang style").
 //
 // ARCHITECTURE: the mob lives in the engine AiWorld (cell position,
-// pathing, deterministic per-mob AiRng) exactly like the B6 AiHost
+// pathing, deterministic per-mob AiRng) exactly like the B6 cAiHost
 // wiring intended — content-free engine, game-owned behaviour. The
 // brain is an ai::IBtNode; everything game-side it needs (player pose,
 // ground item entities, player damage) arrives through
-// DeceitorDirector::Hooks, which Game fills from its EntityManager /
+// cDeceitorDirector::Hooks, which Game fills from its EntityManager /
 // player / adapter. The director also owns the registry the renderer
 // reads (expression per mob) and the mirror-entity sync Game runs.
 //
@@ -47,7 +47,7 @@
 // mixture in either proportion is representable; the ratio itself is
 // data for JD's interchange placement, not code.
 //
-// GATE: Deceitors exist only when spawned — via AiHost's AiWorld when
+// GATE: Deceitors exist only when spawned — via cAiHost's AiWorld when
 // `ai.enabled` is on (console command `deceitor spawn`, cheat), or by
 // tests. Nothing spawns them in the default game, so the default
 // scenario/determinism surface is untouched. Natural spawning at
@@ -154,7 +154,7 @@ struct DeceitorHooks {
 enum class DeceitorMood : uint8_t { Neutral, Provoked, Hostile };
 enum class DeceitorFace : uint8_t { Neutral, Smile, Scowl };
 
-class DeceitorDirector;
+class cDeceitorDirector;
 
 /// Behaviour-tree brain for one Deceitor (one instance per mob; the
 /// AiWorld owns it). Registers itself with the director on first tick
@@ -162,7 +162,7 @@ class DeceitorDirector;
 /// exactly the live population.
 class cDeceitorBrain final : public litholattice::ai::IBtNode {
  public:
-  explicit cDeceitorBrain(DeceitorDirector& dir) : dir_(dir) {}
+  explicit cDeceitorBrain(cDeceitorDirector& dir) : dir_(dir) {}
   ~cDeceitorBrain() override;
   cDeceitorBrain(const cDeceitorBrain&) = delete;
   cDeceitorBrain& operator=(const cDeceitorBrain&) = delete;
@@ -188,7 +188,7 @@ class cDeceitorBrain final : public litholattice::ai::IBtNode {
   void onBarter(litholattice::ai::AiContext& ctx, uint32_t offeredItem);
   bool unfed(uint64_t tick) const;
 
-  DeceitorDirector& dir_;
+  cDeceitorDirector& dir_;
   uint32_t mobId_ = 0;
   bool registered_ = false;
   DeceitorMood mood_ = DeceitorMood::Neutral;
@@ -210,12 +210,12 @@ class cDeceitorBrain final : public litholattice::ai::IBtNode {
 /// entry points (failed click / player attack) that the future
 /// click-picking and mob-combat paths will call — today the `deceitor`
 /// console command (cheat) and the selftest drive them.
-class DeceitorDirector {
+class cDeceitorDirector {
  public:
-  DeceitorDirector();
-  ~DeceitorDirector();
-  DeceitorDirector(const DeceitorDirector&) = delete;
-  DeceitorDirector& operator=(const DeceitorDirector&) = delete;
+  cDeceitorDirector();
+  ~cDeceitorDirector();
+  cDeceitorDirector(const cDeceitorDirector&) = delete;
+  cDeceitorDirector& operator=(const cDeceitorDirector&) = delete;
 
   void setHooks(DeceitorHooks hooks) { hooks_ = std::move(hooks); }
   const DeceitorHooks& hooks() const { return hooks_; }

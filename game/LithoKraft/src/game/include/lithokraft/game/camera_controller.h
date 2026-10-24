@@ -1,4 +1,4 @@
-// GameCameraController: LithoKraft's integration of the engine camera system
+// cGameCameraController: LithoKraft's integration of the engine camera system
 // (litholattice::camera). Owns the game's cCameraMgr and its cameras:
 //
 //   - the player camera, attached to the local player through a
@@ -23,7 +23,7 @@
 //   - a free camera for spectate/debug (Free mode): Look turns it, the
 //     movement actions fly it; the player is untouched while it is active.
 //   - pilot cameras for MCP agent vision: one engine camera per pilot in
-//     the cPilotCameraRig, created lazily, shared with McpSensesAdapter.
+//     the cPilotCameraRig, created lazily, shared with cMcpSensesAdapter.
 //
 // Presentation only: nothing here feeds the sim thread, and camera state is
 // never an input to deterministic simulation.
@@ -101,8 +101,8 @@ std::optional<GameCameraMode> parseGameCameraMode(std::string_view name);
 struct GameCameraHooks {
   /// MCP pilot snapshot (the piloted player's pose; yaw/pitch radians).
   /// The pilot target adds the standard eye height on top of it, exactly
-  /// like McpSensesAdapter's tracking path always has.
-  std::function<McpPlayerView::GameState()> pilotSnapshot;
+  /// like cMcpSensesAdapter's tracking path always has.
+  std::function<cMcpPlayerView::GameState()> pilotSnapshot;
   /// Race-free raycast against the active world (Game implements it with
   /// SimThread::runBetweenTicks + litholattice::raycast). Returns true and
   /// sets `hitDist` (a conservative distance from `origin` that is safe to
@@ -120,7 +120,7 @@ struct GameCameraHooks {
 };
 
 /// Per-pilot engine cameras for MCP agent vision. Owned by the
-/// GameCameraController; McpSensesAdapter holds a shared_ptr and talks to
+/// cGameCameraController; cMcpSensesAdapter holds a shared_ptr and talks to
 /// pilots through this rig instead of keeping raw CameraPose structs.
 ///
 /// Semantics mirror the adapter's old per-pilot CameraPose map exactly:
@@ -134,7 +134,7 @@ class cPilotCameraRig {
   ~cPilotCameraRig();
 
   /// Pilots the rig serves. v1 registers exactly "player" (the local
-  /// player), matching McpSensesAdapter::pilotIds().
+  /// player), matching cMcpSensesAdapter::pilotIds().
   bool hasPilot(std::string_view pilot) const;
   /// MCP thread: hold a free pose (already validated by the caller; stored
   /// verbatim for cameraPose()). False for an unknown pilot.
@@ -148,7 +148,7 @@ class cPilotCameraRig {
   /// unknown or never resolved.
   bool resolvedPose(std::string_view pilot, CameraViewPose& out) const;
 
-  // -- game thread (GameCameraController mediates; not for the adapter) ----
+  // -- game thread (cGameCameraController mediates; not for the adapter) ----
   /// A pilot's pending state, applied to its engine camera by the
   /// controller: tracking the player, or holding `freePose` (degrees, the
   /// MCP-side mirror, converted by the controller).
@@ -168,10 +168,10 @@ class cPilotCameraRig {
 /// The game's camera-system front end. Game owns one, constructs it with
 /// the local player + hooks, calls update() once per frame after
 /// Player::update, and renders from viewPose().
-class GameCameraController {
+class cGameCameraController {
  public:
-  GameCameraController(Player& player, GameCameraHooks hooks);
-  ~GameCameraController();
+  cGameCameraController(Player& player, GameCameraHooks hooks);
+  ~cGameCameraController();
 
   void setMode(GameCameraMode m);
   GameCameraMode mode() const { return mode_; }
@@ -186,7 +186,7 @@ class GameCameraController {
 
   /// Cvar-driven camera config (camera.*), refreshed by Game once per
   /// frame from the console registry (main-thread-only) — the same
-  /// pattern McpSensesAdapter uses. Applied to camera configs on the
+  /// pattern cMcpSensesAdapter uses. Applied to camera configs on the
   /// next update().
   void syncCvars(const litholattice::camera::CameraCvarValues& v);
 
@@ -218,7 +218,7 @@ class GameCameraController {
   /// free (its centre is wherever it is looking from, which can be far
   /// from the player), plus every MCP pilot camera. The player camera is
   /// deliberately absent — Game's player-centred streaming already covers
-  /// it. Game feeds these to the ChunkStreamer AFTER the player's own
+  /// it. Game feeds these to the cChunkStreamer AFTER the player's own
   /// update, so they spend only leftover in-flight capacity. Radii are
   /// the cameras' configured chunk budgets (camera.chunk_radius, default
   /// 4): there is NO hardware scaling of the radius (the earlier claim

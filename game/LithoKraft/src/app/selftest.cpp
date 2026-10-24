@@ -721,7 +721,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
        // in a column OUTSIDE the initial load square, saved, and reloaded
        // through the streaming seam — cWorldSave::loadColumn + SignalSim::
        // scanColumn/importState, the exact calls Game::pumpStreaming makes on
-       // insertion, plus a ChunkStreamer pass through the real job pool —
+       // insertion, plus a cChunkStreamer pass through the real job pool —
        // must come back alive with its component memory intact. (The full
        // Game-level loop is NOT driven here: no Game/SimThread is constructed
        // in this test, so mesh submission and the stop/start seam itself are
@@ -792,18 +792,18 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         const auto bad2 = corruptSave.loadColumn("wafer", 20, 20);
         check(bad1.status == cWorldSave::ColumnLoad::Unreadable && bad2.status == cWorldSave::ColumnLoad::Unreadable && !bad1.column,
               "p1-stream (B-M3): corrupt name table => Unreadable on every call (fail closed per column, no latch, never 'never saved')");
-        // ChunkStreamer integration: the healthy path delivers disk + SGNL
+        // cChunkStreamer integration: the healthy path delivers disk + SGNL
         // through the real job pool (SW-H3 guard on its normal exit), and an
         // unreadable column is neither delivered nor generated over, with
         // its key un-requested for a backed-off retry (B-L7).
-        ChunkStreamer good(pool, wafer->generator, &streamSave, "wafer", 0, {});
+        cChunkStreamer good(pool, wafer->generator, &streamSave, "wafer", 0, {});
         good.update(20, 20);
         bool got = false;
         for (int i = 0; i < 500 && !got; ++i) { got = good.hasReady(); if (!got) std::this_thread::sleep_for(std::chrono::milliseconds(10)); }
         auto readyCols = good.takeReady();
         check(got && readyCols.size() == 1 && readyCols[0].fromDisk && readyCols[0].column && readyCols[0].column->cx == 20 && !readyCols[0].signal.empty(),
               "p1-stream (SW-H1/H3): ChunkStreamer delivers the disk column with its SGNL payload through the job pool");
-        ChunkStreamer bad(pool, wafer->generator, &corruptSave, "wafer", 0, {});
+        cChunkStreamer bad(pool, wafer->generator, &corruptSave, "wafer", 0, {});
         bad.update(20, 20);
         bool erased = false;
         for (int i = 0; i < 500 && !erased; ++i) {
@@ -815,7 +815,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       }
       {  // B-M2 (P3-2): takeReadyUpTo bounds every drain — a burst of
          // finished columns can no longer land in one insertion window.
-        ChunkStreamer many(pool, wafer->generator, nullptr, "wafer", 1, {});
+        cChunkStreamer many(pool, wafer->generator, nullptr, "wafer", 1, {});
         many.update(40, 40);  // 3x3 around chunk (40,40), generate-only
         size_t total = 0;
         bool bounded = true;
@@ -917,7 +917,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   {  // A2 (B-M1 column eviction, 2026-10-13): the production seams composed
      // exactly as Game::evictFarColumns drives them — SGNL export before
      // unscan, save-on-evict through cWorldSave::saveColumns, ChunkMap::erase,
-     // ChunkStreamer::forgetColumn, and selectEvictionCandidates bounding.
+     // cChunkStreamer::forgetColumn, and selectEvictionCandidates bounding.
      // (The full Game loop is not constructed here; mesh retire is a
      // renderer-queue operation covered by the empty-verts contract.)
     using namespace litholattice;
@@ -1042,7 +1042,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       const auto none = selectEvictionCandidates(keys, 0, 0, 100, 2, 4);
       check(none.empty(), "evict (A2): no candidates inside the hysteresis band (no boundary thrash)");
       // forgetColumn makes an evicted column requestable again.
-      ChunkStreamer fs(pool, wafer->generator, nullptr, "wafer", 0, {ChunkKey::make(50, 50)});
+      cChunkStreamer fs(pool, wafer->generator, nullptr, "wafer", 0, {ChunkKey::make(50, 50)});
       fs.forgetColumn(50, 50);
       check(fs.requestedCount() == 0, "evict (A2): ChunkStreamer::forgetColumn removes the requested_ entry (re-streamable)");
       {  // fix 3b (JD t2279u): requests go nearest-first by diamond distance, ties deterministic

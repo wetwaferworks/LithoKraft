@@ -1,4 +1,4 @@
-// AiHost smoke self-test (app selftest section): proves the production
+// cAiHost smoke self-test (app selftest section): proves the production
 // construction path for AiWorld (brief B6) without a window:
 //   * ai.enabled cvar registered, default off;
 //   * a bound-but-disabled host constructs NOTHING and advance() is a
@@ -51,7 +51,7 @@ int runAiHostSelfTest() {
   for (int z = 0; z < 64; ++z)
     for (int x = 0; x < 64; ++x) w.set(x, 9, z, rock);
 
-  AiHost host;
+  cAiHost host;
   host.bindWorld(w, blocks, nullptr, {2, 10, 2});
   check(!host.enabled() && !host.constructed() && host.world() == nullptr,
         "ai host: bound but disabled constructs no AiWorld (default is safe)");
@@ -115,7 +115,7 @@ int runAiHostSelfTest() {
     fw.set(12, 10, 10, ladB);
     fw.set(14, 10, 10, fluB);
 
-    AiHost h2;
+    cAiHost h2;
     h2.bindWorld(fw, fb, nullptr, {2, 10, 2});
     h2.setEnabled(true);
     const ai::WalkCache* nv = h2.nav();
@@ -170,7 +170,7 @@ int runAiHostSelfTest() {
     for (int z = 0; z < 64; ++z)
       for (int x = 0; x < 64; ++x) rw.set(x, 9, z, rockC);
 
-    AiHost h3;
+    cAiHost h3;
     h3.bindWorld(rw, rb, nullptr, {2, 10, 2});  // disabled: the default session
     check(h3.pendingInvalidations() == 0, "ai host B-H1: queue starts empty while disabled");
     // Drive edits through the REAL path (ChunkMap::set/insert/erase fire

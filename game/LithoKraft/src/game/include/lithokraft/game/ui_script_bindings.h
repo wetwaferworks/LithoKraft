@@ -15,12 +15,12 @@
 
 namespace lithokraft {
 
-class UiScriptBindings final : public ui::IScriptHost {
+class cUiScriptBindings final : public ui::IScriptHost {
  public:
   /// `scripts` and `ui` must outlive this object. Call registerApi() after scripts.init() and
   /// before loading script files. The caller must first set the mod's permissions on the
   /// ScriptEngine (the ui_* bindings require kPermUI); anything unlisted is refused.
-  UiScriptBindings(ScriptEngine& scripts, ui::UiRoot& ui) : scripts_(scripts), ui_(ui) {}
+  cUiScriptBindings(ScriptEngine& scripts, ui::UiRoot& ui) : scripts_(scripts), ui_(ui) {}
   bool registerApi();
   bool callHandler(std::string_view functionDecl, std::string_view widgetId) override;
   ui::UiRoot& ui() { return ui_; }
