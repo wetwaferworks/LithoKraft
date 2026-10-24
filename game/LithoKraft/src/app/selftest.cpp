@@ -694,7 +694,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
               "save (fix run 3): an unknown saved shape warns and falls back to diamond; parsing is case-insensitive");
       }
       {  // SV-H1: a failed region flush surfaces as failure, and the pending
-         // records kept by RegionFile land on the retry. Injection: a
+         // records kept by cRegionFile land on the retry. Injection: a
          // DIRECTORY at the region file's .tmp path makes writeFileAtomic
          // fail deterministically (even running as root, where chmod-based
          // read-only directories would not).
@@ -872,9 +872,9 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     std::filesystem::create_directories(pdir);
     {  // C-M3: a region file past the 64 MiB cap is refused at open.
       const auto rp = pdir / "r.0.0.llr";
-      { storage::RegionFile rf(rp); std::string e; rf.open(&e); rf.put(0, 0, storage::Bytes{1, 2, 3}); rf.flush(&e); }
-      std::filesystem::resize_file(rp, storage::RegionFile::kMaxFileBytes + 1);
-      storage::RegionFile rf2(rp);
+      { storage::cRegionFile rf(rp); std::string e; rf.open(&e); rf.put(0, 0, storage::Bytes{1, 2, 3}); rf.flush(&e); }
+      std::filesystem::resize_file(rp, storage::cRegionFile::kMaxFileBytes + 1);
+      storage::cRegionFile rf2(rp);
       std::string e2;
       check(!rf2.open(&e2) && e2.find("cap") != std::string::npos,
             "storage (C-M3): a region file over the 64 MiB cap is refused at open, before any whole-file read");
@@ -1380,7 +1380,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
           "shaders: chunk / hud / line load from assets/shaders through the pack stack");
   }
   {  // HUD readout comes from each block's behaviour class, through the registry
-    const auto& cat = BehaviorCatalog::get();
+    const auto& cat = cBehaviorCatalog::get();
     check(cat.describe(kRepeator, makeState(64, 1, 3, true)) == "Repeator | delay 4 | out 64 | facing E" &&
               cat.describe(kRedTrace, 40) == "Red Trace | strength 40" &&
               cat.describe(kColorLamp16, makeState(17, 0)) == "Color Lamp 16 | tier 16 (wrap) | strength 17 -> colour 0" &&

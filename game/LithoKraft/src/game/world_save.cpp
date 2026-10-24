@@ -251,10 +251,10 @@ std::optional<cWorldSave::WorldAreaMeta> cWorldSave::readWorldArea(const std::fi
   return a;
 }
 
-storage::WorldStore& cWorldSave::store(const std::string& dim) {
+storage::cWorldStore& cWorldSave::store(const std::string& dim) {
   std::lock_guard l(storesMutex_);
   auto& s = stores_[dim];
-  if (!s) s = std::make_unique<storage::WorldStore>(root_ / dim, payloads_);
+  if (!s) s = std::make_unique<storage::cWorldStore>(root_ / dim, payloads_);
   return *s;
 }
 
@@ -377,7 +377,7 @@ size_t cWorldSave::saveDimension(const std::string& dim, const ChunkMap& world, 
     logError("save: %s (save refused: world metadata not written)", nerr.c_str());
     return 0;
   }
-  storage::WorldStore& s = store(dim);
+  storage::cWorldStore& s = store(dim);
   // The SGNL source for the encodes that follow (the I/O thread runs jobs in order).
   s.enqueue([this, state] { std::lock_guard l(m_); exporting_ = std::move(*state); });
   for (auto& c : copies) s.saveAsync(std::move(c));
@@ -448,7 +448,7 @@ size_t cWorldSave::saveColumns(const std::string& dim, const std::vector<const C
     logError("save: %s (eviction-column save refused: world metadata not written)", nerr.c_str());
     return 0;
   }
-  storage::WorldStore& s = store(dim);
+  storage::cWorldStore& s = store(dim);
   s.enqueue([this, state] { std::lock_guard l(m_); exporting_ = std::move(*state); });
   for (auto& c : copies) s.saveAsync(std::move(c));
   s.enqueue([this] { std::lock_guard l(m_); exporting_.clear(); });
@@ -487,7 +487,7 @@ int cWorldSave::loadDimension(const std::string& dim, ChunkMap& world, std::vect
   for (const std::string& u : remap->unknown) logError("save '%s': unknown block '%s' loads as air", dim.c_str(), u.c_str());
   std::vector<uint8_t> imported;  // this call's private SGNL sink (C-M4)
   { std::lock_guard l(m_); signalSink_ = &imported; }
-  storage::WorldStore& s = store(dim);
+  storage::cWorldStore& s = store(dim);
   std::mutex got;
   std::vector<std::unique_ptr<ChunkColumn>> loaded;
   int bad = 0;

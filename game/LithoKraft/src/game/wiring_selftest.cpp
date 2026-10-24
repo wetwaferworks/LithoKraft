@@ -86,8 +86,8 @@ int runWiringSelfTest() {
     check(uint32_t(kEtchor) == uint32_t(kCertificateTable) + 1,
           "B6: Etchor id appends directly after the certificate table (append-only, no renumber)");
     check(roleOf(kEtchor) == SimRole::Etchor, "B6: Etchor carries SimRole::Etchor");
-    check(BehaviorCatalog::get().byName("etchor") != nullptr, "B6: 'etchor' behaviour registered in the catalog");
-    check(BehaviorCatalog::get().describe(kEtchor, 0) == "Etchor", "B6: Etchor readout resolves through its behaviour");
+    check(cBehaviorCatalog::get().byName("etchor") != nullptr, "B6: 'etchor' behaviour registered in the catalog");
+    check(cBehaviorCatalog::get().describe(kEtchor, 0) == "Etchor", "B6: Etchor readout resolves through its behaviour");
     check(etchInputItemId() == uint32_t(kWaferSilicon), "B6: etch input is the Wafer Silicon blank");
     check(etchedChipItemId() == uint32_t(kChipor), "B6: etch output is the Chipor item (block-backed id)");
   }

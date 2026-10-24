@@ -1,7 +1,7 @@
 // Block behaviours: one class per block type that does something.
 //
 // A block opts into a behaviour by name in the block registry (BlockDef::behavior, e.g. "repeator").
-// BehaviorCatalog resolves those names to instances once, so neither the sim nor the HUD switches
+// cBehaviorCatalog resolves those names to instances once, so neither the sim nor the HUD switches
 // on block types; a new block is one class plus one registry line.
 //  - cBlockBehavior: describe() for the look-at readout (wire, torch, lamps, every component).
 //  - cCompBehavior: also ticks, emits signal and reacts to right-click (repeator, pulsor, ...).
@@ -108,10 +108,10 @@ class cCompBehavior : public cBlockBehavior {
 };
 
 /// Name -> behaviour table, and BlockId -> behaviour resolved through the block registry.
-class BehaviorCatalog {
+class cBehaviorCatalog {
  public:
   /// The catalog with every built-in behaviour, bound to the blocks that name them.
-  static const BehaviorCatalog& get();
+  static const cBehaviorCatalog& get();
 
   /// Behaviour of block `b` (a plain name-only readout for blocks without one).
   const cBlockBehavior& behavior(BlockId b) const;
@@ -123,7 +123,7 @@ class BehaviorCatalog {
   std::string describe(BlockId b, CellState state) const { return behavior(b).describe(blockRegistry().def(b), state); }
 
  private:
-  BehaviorCatalog();
+  cBehaviorCatalog();
   void add(std::string_view name, std::unique_ptr<cBlockBehavior> behavior);
 
   cBlockBehavior plain_;

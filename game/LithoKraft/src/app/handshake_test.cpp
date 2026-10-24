@@ -992,7 +992,7 @@ void testRateInvalidClassRates() {
      // Memor-delegating behaviour declaring {0,1,0}. With the validated
      // (neutral) rate the loop runs once and the store lands; with the
      // raw rate it would run zero times and publish state 0.
-    const cCompBehavior* memor = BehaviorCatalog::get().component(kMemor);
+    const cCompBehavior* memor = cBehaviorCatalog::get().component(kMemor);
     check(memor != nullptr, "RATE/A-H2: Memor behaviour is catalog-bound for the no-wipe composition");
     if (memor) {
       class MemorWithBadRate final : public cCompBehavior {

@@ -2982,7 +2982,7 @@ void Game::handleTyping() {
 std::string Game::targetText() const {
   const SimStats& st = sim_->stats();
   if (!st.hit) return "-";
-  std::string text = BehaviorCatalog::get().describe(st.hitBlock, st.hitState);
+  std::string text = cBehaviorCatalog::get().describe(st.hitBlock, st.hitState);
   if (st.hitInfo[0]) { text += "\n"; text += st.hitInfo; }  // inspector: ids, raw state, net, memory
   if (!st.inReach) text += "  (out of reach)";
   return text;

@@ -10,7 +10,7 @@
 // behaviour is a cCompBehavior, but scan() (world load) pre-filters to
 // SimRole != None. A cCompBehavior here would make right-click work when
 // the table is placed yet silently stop after a reload: a broken seam.
-// As a describe-only cBlockBehavior, BehaviorCatalog::component() stays
+// As a describe-only cBlockBehavior, cBehaviorCatalog::component() stays
 // nullptr, cSignalSim::use returns false (the framework's not-usable result)
 // uniformly, and the look-at readout resolves through the standard path --
 // exactly the structure block's current behaviour, but with the name anchored

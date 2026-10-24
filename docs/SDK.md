@@ -35,7 +35,7 @@ Namespaces: engine = `litholattice::` (sub-namespaces `procgen::`, `ui::`, `stor
   - `randomTick(world, area, tickIndex, dirty)`: **stub**, default no-op
   - `activeCount()`, `takeEvents()`
 - **[EXISTS]** `SimThread`: fixed-step loop and `ClockDomain`s. A clock domain is a game-named rate (power of two, up to 512 Hz) with a `step` callback. It also handles edits from the main thread, remesh snapshots, and `takeChangedColumns()` for partial saves.
-- **[EXISTS, game side]** LithoKraft's `cBlockBehavior` / `cCompBehavior` (`tick(inputs, state, mem) -> ComponentStep`, `emitToward`, `use`, `describe`) and `BehaviorCatalog` (name -> behaviour, bound through `BlockDef::behavior`). These live in `lithokraft::`, so the engine has no notion of "component".
+- **[EXISTS, game side]** LithoKraft's `cBlockBehavior` / `cCompBehavior` (`tick(inputs, state, mem) -> ComponentStep`, `emitToward`, `use`, `describe`) and `cBehaviorCatalog` (name -> behaviour, bound through `BlockDef::behavior`). These live in `lithokraft::`, so the engine has no notion of "component".
 - **[PROPOSED]** Promote a generic `IBlockBehavior` / `BehaviorRegistry` into the SDK (`sdk/sim/behavior.h`) so that script and native mods can add components without patching LithoKraft's catalog. LithoKraft's `cCompBehavior` becomes one *kind* of behavior registered by mod #1.
 - **[PROPOSED] Random ticks** (decided in the brief): the engine picks **8 random cells per 16x16x16 section per world tick** around the player. This is configurable per dimension, runs at the world TPS only, and is not scaled by beacons. Each chosen cell goes to `IRandomTickHandler::onRandomTick(world, x, y, z, rng, dirty)`, registered per block id. Cells changed through `dirty` are marked for saves (this mechanism exists). The existing `randomTick` hook stays as the low-level, whole-area escape hatch.
 
@@ -75,7 +75,7 @@ Namespaces: engine = `litholattice::` (sub-namespaces `procgen::`, `ui::`, `stor
 - **[PROPOSED]** `WidgetFactory::registerType("mymod:gauge", factory)` for native widget types. Script mods compose existing widgets from JSON and bind events to AngelScript handlers.
 
 ### 2.9 Storage: payload serializers and migrations (`storage`)
-- **[EXISTS]** `PayloadType {tag fourcc, version, save, load, migrate[v] -> v+1}` and `PayloadRegistry` (the engine registers `BLKS`; LithoKraft registers `SGNL`). Also `RegionFile` (32x32 columns, CRC, atomic swap), `WorldStore` (I/O thread, `saveAsync`, `enqueue`), and partial saves driven by `SimThread::takeChangedColumns()`.
+- **[EXISTS]** `PayloadType {tag fourcc, version, save, load, migrate[v] -> v+1}` and `cPayloadReg` (the engine registers `BLKS`; LithoKraft registers `SGNL`). Also `cRegionFile` (32x32 columns, CRC, atomic swap), `cWorldStore` (I/O thread, `saveAsync`, `enqueue`), and partial saves driven by `SimThread::takeChangedColumns()`.
 - **[PROPOSED]** A mod-scoped tag namespace (fourcc plus mod id in the record header). A save-level manifest records the mods and versions it was written with, plus the block-name palette (2.1). Unknown payloads are *kept verbatim* (not dropped) so that removing a mod and adding it back loses nothing (today they are skipped).
 
 ### 2.10 Scripting: AngelScript (`script`)

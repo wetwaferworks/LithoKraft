@@ -214,12 +214,12 @@ class cWorldSave {
   bool writePlayer(const PlayerMeta& m, std::string* err) const;
   std::optional<PlayerMeta> readPlayer(std::string* err) const;
 
-  const storage::PayloadRegistry& payloads() const { return payloads_; }
+  const storage::cPayloadReg& payloads() const { return payloads_; }
 
  private:
-  storage::WorldStore& store(const std::string& dim);
+  storage::cWorldStore& store(const std::string& dim);
   std::filesystem::path root_;
-  storage::PayloadRegistry payloads_;
+  storage::cPayloadReg payloads_;
   std::mutex m_;
   std::map<uint64_t, std::vector<uint8_t>> exporting_;  // SGNL save source (caller's thread)
   // SGNL load sink (C-M4): NOT a shared accumulator any more. The decode
@@ -231,7 +231,7 @@ class cWorldSave {
   // a cWorldSave load call).
   std::vector<uint8_t>* signalSink_ = nullptr;
   std::mutex loadMutex_;  ///< serialises loadColumn vs loadDimension (and loadColumn vs itself)
-  std::map<std::string, std::unique_ptr<storage::WorldStore>> stores_;
+  std::map<std::string, std::unique_ptr<storage::cWorldStore>> stores_;
   std::mutex storesMutex_;  ///< guards stores_ (loadColumn runs on job threads)
   uint64_t seed_ = 0;       ///< world seed for level.json (SV-H2); set by Game from cfg.seed
   bool hasSeed_ = false;

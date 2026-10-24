@@ -271,7 +271,7 @@ class cSignalSim {
 
  private:
   struct Comp {
-    const cCompBehavior* behavior;  // shared, owned by BehaviorCatalog
+    const cCompBehavior* behavior;  // shared, owned by cBehaviorCatalog
     ComponentMemory mem;
     bool rateHeld = false;  ///< divided-gated on an earlier tick: component sleep must not swallow its due tick (rate scaling)
     // Input fast path (filled by buildNets, valid while the networks are): per side 0 = reads

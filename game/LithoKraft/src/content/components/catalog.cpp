@@ -7,12 +7,12 @@ const char* facingName(int facing) {
   return kNames[facing & 3];
 }
 
-const BehaviorCatalog& BehaviorCatalog::get() {
-  static const BehaviorCatalog catalog;
+const cBehaviorCatalog& cBehaviorCatalog::get() {
+  static const cBehaviorCatalog catalog;
   return catalog;
 }
 
-BehaviorCatalog::BehaviorCatalog() {
+cBehaviorCatalog::cBehaviorCatalog() {
   const components::Registrar add = [this](std::string_view name, std::unique_ptr<cBlockBehavior> b) {
     this->add(name, std::move(b));
   };
@@ -37,15 +37,15 @@ BehaviorCatalog::BehaviorCatalog() {
   }
 }
 
-void BehaviorCatalog::add(std::string_view name, std::unique_ptr<cBlockBehavior> behavior) {
+void cBehaviorCatalog::add(std::string_view name, std::unique_ptr<cBlockBehavior> behavior) {
   named_.emplace_back(name, std::move(behavior));
 }
 
-const cBlockBehavior& BehaviorCatalog::behavior(BlockId b) const {
+const cBlockBehavior& cBehaviorCatalog::behavior(BlockId b) const {
   return b < behaviors_.size() ? *behaviors_[b] : plain_;
 }
 
-const cBlockBehavior* BehaviorCatalog::byName(std::string_view name) const {
+const cBlockBehavior* cBehaviorCatalog::byName(std::string_view name) const {
   for (const auto& [n, b] : named_)
     if (n == name) return b.get();
   return nullptr;

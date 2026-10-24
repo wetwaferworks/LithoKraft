@@ -9,7 +9,7 @@
 // cChunkStreamer closes that hole by reusing the existing machinery, not a
 // parallel system: the dimension's ColumnGenerator (same worldgen the pre-bake
 // uses), the game's JobPool, and cWorldSave (per-column disk loads through the
-// existing WorldStore / region format — the save format is unchanged). The Game
+// existing cWorldStore / region format — the save format is unchanged). The Game
 // calls update() once per frame with the player position; columns inside the
 // load radius (GameConfig::tickRadius, the same radius the sim ticks) that are
 // neither loaded nor in flight are requested nearest-first. Finished columns are

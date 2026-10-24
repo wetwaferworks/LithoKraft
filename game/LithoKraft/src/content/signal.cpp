@@ -179,7 +179,7 @@ void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now) {
   if (r == SimRole::Torch) torches_.insert(k);
   else if (r == SimRole::Wire) wires_.insert(k);
   else if (r == SimRole::Lamp || r == SimRole::ColorLamp) lamps_.insert(k);
-  else if (const cCompBehavior* b = BehaviorCatalog::get().component(now)) comps_[k] = Comp{b, {}};
+  else if (const cCompBehavior* b = cBehaviorCatalog::get().component(now)) comps_[k] = Comp{b, {}};
 }
 
 // Minecraft-style strong power: a lit torch (either colour) powers the solid opaque block above it.
