@@ -2200,6 +2200,8 @@ void Game::handleWorldActions() {
     }
   }  // Cortana 2026-10-15 1515 (GAME, Herominde H-01): Pick Block needs a target within reach,
   // and only creative may create the block from nothing (survival only selects an existing stack).
+  if (input_.pressed(Action::PickBlock))  // 2026-10-24 (JD playtest: MMB looked dead): one diagnostic line per press
+    logInfo("pick block: press hit=%d dist=%.1f block=%u hot=%d", int(st.hit), double(st.hitDist), unsigned(st.hitBlock), hot_);
   if (input_.pressed(Action::PickBlock) && st.hit && st.hitDist <= (creativeMode() ? 16.f : 8.f) + 0.5f && st.hitBlock != kAir) {
     // PickBlock routes into the inventory (P2b-1), like every other block
     // collection path: if a hotbar stack already places this block, select
@@ -2222,6 +2224,7 @@ void Game::handleWorldActions() {
     if (found < 0)
       for (auto& s : player_.inventory.main())
         if (!s.empty() && placedBlockForItem(s.itemId) == st.hitBlock) { carry = &s; break; }
+    logInfo("pick block: hotbar slot %d, carry %s", found, carry ? "yes" : "no");
     if (found >= 0) {
       hot_ = found;
     } else if (carry) {
