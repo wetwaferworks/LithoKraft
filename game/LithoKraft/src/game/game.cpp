@@ -2145,7 +2145,7 @@ void Game::handleWorldActions() {
   } else if (placeNow && selBlock != kAir && !(input_.held(Action::Use) && usable && !input_.pressed(Action::Place))) {
     // Aim directional blocks along the player's horizontal look direction (front = away from you).
     const Vec3 fw = player_.forward();
-    const int facing = std::abs(fw.x) > std::abs(fw.z) ? (fw.x > 0 ? 1 : 3) : (fw.z > 0 ? 2 : 0);
+    const int facing = foliage::facingFromLook(fw.x, fw.z);
     const bool repeat = !input_.pressed(Action::Place);
     if (inReach && (!repeat || newTarget)) {
       EditCmd pc{EditCmd::Kind::Place, selBlock, uint8_t(facing)};

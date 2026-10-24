@@ -184,7 +184,7 @@ FaceSlot localSlot(int face) {  // north-facing local frame
 }
 // One local box [lo,hi) with its six faces; `top` overrides the top material (nullptr = model slot).
 void machineBox(const CustomBlock& cell, MeshWriter& out, const int lo[3], const int hi[3], bool on,
-                const FaceMaterial* top = nullptr) {
+                const FaceMaterial* top = nullptr, int topTurns = 0) {
   const int facing = stFacing(cell.state);
   for (int f = 0; f < 6; ++f) {
     if (f == 3 && lo[1] == 0 && cell.blocks.has(cell.neighbor(0, -1, 0), kOpaque)) continue;  // floor-hidden
@@ -199,7 +199,7 @@ void machineBox(const CustomBlock& cell, MeshWriter& out, const int lo[3], const
     if (flush && cell.blocks.has(cell.neighbor(kN[r.face][0], kN[r.face][1], kN[r.face][2]), kOpaque)) continue;
     const FaceMaterial& fm = (f == 2 && top) ? *top : cell.materials.face(cell.id, localSlot(f), on);
     const int l[3] = {r.lo[0], r.lo[1], r.lo[2]}, h[3] = {r.hi[0], r.hi[1], r.hi[2]};
-    out.face(cell, r.face, l, h, fm, machineTintLook(cell, fm, on), (f == 2 || f == 3) ? facing : 0);
+    out.face(cell, r.face, l, h, fm, machineTintLook(cell, fm, on), (f == 2 || f == 3) ? ((facing + topTurns) & 3) : 0);
   }
 }
 // Cortana 2026-10-16 [GAME] (JD): Aluminum Ramp mesh. Planar faces only: the base square, up to
@@ -402,7 +402,8 @@ void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out)
   if (roleOf(def) == SimRole::Repeator) {
     static constexpr const char* kTops[4] = {"repeator_top_d2_base", "repeator_top_d4_base", "repeator_top_d8_base", "repeator_top_d16_base"};
     static constexpr int lo[3] = {0, 0, 0}, hi[3] = {16, 3, 16};
-    machineBox(cell, out, lo, hi, stOn(cell.state), cell.materials.named(kTops[repeator::delayIndex(cell.state) & 3]));
+    machineBox(cell, out, lo, hi, stOn(cell.state), cell.materials.named(kTops[repeator::delayIndex(cell.state) & 3]),
+               foliage::kRepeatorTopTurns);  // 2026-10-24: art's arrow points +v
     return;
   }
   // 2026-10-16 WaferBeta: Lithographor cuboids (CloudAtlas lithographor.cuboids.json, hand-ported:

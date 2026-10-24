@@ -144,6 +144,14 @@ int runContentSelfTest() {
           rot = rot && std::memcmp(&r4, &q, sizeof q) == 0 && r1.lo[0] >= 0 && r1.hi[0] <= 16 && r1.lo[1] == q.lo[1];
         }
       }
+      {  // 2026-10-24 (JD): placement faces away from the player, one check per yaw quadrant
+        const double kPi = 3.14159265358979323846;
+        auto at = [&](double deg) { const double y = deg * kPi / 180.0; return fo::facingFromLook(std::cos(y), std::sin(y)); };
+        check(at(-90) == 0 && at(-60) == 0 && at(-120) == 0, "placement facing: looking north (-Z) -> facing N");
+        check(at(0) == 1 && at(30) == 1 && at(-30) == 1, "placement facing: looking east (+X) -> facing E");
+        check(at(90) == 2 && at(60) == 2 && at(120) == 2, "placement facing: looking south (+Z) -> facing S");
+        check(at(180) == 3 && at(150) == 3 && at(-150) == 3, "placement facing: looking west (-X) -> facing W");
+      }
       check(det, "foliage models: deterministic leaf hashes, block stacks match kind heights");
       check(shared && bounds, "foliage meshes: one shared quad list per kind, inside the kind's cell column");
       // Cortana 2026-10-15 2310: the coplanar merge reduced (or kept) every kind's quad count.

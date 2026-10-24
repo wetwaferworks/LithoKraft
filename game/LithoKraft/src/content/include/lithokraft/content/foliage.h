@@ -15,6 +15,7 @@
 //
 // Render-side + deterministic worldgen only: foliage blocks have no sim role, never tick.
 #pragma once
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -85,6 +86,16 @@ std::vector<model::Model> buildRepeatorModel(int activeIndex);
 /// Authored-quadrant button index for a top-face point (lx, lz in 0..1 cell-local) of a
 /// Repeator facing `facing` (inverse of the mesh rotation).
 int repeatorButtonAt(double lx, double lz, int facing);
+/// 2026-10-24 (JD): facing for a directional block placed by a player looking along (fx, fz):
+/// the horizontal look direction snapped to the dominant cardinal axis, so the block's front
+/// (output) points AWAY from the player, as in Minecraft. 0 N (-Z), 1 E (+X), 2 S (+Z), 3 W (-X).
+inline int facingFromLook(double fx, double fz) {
+  return std::abs(fx) > std::abs(fz) ? (fx > 0 ? 1 : 3) : (fz > 0 ? 2 : 0);
+}
+/// 2026-10-24 (JD): CloudAtlas's repeator top art is authored with the output toward +v
+/// (texture bottom, chevrons pointing down; NOTES.md: front at z=31). The engine's north
+/// frame has the front at -Z = texture top, so the top/bottom UVs get two extra turns.
+inline constexpr int kRepeatorTopTurns = 2;
 /// Rotate a shared quad by `turns` quarter turns about the cell's vertical axis.
 Quad rotated(const Quad& q, int turns);
 
