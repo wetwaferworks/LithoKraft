@@ -1,6 +1,6 @@
 // Game settings: the player's preferences, persisted to config/settings.json (next to
 // config/input.json). Every field maps to a real control, applied live or at boot:
-//   - master volume + mute: AudioEngine (live, via masterGain commands / setEnabled)
+//   - master volume + mute: cAudioEngine (live, via masterGain commands / setEnabled)
 //   - HUD scale: the UI theme scale (live; 0 = auto from the window height)
 //   - display mode + vsync: the window (display mode live; vsync at boot)
 //   - tick rate + EUV domain: the sim (live, via setTickRate / toggleDomain)
@@ -37,7 +37,7 @@ static_assert(kSettingsPbrTierCount == int(litholattice::PbrTransparencyTier::Tr
 int nearestTps(int v);
 
 struct GameSettings {
-  float masterVolume = 0.6f;  ///< 0..1; matches the AudioEngine default gain
+  float masterVolume = 0.6f;  ///< 0..1; matches the cAudioEngine default gain
   bool muted = false;
   int hudScale = 0;       ///< 0 = auto, else a fixed GUI scale (1-4)
   int displayMode = 2;    ///< index into kSettingsDisplayModes (Cortana 2026-10-15 1153: default Borderless per JD, was 0 Windowed)

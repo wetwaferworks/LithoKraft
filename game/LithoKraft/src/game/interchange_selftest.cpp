@@ -97,7 +97,7 @@ int runInterchangeSelfTest() {
   // change nothing (and likewise at size 6, the app selftest's world).
   {
     JobPool pool(2);
-    DimensionRegistry reg = createDimensions();
+    cDimensionReg reg = createDimensions();
     Dimension* wafer = reg.find("wafer");
     check(wafer != nullptr, "wafer dimension exists");
     wafer->load(pool, 8);
@@ -115,7 +115,7 @@ int runInterchangeSelfTest() {
   // via the production setup path, with the expected blocks in place.
   {
     JobPool pool(2);
-    DimensionRegistry reg = createDimensions();
+    cDimensionReg reg = createDimensions();
     Dimension* wafer = reg.find("wafer");
     wafer->load(pool, 24);
     // Plans fully inside the world, same filter placeInterchanges uses.
@@ -156,7 +156,7 @@ int runInterchangeSelfTest() {
       check(lamps >= 5, "plaza + corner lamps are placed");
 
       // Build determinism: a second fresh world grows the identical site.
-      DimensionRegistry reg2 = createDimensions();
+      cDimensionReg reg2 = createDimensions();
       Dimension* wafer2 = reg2.find("wafer");
       wafer2->load(pool, 24);
       uint64_t h1 = 1469598103934665603ULL, h2 = h1;

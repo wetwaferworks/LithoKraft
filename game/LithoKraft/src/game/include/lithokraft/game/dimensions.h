@@ -55,7 +55,7 @@ namespace lithokraft {
 /// "wafer" + "organic" ("overworld" is an alias) + "underwafer" +
 /// "cosmic", generated from `settings` (pack JSON, else the built-in
 /// generators). The Void is deliberately absent — see the header ledger.
-DimensionRegistry createDimensions(const WorldgenSettings& settings = {});
+cDimensionReg createDimensions(const WorldgenSettings& settings = {});
 
 /// Built-in generator JSON for "wafer" / "organic" (assets/worldgen/<id>.json), or nullptr.
 const char* builtinWorldgenSource(std::string_view dimensionId);

@@ -102,7 +102,7 @@ uint64_t hashWorld(const ChunkMap& world, const cSignalSim& sig, uint64_t ticks)
 // equivalent; the SimThread path is exercised by the freeze proof below
 // and by --perf-headless.)
 struct Scenario {
-  DimensionRegistry reg;
+  cDimensionReg reg;
   Dimension* wafer = nullptr;
   std::unique_ptr<cSignalWorldSim> ws;
   int y = 0, wireX = -1, wireZ = -1, repX = -1, repZ = -1;

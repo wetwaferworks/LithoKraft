@@ -130,7 +130,7 @@ Group groupOf(const BlockDef& d) {
   const auto r = SimRole(d.role);
   if (r == SimRole::Wire) return kGWire;
   if (r == SimRole::Lamp || r == SimRole::ColorLamp) return kGLamp;
-  if (r == SimRole::Torch || r == SimRole::Switch || r == SimRole::Button || r == SimRole::Keyboard) return kGIo;
+  if (r == SimRole::Torch || r == SimRole::Switch || r == SimRole::cButton || r == SimRole::Keyboard) return kGIo;
   if (r != SimRole::None) return kGLogic;
   if (d.flags & kAttachable) return kGPlant;
   if (d.flags & (kDirectional | kInteractive)) return kGMachine;

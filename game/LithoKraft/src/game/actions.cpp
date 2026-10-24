@@ -4,7 +4,7 @@
 namespace lithokraft {
 namespace {
 
-#define LITHOKRAFT_INPUT_INFO(n) ActionInfo{#n, Action::n == Action::Look ? ActionKind::Axis2D : ActionKind::Button},
+#define LITHOKRAFT_INPUT_INFO(n) ActionInfo{#n, Action::n == Action::Look ? ActionKind::Axis2D : ActionKind::cButton},
 const ActionInfo kActionInfo[] = {LITHOKRAFT_INPUT_ACTIONS(LITHOKRAFT_INPUT_INFO)};
 #undef LITHOKRAFT_INPUT_INFO
 static_assert(std::size(kActionInfo) == kActionCount);

@@ -1,6 +1,6 @@
 // The game's screens on the retained UI: HUD (debug panel, controls panel, keyboard-capture
 // banner), the hotbar and the block palette (a modal dialog). The game hands in a
-// HudModel each frame and reacts to callbacks; cGameUi owns the widgets and the UiRoot.
+// HudModel each frame and reacts to callbacks; cGameUi owns the widgets and the cUiRoot.
 #pragma once
 #include "lithokraft/game/engine.h"
 #include <array>
@@ -52,8 +52,8 @@ class cGameUi {
   };
 
   explicit cGameUi(Callbacks callbacks);
-  ui::UiRoot& root() { return ui_; }
-  const ui::UiRoot& root() const { return ui_; }
+  ui::cUiRoot& root() { return ui_; }
+  const ui::cUiRoot& root() const { return ui_; }
 
   /// Re-applies a theme (after a resource reload); the HUD scale stays.
   void applyTheme(const ui::Theme& theme);
@@ -109,9 +109,9 @@ class cGameUi {
   float s() const { return scale_; }
 
   Callbacks cb_;
-  ui::UiRoot ui_;
+  ui::cUiRoot ui_;
   float scale_ = 0;  // HUD scale the widgets were built for (0 = not built)
-  ui::Widget* hud_ = nullptr;
+  ui::cWidget* hud_ = nullptr;
   ui::cPanel* debugPanel_ = nullptr;
   ui::cLabel* debugText_ = nullptr;
   ui::cLabel* debugLook_ = nullptr;      ///< 2026-10-16 (JD): the look-at line, red
@@ -126,15 +126,15 @@ class cGameUi {
   ui::cLabel* lookName_ = nullptr;  ///< 2026-10-16 (JD): looked-at block, above the held-item name
   ui::cLabel* splash_ = nullptr;  // "Powered by LithoLattice", bottom right for the first seconds
   float age_ = 0;
-  ui::Dialog* inventory_ = nullptr;
-  ui::Dialog* pause_ = nullptr;
+  ui::cDialog* inventory_ = nullptr;
+  ui::cDialog* pause_ = nullptr;
   ui::cLabel* inventoryHover_ = nullptr;
   std::vector<ui::cSlot*> carrySlots_;   // playtest 2026-10-16: the dialog's carry grid
   std::vector<ItemStack> carry_;        // what it shows (hover text)
-  ui::Widget* menu_ = nullptr;
+  ui::cWidget* menu_ = nullptr;
   float menuScale_ = 0;  // UI scale the menu was built for (0 = not built)
   std::string version_;
-  ui::Dialog* settings_ = nullptr;
+  ui::cDialog* settings_ = nullptr;
   int hudScalePref_ = 0;  // 0 = auto
 
   void rebuildMenu();

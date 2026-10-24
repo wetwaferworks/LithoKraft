@@ -496,7 +496,7 @@ const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def) const {
   if (roleOf(def) == SimRole::Torch) return torch ? &*torch : nullptr;
   static const std::optional<BoxModel> button = BoxModel::parse(kButtonModel, nullptr);
   if (roleOf(def) == SimRole::Switch) return sw ? &*sw : nullptr;
-  if (roleOf(def) == SimRole::Button) return button ? &*button : nullptr;
+  if (roleOf(def) == SimRole::cButton) return button ? &*button : nullptr;
   return nullptr;
 }
 

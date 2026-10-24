@@ -39,8 +39,8 @@ class Checker {
   int fails_ = 0;
 };
 
-ui::Vec2 center(const ui::Widget& w) { return {w.rect().x + w.rect().w * 0.5f, w.rect().y + w.rect().h * 0.5f}; }
-void click(ui::UiRoot& ui, ui::Vec2 p, uint8_t mods = ui::kModNone) {
+ui::Vec2 center(const ui::cWidget& w) { return {w.rect().x + w.rect().w * 0.5f, w.rect().y + w.rect().h * 0.5f}; }
+void click(ui::cUiRoot& ui, ui::Vec2 p, uint8_t mods = ui::kModNone) {
   ui::UiEvent down = ui::UiEvent::down(p), up = ui::UiEvent::up(p);
   down.mods = up.mods = mods;
   ui.handleEvent(ui::UiEvent::move(p));
@@ -90,7 +90,7 @@ void testHudRenderer(Checker& check) {
 
 void testScriptBindings(Checker& check) {
   ScriptEngine scripts;
-  ui::UiRoot ui;
+  ui::cUiRoot ui;
   cUiScriptBindings bindings(scripts, ui);
   const bool ready = [&] {
     if (!scripts.init()) return false;
@@ -100,7 +100,7 @@ void testScriptBindings(Checker& check) {
   ui.setScriptHost(&bindings);
   auto& stack = ui.root().add<ui::cStackPanel>();
   stack.setLayout(ui::Layout::at({0, 0}, {0, 0}, {}, {200, 200}));
-  auto& btn = stack.add<ui::Button>("Go");
+  auto& btn = stack.add<ui::cButton>("Go");
   btn.setId("go");
   btn.onScript("click", "void onGo(const string &in)");
   stack.add<ui::cLabel>("").setId("lbl");
@@ -123,7 +123,7 @@ void testScriptBindings(Checker& check) {
         "script bindings: widget event calls the script handler, which reads / writes widgets by id");
   scripts.callHook("void onLoad()");
   ui.layout({800, 600});
-  ui::Widget* x = ui.root().find("x");
+  ui::cWidget* x = ui.root().find("x");
   const bool shown = x != nullptr;
   if (x) click(ui, center(*x));
   check(shown && ui.root().find("popup") == nullptr, "script bindings: ui_show builds JSON UI; its handler closes itself");
@@ -141,7 +141,7 @@ void testScriptEditor(Checker& check) {
   scripts.init();
   scripts.loadDirectory(dir.string());
   scripts.callHook("void onLoad()");
-  ui::UiRoot ui;
+  ui::cUiRoot ui;
   ui.layout({1280, 720});
   int reloads = 0;
   cScriptEditor editor(ui, scripts, dir, [&] {
@@ -194,7 +194,7 @@ void testGameUi(Checker& check) {
   m.debugLines = {"FPS 60", "TPS 32"};
   m.controlLines = {"H show controls"};
   gui.update(m, {1280, 720}, 0.016f);
-  ui::Widget* bar = gui.root().root().find("hotbar");
+  ui::cWidget* bar = gui.root().root().find("hotbar");
   const bool hud = bar && bar->children().size() == kHotbarSlots && bar->rect().bottom() <= 720 && bar->rect().x > 0;
   if (bar) click(gui.root(), center(*bar->children()[4]));
   check(hud && selected == 4, "HUD: hotbar is bottom-centred; clicking a slot selects it");
@@ -209,7 +209,7 @@ void testGameUi(Checker& check) {
                  {}, {}, {}, {}, {}};
     im.selected = 0;
     gui.update(im, {1280, 720}, 0.016f);
-    ui::Widget* bar2 = gui.root().root().find("hotbar");
+    ui::cWidget* bar2 = gui.root().root().find("hotbar");
     const ui::cSlot* s0 = bar2 ? dynamic_cast<const ui::cSlot*>(bar2->children()[0].get()) : nullptr;
     const ui::cSlot* s1 = bar2 ? dynamic_cast<const ui::cSlot*>(bar2->children()[1].get()) : nullptr;
     const ui::cSlot* s2 = bar2 ? dynamic_cast<const ui::cSlot*>(bar2->children()[2].get()) : nullptr;
@@ -219,7 +219,7 @@ void testGameUi(Checker& check) {
     check(s2 && s2->icon() == itemIconRef(uint32_t(kLamp)), "HUD: a block stack renders with its block icon");
     // The selected slot's name label (the label laid out above the bar).
     bool nameOk = false;
-    const auto findName = [&nameOk](const auto& self, const ui::Widget& w) -> void {
+    const auto findName = [&nameOk](const auto& self, const ui::cWidget& w) -> void {
       if (const auto* l = dynamic_cast<const ui::cLabel*>(&w); l && l->text() == "The Logbook") nameOk = true;
       for (const auto& c : w.children()) self(self, *c);
     };
@@ -232,13 +232,13 @@ void testGameUi(Checker& check) {
 
   gui.openInventory(1);
   gui.update(m, {1600, 1000}, 0.016f);
-  ui::Widget* inv = gui.root().topModal();
-  ui::Widget* firstCell = nullptr;
+  ui::cWidget* inv = gui.root().topModal();
+  ui::cWidget* firstCell = nullptr;
   // The first slot of the inventory grid (block 1).
-  const auto findSlot = [](const auto& self, ui::Widget& w) -> ui::Widget* {
+  const auto findSlot = [](const auto& self, ui::cWidget& w) -> ui::cWidget* {
     if (dynamic_cast<ui::cSlot*>(&w)) return &w;
     for (const auto& c : w.children())
-      if (ui::Widget* s = self(self, *c)) return s;
+      if (ui::cWidget* s = self(self, *c)) return s;
     return nullptr;
   };
   if (inv) firstCell = findSlot(findSlot, *inv);
@@ -247,7 +247,7 @@ void testGameUi(Checker& check) {
   // P2b-1 honesty: the dialog is the creative BLOCK PALETTE (it gives full
   // stacks into the real inventory hotbar), and it says so in its title.
   {
-    const auto* dlg = dynamic_cast<const ui::Dialog*>(inv);
+    const auto* dlg = dynamic_cast<const ui::cDialog*>(inv);
     check(dlg && dlg->title().find("Block palette") != std::string::npos &&
               dlg->title().find("Creative inventory") == std::string::npos,
           "palette: the dialog title honestly reads 'Block palette (creative)', not 'Creative inventory'");
@@ -310,9 +310,9 @@ void testLaunchMenu(Checker& check) {
   check(tag && tag->text() == "A LITHOLATTICE GAME", "menu: tagline reads 'A LITHOLATTICE GAME'");
   check(ver && ver->text().find("9.9.9-test") != std::string::npos, "menu: version footer shows the plumbed version");
   check(gui.root().root().find("menu-divider") != nullptr, "menu: divider under the tagline");
-  ui::Button* play = gui.root().root().findAs<ui::Button>("menu-play");
-  ui::Button* set = gui.root().root().findAs<ui::Button>("menu-settings");
-  ui::Button* exit = gui.root().root().findAs<ui::Button>("menu-exit");
+  ui::cButton* play = gui.root().root().findAs<ui::cButton>("menu-play");
+  ui::cButton* set = gui.root().root().findAs<ui::cButton>("menu-settings");
+  ui::cButton* exit = gui.root().root().findAs<ui::cButton>("menu-exit");
   check(play && set && exit, "menu: Play / Settings / Exit buttons");
   if (play) click(gui.root(), center(*play));
   check(played, "menu: Play dispatches the play callback");
@@ -362,15 +362,15 @@ void testPauseMenu(Checker& check) {
               {}, [&] { toMenu = true; }, [&] { settingsOpened = true; }, {}});
   HudModel m;
   const auto pauseButton = [&](const char* id) {
-    ui::Widget* modal = gui.root().topModal();
-    return modal ? modal->findAs<ui::Button>(id) : nullptr;
+    ui::cWidget* modal = gui.root().topModal();
+    return modal ? modal->findAs<ui::cButton>(id) : nullptr;
   };
   gui.openPause();
   gui.update(m, {1280, 720}, 0.016f);
-  ui::Button* resume = pauseButton("pause-resume");
-  ui::Button* set = pauseButton("pause-settings");
-  ui::Button* exitMenu = pauseButton("pause-exit-menu");
-  ui::Button* quitBtn = pauseButton("pause-quit");
+  ui::cButton* resume = pauseButton("pause-resume");
+  ui::cButton* set = pauseButton("pause-settings");
+  ui::cButton* exitMenu = pauseButton("pause-exit-menu");
+  ui::cButton* quitBtn = pauseButton("pause-quit");
   const bool four = resume && resume->text() == "Resume" && set && set->text() == "Settings" &&
                     exitMenu && exitMenu->text() == "Exit to menu" && quitBtn && quitBtn->text() == "Quit to desktop";
   check(four, "pause: Resume / Settings / Exit to menu / Quit to desktop");
@@ -378,13 +378,13 @@ void testPauseMenu(Checker& check) {
   check(resumed && !gui.pauseOpen(), "pause: Resume closes the dialog and reports it");
   gui.openPause();
   gui.update(m, {1280, 720}, 0.016f);
-  if (ui::Button* s2 = pauseButton("pause-settings")) click(gui.root(), center(*s2));
+  if (ui::cButton* s2 = pauseButton("pause-settings")) click(gui.root(), center(*s2));
   check(settingsOpened && gui.pauseOpen(), "pause: Settings reports openSettings and keeps the pause dialog");
-  if (ui::Button* e2 = pauseButton("pause-exit-menu")) click(gui.root(), center(*e2));
+  if (ui::cButton* e2 = pauseButton("pause-exit-menu")) click(gui.root(), center(*e2));
   check(toMenu, "pause: Exit to menu dispatches exitToMenu");
   gui.openPause();
   gui.update(m, {1280, 720}, 0.016f);
-  if (ui::Button* q2 = pauseButton("pause-quit")) click(gui.root(), center(*q2));
+  if (ui::cButton* q2 = pauseButton("pause-quit")) click(gui.root(), center(*q2));
   check(quit, "pause: Quit to desktop dispatches quit");
 }
 
@@ -399,7 +399,7 @@ void testSettingsDialog(Checker& check) {
   gui.openSettings(cur);
   gui.update(m, {1280, 720}, 0.016f);
   check(gui.settingsOpen(), "settings: openSettings shows the dialog");
-  ui::Widget* dlg = gui.root().topModal();
+  ui::cWidget* dlg = gui.root().topModal();
   check(dlg && dlg->id() == "settings", "settings: the dialog is the top modal");
   ui::cTabView* tabs = dlg ? dlg->findAs<ui::cTabView>("settings-tabs") : nullptr;
   check(tabs && tabs->count() == 4, "settings: Audio / Video / Graphics / Sim tabs");  // Cortana 2026-10-16: + Graphics

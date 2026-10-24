@@ -21,7 +21,7 @@ NoteSpec toneNote(int strength, float gain) {
 
 }  // namespace
 
-cSoundDirector::cSoundDirector(AudioEngine& audio) : audio_(audio), tones_(audio.musicVoiceCount())  /* Cortana 2026-10-15 1658: F-4 */ {}
+cSoundDirector::cSoundDirector(cAudioEngine& audio) : audio_(audio), tones_(audio.musicVoiceCount())  /* Cortana 2026-10-15 1658: F-4 */ {}
 
 void cSoundDirector::play(std::span<const SoundEvent> events, const Vec3& listener) {
   for (const SoundEvent& e : events) {

@@ -22,7 +22,7 @@ int runHandshakeSelfTest();
 /// harness (which drives the same world through the real SimThread and
 /// the serialized control stream instead of in-process tick calls).
 struct ControlScenarioWorld {
-  DimensionRegistry reg;
+  cDimensionReg reg;
   Dimension* wafer = nullptr;
   std::unique_ptr<cSignalWorldSim> ws;
   int y = 0, wireX = -1, wireZ = -1, repX = -1, repZ = -1;

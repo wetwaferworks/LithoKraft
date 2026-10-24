@@ -1,5 +1,5 @@
 // Headless harness self-tests: drive the REAL Game and the REAL retained UI through the
-// menu state machine and assert the Game-level transitions. Clicks go through UiRoot
+// menu state machine and assert the Game-level transitions. Clicks go through cUiRoot
 // exactly like the app's event loop, so these prove the wiring, not just the widgets.
 #include "headless_harness.h"
 #include <cmath>
@@ -27,11 +27,11 @@ class Checker {
   int fails_ = 0;
 };
 
-litholattice::ui::Vec2 center(const litholattice::ui::Widget& w) {
+litholattice::ui::Vec2 center(const litholattice::ui::cWidget& w) {
   return {w.rect().x + w.rect().w * 0.5f, w.rect().y + w.rect().h * 0.5f};
 }
 
-void click(litholattice::ui::UiRoot& ui, litholattice::ui::Vec2 p) {
+void click(litholattice::ui::cUiRoot& ui, litholattice::ui::Vec2 p) {
   ui.handleEvent(litholattice::ui::UiEvent::move(p));
   ui.handleEvent(litholattice::ui::UiEvent::down(p));
   ui.handleEvent(litholattice::ui::UiEvent::up(p));
@@ -41,7 +41,7 @@ void click(litholattice::ui::UiRoot& ui, litholattice::ui::Vec2 p) {
 /// Searches the root tree, then the top modal (pause / settings dialogs live there).
 bool clickId(cHeadlessGame& hg, const char* id) {
   auto& ui = hg.game().gameUi().root();
-  litholattice::ui::Widget* w = ui.root().find(id);
+  litholattice::ui::cWidget* w = ui.root().find(id);
   if (!w && ui.topModal()) w = ui.topModal()->find(id);
   if (!w) return false;
   click(ui, center(*w));

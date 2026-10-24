@@ -46,7 +46,7 @@ void cGameUi::applyTheme(const ui::Theme& theme) {
 
 void cGameUi::rebuildHud() {
   if (hud_) ui_.destroyLater(ui_.root().removeChild(*hud_));
-  hud_ = &ui_.root().add<ui::Widget>();
+  hud_ = &ui_.root().add<ui::cWidget>();
   hud_->setId("hud");
   const float k = s();
 
@@ -85,7 +85,7 @@ void cGameUi::rebuildHud() {
   for (int i = 0; i < kHotbarSlots; ++i) {
     ui::cSlot& slot = bar.add<ui::cSlot>(ui::Vec2{40 * k * kInventoryScale, 40 * k * kInventoryScale});  // +25% (JD 2026-10-16)
     slot.setCaption(std::to_string(i + 1)).setData(i);
-    slot.on("click", [this](ui::Widget& w) {
+    slot.on("click", [this](ui::cWidget& w) {
       if (cb_.selectSlot) cb_.selectSlot(static_cast<ui::cSlot&>(w).data());
     });
     slots_[size_t(i)] = &slot;
@@ -121,7 +121,7 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
   const std::string title = "Block palette (creative) - click: give a full stack to hotbar slot " +
                             std::to_string(selectedSlot + 1) +
                             ", shift-click: first free slot, E/Esc: close";
-  ui::Dialog& dlg = ui::Dialog::show(ui_, title);
+  ui::cDialog& dlg = ui::cDialog::show(ui_, title);
   dlg.setId("inventory");
   auto& note = dlg.body().add<ui::cLabel>(
       "Creative palette: every block in the registry. A click gives a full stack (512) "
@@ -138,7 +138,7 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
     const BlockId b = BlockId(i + 1);
     ui::cSlot& slot = grid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
     slot.setIcon(blockIcon(b)).setData(int(b));
-    slot.on("click", [this](ui::Widget& w) {
+    slot.on("click", [this](ui::cWidget& w) {
       if (cb_.pickBlock) cb_.pickBlock(BlockId(static_cast<ui::cSlot&>(w).data()), (ui_.modifiers() & ui::kModShift) != 0);
     });
   }
@@ -151,7 +151,7 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
     for (int i = 0; i < int(carry.size()); ++i) {
       ui::cSlot& slot = cgrid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
       slot.setData(kCarryData + i);
-      slot.on("click", [this](ui::Widget& w) {
+      slot.on("click", [this](ui::cWidget& w) {
         if (cb_.pickCarry) cb_.pickCarry(static_cast<ui::cSlot&>(w).data() - kCarryData);
       });
       carrySlots_.push_back(&slot);
@@ -161,7 +161,7 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
   }
   inventoryHover_ = &dlg.body().add<ui::cLabel>(" ");
   inventoryHover_->setCentered(true);
-  dlg.on("close", [this](ui::Widget&) {
+  dlg.on("close", [this](ui::cWidget&) {
     inventory_ = nullptr;
     inventoryHover_ = nullptr;
     carrySlots_.clear();
@@ -172,13 +172,13 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
 
 void cGameUi::openPause() {
   if (pause_) return;
-  ui::Dialog& dlg = ui::Dialog::show(ui_, "Paused");
+  ui::cDialog& dlg = ui::cDialog::show(ui_, "Paused");
   dlg.setId("pause");
   dlg.addButton("Resume").setId("pause-resume");  // closes -> "close" -> pauseClosed
   dlg.addButton("Settings", [this] { if (cb_.openSettings) cb_.openSettings(); }, false).setId("pause-settings");
   dlg.addButton("Exit to menu", [this] { if (cb_.exitToMenu) cb_.exitToMenu(); }, false).setId("pause-exit-menu");
   dlg.addButton("Quit to desktop", [this] { if (cb_.quit) cb_.quit(); }).setId("pause-quit");
-  dlg.on("close", [this](ui::Widget&) {
+  dlg.on("close", [this](ui::cWidget&) {
     pause_ = nullptr;
     if (cb_.pauseClosed) cb_.pauseClosed();
   });
@@ -190,7 +190,7 @@ void cGameUi::openMenu(const std::string& version) {
   version_ = version;
   const float k = std::max(1.f, s());
   menuScale_ = k;
-  ui::Widget& m = ui_.root().add<ui::Widget>();
+  ui::cWidget& m = ui_.root().add<ui::cWidget>();
   m.setId("menu");
   m.setLayout(ui::Layout::fill());
   auto& center = m.add<ui::cStackPanel>(ui::Orientation::Vertical, 10 * k);
@@ -204,18 +204,18 @@ void cGameUi::openMenu(const std::string& version) {
   tagline.setCentered(true);
   tagline.setColor({0.85f, 0.92f, 1.f, 1.f});  // 2026-10-16: was {0.55,0.65,0.8} (low contrast)
   center.add<ui::cDivider>(ui::Orientation::Horizontal, 2.f * k).setId("menu-divider");
-  auto& play = center.add<ui::Button>("Play");
+  auto& play = center.add<ui::cButton>("Play");
   play.setId("menu-play");
   play.setLayout(ui::Layout::sized({600 * k, 52 * k}));
-  play.on("click", [this](ui::Widget&) { if (cb_.play) cb_.play(); });
-  auto& settings = center.add<ui::Button>("Settings");
+  play.on("click", [this](ui::cWidget&) { if (cb_.play) cb_.play(); });
+  auto& settings = center.add<ui::cButton>("Settings");
   settings.setId("menu-settings");
   settings.setLayout(ui::Layout::sized({600 * k, 52 * k}));
-  settings.on("click", [this](ui::Widget&) { if (cb_.openSettings) cb_.openSettings(); });
-  auto& exit = center.add<ui::Button>("Exit");
+  settings.on("click", [this](ui::cWidget&) { if (cb_.openSettings) cb_.openSettings(); });
+  auto& exit = center.add<ui::cButton>("Exit");
   exit.setId("menu-exit");
   exit.setLayout(ui::Layout::sized({600 * k, 52 * k}));
-  exit.on("click", [this](ui::Widget&) { if (cb_.quit) cb_.quit(); });
+  exit.on("click", [this](ui::cWidget&) { if (cb_.quit) cb_.quit(); });
   auto& footerL = m.add<ui::cLabel>("v" + version_);
   footerL.setId("menu-version");
   footerL.setLayout(ui::Layout::at({0, 1}, {0, 1}, {12 * k, -12 * k}));
@@ -229,7 +229,7 @@ void cGameUi::openMenu(const std::string& version) {
 
 void cGameUi::closeMenu() {
   if (!menu_) return;
-  ui::Widget* m = menu_;
+  ui::cWidget* m = menu_;
   menu_ = nullptr;
   ui_.destroyLater(ui_.root().removeChild(*m));
 }
@@ -243,7 +243,7 @@ void cGameUi::openSettings(const GameSettings& cur) {
   if (settings_) return;
   const float k = std::max(1.f, s());
   auto state = std::make_shared<GameSettings>(cur);
-  ui::Dialog& dlg = ui::Dialog::show(ui_, "Settings");
+  ui::cDialog& dlg = ui::cDialog::show(ui_, "Settings");
   dlg.setId("settings");
   auto& tabs = dlg.body().add<ui::cTabView>();
   tabs.setId("settings-tabs");
@@ -279,7 +279,7 @@ void cGameUi::openSettings(const GameSettings& cur) {
       volText.setText(buf);
     };
     showVol(vol.value());
-    vol.on("change", [changed, state, showVol, &volText](ui::Widget& w) {
+    vol.on("change", [changed, state, showVol, &volText](ui::cWidget& w) {
       const float v = static_cast<ui::cSlider&>(w).value();
       state->masterVolume = v / 100.f;
       showVol(v);
@@ -287,7 +287,7 @@ void cGameUi::openSettings(const GameSettings& cur) {
     });
     ui::cCheckbox& mute = pg.add<ui::cCheckbox>("Mute audio", cur.muted);
     mute.setId("set-mute");
-    mute.on("change", [changed, state](ui::Widget& w) {
+    mute.on("change", [changed, state](ui::cWidget& w) {
       state->muted = static_cast<ui::cCheckbox&>(w).checked();
       changed();
     });
@@ -300,13 +300,13 @@ void cGameUi::openSettings(const GameSettings& cur) {
     const std::vector<std::string> dispItems{kSettingsDisplayModes, kSettingsDisplayModes + kSettingsDisplayModeCount};
     ui::cDropdown& disp = dr.add<ui::cDropdown>(dispItems, cur.displayMode);
     disp.setId("set-display");
-    disp.on("change", [changed, state](ui::Widget& w) {
+    disp.on("change", [changed, state](ui::cWidget& w) {
       state->displayMode = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
     ui::cCheckbox& vsync = pg.add<ui::cCheckbox>("VSync (applies on restart)", cur.vsync);
     vsync.setId("set-vsync");
-    vsync.on("change", [changed, state](ui::Widget& w) {
+    vsync.on("change", [changed, state](ui::cWidget& w) {
       state->vsync = static_cast<ui::cCheckbox&>(w).checked();
       changed();
     });
@@ -314,7 +314,7 @@ void cGameUi::openSettings(const GameSettings& cur) {
     const std::vector<std::string> hudItems{"Auto", "1x", "2x", "3x", "4x"};  // Cortana 2026-10-16: GUI scale 1-4
     ui::cDropdown& hud = hr.add<ui::cDropdown>(hudItems, cur.hudScale);
     hud.setId("set-hud");
-    hud.on("change", [changed, state](ui::Widget& w) {
+    hud.on("change", [changed, state](ui::cWidget& w) {
       state->hudScale = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
@@ -324,7 +324,7 @@ void cGameUi::openSettings(const GameSettings& cur) {
     const std::vector<std::string> mesherItems{kSettingsMesherNames, kSettingsMesherNames + kSettingsMesherCount};
     ui::cDropdown& mesher = mr.add<ui::cDropdown>(mesherItems, cur.mesher);
     mesher.setId("set-mesher");
-    mesher.on("change", [changed, state](ui::Widget& w) {
+    mesher.on("change", [changed, state](ui::cWidget& w) {
       state->mesher = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
@@ -337,7 +337,7 @@ void cGameUi::openSettings(const GameSettings& cur) {
                                            kSettingsPbrTierNames + kSettingsPbrTierCount};
     ui::cDropdown& pbr = pr.add<ui::cDropdown>(pbrItems, cur.pbrTier);
     pbr.setId("set-pbrtier");
-    pbr.on("change", [changed, state](ui::Widget& w) {
+    pbr.on("change", [changed, state](ui::cWidget& w) {
       state->pbrTier = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
@@ -355,12 +355,12 @@ void cGameUi::openSettings(const GameSettings& cur) {
       ui::cStackPanel& r = row(pg, name);
       ui::cDropdown& d = r.add<ui::cDropdown>(items, sel);
       d.setId(id);
-      d.on("change", [changed, state, apply](ui::Widget& w) { apply(*state, static_cast<ui::cDropdown&>(w).selected()); changed(); });
+      d.on("change", [changed, state, apply](ui::cWidget& w) { apply(*state, static_cast<ui::cDropdown&>(w).selected()); changed(); });
     };
     auto box = [&](const char* name, const char* id, bool on, auto apply) {
       ui::cCheckbox& c = pg.add<ui::cCheckbox>(name, on);
       c.setId(id);
-      c.on("change", [changed, state, apply](ui::Widget& w) { apply(*state, static_cast<ui::cCheckbox&>(w).checked()); changed(); });
+      c.on("change", [changed, state, apply](ui::cWidget& w) { apply(*state, static_cast<ui::cCheckbox&>(w).checked()); changed(); });
     };
     const int texSel = cur.texRes == 16 ? 1 : cur.texRes == 32 ? 2 : cur.texRes == 64 ? 3 : 0;
     drop("Texture resolution (F9)", "set-texres", {"Auto", "16", "32", "64"}, texSel,
@@ -379,11 +379,11 @@ void cGameUi::openSettings(const GameSettings& cur) {
     // JD 2026-10-16: world streaming and render / stream distance (boot-only).
     ui::cCheckbox& sc = pg.add<ui::cCheckbox>("World streaming: generate ahead of you (restart)", cur.streaming);
     sc.setId("set-streaming");
-    sc.on("change", [changed, state](ui::Widget& w) { state->streaming = static_cast<ui::cCheckbox&>(w).checked(); changed(); });
+    sc.on("change", [changed, state](ui::cWidget& w) { state->streaming = static_cast<ui::cCheckbox&>(w).checked(); changed(); });
     ui::cStackPanel& rr = row(pg, "Render / stream distance, chunks (0 = auto: Vulkan 64, others 32; restart)");
     ui::cNumberField& nf = rr.add<ui::cNumberField>(0, 64, cur.streamRadius);
     nf.setId("set-stream-radius");
-    nf.on("change", [changed, state](ui::Widget& w) { state->streamRadius = static_cast<ui::cNumberField&>(w).value(); changed(); });
+    nf.on("change", [changed, state](ui::cWidget& w) { state->streamRadius = static_cast<ui::cNumberField&>(w).value(); changed(); });
     // JD Vulkan push (Cortana 2026-10-16): one toggle per Vulkan effect (live; GL33 / software keep their look).
     pg.add<ui::cLabel>("Vulkan effects (live; OpenGL / software unchanged)");
     struct FxBox { const char* name; const char* id; int bit; };
@@ -416,25 +416,25 @@ void cGameUi::openSettings(const GameSettings& cur) {
     }
     ui::cDropdown& tps = tr.add<ui::cDropdown>(tpsItems, tpsSel);
     tps.setId("set-tps");
-    tps.on("change", [changed, state](ui::Widget& w) {
+    tps.on("change", [changed, state](ui::cWidget& w) {
       state->tps = kSettingsTpsModes[static_cast<ui::cDropdown&>(w).selected()];
       changed();
     });
     ui::cStackPanel& rr = row(pg, "Simulation distance, chunks (restart)");
     ui::cNumberField& radius = rr.add<ui::cNumberField>(0, 512, cur.tickRadius);
     radius.setId("set-radius");
-    radius.on("change", [changed, state](ui::Widget& w) {
+    radius.on("change", [changed, state](ui::cWidget& w) {
       state->tickRadius = static_cast<ui::cNumberField&>(w).value();
       changed();
     });
     {  // F56-7 (Proposed by JD, Built by Cortana): round sim area
       ui::cCheckbox& rnd = pg.add<ui::cCheckbox>("Round simulation area (restart)", cur.roundSimArea);
       rnd.setId("set-round-sim");
-      rnd.on("change", [changed, state](ui::Widget& w) { state->roundSimArea = static_cast<ui::cCheckbox&>(w).checked(); changed(); });
+      rnd.on("change", [changed, state](ui::cWidget& w) { state->roundSimArea = static_cast<ui::cCheckbox&>(w).checked(); changed(); });
     }
     ui::cCheckbox& euv = pg.add<ui::cCheckbox>("EUV domain (live)", cur.euv);
     euv.setId("set-euv");
-    euv.on("change", [changed, state](ui::Widget& w) {
+    euv.on("change", [changed, state](ui::cWidget& w) {
       state->euv = static_cast<ui::cCheckbox&>(w).checked();
       changed();
     });
@@ -444,13 +444,13 @@ void cGameUi::openSettings(const GameSettings& cur) {
   // Cortana 2026-10-16 (standards review): hide the launch menu while Settings is open (its
   // buttons bled around the dialog); shown again when the dialog closes.
   if (menu_) menu_->setVisible(false);
-  dlg.on("close", [this](ui::Widget&) { settings_ = nullptr; if (menu_) menu_->setVisible(true); });
+  dlg.on("close", [this](ui::cWidget&) { settings_ = nullptr; if (menu_) menu_->setVisible(true); });
   settings_ = &dlg;
 }
 
 void cGameUi::closeSettings() {
   if (!settings_) return;
-  ui::Dialog* d = settings_;
+  ui::cDialog* d = settings_;
   settings_ = nullptr;  // closeModal emits no "close": no callback for a close the game asked for
   ui_.closeModal(*d);
   if (menu_) menu_->setVisible(true);  // 2026-10-16: restore the menu hidden by openSettings
@@ -458,14 +458,14 @@ void cGameUi::closeSettings() {
 
 void cGameUi::closePause() {
   if (!pause_) return;
-  ui::Dialog* d = pause_;
+  ui::cDialog* d = pause_;
   pause_ = nullptr;
   ui_.closeModal(*d);
 }
 
 void cGameUi::closeInventory() {
   if (!inventory_) return;
-  ui::Dialog* d = inventory_;
+  ui::cDialog* d = inventory_;
   inventory_ = nullptr;  // close() emits "close": no callback for a close the game asked for
   inventoryHover_ = nullptr;
   carrySlots_.clear();

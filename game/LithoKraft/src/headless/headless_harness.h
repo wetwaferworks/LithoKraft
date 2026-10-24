@@ -3,7 +3,7 @@
 //
 // This is the general game-testing fixture, not a one-off runner: future gameplay tests
 // (inventory, combat, dimensions, lithography) live here. Tests drive the REAL Game and the
-// REAL retained UI (cGameUi) — clicks go through UiRoot exactly like the app's event loop —
+// REAL retained UI (cGameUi) — clicks go through cUiRoot exactly like the app's event loop —
 // so a passing harness test means the wiring works, not just the widgets.
 //
 // Note (G-L3, corrected 2026-10-13): earlier versions of this comment claimed
@@ -63,7 +63,7 @@ class cNullRenderer final : public litholattice::IRenderer {
 
 /// Owns everything a Game needs and constructs it headless, in main.cpp's order:
 /// JobPool, cNullRenderer, cResourceMgr (no packs; built-in worldgen fallbacks),
-/// AudioEngine (no output device; commands queue harmlessly), InputSystem (default action
+/// cAudioEngine (no output device; commands queue harmlessly), InputSystem (default action
 /// map, no backend). Members declare in construction order; destruction runs in reverse,
 /// so the Game dies before the things that must outlive it.
 class cHeadlessGame {
@@ -94,7 +94,7 @@ class cHeadlessGame {
   litholattice::JobPool pool_;
   cNullRenderer renderer_;
   cResourceMgr resources_;
-  litholattice::AudioEngine audio_;
+  litholattice::cAudioEngine audio_;
   litholattice::InputSystem input_;
   std::unique_ptr<Game> game_;
 };

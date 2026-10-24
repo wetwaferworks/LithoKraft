@@ -148,7 +148,7 @@ constexpr uint32_t kGameFluid = uint32_t(kFirstGameFlag) << 3;      // swimmable
 /// What a block does in the signal sim (stored in BlockDef::role).
 enum class SimRole : uint16_t {
   None, Wire, Torch, Lamp, ColorLamp,
-  Repeator, Thresholdor, Redirector, Pulsor, Memor, FastLatch, Switch, Button, Keyboard, Tone, Catchor,
+  Repeator, Thresholdor, Redirector, Pulsor, Memor, FastLatch, Switch, cButton, Keyboard, Tone, Catchor,
   cSignalTransmittor, cSignalReceivor, cDish, cOverclockor, Lithographor, Chipor, cPortor, cFusor,
   Etchor,  // appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
 };

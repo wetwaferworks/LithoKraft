@@ -43,7 +43,7 @@ std::optional<ui::PointerButton> uiButton(MouseButton b) {
 
 }  // namespace
 
-void translateUiEvents(std::span<const InputEvent> events, const DeviceState& devices, std::vector<ui::UiEvent>& out) {
+void translateUiEvents(std::span<const InputEvent> events, const cDeviceState& devices, std::vector<ui::UiEvent>& out) {
   uint8_t mods = ui::kModNone;
   if (devices.keyDown(Key::LeftShift) || devices.keyDown(Key::RightShift)) mods |= ui::kModShift;
   if (devices.keyDown(Key::LeftCtrl) || devices.keyDown(Key::RightCtrl)) mods |= ui::kModCtrl;

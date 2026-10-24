@@ -33,7 +33,7 @@
 // camera's game-thread-computed eye/yaw/pitch/fov, at most one frame
 // stale — the mesh cache it renders is a frame snapshot too).
 //
-// AUDIO: drains the AudioEngine's mixed-output tap (post-shed,
+// AUDIO: drains the cAudioEngine's mixed-output tap (post-shed,
 // pre-master-gain, positional — the pilot's ears, not a global mix) and
 // box-downsamples to the requested tier rate. The tap is armed once at
 // construction and disarmed at destruction. captureAudioChunk() needs
@@ -111,7 +111,7 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   /// the sim world tick for frame/chunk stamping (0 when the sim is down).
   /// `rig` carries the per-pilot engine cameras (owned by the game's
   /// cGameCameraController, which is constructed before this adapter).
-  cMcpSensesAdapter(litholattice::AudioEngine& audio,
+  cMcpSensesAdapter(litholattice::cAudioEngine& audio,
                    std::function<cMcpPlayerView::GameState()> snapshot,
                    std::function<uint64_t()> tick, std::shared_ptr<cPilotCameraRig> rig);
   ~cMcpSensesAdapter();
@@ -161,7 +161,7 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
     std::vector<litholattice::PackedVertex> verts;  ///< quads, sub-chunk-local
   };
 
-  litholattice::AudioEngine& audio_;
+  litholattice::cAudioEngine& audio_;
   std::function<cMcpPlayerView::GameState()> snapshot_;
   std::function<uint64_t()> tick_;
   std::shared_ptr<cPilotCameraRig> rig_;  ///< per-pilot engine cameras (own mutex inside)

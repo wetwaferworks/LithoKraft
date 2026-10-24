@@ -1207,7 +1207,7 @@ int main(int argc, char** argv) {
   cResourceMgr resources(packStack(assets, pack, extraPacks, modPacks));  // outlives the game (mesh jobs)
   resources.reload();
   resources.apply(*renderer);
-  AudioEngine audio;  // outlives the output device and the game
+  cAudioEngine audio;  // outlives the output device and the game
   std::unique_ptr<IAudioOutput> audioOut;
   if (mute) {
     audio.setEnabled(false);

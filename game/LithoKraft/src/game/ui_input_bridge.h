@@ -12,6 +12,6 @@ namespace lithokraft {
 
 /// Appends the UI events for `events` to `out`. Pointer positions come from CursorPos events
 /// (and `devices` for button / wheel events); modifiers from the keys held in `devices`.
-void translateUiEvents(std::span<const InputEvent> events, const DeviceState& devices, std::vector<ui::UiEvent>& out);
+void translateUiEvents(std::span<const InputEvent> events, const cDeviceState& devices, std::vector<ui::UiEvent>& out);
 
 }  // namespace lithokraft

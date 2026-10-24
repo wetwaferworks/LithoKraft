@@ -108,7 +108,7 @@ class Game {
   /// `resources` (block materials for meshing and HUD swatches; F9 reloads them), `audio` and
   /// `input` must outlive the game. The game pushes / pops input contexts (inventory, keyboard
   /// typing) on `input`.
-  Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceMgr& resources, AudioEngine& audio,
+  Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceMgr& resources, cAudioEngine& audio,
        InputSystem& input);
   ~Game();
   /// Saves the active dimension and the player (F5, autosave, exit, dimension switch). `wait`
@@ -448,7 +448,7 @@ class Game {
   bool benchSet_ = false;
   std::vector<SoundEvent> soundBuf_;
   JobPool& pool_;
-  DimensionRegistry registry_;
+  cDimensionReg registry_;
   Dimension* active_ = nullptr;
   Player player_;
   // --- IPlayer integration (player_adapter.h) ---
@@ -543,7 +543,7 @@ class Game {
   size_t chunkColumns_ = 0;
 
   InputSystem& input_;
-  AudioEngine& audio_;
+  cAudioEngine& audio_;
   // cCamera system: owns the engine cCameraMgr (player/orbit/follow/free
   // view cameras + MCP pilot cameras). Presentation only — declared before
   // the MCP members because mcpSenses_ borrows its cPilotCameraRig.

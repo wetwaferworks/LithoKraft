@@ -76,7 +76,7 @@ inline int variantAt(int wx, int wy, int wz) {
 }
 /// Cortana 2026-10-15 2215 [GAME]: Repeator placeholder model (CloudAtlas will replace it).
 /// A low slab (5/16) facing N (front = -Z) with 4 top buttons; `activeIndex` 0..3 (2/4/8/16
-/// ticks) is raised and glowing. Button quadrants in authored (facing-N) coords:
+/// ticks) is raised and glowing. cButton quadrants in authored (facing-N) coords:
 /// 0 front-left (x<8, z<8), 1 front-right, 2 back-right, 3 back-left.
 /// Swappable: assets/models/repeator/repeator_<i>.lthm (one per active button) override the
 /// placeholder when present. Shared, built once; the facing is applied with rotated(q, facing).

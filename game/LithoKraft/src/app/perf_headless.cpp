@@ -116,7 +116,7 @@ class cPerfNullRenderer final : public IRenderer {
 
 int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) {
   std::string json = "{\n";
-  DimensionRegistry reg = createDimensions();
+  cDimensionReg reg = createDimensions();
   Dimension* wafer = reg.find("wafer");
   if (!wafer || !wafer->generator) { std::printf("perf: no wafer generator\n"); return 1; }
   const unsigned all = std::max(1u, std::thread::hardware_concurrency());
@@ -225,7 +225,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   json += "  \"ai\": [";
   {
     namespace ai = litholattice::ai;
-    DimensionRegistry areg = createDimensions();
+    cDimensionReg areg = createDimensions();
     Dimension* ad = areg.find("wafer");
     ad->load(pool, 32);
     ai::cWalkCache nav(ad->chunks, blockRegistry(), {});
@@ -261,7 +261,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   std::printf("== random ticks (wafer 32x32, every block opted in, 8 per section)\n");
   json += "  \"random_ticks\": [";
   {
-    DimensionRegistry rreg = createDimensions();
+    cDimensionReg rreg = createDimensions();
     Dimension* rt = rreg.find("wafer");
     rt->load(pool, 32);
     const std::vector<uint8_t> everyBlock(blockRegistry().size(), 1);

@@ -13,7 +13,7 @@ namespace lithokraft {
 
 class cSoundDirector {
  public:
-  explicit cSoundDirector(AudioEngine& audio);
+  explicit cSoundDirector(cAudioEngine& audio);
 
   /// Plays `events`; volume falls off with distance from `listener` (silent beyond kHearing).
   void play(std::span<const SoundEvent> events, const Vec3& listener);
@@ -25,8 +25,8 @@ class cSoundDirector {
  private:
   void playTone(const SoundEvent& e, float gain);
 
-  AudioEngine& audio_;
-  VoiceAllocator tones_;
+  cAudioEngine& audio_;
+  cVoiceAllocator tones_;
 };
 
 }  // namespace lithokraft

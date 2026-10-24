@@ -180,7 +180,7 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
   // -- software-rendered world capture (the MCP vision path) ----------------
   {
     const WorldgenSettings ws = rm.worldgen(1);
-    DimensionRegistry dims = createDimensions(ws);
+    cDimensionReg dims = createDimensions(ws);
     Dimension* wafer = dims.find("wafer");
     bool sceneOk = wafer && wafer->generator && rm.materials() != nullptr;
     std::vector<ChunkMesh> meshes;

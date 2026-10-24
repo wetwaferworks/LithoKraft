@@ -60,7 +60,7 @@ BlockRegistry& mutableRegistry() {
     r.add(def("lithokraft:memor", "Memor", kDir, S::Cube, "memor", "memor", R::Memor, 0, 0, 45));
     r.add(def("lithokraft:fast_latch", "Fast Latch", kDir, S::Cube, "fast_latch", "fast_latch", R::FastLatch, 0, 0, 45));
     r.add(def("lithokraft:switch", "Switch", kSolid | kCutsWire | kInteractive | kAttachable, S::Cube, "switch", "switch", R::Switch, 0, 0, 45));
-    r.add(def("lithokraft:button", "Button", kSolid | kCutsWire | kInteractive | kAttachable, S::Cube, "button", "button", R::Button, 0, 0, 45));
+    r.add(def("lithokraft:button", "Button", kSolid | kCutsWire | kInteractive | kAttachable, S::Cube, "button", "button", R::cButton, 0, 0, 45));
     r.add(def("lithokraft:keyboard", "Keyboard", kDir | kInteractive, S::Cube, "keyboard", "keyboard", R::Keyboard, 0, 0, 45));
     r.add(def("lithokraft:color_lamp_16", "Color Lamp 16", kComp, S::Cube, "color_lamp_16", "color_lamp", R::ColorLamp, 0, 16, 40));
     r.add(def("lithokraft:color_lamp_32", "Color Lamp 32", kComp, S::Cube, "color_lamp_32", "color_lamp", R::ColorLamp, 0, 32, 40));

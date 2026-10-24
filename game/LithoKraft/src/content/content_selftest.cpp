@@ -34,7 +34,7 @@ int runContentSelfTest() {
   {
     bool ok = true;
     for (Sfx s : {Sfx::Place, Sfx::Break, Sfx::Click, Sfx::PulsorFire}) {
-      AudioEngine eng(48000.f);
+      cAudioEngine eng(48000.f);
       eng.post(sfxCommand(s, 1.f, 30));
       std::vector<float> x(24000);
       eng.render(x.data(), x.size(), 1);

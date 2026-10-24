@@ -200,7 +200,7 @@ void cSignalSim::collectMountPowered(const ChunkMap& w) {
     int x, y, z; unpackPos(k, x, y, z);
     const CellState s = w.getState(x, y, z);
     if (!stAttach(s) || !stOn(s)) continue;
-    if (const auto r = blockRegistry().def(w.get(x, y, z)).role; r != uint16_t(SimRole::Switch) && r != uint16_t(SimRole::Button)) continue;
+    if (const auto r = blockRegistry().def(w.get(x, y, z)).role; r != uint16_t(SimRole::Switch) && r != uint16_t(SimRole::cButton)) continue;
     int ox, oy, oz;
     attachOffset(stAttach(s), ox, oy, oz);
     mountPowered_.insert(packPos(x + ox, y + oy, z + oz));
@@ -821,7 +821,7 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
     int x, y, z; unpackPos(k, x, y, z);
     if (!area_.contains(x, z)) continue;
     const CellState st = w.getState(x, y, z);
-    if (const int face = stAttach(st); face && (reg.def(w.get(x, y, z)).role == SimRole::Switch || reg.def(w.get(x, y, z)).role == SimRole::Button)) {
+    if (const int face = stAttach(st); face && (reg.def(w.get(x, y, z)).role == SimRole::Switch || reg.def(w.get(x, y, z)).role == SimRole::cButton)) {
       // Attached switch: powers its support (colourless, all 6 sides, like a torch-powered
       // block) and, mounted on top, the dust directly below the support (two-block reach).
       int ox, oy, oz;
@@ -969,7 +969,7 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
     int x, y, z; unpackPos(k, x, y, z);
     if (!area_.contains(x, z)) continue;
     const CellState st = w.getState(x, y, z);
-    if (const int face = stAttach(st); face && (reg.def(w.get(x, y, z)).role == SimRole::Switch || reg.def(w.get(x, y, z)).role == SimRole::Button)) {
+    if (const int face = stAttach(st); face && (reg.def(w.get(x, y, z)).role == SimRole::Switch || reg.def(w.get(x, y, z)).role == SimRole::cButton)) {
       int ox, oy, oz;
       attachOffset(face, ox, oy, oz);
       const int sx = x + ox, sy = y + oy, sz = z + oz;

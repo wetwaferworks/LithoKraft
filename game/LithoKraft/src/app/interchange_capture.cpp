@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
   const std::string root = interchangeSourceRoot();
   const std::string waferJsonText = readFile(root + "/game/LithoKraft/assets/worldgen/wafer.json");
   if (!waferJsonText.empty()) settings.generators["wafer"] = waferJsonText;
-  litholattice::DimensionRegistry reg = lithokraft::createDimensions(settings);
+  litholattice::cDimensionReg reg = lithokraft::createDimensions(settings);
   litholattice::Dimension* wafer = reg.find("wafer");
   if (!wafer || !wafer->generator) {
     std::fprintf(stderr, "interchange_capture: no wafer generator\n");

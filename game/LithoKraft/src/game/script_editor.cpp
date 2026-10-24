@@ -24,7 +24,7 @@ int firstErrorLine(const std::vector<std::string>& errors, const std::string& fi
 
 }  // namespace
 
-cScriptEditor::cScriptEditor(ui::UiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload)
+cScriptEditor::cScriptEditor(ui::cUiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload)
     : ui_(ui), scripts_(scripts), dir_(std::move(dir)), afterReload_(std::move(afterReload)) {}
 
 void cScriptEditor::toggle() {
@@ -48,7 +48,7 @@ void cScriptEditor::refreshFiles() {
 
 void cScriptEditor::open() {
   if (isOpen()) return;
-  ui::Dialog& dlg = ui::Dialog::show(ui_, "Script editor (debug) - " + dir_.generic_string());
+  ui::cDialog& dlg = ui::cDialog::show(ui_, "Script editor (debug) - " + dir_.generic_string());
   dlg.setId("script-editor");
   // Most of the screen, wherever it is.
   dlg.layout() = ui::Layout::fill({40, 30, 40, 30});
@@ -83,16 +83,16 @@ void cScriptEditor::open() {
   split.setPane(1, std::move(editor));
   statusLabel_ = &dlg.body().add<ui::cLabel>();
 
-  list_->on("select", [this](ui::Widget&) {
+  list_->on("select", [this](ui::cWidget&) {
     const std::string* name = list_->selectedItem();
     if (!name || *name == file_) return;
     const std::string next = *name;
     confirmDiscard([this, next] { openFile(next); });
     refreshFiles();  // keeps the current file selected until the switch happens
   });
-  editor_->on("change", [this](ui::Widget&) { updateStatus(); });
-  editor_->on("save", [this](ui::Widget&) { this->save(); });
-  dlg.on("close", [this](ui::Widget&) {
+  editor_->on("change", [this](ui::cWidget&) { updateStatus(); });
+  editor_->on("save", [this](ui::cWidget&) { this->save(); });
+  dlg.on("close", [this](ui::cWidget&) {
     dialog_ = nullptr;
     list_ = nullptr;
     editor_ = nullptr;
@@ -169,7 +169,7 @@ void cScriptEditor::confirmDiscard(std::function<void()> action) {
     action();
     return;
   }
-  ui::Dialog& ask = ui::Dialog::show(ui_, "Unsaved changes");
+  ui::cDialog& ask = ui::cDialog::show(ui_, "Unsaved changes");
   ask.body().add<ui::cLabel>(file_ + " has unsaved changes. Discard them?");
   ask.addButton("Discard", std::move(action));
   ask.addButton("Cancel");

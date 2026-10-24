@@ -105,7 +105,7 @@ static int resolvedTwinkle(const GameSettings& s) {
   return resolvedLeavesFancy(s) ? 2 : 1;
 }
 
-Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceMgr& resources, AudioEngine& audio,
+Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceMgr& resources, cAudioEngine& audio,
            InputSystem& input)
     : cfg_(cfg),
       ui_({[this](int slot) { hot_ = slot; }, [this](BlockId b, bool shift) { pickInventoryBlock(b, shift); },

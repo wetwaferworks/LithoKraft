@@ -108,7 +108,7 @@ const char* builtinWorldgenSource(std::string_view dimensionId) {
   return nullptr;
 }
 
-DimensionRegistry createDimensions(const WorldgenSettings& settings) {
+cDimensionReg createDimensions(const WorldgenSettings& settings) {
   // Registered: wafer, organic (+ overworld alias), cosmic, underwafer
   // (B5 2026-10-13). Cosmic and Underwafer are registered with honest
   // CRUST-LEVEL content only (see their assets/worldgen JSONs): each has
@@ -126,7 +126,7 @@ DimensionRegistry createDimensions(const WorldgenSettings& settings) {
   //    analysis); infohazard mechanics and any content are also missing.
   //    `map void` honestly answers "unknown dimension" until JD decides
   //    a finite bound or a virtualised coordinate scheme.
-  DimensionRegistry r;
+  cDimensionReg r;
   auto wafer = std::make_unique<Dimension>();
   wafer->id = "wafer";
   wafer->name = "Wafer";

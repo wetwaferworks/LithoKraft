@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
   const std::string root = sourceRoot();
   const std::string wj = readFile(root + "/game/LithoKraft/assets/worldgen/wafer.json");
   if (!wj.empty()) settings.generators["wafer"] = wj;
-  litholattice::DimensionRegistry reg = lithokraft::createDimensions(settings);
+  litholattice::cDimensionReg reg = lithokraft::createDimensions(settings);
   litholattice::Dimension* wafer = reg.find("wafer");
   if (!wafer || !wafer->generator) { std::fprintf(stderr, "city_capture: no wafer generator\n"); return 1; }
   litholattice::JobPool pool(2);

@@ -22,7 +22,7 @@ constexpr double kRadToDeg = 180.0 / 3.14159265358979323846;
 constexpr uint32_t kSkyClear = 0xFF94B3DB;  // wafer day sky, from Game::frameParams (0xAARRGGBB)
 constexpr int kMinDim = 16, kMaxDim = 512;
 constexpr float kNear = 0.05f, kFar = 1000.0f;  // same clip range as the game camera
-constexpr float kTapRate = 48000.0f;            // AudioEngine renders at 48 kHz
+constexpr float kTapRate = 48000.0f;            // cAudioEngine renders at 48 kHz
 // Largest single drain: tier 0 needs 1024 * (48000/8000) tap frames.
 constexpr size_t kTapScratchFrames =
     litholattice::mcp::kAudioChunkFrames * size_t(kTapRate / litholattice::mcp::kAudioTierRates[0]);
@@ -37,7 +37,7 @@ litholattice::Mat4 translation(float x, float y, float z) {
 
 }  // namespace
 
-cMcpSensesAdapter::cMcpSensesAdapter(litholattice::AudioEngine& audio,
+cMcpSensesAdapter::cMcpSensesAdapter(litholattice::cAudioEngine& audio,
                                    std::function<cMcpPlayerView::GameState()> snapshot,
                                    std::function<uint64_t()> tick,
                                    std::shared_ptr<cPilotCameraRig> rig)

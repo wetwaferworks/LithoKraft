@@ -70,7 +70,7 @@ Spawn buildDemoCircuit(ChunkMap& w, int ox, int oz) {
   put(25, y, 17, kLamp);
 
   // Row z=21: Pulsor -> 24 wires (no decay) -> Memor -> Color Lamp 64. Data = a memory
-  // cell preloaded with 23 behind the Pulsor; press the Button (clock, Pulsor's left) to fire.
+  // cell preloaded with 23 behind the Pulsor; press the cButton (clock, Pulsor's left) to fire.
   put(5, y, 21, kMemor, makeState(23, E, 0, true));
   put(6, y, 21, kPulsor, makeState(0, E));
   put(6, y, 20, kButton);
@@ -102,7 +102,7 @@ Spawn buildDemoCircuit(ChunkMap& w, int ox, int oz) {
   put(17, y, 28, kRedTrace);
   put(18, y, 28, kColorLamp64);
   put(12, y, 29, kBlueTrace); put(12, y, 30, kLamp);              // control port (right = south)
-  // Fast Latch: press the Button -> toggles -> Lamp.
+  // Fast Latch: press the cButton -> toggles -> Lamp.
   put(22, y, 28, kButton);
   put(23, y, 28, kFastLatch, makeState(0, E));
   put(24, y, 28, kRedTrace); put(25, y, 28, kLamp);

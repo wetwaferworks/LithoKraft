@@ -11,16 +11,16 @@
 namespace lithokraft {
 namespace {
 
-ui::Widget* find(cUiScriptBindings* b, const std::string& id) {
-  ui::Widget* w = b->ui().root().find(id);
+ui::cWidget* find(cUiScriptBindings* b, const std::string& id) {
+  ui::cWidget* w = b->ui().root().find(id);
   if (!w) logError("[script] ui: no widget '%s'", id.c_str());
   return w;
 }
 
 std::string uiText(const std::string& id, cUiScriptBindings* b) {
-  ui::Widget* w = find(b, id);
+  ui::cWidget* w = find(b, id);
   if (auto* l = dynamic_cast<ui::cLabel*>(w)) return l->text();
-  if (auto* t = dynamic_cast<ui::Button*>(w)) return t->text();
+  if (auto* t = dynamic_cast<ui::cButton*>(w)) return t->text();
   if (auto* e = dynamic_cast<ui::cTextEditBase*>(w)) return e->text();
   if (auto* d = dynamic_cast<ui::cDropdown*>(w); d && !d->items().empty()) return d->items()[size_t(d->selected())];
   if (auto* l = dynamic_cast<ui::cListView*>(w); l && l->selectedItem()) return *l->selectedItem();
@@ -28,9 +28,9 @@ std::string uiText(const std::string& id, cUiScriptBindings* b) {
 }
 
 void uiSetText(const std::string& id, const std::string& text, cUiScriptBindings* b) {
-  ui::Widget* w = find(b, id);
+  ui::cWidget* w = find(b, id);
   if (auto* l = dynamic_cast<ui::cLabel*>(w)) l->setText(text);
-  else if (auto* t = dynamic_cast<ui::Button*>(w)) t->setText(text);
+  else if (auto* t = dynamic_cast<ui::cButton*>(w)) t->setText(text);
   else if (auto* e = dynamic_cast<ui::cTextEditBase*>(w)) e->setText(text);
 }
 
@@ -44,7 +44,7 @@ void uiSetChecked(const std::string& id, bool on, cUiScriptBindings* b) {
 }
 
 float uiValue(const std::string& id, cUiScriptBindings* b) {
-  ui::Widget* w = find(b, id);
+  ui::cWidget* w = find(b, id);
   if (auto* s = dynamic_cast<ui::cSlider*>(w)) return s->value();
   if (auto* n = dynamic_cast<ui::cNumberField*>(w)) return float(n->value());
   if (auto* p = dynamic_cast<ui::cProgressBar*>(w)) return p->value();
@@ -54,7 +54,7 @@ float uiValue(const std::string& id, cUiScriptBindings* b) {
 }
 
 void uiSetValue(const std::string& id, float v, cUiScriptBindings* b) {
-  ui::Widget* w = find(b, id);
+  ui::cWidget* w = find(b, id);
   if (auto* s = dynamic_cast<ui::cSlider*>(w)) s->setValue(v);
   else if (auto* n = dynamic_cast<ui::cNumberField*>(w)) n->setValue(int(v));
   else if (auto* p = dynamic_cast<ui::cProgressBar*>(w)) p->setValue(v);
@@ -63,11 +63,11 @@ void uiSetValue(const std::string& id, float v, cUiScriptBindings* b) {
 }
 
 void uiSetVisible(const std::string& id, bool on, cUiScriptBindings* b) {
-  if (ui::Widget* w = find(b, id)) w->setVisible(on);
+  if (ui::cWidget* w = find(b, id)) w->setVisible(on);
 }
 
 void uiSetEnabled(const std::string& id, bool on, cUiScriptBindings* b) {
-  if (ui::Widget* w = find(b, id)) w->setEnabled(on);
+  if (ui::cWidget* w = find(b, id)) w->setEnabled(on);
 }
 
 bool uiShow(const std::string& json, cUiScriptBindings* b) {
@@ -93,7 +93,7 @@ bool uiShow(const std::string& json, cUiScriptBindings* b) {
 }
 
 void uiClose(const std::string& id, cUiScriptBindings* b) {
-  ui::Widget* w = find(b, id);
+  ui::cWidget* w = find(b, id);
   if (w && w->parent()) b->ui().destroyLater(w->parent()->removeChild(*w));  // may be closing itself
 }
 

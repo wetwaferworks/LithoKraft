@@ -13,7 +13,7 @@
 #include "litholattice/ui/ui_root.h"
 
 namespace litholattice::ui {
-class Dialog;
+class cDialog;
 class cLabel;
 class cListView;
 class cTextEditor;
@@ -24,7 +24,7 @@ namespace lithokraft {
 class cScriptEditor {
  public:
   /// `afterReload` runs after a successful hot reload (e.g. re-run the onLoad hook).
-  cScriptEditor(ui::UiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload = {});
+  cScriptEditor(ui::cUiRoot& ui, ScriptEngine& scripts, std::filesystem::path dir, std::function<void()> afterReload = {});
   void toggle();
   void open();
   /// Closes (asks first when there are unsaved changes, unless `force`).
@@ -46,14 +46,14 @@ class cScriptEditor {
   void updateStatus();
   void setStatus(std::string s);
 
-  ui::UiRoot& ui_;
+  ui::cUiRoot& ui_;
   ScriptEngine& scripts_;
   std::filesystem::path dir_;
   std::function<void()> afterReload_;
   std::vector<std::string> files_;
   std::string file_, status_;
   uint64_t savedRevision_ = 0;
-  ui::Dialog* dialog_ = nullptr;
+  ui::cDialog* dialog_ = nullptr;
   ui::cListView* list_ = nullptr;
   ui::cTextEditor* editor_ = nullptr;
   ui::cLabel* statusLabel_ = nullptr;

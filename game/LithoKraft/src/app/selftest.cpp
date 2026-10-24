@@ -192,7 +192,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   fails += runAiHostSelfTest();
   fails += runDeceitorSelfTest();
   fails += runInterchangeSelfTest();
-  DimensionRegistry reg = createDimensions();
+  cDimensionReg reg = createDimensions();
   Dimension* wafer = reg.find("wafer");
   Dimension* ow = reg.find("organic");
   {  // B5 (2026-10-13, Team B worker2): cosmic + underwafer registered
@@ -269,7 +269,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         }
       }
     check(n311 == 1 && n314 == 1, "spawn garden: exactly one 311 and one 314 shrub in the whole wafer");
-    DimensionRegistry reg2 = createDimensions();
+    cDimensionReg reg2 = createDimensions();
     Dimension* wafer2 = reg2.find("wafer");
     const Spawn sp2 = wafer2->load(pool, 6);
     check(int(sp2.x) == sx && int(sp2.z) == sz && int(sp2.y) == py &&
@@ -535,7 +535,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       const ChunkMap g1 = genWith(1), g4 = genWith(4), gAll = genWith(std::max(2u, std::thread::hardware_concurrency()));
       check(g1.columns().size() == 16 && sameCells(g1, g4) && sameCells(g1, gAll),
             "worldgen: same seed gives identical columns with 1, 4 and all threads");
-      DimensionRegistry r1 = createDimensions(), r2 = createDimensions();
+      cDimensionReg r1 = createDimensions(), r2 = createDimensions();
       Dimension* a = r1.find("wafer"); Dimension* b = r2.find("wafer");
       a->load(pool, 6);
       b->load(pool, 6);
@@ -563,7 +563,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         for (int i = 0; i < 30; ++i) sa.tick(a->chunks, 2, 2, 12, mark);
         written += save.saveDimension("wafer", a->chunks, sa, true, &changed);
       }
-      DimensionRegistry r3 = createDimensions();
+      cDimensionReg r3 = createDimensions();
       Dimension* c = r3.find("wafer");
       c->load(pool, 6);  // regenerated: untouched columns come from the seed
       std::vector<uint8_t> state;
@@ -589,7 +589,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       check(frozen, "blocks: save ids are explicit and frozen (silicon, red_torch, switch, button, lamp)");
       const bool table = std::filesystem::exists(pdir / "blocks.names");
       std::filesystem::remove(pdir / "blocks.names");
-      DimensionRegistry r4 = createDimensions();
+      cDimensionReg r4 = createDimensions();
       Dimension* l = r4.find("wafer");
       l->load(pool, 6);
       std::vector<uint8_t> st2;
@@ -1221,7 +1221,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     check(caves > 0 && dirtVeins > 0, "organic worldgen: worm caves and dirt veins underground, surface intact");
     WorldgenSettings seeded;
     seeded.seed = 12345;
-    DimensionRegistry other = createDimensions(seeded);
+    cDimensionReg other = createDimensions(seeded);
     const auto a = ow->generator->generate(3, 3), b = other.find("organic")->generator->generate(3, 3);
     const auto w0 = wafer->generator->generate(1, 1), w1 = other.find("wafer")->generator->generate(1, 1);
     int organicDiff = 0, waferDiff = 0;
