@@ -401,8 +401,12 @@ void cSignalSim::hsMark(ChunkMap& w) {
   };
   const std::unordered_set<int64_t> mountsBefore = mountPowered_.empty() ? std::unordered_set<int64_t>{} : mountPowered_;
   collectMountPowered(w);
+  // Canonical order (packPos) for the mount diff: unordered_set iteration
+  // depends on insertion history (review W-1).
+  const size_t mountDiffBegin = changedSrc_.size();
   for (int64_t k : mountsBefore) if (!mountPowered_.contains(k)) changedSrc_.push_back(k);
   for (int64_t k : mountPowered_) if (!mountsBefore.contains(k)) changedSrc_.push_back(k);
+  std::sort(changedSrc_.begin() + std::ptrdiff_t(mountDiffBegin), changedSrc_.end());
   if (!fullPass_ && changedSrc_.empty() && extraLamps_.empty()) {  // same result as last pass
     hsSkip_ = true;
     populateWake();
@@ -519,6 +523,7 @@ void cSignalSim::buildNets(ChunkMap& w) {
       for (int64_t n : links) if (wires_.contains(n) && wireNet_.emplace(n, id).second) stack.push_back(n);
     }
     netLamps_[size_t(id)].assign(lampSet.begin(), lampSet.end());
+    std::sort(netLamps_[size_t(id)].begin(), netLamps_[size_t(id)].end());  // canonical order, as above (review W-2)
   }
   // Component input fast path: neighbour kinds and state pointers.
   for (const auto& reg = blockRegistry(); auto& [k, c] : comps_) {
