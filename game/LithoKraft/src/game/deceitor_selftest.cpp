@@ -112,7 +112,7 @@ struct Fixture {
   void ticks(int n) {
     for (int i = 0; i < n; ++i) world->tick();
   }
-  DeceitorBrain* brain(uint32_t id) { return dir.brain(id); }
+  cDeceitorBrain* brain(uint32_t id) { return dir.brain(id); }
   bool itemPresent(uint64_t entityId) { return entities.get(entityId) != nullptr; }
 };
 
@@ -142,7 +142,7 @@ int runDeceitorSelfTest() {
     const auto id = f.dir.spawn(*f.world, {4, 10, 4});
     check(id.has_value(), "deceitor: spawn through the director works");
     f.ticks(1);  // brain registers; player 4 away, facing it
-    DeceitorBrain* b = f.brain(*id);
+    cDeceitorBrain* b = f.brain(*id);
     check(b != nullptr, "deceitor: brain registered itself with the director");
     check(b && b->face() == DeceitorFace::Smile,
           "deceitor: approach face is the Smile (identical to a Receiptor's)");
@@ -163,7 +163,7 @@ int runDeceitorSelfTest() {
     Fixture f;
     const auto id = f.dir.spawn(*f.world, {4, 10, 4});
     f.ticks(1);
-    DeceitorBrain* b = f.brain(*id);
+    cDeceitorBrain* b = f.brain(*id);
     const uint64_t dropId = f.drop(kItemTitaniumOxide, 4.5, 6.5);
     int ticksToReturn = -1;
     for (int i = 0; i < 40 && ticksToReturn < 0; ++i) {
@@ -185,7 +185,7 @@ int runDeceitorSelfTest() {
     const auto id = f.dir.spawn(*f.world, {4, 10, 4});
     f.fz = 1.0;  // player faces +z: back turned to the mob at z=4
     f.ticks(1);
-    DeceitorBrain* b = f.brain(*id);
+    cDeceitorBrain* b = f.brain(*id);
     check(b && b->face() == DeceitorFace::Neutral,
           "deceitor: no smile is shown to a turned back (mask needs a face)");
     bool hostile = false;
@@ -203,7 +203,7 @@ int runDeceitorSelfTest() {
     Fixture f;
     const auto id = f.dir.spawn(*f.world, {4, 10, 4});
     f.ticks(1);
-    DeceitorBrain* b = f.brain(*id);
+    cDeceitorBrain* b = f.brain(*id);
     f.ticks(3000);  // far beyond the 600-tick unfed window
     check(b && b->mood() != DeceitorMood::Hostile,
           "deceitor: no betrayal while the player faces the mob, even unfed");
@@ -213,7 +213,7 @@ int runDeceitorSelfTest() {
     Fixture f;
     const auto id = f.dir.spawn(*f.world, {4, 10, 4});
     f.ticks(1);
-    DeceitorBrain* b = f.brain(*id);
+    cDeceitorBrain* b = f.brain(*id);
     f.drop(uint32_t(kWaferSilicon), 4.5, 6.5);
     f.ticks(30);
     check(b && b->everFed(), "deceitor (fed setup): barter completed");
@@ -227,7 +227,7 @@ int runDeceitorSelfTest() {
     Fixture f;
     const auto id = f.dir.spawn(*f.world, {4, 10, 4});
     f.ticks(1);
-    DeceitorBrain* b = f.brain(*id);
+    cDeceitorBrain* b = f.brain(*id);
     const bool opened = f.dir.playerInteract(*id, f.world->stats().ticks);
     check(!opened, "deceitor: interacting opens NO interface (the tell vs a Receiptor)");
     check(b && b->mood() == DeceitorMood::Provoked, "deceitor: a failed click provokes (grace runs)");
@@ -241,7 +241,7 @@ int runDeceitorSelfTest() {
     Fixture f;
     const auto id = f.dir.spawn(*f.world, {4, 10, 4});
     f.ticks(1);
-    DeceitorBrain* b = f.brain(*id);
+    cDeceitorBrain* b = f.brain(*id);
     f.dir.playerInteract(*id, f.world->stats().ticks);
     f.ticks(60);  // grace is 30 AI ticks
     check(b && b->mood() == DeceitorMood::Hostile,

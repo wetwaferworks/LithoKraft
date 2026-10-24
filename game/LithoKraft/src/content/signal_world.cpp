@@ -7,7 +7,7 @@
 
 namespace lithokraft {
 
-bool SignalWorldSimulation::canPlace(const ChunkMap& w, int x, int y, int z, BlockId block) const {
+bool cSignalWorldSim::canPlace(const ChunkMap& w, int x, int y, int z, BlockId block) const {
   if (isFlatWire(block)) return wireSupported(w, x, y, z);
   // Proposed by JD, Built by Cortana: the Highway Ramp needs room for its second half (any side).
   if (block == kHighwayRamp)
@@ -15,11 +15,11 @@ bool SignalWorldSimulation::canPlace(const ChunkMap& w, int x, int y, int z, Blo
   return true;  // torches and switches: canAttach decides (they mount on the clicked face)
 }
 
-bool SignalWorldSimulation::stillSupported(const ChunkMap& w, int x, int y, int z) const {
+bool cSignalWorldSim::stillSupported(const ChunkMap& w, int x, int y, int z) const {
   return !isFlatWire(w.get(x, y, z)) || wireSupported(w, x, y, z);
 }
 
-bool SignalWorldSimulation::canAttach(const ChunkMap& w, int x, int y, int z, BlockId block, int face) const {
+bool cSignalWorldSim::canAttach(const ChunkMap& w, int x, int y, int z, BlockId block, int face) const {
   int dx, dy, dz;
   attachOffset(face, dx, dy, dz);
   if (!blockRegistry().has(w.get(x + dx, y + dy, z + dz), kSolid)) return false;  // needs a solid support
@@ -27,7 +27,7 @@ bool SignalWorldSimulation::canAttach(const ChunkMap& w, int x, int y, int z, Bl
   return true;  // switch: top, sides or bottom
 }
 
-void SignalWorldSimulation::onBlockChanged(ChunkMap& w, int x, int y, int z, BlockId now) {
+void cSignalWorldSim::onBlockChanged(ChunkMap& w, int x, int y, int z, BlockId now) {
   // Cortana 2026-10-16 (JD): Aluminum Ramp placement. Hanging when placed under an overhang (air
   // below, solid above); facing from the placement (kDirectional, standard facing bits) is
   // re-packed into the ramp's 5-bit state, then Minecraft-stair corner snapping runs for the new
@@ -95,13 +95,13 @@ void SignalWorldSimulation::onBlockChanged(ChunkMap& w, int x, int y, int z, Blo
   sounds_.push_back({now == kAir ? SoundCue::Break : SoundCue::Place, 0, x, y, z});
 }
 
-bool SignalWorldSimulation::use(ChunkMap& w, int x, int y, int z, const DirtyFn& dirty) {
+bool cSignalWorldSim::use(ChunkMap& w, int x, int y, int z, const DirtyFn& dirty) {
   if (!signal_.use(w, x, y, z, dirty)) return false;
   sounds_.push_back({SoundCue::Click, 0, x, y, z});
   return true;
 }
 
-void SignalWorldSimulation::command(ChunkMap& w, const SimCommand& c, const DirtyFn& dirty) {
+void cSignalWorldSim::command(ChunkMap& w, const SimCommand& c, const DirtyFn& dirty) {
   if (c.code == kCmdKeyPulse) signal_.keyPulse(c.x, c.y, c.z, c.a, c.b);
   else if (c.code == kCmdAltUse && signal_.use(w, c.x, c.y, c.z, dirty, true)) sounds_.push_back({SoundCue::Click, 0, c.x, c.y, c.z});
   // Cortana 2026-10-15 2215 [GAME]: Repeator top-button select (JD D4) and walk-bridging (JD D9).
@@ -133,7 +133,7 @@ void SignalWorldSimulation::command(ChunkMap& w, const SimCommand& c, const Dirt
     sounds_.push_back({SoundCue::Click, 0, c.x, c.y, c.z});
 }
 
-void SignalWorldSimulation::onBlockPopped(ChunkMap& /*w*/, int x, int y, int z, BlockId was) {
+void cSignalWorldSim::onBlockPopped(ChunkMap& /*w*/, int x, int y, int z, BlockId was) {
   // Popped blocks become item drops (Minecraft-style): the game thread spawns the entity.
   if (was == kSilicaGrass) {
     // Silica grass drops seeds, not the grass block itself (pop policy: 1 seed).
@@ -144,7 +144,7 @@ void SignalWorldSimulation::onBlockPopped(ChunkMap& /*w*/, int x, int y, int z, 
   dropEvents_.push_back(SimEvent{kEvItemDrop, int(was), x, y, z});
 }
 
-void SignalWorldSimulation::onRandomTick(ChunkMap& w, int x, int y, int z, BlockId block, uint32_t rnd,
+void cSignalWorldSim::onRandomTick(ChunkMap& w, int x, int y, int z, BlockId block, uint32_t rnd,
                                          const DirtyFn& dirty) {
   if (block != kSilicaGrass) return;
   // No ILighting is plumbed into the sim path yet: pass a null query and the
@@ -157,7 +157,7 @@ void SignalWorldSimulation::onRandomTick(ChunkMap& w, int x, int y, int z, Block
                      });
 }
 
-void SignalWorldSimulation::takeEvents(std::vector<SimEvent>& out) {
+void cSignalWorldSim::takeEvents(std::vector<SimEvent>& out) {
   out.insert(out.end(), dropEvents_.begin(), dropEvents_.end());
   dropEvents_.clear();
   signal_.takeSounds(sounds_);
@@ -177,7 +177,7 @@ void SignalWorldSimulation::takeEvents(std::vector<SimEvent>& out) {
 // sim thread replays through the real dirty fn at the phase commit, in
 // canonical (shard, then ascending key) order (hs-design §3.3).
 
-void SignalWorldSimulation::registerHandshake(litholattice::TimingHandshakeAuthority& authority) {
+void cSignalWorldSim::registerHandshake(litholattice::TimingHandshakeAuthority& authority) {
   hsAuthority_ = &authority;
   const int p = authority.phasesPerCycle();
   const int w = authority.workerCount();
@@ -236,7 +236,7 @@ void SignalWorldSimulation::registerHandshake(litholattice::TimingHandshakeAutho
   }
 }
 
-void SignalWorldSimulation::onHsCommit(uint64_t phase, uint64_t /*cycleTick*/, uint32_t group) {
+void cSignalWorldSim::onHsCommit(uint64_t phase, uint64_t /*cycleTick*/, uint32_t group) {
   if (group != 1 || !hsAuthority_) return;
   const int p = hsAuthority_->phasesPerCycle();
   const int sub = p > 0 ? int(phase % uint64_t(p)) : 0;
@@ -262,7 +262,7 @@ void SignalWorldSimulation::onHsCommit(uint64_t phase, uint64_t /*cycleTick*/, u
   }
 }
 
-void SignalWorldSimulation::tickHandshake(ChunkMap& world, const TickArea& area, const DirtyFn& dirty) {
+void cSignalWorldSim::tickHandshake(ChunkMap& world, const TickArea& area, const DirtyFn& dirty) {
   signal_.setRoundArea(area.round);  // F56-7
   signal_.setDiamondArea(area.diamond);  // diamond (JD 2026-10-23)
   const int p = hsAuthority_->phasesPerCycle();

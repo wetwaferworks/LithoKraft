@@ -65,27 +65,27 @@ BarterReturn deceitorBarterReturn(bool liked, ai::AiRng& rng) {
 }
 
 // ------------------------------------------------------------------ brain
-DeceitorBrain::~DeceitorBrain() {
+cDeceitorBrain::~cDeceitorBrain() {
   if (registered_) dir_.detach(mobId_, this);
 }
 
-void DeceitorBrain::provoke(uint64_t aiTick) {
+void cDeceitorBrain::provoke(uint64_t aiTick) {
   if (mood_ == DeceitorMood::Hostile) return;
   mood_ = DeceitorMood::Provoked;
   provokedUntilTick_ = aiTick + DeceitorTuning::kFailedClickGraceTicks;
 }
 
-void DeceitorBrain::enrage() {
+void cDeceitorBrain::enrage() {
   mood_ = DeceitorMood::Hostile;
   hasPendingReturn_ = false;  // it keeps what it took
 }
 
-bool DeceitorBrain::unfed(uint64_t tick) const {
+bool cDeceitorBrain::unfed(uint64_t tick) const {
   const uint64_t base = everFed_ ? lastFedTick_ : spawnTick_;
   return tick >= base && tick - base > DeceitorTuning::kUnfedWindowTicks;
 }
 
-void DeceitorBrain::onBarter(ai::AiContext& ctx, uint32_t offeredItem) {
+void cDeceitorBrain::onBarter(ai::AiContext& ctx, uint32_t offeredItem) {
   everFed_ = true;
   lastFedTick_ = ctx.tick;
   mood_ = DeceitorMood::Neutral;  // diverts a provocation; de-aggros a betrayal
@@ -95,7 +95,7 @@ void DeceitorBrain::onBarter(ai::AiContext& ctx, uint32_t offeredItem) {
                                                   : DeceitorTuning::kReturnDelayTicks);
 }
 
-ai::BtStatus DeceitorBrain::tick(ai::AiContext& ctx) {
+ai::BtStatus cDeceitorBrain::tick(ai::AiContext& ctx) {
   if (!registered_) {
     mobId_ = ctx.mob.id;
     spawnTick_ = ctx.tick;
@@ -198,19 +198,19 @@ DeceitorDirector::DeceitorDirector() : walk_(ai::makeLeap()) {}
 DeceitorDirector::~DeceitorDirector() = default;
 
 std::optional<uint32_t> DeceitorDirector::spawn(ai::AiWorld& world, ai::Cell at) {
-  return world.spawn(at, walk_.get(), std::make_unique<DeceitorBrain>(*this));
+  return world.spawn(at, walk_.get(), std::make_unique<cDeceitorBrain>(*this));
 }
 
-void DeceitorDirector::attach(uint32_t mobId, DeceitorBrain* brain) { brains_[mobId] = brain; }
-void DeceitorDirector::detach(uint32_t mobId, DeceitorBrain* brain) {
+void DeceitorDirector::attach(uint32_t mobId, cDeceitorBrain* brain) { brains_[mobId] = brain; }
+void DeceitorDirector::detach(uint32_t mobId, cDeceitorBrain* brain) {
   const auto it = brains_.find(mobId);
   if (it != brains_.end() && it->second == brain) brains_.erase(it);
 }
-DeceitorBrain* DeceitorDirector::brain(uint32_t mobId) {
+cDeceitorBrain* DeceitorDirector::brain(uint32_t mobId) {
   const auto it = brains_.find(mobId);
   return it == brains_.end() ? nullptr : it->second;
 }
-const DeceitorBrain* DeceitorDirector::brain(uint32_t mobId) const {
+const cDeceitorBrain* DeceitorDirector::brain(uint32_t mobId) const {
   const auto it = brains_.find(mobId);
   return it == brains_.end() ? nullptr : it->second;
 }
@@ -222,7 +222,7 @@ std::vector<uint32_t> DeceitorDirector::mobIds() const {
 }
 
 bool DeceitorDirector::playerInteract(uint32_t mobId, uint64_t aiTick) {
-  if (DeceitorBrain* b = brain(mobId)) b->provoke(aiTick);
+  if (cDeceitorBrain* b = brain(mobId)) b->provoke(aiTick);
   return false;  // a Deceitor has NO trading interface — that is the tell
 }
 
@@ -231,7 +231,7 @@ void DeceitorDirector::playerAttacked(ai::AiWorld& world, uint32_t mobId) {
   if (!victim) return;
   const ai::Cell v = victim->pos;
   for (const auto id : mobIds()) {
-    DeceitorBrain* b = brain(id);
+    cDeceitorBrain* b = brain(id);
     const ai::Mob* m = world.mob(id);
     if (!b || !m) continue;
     const double dx = double(m->pos.x - v.x), dz = double(m->pos.z - v.z);
@@ -240,7 +240,7 @@ void DeceitorDirector::playerAttacked(ai::AiWorld& world, uint32_t mobId) {
 }
 
 DeceitorFace DeceitorDirector::faceOf(uint32_t mobId) const {
-  const DeceitorBrain* b = brain(mobId);
+  const cDeceitorBrain* b = brain(mobId);
   return b ? b->face() : DeceitorFace::Neutral;
 }
 

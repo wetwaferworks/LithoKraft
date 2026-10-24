@@ -188,7 +188,7 @@ int runWiringSelfTest() {
         ("lithokraft_wiring_selftest_" + std::to_string(std::time(nullptr)));
     fs::remove_all(dir);
     fs::create_directories(dir);
-    WorldSave save(dir);
+    cWorldSave save(dir);
     PlayerMeta m;
     m.dimension = "wafer";
     ItemStack named;
@@ -334,7 +334,7 @@ int runWiringSelfTest() {
     const fs::path dir = fs::temp_directory_path() / ("lithokraft_prayer_selftest_" + std::to_string(std::time(nullptr)));
     fs::remove_all(dir);
     fs::create_directories(dir);
-    WorldSave save(dir);
+    cWorldSave save(dir);
     PlayerMeta m;
     m.dimension = "wafer";
     m.prayerDay = 7;
@@ -363,7 +363,7 @@ int runWiringSelfTest() {
     };
     const fs::path ldir = dir / "legacy";
     fs::create_directories(ldir);
-    WorldSave lsave(ldir);
+    cWorldSave lsave(ldir);
     std::string werr;
     check(storage::writeFileAtomic(ldir / "player.dat", handBuilt(6, true), &werr), "hand-built v6 player.dat writes");
     const auto back6 = lsave.readPlayer(&err);
@@ -382,10 +382,10 @@ int runWiringSelfTest() {
     lsave.setSeed(99);
     check(lsave.writeWorldMeta(&err), "level.json v1 (no clock) writes");
     std::string cerr;
-    check(!WorldSave::readWorldClock(ldir, &cerr) && cerr.empty(), "world clock: a level.json without a clock reads as absent");
+    check(!cWorldSave::readWorldClock(ldir, &cerr) && cerr.empty(), "world clock: a level.json without a clock reads as absent");
     lsave.setWorldClock(0x2'0000'0001ull, 123456789ull);
     check(lsave.writeWorldMeta(&err), "level.json v2 writes");
-    const auto clk = WorldSave::readWorldClock(ldir, &cerr);
+    const auto clk = cWorldSave::readWorldClock(ldir, &cerr);
     check(clk && clk->tick == 0x2'0000'0001ull && clk->time == 123456789ull, "world clock: worldTick + worldTime round-trip in level.json");
     fs::remove_all(dir);
   }

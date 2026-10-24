@@ -7,7 +7,7 @@
 // is registered per itemId for behavior ALREADY DEFINED in code/docs;
 // dispatch for an item with no handler FAILS CLOSED: it logs and returns
 // Failed, never a silent fake success. Handlers run on the SIM thread
-// (SignalWorldSimulation::command, kCmdItemUse) because they mutate the
+// (cSignalWorldSim::command, kCmdItemUse) because they mutate the
 // world; Game::handleWorldActions routes the player's Use press there
 // through SimThread::edit, exactly like block Use.
 #pragma once

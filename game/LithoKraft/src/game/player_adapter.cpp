@@ -1,4 +1,4 @@
-// GamePlayerAdapter implementation. LF line endings.
+// cGamePlayerAdapter implementation. LF line endings.
 #include "lithokraft/game/player_adapter.h"
 
 #include <algorithm>
@@ -21,7 +21,7 @@ bool blockIsLiquid(BlockId id) {
   return def.behavior == "water" || def.behavior == "liquid" || def.behavior == "lava";
 }
 
-GamePlayerAdapter::GamePlayerAdapter(Player& gamePlayer) : game_(gamePlayer) {
+cGamePlayerAdapter::cGamePlayerAdapter(Player& gamePlayer) : game_(gamePlayer) {
   // Standard vitals first (health/oxygen/stamina, 0..64, default 64, on
   // the IVitals registry), then the engine's standard stat (xp) and
   // LithoKraft's own stats (kharge, static) on IStat. Registration is
@@ -40,14 +40,14 @@ GamePlayerAdapter::GamePlayerAdapter(Player& gamePlayer) : game_(gamePlayer) {
   syncFromGame(1, 0.f);          // 1 = Wafer until the game passes the real dimension
 }
 
-litholattice::IPlayer& GamePlayerAdapter::enginePlayer() { return manager_.localPlayer(); }
+litholattice::IPlayer& cGamePlayerAdapter::enginePlayer() { return manager_.localPlayer(); }
 
-const litholattice::IPlayer& GamePlayerAdapter::enginePlayer() const {
+const litholattice::IPlayer& cGamePlayerAdapter::enginePlayer() const {
   // The constructor created the local player; it lives as long as the manager.
   return *manager_.player(manager_.localId());
 }
 
-bool GamePlayerAdapter::teleportTripped(float dtSeconds) {
+bool cGamePlayerAdapter::teleportTripped(float dtSeconds) {
   // Implied speed of the position delta since the last sync; a
   // discontinuity (respawn / dimension switch / scripted move) trips the
   // guard. The baseline refreshes here so every sync path shares it.
@@ -62,7 +62,7 @@ bool GamePlayerAdapter::teleportTripped(float dtSeconds) {
   return tripped;
 }
 
-void GamePlayerAdapter::mirrorState(uint8_t dimensionNumber, double vx, double vy, double vz) {
+void cGamePlayerAdapter::mirrorState(uint8_t dimensionNumber, double vx, double vy, double vz) {
   litholattice::IPlayer& p = enginePlayer();
   litholattice::PlayerState& st = p.state();
   // PLY-4: onPlayerStateChanged is a CHANGE notification — Game mirrors
@@ -92,7 +92,7 @@ void GamePlayerAdapter::mirrorState(uint8_t dimensionNumber, double vx, double v
   if (changed) p.notifyStateChanged();
 }
 
-void GamePlayerAdapter::syncFromGame(uint8_t dimensionNumber, float dtSeconds) {
+void cGamePlayerAdapter::syncFromGame(uint8_t dimensionNumber, float dtSeconds) {
   // Legacy path (init-time syncs, before the locomotion body is the
   // movement authority): velocity derived from the movement actually
   // applied since the last sync, teleport-guarded.
@@ -111,7 +111,7 @@ void GamePlayerAdapter::syncFromGame(uint8_t dimensionNumber, float dtSeconds) {
   mirrorState(dimensionNumber, vx, vy, vz);
 }
 
-void GamePlayerAdapter::syncFromGame(uint8_t dimensionNumber, float dtSeconds, const Vec3& trueVelocity) {
+void cGamePlayerAdapter::syncFromGame(uint8_t dimensionNumber, float dtSeconds, const Vec3& trueVelocity) {
   // The locomotion body's velocity is the truth; the teleport guard still
   // vetoes it for one sync when the position itself jumped (a teleport
   // tick reports zero velocity once).
@@ -122,21 +122,21 @@ void GamePlayerAdapter::syncFromGame(uint8_t dimensionNumber, float dtSeconds, c
   mirrorState(dimensionNumber, trueVelocity.x, trueVelocity.y, trueVelocity.z);
 }
 
-int32_t GamePlayerAdapter::health() const { return enginePlayer().vital(vitals_.health); }
-int32_t GamePlayerAdapter::oxygen() const { return enginePlayer().vital(vitals_.oxygen); }
-int32_t GamePlayerAdapter::stamina() const { return enginePlayer().vital(vitals_.stamina); }
-int32_t GamePlayerAdapter::kharge() const { return enginePlayer().stat(kharge_); }
-int32_t GamePlayerAdapter::xp() const { return enginePlayer().stat(standardStats_.xp); }
-int32_t GamePlayerAdapter::staticCharge() const { return enginePlayer().stat(static_); }
+int32_t cGamePlayerAdapter::health() const { return enginePlayer().vital(vitals_.health); }
+int32_t cGamePlayerAdapter::oxygen() const { return enginePlayer().vital(vitals_.oxygen); }
+int32_t cGamePlayerAdapter::stamina() const { return enginePlayer().vital(vitals_.stamina); }
+int32_t cGamePlayerAdapter::kharge() const { return enginePlayer().stat(kharge_); }
+int32_t cGamePlayerAdapter::xp() const { return enginePlayer().stat(standardStats_.xp); }
+int32_t cGamePlayerAdapter::staticCharge() const { return enginePlayer().stat(static_); }
 // Cortana 2026-10-15 2255: prayer payout. Adds to the base (the registry clamps to the stat range).
-void GamePlayerAdapter::grantStatic(int32_t amount) {
+void cGamePlayerAdapter::grantStatic(int32_t amount) {
   if (amount <= 0) return;
   const int64_t next = int64_t(enginePlayer().stat(static_)) + amount;
   enginePlayer().setStat(static_, int32_t(std::min<int64_t>(next, INT32_MAX)));
 }
-bool GamePlayerAdapter::alive() const { return enginePlayer().alive(); }
+bool cGamePlayerAdapter::alive() const { return enginePlayer().alive(); }
 
-std::vector<std::pair<std::string, double>> GamePlayerAdapter::namedStats() const {
+std::vector<std::pair<std::string, double>> cGamePlayerAdapter::namedStats() const {
   const litholattice::IPlayer& p = enginePlayer();
   const litholattice::VitalRegistry& vreg = manager_.vitals();
   const litholattice::StatRegistry& reg = manager_.stats();
@@ -169,7 +169,7 @@ std::vector<std::pair<std::string, double>> GamePlayerAdapter::namedStats() cons
   return out;
 }
 
-std::map<std::string, int32_t> GamePlayerAdapter::statsForSave() const {
+std::map<std::string, int32_t> cGamePlayerAdapter::statsForSave() const {
   const litholattice::IPlayer& p = enginePlayer();
   const litholattice::StatRegistry& reg = manager_.stats();
   std::map<std::string, int32_t> out;
@@ -180,7 +180,7 @@ std::map<std::string, int32_t> GamePlayerAdapter::statsForSave() const {
   return out;
 }
 
-void GamePlayerAdapter::applySavedStats(const std::map<std::string, int32_t>& saved) {
+void cGamePlayerAdapter::applySavedStats(const std::map<std::string, int32_t>& saved) {
   const uint64_t pid = enginePlayer().playerId();
   litholattice::StatRegistry& reg = manager_.stats();
   for (const auto& [name, value] : saved) {
@@ -189,7 +189,7 @@ void GamePlayerAdapter::applySavedStats(const std::map<std::string, int32_t>& sa
   }
 }
 
-std::map<std::string, int32_t> GamePlayerAdapter::vitalsForSave() const {
+std::map<std::string, int32_t> cGamePlayerAdapter::vitalsForSave() const {
   const litholattice::IPlayer& p = enginePlayer();
   const litholattice::VitalRegistry& reg = manager_.vitals();
   std::map<std::string, int32_t> out;
@@ -200,7 +200,7 @@ std::map<std::string, int32_t> GamePlayerAdapter::vitalsForSave() const {
   return out;
 }
 
-void GamePlayerAdapter::applySavedVitals(const std::map<std::string, int32_t>& saved) {
+void cGamePlayerAdapter::applySavedVitals(const std::map<std::string, int32_t>& saved) {
   const uint64_t pid = enginePlayer().playerId();
   litholattice::VitalRegistry& reg = manager_.vitals();
   for (const auto& [name, value] : saved) {
@@ -209,7 +209,7 @@ void GamePlayerAdapter::applySavedVitals(const std::map<std::string, int32_t>& s
   }
 }
 
-void GamePlayerAdapter::tickVitals(uint64_t ticks, bool headInLiquid, bool sprinting, int targetTps) {
+void cGamePlayerAdapter::tickVitals(uint64_t ticks, bool headInLiquid, bool sprinting, int targetTps) {
   if (!ticks) return;
   // PLY-1: convert world ticks at targetTps into reference-rate (32 Hz)
   // ticks before the calibrated accumulators below see them. The

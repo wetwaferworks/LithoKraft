@@ -23,7 +23,7 @@
 //   - a free camera for spectate/debug (Free mode): Look turns it, the
 //     movement actions fly it; the player is untouched while it is active.
 //   - pilot cameras for MCP agent vision: one engine camera per pilot in
-//     the PilotCameraRig, created lazily, shared with McpSensesAdapter.
+//     the cPilotCameraRig, created lazily, shared with McpSensesAdapter.
 //
 // Presentation only: nothing here feeds the sim thread, and camera state is
 // never an input to deterministic simulation.
@@ -42,7 +42,7 @@
 // start from the true view.
 //
 // Threading: the controller and the engine cameras live on the game thread
-// (update() runs inside Game::update). The PilotCameraRig is the exception:
+// (update() runs inside Game::update). The cPilotCameraRig is the exception:
 // MCP server threads read/write pilot state through it, so it guards its
 // mirror state with a mutex and the engine cameras behind it are only ever
 // touched from the game thread (the controller publishes resolved poses
@@ -128,10 +128,10 @@ struct GameCameraHooks {
 /// pose set through setFreePose(); cameraPose() reports the MCP-side pose
 /// (degrees, CameraPose convention); capture resolves the eye from the
 /// engine camera's game-thread-computed pose.
-class PilotCameraRig {
+class cPilotCameraRig {
  public:
-  explicit PilotCameraRig(GameCameraHooks hooks);
-  ~PilotCameraRig();
+  explicit cPilotCameraRig(GameCameraHooks hooks);
+  ~cPilotCameraRig();
 
   /// Pilots the rig serves. v1 registers exactly "player" (the local
   /// player), matching McpSensesAdapter::pilotIds().
@@ -205,7 +205,7 @@ class GameCameraController {
   /// the pose update() last computed.
   CameraViewPose viewPose() const;
 
-  std::shared_ptr<PilotCameraRig> pilotRig() { return pilotRig_; }
+  std::shared_ptr<cPilotCameraRig> pilotRig() { return pilotRig_; }
 
   /// One non-player camera's chunk-load request (CAM-2, P2c 2026-10-13):
   /// chunk column (cx, cz) + radius in chunks, from that camera's
@@ -235,7 +235,7 @@ class GameCameraController {
   // controller integrates movement input into it and setPose()s the result).
   litholattice::Vec3 freePos_{};
   float freeYaw_ = 0.f, freePitch_ = 0.f;
-  std::shared_ptr<PilotCameraRig> pilotRig_;
+  std::shared_ptr<cPilotCameraRig> pilotRig_;
 };
 
 /// Console surface (Decision-9 pattern, mirroring GameCommandBindings):

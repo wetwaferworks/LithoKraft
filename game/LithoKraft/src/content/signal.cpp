@@ -331,7 +331,7 @@ void SignalSim::keyPulse(int x, int y, int z, int front, int control) {
 
 void SignalSim::tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty) {
   // Reassembled from the hs* pieces (hs-design §3.2); the handshake path in
-  // SignalWorldSimulation drives the identical pieces through the authority.
+  // cSignalWorldSim drives the identical pieces through the authority.
   hsBeginCycle(w, pcx, pcz, radius);
   hsFlipAndTorches(w, dirty);
   hsComponents(w, dirty);

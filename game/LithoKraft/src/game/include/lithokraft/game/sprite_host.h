@@ -1,4 +1,4 @@
-// SpriteHost: LithoKraft's host for the engine sprite system
+// cSpriteHost: LithoKraft's host for the engine sprite system
 // (litholattice::sprite). Owns the game's cSpriteReg + SpriteSystem,
 // registers the starter sprite defs (proving every image source the core
 // offers), ticks instances from the game's sim-tick stream, and converts
@@ -45,11 +45,11 @@ class cConsoleReg;
 
 namespace lithokraft {
 
-class ResourceManager;
+class cResourceMgr;
 
-class SpriteHost {
+class cSpriteHost {
  public:
-  SpriteHost();
+  cSpriteHost();
 
   /// Register the starter defs (idempotent: the registry is first-wins,
   /// so a second call keeps the originals). Sources, one per kind:
@@ -60,13 +60,13 @@ class SpriteHost {
   ///   fx:glyph_a     - Systerian glyph 'A', violet on dark (Image source).
   ///   fx:icon_certificate_table - the certificate table's pack icon,
   ///     decoded from textures/ui/icons/certificate_table.png by the
-  ///     ResourceManager (Image source; the raw PNG entry points are
+  ///     cResourceMgr (Image source; the raw PNG entry points are
   ///     exercised against the pack file in the host selftest).
   ///   fx:pulse       - animated 4-frame star strip built in code
   ///     (Image source, frameCount 4, additive).
   ///   fx:spark       - small additive mote, the burst workhorse.
   /// Failures are logged (and the def skipped), never fatal.
-  void registerStarterSprites(const ResourceManager& resources);
+  void registerStarterSprites(const cResourceMgr& resources);
 
   // -- console-facing operations (positions are world blocks) --------------
   /// Spawn `count` immortal markers of def `name` scattered deterministically

@@ -1,4 +1,4 @@
-// GamePlayerAdapter: presents LithoKraft's local player as an engine IPlayer.
+// cGamePlayerAdapter: presents LithoKraft's local player as an engine IPlayer.
 //
 // The game keeps its own Player (creative-flight camera + inventory, player.h).
 // The engine's player system (litholattice/player: PlayerManager, IPlayer,
@@ -60,7 +60,7 @@ Vec3 playerEyePos(const Player& p, float eyeHeight);
 /// below is wired and live, and starts draining the day a liquid block lands.
 bool blockIsLiquid(BlockId id);
 
-class GamePlayerAdapter {
+class cGamePlayerAdapter {
  public:
   /// Vitals pacing, in sim world ticks (32/s at the default TPS). One stat
   /// point per N ticks, so a full 64-point bar is 64*N ticks of budget.
@@ -70,7 +70,7 @@ class GamePlayerAdapter {
   static constexpr uint64_t kStaminaDrainTicks = 16;  ///< sprinting: 1 point / 0.5 s
   static constexpr uint64_t kStaminaRegenTicks = 8;   ///< otherwise: 1 point / 0.25 s
 
-  explicit GamePlayerAdapter(Player& gamePlayer);
+  explicit cGamePlayerAdapter(Player& gamePlayer);
 
   /// The engine view of the local player (id = the manager's local id).
   litholattice::IPlayer& enginePlayer();

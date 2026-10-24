@@ -131,10 +131,10 @@ McpPlayerView::Snapshot McpPlayerView::localPlayer() {
   GameState g = snapshot_();
   Snapshot s;
   s.x = g.x; s.y = g.y; s.z = g.z;
-  s.vx = g.vx; s.vy = g.vy; s.vz = g.vz;  // derived from applied movement by GamePlayerAdapter
+  s.vx = g.vx; s.vy = g.vy; s.vz = g.vz;  // derived from applied movement by cGamePlayerAdapter
   s.yaw = g.yaw; s.pitch = g.pitch;
   s.dimension = g.dimension;
-  s.health = g.health;  // the real health stat, via GamePlayerAdapter
+  s.health = g.health;  // the real health stat, via cGamePlayerAdapter
   s.stats = g.stats;
   s.hotbar = std::move(g.hotbar);
   s.selectedSlot = g.selectedSlot;

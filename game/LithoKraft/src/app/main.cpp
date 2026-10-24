@@ -1144,7 +1144,7 @@ int main(int argc, char** argv) {
   // to seed 0 inside worldgen and is unaffected either way.
   if (!cfg.saveDir.empty()) {
     std::string seedErr;
-    if (const auto persisted = WorldSave::readWorldSeed(cfg.saveDir, &seedErr)) {
+    if (const auto persisted = cWorldSave::readWorldSeed(cfg.saveDir, &seedErr)) {
       if (seedGiven && *persisted != cfg.seed)
         logError("save: --seed %llu DISAGREES with the saved world's seed %llu in '%s'; using the SAVED seed (an existing world must not regenerate under a new seed)",
                  (unsigned long long)cfg.seed, (unsigned long long)*persisted, cfg.saveDir.c_str());
@@ -1152,7 +1152,7 @@ int main(int argc, char** argv) {
     } else if (!seedErr.empty()) {
       // Present but unreadable after recovery: warn loudly and fall back to
       // the CLI/default seed. (level.json alone gates no region data — the
-      // blocks.names fail-closed path in WorldSave is the data gate.)
+      // blocks.names fail-closed path in cWorldSave is the data gate.)
       logError("save: world metadata in '%s' is unreadable (%s); falling back to %s seed %llu", cfg.saveDir.c_str(), seedErr.c_str(),
                seedGiven ? "the --seed" : "the default", (unsigned long long)cfg.seed);
     }
@@ -1162,7 +1162,7 @@ int main(int argc, char** argv) {
   // v1/v2 saves carry none and keep the configured area (old behaviour).
   if (!cfg.saveDir.empty()) {
     std::string areaErr;
-    if (const auto wa = WorldSave::readWorldArea(cfg.saveDir, &areaErr)) {
+    if (const auto wa = cWorldSave::readWorldArea(cfg.saveDir, &areaErr)) {
       const bool simD = wa->sim == litholattice::AreaShape::Diamond, simR = wa->sim == litholattice::AreaShape::Round;
       const bool strD = wa->stream == litholattice::AreaShape::Diamond;
       if (simD != cfg.diamondSimArea || (!simD && simR != cfg.roundSimArea) || strD != cfg.diamondStreamArea || wa->tickRadius != cfg.tickRadius)
@@ -1204,7 +1204,7 @@ int main(int argc, char** argv) {
   }
   cfg.materials = &materials;
   const std::vector<std::filesystem::path> modPacks = scanMods(argv[0]);
-  ResourceManager resources(packStack(assets, pack, extraPacks, modPacks));  // outlives the game (mesh jobs)
+  cResourceMgr resources(packStack(assets, pack, extraPacks, modPacks));  // outlives the game (mesh jobs)
   resources.reload();
   resources.apply(*renderer);
   AudioEngine audio;  // outlives the output device and the game

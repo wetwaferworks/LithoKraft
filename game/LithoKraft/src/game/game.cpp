@@ -105,7 +105,7 @@ static int resolvedTwinkle(const GameSettings& s) {
   return resolvedLeavesFancy(s) ? 2 : 1;
 }
 
-Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceManager& resources, AudioEngine& audio,
+Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceMgr& resources, AudioEngine& audio,
            InputSystem& input)
     : cfg_(cfg),
       ui_({[this](int slot) { hot_ = slot; }, [this](BlockId b, bool shift) { pickInventoryBlock(b, shift); },
@@ -732,7 +732,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceMa
   };
   std::optional<PlayerMeta> savedPlayer;
   if (!cfg_.saveDir.empty()) {
-    save_ = std::make_unique<WorldSave>(cfg_.saveDir, cfg_.materials);
+    save_ = std::make_unique<cWorldSave>(cfg_.saveDir, cfg_.materials);
     save_->setSeed(cfg_.seed);  // SV-H2: cfg.seed already carries the persisted-seed override (main.cpp)
     save_->setWorldArea({simAreaShapeOf(cfg_), streamAreaShapeOf(cfg_), cfg_.tickRadius});  // Fix run 3: level.json v3 (main.cpp applies the saved area)
     std::string err;
@@ -742,7 +742,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceMa
     // saved before the clock existed migrates the v6 player play clock (ticks at 32 TPS), else
     // starts at tick 0 (00:00 of day 0).
     std::string cerr;
-    if (const auto c = WorldSave::readWorldClock(cfg_.saveDir, &cerr)) {
+    if (const auto c = cWorldSave::readWorldClock(cfg_.saveDir, &cerr)) {
       worldClock_ = worldclock::Clock{c->tick, c->time};
     } else {
       if (!cerr.empty()) logError("save: %s (world clock starts at 0)", cerr.c_str());
@@ -1090,7 +1090,7 @@ void Game::loadActive() {
   if (sc.timingHandshake) logInfo("timing handshake: ON (phases/cycle %d; applies at this world load)", sc.handshakePhasesPerCycle);
   placeRefunds_.clear();  // receipts belong to the sim that is replaced here
   clockSynced_ = false;   // 2026-10-16: a new sim's worldTick must not be diffed against the old one's
-  auto worldSim = std::make_unique<SignalWorldSimulation>();
+  auto worldSim = std::make_unique<cSignalWorldSim>();
   for (PatternRomScreen& r : roms) worldSim->addPatternRom(std::move(r));  // before the sim thread owns it
   sim_ = std::make_unique<SimThread>(active_->chunks, blockRegistry(), std::move(worldSim), std::move(sc),
                                      submitMesh_);
@@ -1102,7 +1102,7 @@ void Game::loadActive() {
     // logged with its loaded count, plus the signal state, so streaming distance cannot change what is hashed.
     const uint64_t at = std::strtoull(hashAt, nullptr, 10);
     ChunkMap* cm = &active_->chunks;
-    SignalSim* sig = &static_cast<SignalWorldSimulation&>(sim_->simulation()).signal();
+    SignalSim* sig = &static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
     SimThread* simp = sim_.get();
     int rcx = 3, rcz = 2;  // LL_HASH_REGION=cx,cz (default: the test world's spawn / circuit chunk)
     if (const char* e = std::getenv("LL_HASH_REGION")) std::sscanf(e, "%d,%d", &rcx, &rcz);
@@ -1143,13 +1143,13 @@ void Game::loadActive() {
     logInfo("hash-at-tick: armed for world tick %llu (LL_HASH_AT_TICK, measure only)", (unsigned long long)at);
   }
   if (restored > 0) {
-    if (!static_cast<SignalWorldSimulation&>(sim_->simulation()).signal().importState(signalState))
+    if (!static_cast<cSignalWorldSim&>(sim_->simulation()).signal().importState(signalState))
       logError("save '%s': signal state unreadable (components restart idle)", active_->id.c_str());
     logInfo("save: '%s' restored %d columns", active_->id.c_str(), restored);
   }
   // Lamp afterglow (visual only): ~1/30 s at high TPS so 1-tick pulses reach a rendered frame.
   // The pattern wall lights each pixel once per colour sweep, so it holds a lamp for > one sweep.
-  static_cast<SignalWorldSimulation&>(sim_->simulation()).signal().setLampHoldTicks(
+  static_cast<cSignalWorldSim&>(sim_->simulation()).signal().setLampHoldTicks(
       cfg_.benchScene == "pattern-wall" ? 600 : cfg_.tps >= 256 ? cfg_.tps / 30 : 0);
   // Player-centered chunk streaming: the pre-bake above only covers the fixed
   // [0, worldChunks)^2 square at the origin; the streamer generates/loads the
@@ -1230,7 +1230,7 @@ bool Game::saveWorld(const char* reason, bool wait) {
   const std::unordered_set<uint64_t> dirty = sim_->takeChangedColumns();
   advanceWorldClock();  // Cortana 2026-10-16: bring the clock up to the stopped sim, then persist it
   save_->setWorldClock(worldClock_.tick, worldClock_.time);
-  const size_t n = save_->saveDimension(active_->id, active_->chunks, static_cast<SignalWorldSimulation&>(sim_->simulation()).signal(),
+  const size_t n = save_->saveDimension(active_->id, active_->chunks, static_cast<cSignalWorldSim&>(sim_->simulation()).signal(),
                                         wait, &dirty);
   sim_->start();
   applySimPause();  // restore the machine's pause computation on the restarted sim
@@ -1318,7 +1318,7 @@ void Game::pumpStreaming() {
   constexpr size_t kStreamInsertBudget = 4;
   std::vector<StreamedColumn> fresh = streamer_->takeReadyUpTo(kStreamInsertBudget);
   if (fresh.empty()) return;  // hold released by the lock's destructor
-  SignalSim& signal = static_cast<SignalWorldSimulation&>(sim_->simulation()).signal();
+  SignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   size_t added = 0;
   for (auto& sc : fresh) {
     std::unique_ptr<ChunkColumn> col = std::move(sc.column);
@@ -1428,7 +1428,7 @@ void Game::evictFarColumns() {
               sim_->handshakeFrozen() ? "timing handshake frozen" : "handshake workers outstanding");
     return;
   }
-  SignalSim& signal = static_cast<SignalWorldSimulation&>(sim_->simulation()).signal();
+  SignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   size_t evicted = 0;
   for (uint64_t key : candidates) {
     const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
@@ -1485,7 +1485,7 @@ int Game::surfaceYAt(int x, int z) {
 // thread between ticks (inside SimThread::runBetweenTicks): the sim owns the map while ticking.
 LithoReader Game::lithoReader() {
   ChunkMap& ch = active_->chunks;
-  const SignalSim& sig = static_cast<SignalWorldSimulation&>(sim_->simulation()).signal();
+  const SignalSim& sig = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   return LithoReader{[&ch](int x, int y, int z) { return ch.get(x, y, z); },
                      [&ch](int x, int y, int z) { return ch.getState(x, y, z); },
                      [&ch, &sig](int x, int y, int z) { return sig.strongPowered(ch, x, y, z); }};

@@ -74,12 +74,12 @@ class McpPlayerView : public litholattice::mcp::IPlayerView {
  public:
   struct GameState {
     double x = 0, y = 0, z = 0;
-    double vx = 0, vy = 0, vz = 0;  ///< true velocity (blocks/s), via GamePlayerAdapter
+    double vx = 0, vy = 0, vz = 0;  ///< true velocity (blocks/s), via cGamePlayerAdapter
     float yaw = 0, pitch = 0;
     uint8_t dimension = 1;
     uint8_t health = 64;  ///< effective health stat (IPlayer integration)
     /// Named stats (name, effective value) from the engine stat registry,
-    /// via GamePlayerAdapter::namedStats().
+    /// via cGamePlayerAdapter::namedStats().
     std::vector<std::pair<std::string, double>> stats;
     std::vector<uint16_t> hotbar;
     int selectedSlot = 0;

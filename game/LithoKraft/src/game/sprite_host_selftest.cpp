@@ -1,4 +1,4 @@
-// SpriteHost self-test (app selftest section): proves the game-side sprite
+// cSpriteHost self-test (app selftest section): proves the game-side sprite
 // integration end to end without a window —
 //   * the starter defs register from every image-source kind the core
 //     offers (Image, SVG text, PNG file, PNG bytes), first-wins intact;
@@ -69,10 +69,10 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
     if (!ok) ++fails;
   };
 
-  ResourceManager rm(packDirs);
+  cResourceMgr rm(packDirs);
   rm.reload();
 
-  SpriteHost host;
+  cSpriteHost host;
   host.registerStarterSprites(rm);
   spr::ISpriteReg& reg = host.registry();
 
@@ -97,7 +97,7 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
   // -- PNG entry points against the real pack file --------------------------
   {
     const std::string iconFile =
-        std::string("textures/ui/icons/") + ResourceManager::iconName(kCertificateTable) + ".png";
+        std::string("textures/ui/icons/") + cResourceMgr::iconName(kCertificateTable) + ".png";
     std::filesystem::path found;
     for (auto it = packDirs.rbegin(); it != packDirs.rend(); ++it) {  // highest priority last
       if (std::filesystem::exists(*it / iconFile)) {
@@ -155,7 +155,7 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
 
   // -- animation advances on sim ticks (own host: the only quad is the pulse)
   {
-    SpriteHost anim;
+    cSpriteHost anim;
     anim.registerStarterSprites(rm);
     anim.spawnNamed("fx:pulse", {0.f, 100.f, 0.f}, 1);
     auto frameOrigin = [&]() -> std::pair<float, float> {
@@ -212,7 +212,7 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
     check(sceneOk, "sprite capture: wafer scene generated + meshed for the software render");
 
     if (sceneOk) {
-      SpriteHost world;
+      cSpriteHost world;
       world.registerStarterSprites(rm);
       const uint32_t bigStar = world.registry().findSprite("fx:star5");
       spr::SpriteSpawn sp;

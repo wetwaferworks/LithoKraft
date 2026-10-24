@@ -201,7 +201,7 @@ int main(int argc, char** argv) {
   // Real textures, same loading as biome_capture.
   const std::string engineAssets = root + "/engine/assets";  // Cortana 2026-10-15 1405
   const std::string gameAssets = root + "/game/LithoKraft/assets";
-  lithokraft::ResourceManager rm({engineAssets, gameAssets,
+  lithokraft::cResourceMgr rm({engineAssets, gameAssets,
                                   std::filesystem::path(gameAssets) / "packs" / "pack_64"});
   rm.reload();
   const auto materialsPtr = rm.materials();

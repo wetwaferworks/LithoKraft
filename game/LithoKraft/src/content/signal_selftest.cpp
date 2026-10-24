@@ -845,7 +845,7 @@ int runSignalSelfTest() {
     ChunkMap sw;
     sw.setRegistry(&blockRegistry());
     { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; sw.insert(std::move(col)); }
-    SignalWorldSimulation sim;
+    cSignalWorldSim sim;
     sw.set(2, y - 1, 2, kWaferSilicon); sw.set(4, y + 1, 2, kGlass);
     const bool onFloor = sim.canPlace(sw, 2, y, 2, kRedTrace), underCeiling = sim.canPlace(sw, 4, y, 2, kRedTrace);
     const bool floating = sim.canPlace(sw, 6, y, 2, kRedTrace), viaFree = sim.canPlace(sw, 6, y, 2, kRedVia);
@@ -859,7 +859,7 @@ int runSignalSelfTest() {
     ChunkMap sw;
     sw.setRegistry(&blockRegistry());
     { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; sw.insert(std::move(col)); }
-    SignalWorldSimulation sim;
+    cSignalWorldSim sim;
     sw.set(2, y + 1, 2, kWaferSilicon);  // the ceiling block
     const bool hangs = sim.canAttach(sw, 2, y, 2, kRedTorch, 2) && sim.canAttach(sw, 2, y, 2, kBlueTorch, 2);
     const bool noAir = !sim.canAttach(sw, 6, y, 2, kRedTorch, 2);  // still needs a solid support

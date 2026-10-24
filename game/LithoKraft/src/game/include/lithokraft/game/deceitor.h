@@ -160,12 +160,12 @@ class DeceitorDirector;
 /// AiWorld owns it). Registers itself with the director on first tick
 /// and unregisters on destruction, so the director's registry is always
 /// exactly the live population.
-class DeceitorBrain final : public litholattice::ai::IBtNode {
+class cDeceitorBrain final : public litholattice::ai::IBtNode {
  public:
-  explicit DeceitorBrain(DeceitorDirector& dir) : dir_(dir) {}
-  ~DeceitorBrain() override;
-  DeceitorBrain(const DeceitorBrain&) = delete;
-  DeceitorBrain& operator=(const DeceitorBrain&) = delete;
+  explicit cDeceitorBrain(DeceitorDirector& dir) : dir_(dir) {}
+  ~cDeceitorBrain() override;
+  cDeceitorBrain(const cDeceitorBrain&) = delete;
+  cDeceitorBrain& operator=(const cDeceitorBrain&) = delete;
 
   litholattice::ai::BtStatus tick(litholattice::ai::AiContext& ctx) override;
 
@@ -224,11 +224,11 @@ class DeceitorDirector {
   /// the AiWorld mob cap. The brain self-registers on its first tick.
   std::optional<uint32_t> spawn(litholattice::ai::AiWorld& world, litholattice::ai::Cell at);
 
-  // Brain registry (attach/detach are called by DeceitorBrain only).
-  void attach(uint32_t mobId, DeceitorBrain* brain);
-  void detach(uint32_t mobId, DeceitorBrain* brain);
-  DeceitorBrain* brain(uint32_t mobId);
-  const DeceitorBrain* brain(uint32_t mobId) const;
+  // Brain registry (attach/detach are called by cDeceitorBrain only).
+  void attach(uint32_t mobId, cDeceitorBrain* brain);
+  void detach(uint32_t mobId, cDeceitorBrain* brain);
+  cDeceitorBrain* brain(uint32_t mobId);
+  const cDeceitorBrain* brain(uint32_t mobId) const;
   std::vector<uint32_t> mobIds() const;
   size_t population() const { return brains_.size(); }
 
@@ -253,7 +253,7 @@ class DeceitorDirector {
 
  private:
   std::unique_ptr<litholattice::ai::IMovementMode> walk_;
-  std::map<uint32_t, DeceitorBrain*> brains_;
+  std::map<uint32_t, cDeceitorBrain*> brains_;
   DeceitorHooks hooks_;
 };
 

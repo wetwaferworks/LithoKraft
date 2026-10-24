@@ -11,11 +11,11 @@
 
 namespace lithokraft {
 
-ResourceManager::ResourceManager(std::vector<std::filesystem::path> packDirs)
+cResourceMgr::cResourceMgr(std::vector<std::filesystem::path> packDirs)
     : dirs_(std::move(packDirs)), materials_(std::make_shared<const BlockMaterials>()) {}
 
-void ResourceManager::reload() {
-  PackStack stack;
+void cResourceMgr::reload() {
+  cPackStack stack;
   // 2026-10-16 (JD rename): Repeator art is named repeator_*; packs that still ship only the
   // old repeater_* files keep working through this fallback.
   stack.addFileFallback("repeator", "repeater");
@@ -96,30 +96,30 @@ void ResourceManager::reload() {
   materials_ = std::move(materials);
 }
 
-void ResourceManager::apply(IRenderer& renderer) const {
+void cResourceMgr::apply(IRenderer& renderer) const {
   if (!renderer.textureArray().upload(resources_.textures)) logError("resources: texture array upload reported a GL error");
   renderer.setMaterials(*materials());
   renderer.loadShaders(shaders_);
 }
 
-WorldgenSettings ResourceManager::worldgen(uint64_t seed) const {
+WorldgenSettings cResourceMgr::worldgen(uint64_t seed) const {
   WorldgenSettings s;
   s.seed = seed;
   s.generators = worldgenSources_;
   return s;
 }
 
-std::shared_ptr<const BlockMaterials> ResourceManager::materials() const {
+std::shared_ptr<const BlockMaterials> cResourceMgr::materials() const {
   std::lock_guard lock(mutex_);
   return materials_;
 }
 
-const Image* ResourceManager::itemIcon(uint32_t itemId) const {
+const Image* cResourceMgr::itemIcon(uint32_t itemId) const {
   const auto it = itemIcons_.find(itemId);
   return it != itemIcons_.end() && !it->second.empty() ? &it->second : nullptr;
 }
 
-std::string ResourceManager::iconName(BlockId b) {
+std::string cResourceMgr::iconName(BlockId b) {
   const std::string tex(blockRegistry().def(b).tex);
   return tex == "grass" ? "grass_block" : tex;  // the art's icon file names follow the block names
 }

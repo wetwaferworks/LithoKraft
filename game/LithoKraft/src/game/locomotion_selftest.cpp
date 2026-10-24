@@ -164,7 +164,7 @@ int runLocomotionSelfTest() {
     PlayerLocomotion loco;
     loco.place({4.5, kFloorTop, 28.5});
     p.pos = loco.position();
-    GamePlayerAdapter adapter(p);  // ctor syncs once (baseline)
+    cGamePlayerAdapter adapter(p);  // ctor syncs once (baseline)
     LocomotionInput walk{};
     walk.wishX = 1.0;
     for (int i = 0; i < 48; ++i) loco.tick(walk, isSolid, kDt);
@@ -186,7 +186,7 @@ int runLocomotionSelfTest() {
     // The legacy derived-velocity sync (init-time path) still derives.
     Player p2;
     p2.pos = {0.f, float(kFloorTop), 0.f};
-    GamePlayerAdapter adapter2(p2);
+    cGamePlayerAdapter adapter2(p2);
     p2.pos.x += 0.05f;
     adapter2.syncFromGame(1, 1.f / 60.f);
     check(near(adapter2.enginePlayer().state().vx, 3.0, 0.05),
@@ -200,7 +200,7 @@ int runLocomotionSelfTest() {
     // Pre-fix, tickVitals counted raw ticks, so the 512 TPS player
     // drained 16x faster (and drowned 16x sooner).
     Player pA, pB;
-    GamePlayerAdapter a(pA), b(pB);
+    cGamePlayerAdapter a(pA), b(pB);
     a.tickVitals(512, true, false, 32);
     b.tickVitals(8192, true, false, 512);
     check(a.oxygen() == b.oxygen(),
@@ -211,7 +211,7 @@ int runLocomotionSelfTest() {
           "vitals (PLY-1): 32 TPS calibration unchanged (full 64-point bar drains in 512 ticks)");
     // Refill is normalised too: 4 s surfaced refills the same at both rates.
     Player pC, pD;
-    GamePlayerAdapter c(pC), d(pD);
+    cGamePlayerAdapter c(pC), d(pD);
     c.tickVitals(512, true, false, 32);   // empty the bar at 32 TPS
     d.tickVitals(8192, true, false, 512); // empty the bar at 512 TPS
     c.tickVitals(128, false, false, 32);  // 4 s surfaced
@@ -221,7 +221,7 @@ int runLocomotionSelfTest() {
     // Many small calls (the per-frame pattern) carry the fractional
     // remainder exactly: 8192 x 1 tick at 512 TPS == one 8192-tick call.
     Player pE;
-    GamePlayerAdapter e(pE);
+    cGamePlayerAdapter e(pE);
     for (int i = 0; i < 8192; ++i) e.tickVitals(1, true, false, 512);
     check(e.oxygen() == b.oxygen(),
           "vitals (PLY-1): per-tick calls at 512 TPS accumulate to the same drain (no fractional loss)");

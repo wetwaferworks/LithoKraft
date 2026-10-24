@@ -1,4 +1,4 @@
-// SpriteHost implementation: starter-def registration from every sprite
+// cSpriteHost implementation: starter-def registration from every sprite
 // source kind, console operations, and the per-frame conversion of the
 // sprite system's emitted quads into the render (SpriteDrawQuad) and
 // software (PackedVertex) draw forms. See sprite_host.h for the design.
@@ -94,9 +94,9 @@ const char* shadeName(SpriteShade s) {
 
 }  // namespace
 
-SpriteHost::SpriteHost() : system_(registry_) {}
+cSpriteHost::cSpriteHost() : system_(registry_) {}
 
-void SpriteHost::registerStarterSprites(const ResourceManager& resources) {
+void cSpriteHost::registerStarterSprites(const cResourceMgr& resources) {
   std::string err;
   auto adopted = [&](uint32_t id, const char* what) {
     if (!id) litholattice::logError("sprite: registering %s failed: %s", what, err.c_str());
@@ -147,7 +147,7 @@ void SpriteHost::registerStarterSprites(const ResourceManager& resources) {
     }
   }
   // Pack PNG provenance: the certificate table's UI icon, decoded by the
-  // ResourceManager from textures/ui/icons/certificate_table.png.
+  // cResourceMgr from textures/ui/icons/certificate_table.png.
   if (const Image* icon = resources.icon(kCertificateTable)) {
     SpriteDef d = baseDef("fx:icon_certificate_table", 1.0f, 1.0f, SpriteShade::Cutout);
     adopted(registry_.registerImage(d, *icon, &err), "fx:icon_certificate_table");
@@ -172,7 +172,7 @@ void SpriteHost::registerStarterSprites(const ResourceManager& resources) {
   registry_.ensureAtlas();
 }
 
-std::string SpriteHost::spawnNamed(std::string_view name, Vec3 at, int count) {
+std::string cSpriteHost::spawnNamed(std::string_view name, Vec3 at, int count) {
   const uint32_t id = registry_.findSprite(name);
   if (!id) return "sprite: unknown def '" + std::string(name) + "' (sprite list)";
   count = std::clamp(count, 1, 64);
@@ -192,7 +192,7 @@ std::string SpriteHost::spawnNamed(std::string_view name, Vec3 at, int count) {
          std::to_string(system_.instanceCount()) + " live)";
 }
 
-std::string SpriteHost::burstNamed(std::string_view name, Vec3 at) {
+std::string cSpriteHost::burstNamed(std::string_view name, Vec3 at) {
   const uint32_t id = registry_.findSprite(name);
   if (!id) return "sprite: unknown def '" + std::string(name) + "' (sprite list)";
   ParticleEmitterDef ed;
@@ -219,7 +219,7 @@ std::string SpriteHost::burstNamed(std::string_view name, Vec3 at) {
          " live)";
 }
 
-std::string SpriteHost::clearAll() {
+std::string cSpriteHost::clearAll() {
   const size_t n = system_.instanceCount();
   std::vector<uint64_t> ids;  // instances() is a live span; despawn mutates it
   ids.reserve(n);
@@ -228,7 +228,7 @@ std::string SpriteHost::clearAll() {
   return "sprite: cleared " + std::to_string(n) + " instances";
 }
 
-std::string SpriteHost::listDefs() const {
+std::string cSpriteHost::listDefs() const {
   std::string out = "sprite: " + std::to_string(registry_.spriteCount()) + " defs, " +
                     std::to_string(system_.instanceCount()) + " live instances";
   size_t found = 0;
@@ -245,11 +245,11 @@ std::string SpriteHost::listDefs() const {
   return out;
 }
 
-void SpriteHost::tickDelta(uint32_t ticks) {
+void cSpriteHost::tickDelta(uint32_t ticks) {
   if (ticks) system_.tick(ticks);
 }
 
-std::array<float, 3> SpriteHost::avgColorFor(uint32_t defId) {
+std::array<float, 3> cSpriteHost::avgColorFor(uint32_t defId) {
   if (defId < avgColorByDef_.size() && avgColorByDef_[defId][0] >= 0.f) return avgColorByDef_[defId];
   std::array<float, 3> avg{1.f, 1.f, 1.f};  // fallback: white
   const SpriteUvRect* rect = registry_.frameRect(defId, 0);
@@ -273,7 +273,7 @@ std::array<float, 3> SpriteHost::avgColorFor(uint32_t defId) {
   return avg;
 }
 
-void SpriteHost::buildFrame(Vec3 camPos, Vec3 camFwd, Vec3 camUp) {
+void cSpriteHost::buildFrame(Vec3 camPos, Vec3 camFwd, Vec3 camUp) {
   registry_.ensureAtlas();
   const std::span<const SpriteQuad> quads = system_.emitQuads(camPos, camFwd, camUp);
   drawQuads_.clear();

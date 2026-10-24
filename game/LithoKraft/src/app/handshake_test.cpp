@@ -104,7 +104,7 @@ uint64_t hashWorld(const ChunkMap& world, const SignalSim& sig, uint64_t ticks) 
 struct Scenario {
   DimensionRegistry reg;
   Dimension* wafer = nullptr;
-  std::unique_ptr<SignalWorldSimulation> ws;
+  std::unique_ptr<cSignalWorldSim> ws;
   int y = 0, wireX = -1, wireZ = -1, repX = -1, repZ = -1;
 };
 
@@ -117,7 +117,7 @@ Scenario buildScenario() {
   ChunkMap& w = sc.wafer->chunks;
   sc.y = w.surfaceY(8, 8) + 1;
   buildCircuitScene(w, 4, sc.y, 4, 120);
-  sc.ws = std::make_unique<SignalWorldSimulation>();
+  sc.ws = std::make_unique<cSignalWorldSim>();
   sc.ws->scan(w);
   // First red trace / repeator at scene height, in packPos order (x, then z).
   for (int x = 4; x < 124 && (sc.wireX < 0 || sc.repX < 0); ++x)
@@ -448,12 +448,12 @@ void testFreezeEndToEnd() {
   }
   std::vector<uint8_t> blob;
   {
-    WorldSave save(dir);
-    auto& sig = static_cast<SignalWorldSimulation&>(sim->simulation()).signal();
+    cWorldSave save(dir);
+    auto& sig = static_cast<cSignalWorldSim&>(sim->simulation()).signal();
     save.saveDimension("wafer", w, sig, true);
   }
   {
-    WorldSave save(dir);
+    cWorldSave save(dir);
     save.loadDimension("wafer", restored, blob);
   }
   SignalSim sig2;

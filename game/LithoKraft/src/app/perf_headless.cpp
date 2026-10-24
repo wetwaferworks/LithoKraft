@@ -74,7 +74,7 @@ class cTimedSim final : public IWorldSimulation {
   void takeEvents(std::vector<SimEvent>& out) override { s_->takeEvents(out); }
   void registerHandshake(litholattice::TimingHandshakeAuthority& a) override { s_->registerHandshake(a); }
   SignalSim* signalSim() {  // phase-split timings for the sweep (hs-design §7)
-    auto* sw = dynamic_cast<SignalWorldSimulation*>(s_.get());
+    auto* sw = dynamic_cast<cSignalWorldSim*>(s_.get());
     return sw ? &sw->signal() : nullptr;
   }
   std::vector<double> take() { std::lock_guard l(m_); return std::move(ticks_); }
@@ -179,7 +179,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
     double hitchMs = 0, saveMs = 0, loadMs = 0, dirtyHitchMs = 0;
     uint64_t bytes = 0;
     {
-      WorldSave save(dir);
+      cWorldSave save(dir);
       auto t0 = Clock::now();
       save.saveDimension("wafer", wafer->chunks, sig, false);  // worst case: every column changed (pause = copy all)
       hitchMs = msBetween(t0, Clock::now());
@@ -201,7 +201,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
     ChunkMap fresh;
     for (const auto& [k, col] : wafer->chunks.columns()) { auto c = std::make_unique<ChunkColumn>(); c->cx = col->cx; c->cz = col->cz; fresh.insert(std::move(c)); }
     {
-      WorldSave save(dir);
+      cWorldSave save(dir);
       std::vector<uint8_t> blob;
       const auto t0 = Clock::now();
       save.loadDimension("wafer", fresh, blob);
@@ -350,7 +350,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   const int rates[] = {32, 64, 128, 256, 512};
   for (size_t ri = 0; ri < std::size(rates); ++ri) {
     std::atomic<int> remesh{0};
-    auto timed = std::make_unique<cTimedSim>(std::make_unique<SignalWorldSimulation>());
+    auto timed = std::make_unique<cTimedSim>(std::make_unique<cSignalWorldSim>());
     cTimedSim* t = timed.get();
     SimConfig sc;
     sc.tickRate = rates[ri]; sc.radiusChunks = 8; sc.belowWorldFill = wafer->belowWorldFill;

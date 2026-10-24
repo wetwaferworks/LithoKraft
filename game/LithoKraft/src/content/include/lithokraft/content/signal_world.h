@@ -28,7 +28,7 @@ enum SimCommandCode : uint16_t {
 /// SimEvent kinds above the SoundCue range (SoundCue is uint8_t).
 constexpr uint16_t kEvItemDrop = 0x0100;  ///< value = BlockId dropped; the game spawns an item entity
 
-class SignalWorldSimulation final : public IWorldSimulation {
+class cSignalWorldSim final : public IWorldSimulation {
  public:
   void scan(const ChunkMap& world) override { signal_.scan(world); }
   bool canPlace(const ChunkMap& world, int x, int y, int z, BlockId block) const override;

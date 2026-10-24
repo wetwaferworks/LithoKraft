@@ -165,9 +165,9 @@ class cGameCameraWorld final : public cam::ICameraWorld {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// PilotCameraRig
+// cPilotCameraRig
 
-struct PilotCameraRig::State {
+struct cPilotCameraRig::State {
   struct Pilot {
     litholattice::mcp::CameraPose mirror{};  ///< MCP-side pose (degrees); trackPlayer default true
     bool resolvedValid = false;
@@ -177,19 +177,19 @@ struct PilotCameraRig::State {
   std::map<std::string, Pilot, std::less<>> pilots;
 };
 
-PilotCameraRig::PilotCameraRig(GameCameraHooks /*hooks*/) : state_(std::make_shared<State>()) {
+cPilotCameraRig::cPilotCameraRig(GameCameraHooks /*hooks*/) : state_(std::make_shared<State>()) {
   // v1 serves exactly the local player, like McpSensesAdapter::pilotIds().
   state_->pilots.emplace("player", State::Pilot{});
 }
 
-PilotCameraRig::~PilotCameraRig() = default;
+cPilotCameraRig::~cPilotCameraRig() = default;
 
-bool PilotCameraRig::hasPilot(std::string_view pilot) const {
+bool cPilotCameraRig::hasPilot(std::string_view pilot) const {
   std::lock_guard<std::mutex> lk(state_->mutex);
   return state_->pilots.find(pilot) != state_->pilots.end();
 }
 
-bool PilotCameraRig::setFreePose(std::string_view pilot, const litholattice::mcp::CameraPose& pose) {
+bool cPilotCameraRig::setFreePose(std::string_view pilot, const litholattice::mcp::CameraPose& pose) {
   std::lock_guard<std::mutex> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return false;
@@ -198,7 +198,7 @@ bool PilotCameraRig::setFreePose(std::string_view pilot, const litholattice::mcp
   return true;
 }
 
-bool PilotCameraRig::trackPlayer(std::string_view pilot) {
+bool cPilotCameraRig::trackPlayer(std::string_view pilot) {
   std::lock_guard<std::mutex> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return false;
@@ -206,7 +206,7 @@ bool PilotCameraRig::trackPlayer(std::string_view pilot) {
   return true;
 }
 
-bool PilotCameraRig::mirrorPose(std::string_view pilot, litholattice::mcp::CameraPose& out) const {
+bool cPilotCameraRig::mirrorPose(std::string_view pilot, litholattice::mcp::CameraPose& out) const {
   std::lock_guard<std::mutex> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return false;
@@ -214,7 +214,7 @@ bool PilotCameraRig::mirrorPose(std::string_view pilot, litholattice::mcp::Camer
   return true;
 }
 
-bool PilotCameraRig::resolvedPose(std::string_view pilot, CameraViewPose& out) const {
+bool cPilotCameraRig::resolvedPose(std::string_view pilot, CameraViewPose& out) const {
   std::lock_guard<std::mutex> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end() || !it->second.resolvedValid) return false;
@@ -222,7 +222,7 @@ bool PilotCameraRig::resolvedPose(std::string_view pilot, CameraViewPose& out) c
   return true;
 }
 
-std::vector<std::string> PilotCameraRig::pilotNames() const {
+std::vector<std::string> cPilotCameraRig::pilotNames() const {
   std::lock_guard<std::mutex> lk(state_->mutex);
   std::vector<std::string> names;
   names.reserve(state_->pilots.size());
@@ -230,7 +230,7 @@ std::vector<std::string> PilotCameraRig::pilotNames() const {
   return names;
 }
 
-PilotCameraRig::Request PilotCameraRig::request(std::string_view pilot) const {
+cPilotCameraRig::Request cPilotCameraRig::request(std::string_view pilot) const {
   std::lock_guard<std::mutex> lk(state_->mutex);
   Request r;
   const auto it = state_->pilots.find(pilot);
@@ -240,7 +240,7 @@ PilotCameraRig::Request PilotCameraRig::request(std::string_view pilot) const {
   return r;
 }
 
-void PilotCameraRig::publishResolved(std::string_view pilot, const CameraViewPose& pose) {
+void cPilotCameraRig::publishResolved(std::string_view pilot, const CameraViewPose& pose) {
   std::lock_guard<std::mutex> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return;
@@ -273,7 +273,7 @@ GameCameraController::GameCameraController(Player& player, GameCameraHooks hooks
   impl_->playerTarget = std::make_shared<cPlayerCameraTarget>(player, hooks.playerEyeHeight);
   if (hooks.pilotSnapshot)
     impl_->pilotTarget = std::make_shared<cSnapshotCameraTarget>(hooks.pilotSnapshot);
-  pilotRig_ = std::make_shared<PilotCameraRig>(hooks);
+  pilotRig_ = std::make_shared<cPilotCameraRig>(hooks);
 
   cam::CameraConfig cfg;
   cfg.fovDeg = kGameFovDeg;
@@ -419,7 +419,7 @@ void GameCameraController::update(const litholattice::InputSystem& in, float dt,
         im.manager.addCamera("pilot:" + name, slot);
         im.pilotAppliedTracking[name] = false;
       }
-      const PilotCameraRig::Request req = pilotRig_->request(name);
+      const cPilotCameraRig::Request req = pilotRig_->request(name);
       if (req.tracking) {
         if (!im.pilotAppliedTracking[name]) {
           slot->attach(im.pilotTarget);

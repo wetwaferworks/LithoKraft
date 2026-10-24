@@ -26,7 +26,7 @@
 //
 // CAMERAS (engine camera system, 2026-10-12): pilot cameras are engine
 // cameras now, owned by GameCameraController and shared through
-// PilotCameraRig (lithokraft/game/camera_controller.h). This adapter no
+// cPilotCameraRig (lithokraft/game/camera_controller.h). This adapter no
 // longer keeps raw CameraPose structs: setCameraPose()/trackPlayer() write
 // rig requests, cameraPose() reads the rig's MCP-side mirror, and
 // captureVisionFrame() renders from the rig's resolved pose (the engine
@@ -113,7 +113,7 @@ class McpSensesAdapter : public litholattice::mcp::IVisionCapture,
   /// GameCameraController, which is constructed before this adapter).
   McpSensesAdapter(litholattice::AudioEngine& audio,
                    std::function<McpPlayerView::GameState()> snapshot,
-                   std::function<uint64_t()> tick, std::shared_ptr<PilotCameraRig> rig);
+                   std::function<uint64_t()> tick, std::shared_ptr<cPilotCameraRig> rig);
   ~McpSensesAdapter();
 
   // -- game thread ---------------------------------------------------------
@@ -124,7 +124,7 @@ class McpSensesAdapter : public litholattice::mcp::IVisionCapture,
   /// Drop the whole vision cache (dimension switch / unload).
   void clearMeshes();
   /// This frame's sprite quads in software form (PackedVertex quads,
-  /// positions relative to `origin`), converted by the game's SpriteHost.
+  /// positions relative to `origin`), converted by the game's cSpriteHost.
   /// Captures render them after the chunk meshes, flat-shaded (the sprite's
   /// average color as brightness). Called once per frame from Game::update.
   void setSpriteVerts(std::vector<litholattice::PackedVertex> verts, litholattice::Vec3 origin);
@@ -164,7 +164,7 @@ class McpSensesAdapter : public litholattice::mcp::IVisionCapture,
   litholattice::AudioEngine& audio_;
   std::function<McpPlayerView::GameState()> snapshot_;
   std::function<uint64_t()> tick_;
-  std::shared_ptr<PilotCameraRig> rig_;  ///< per-pilot engine cameras (own mutex inside)
+  std::shared_ptr<cPilotCameraRig> rig_;  ///< per-pilot engine cameras (own mutex inside)
 
   mutable std::mutex mutex_;  ///< guards meshes_, cvars_, spriteVerts_
   std::unordered_map<int64_t, std::shared_ptr<const CachedMesh>> meshes_;

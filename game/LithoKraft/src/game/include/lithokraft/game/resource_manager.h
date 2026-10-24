@@ -1,4 +1,4 @@
-// ResourceManager: owns the loaded resource packs and everything built from them (texture
+// cResourceMgr: owns the loaded resource packs and everything built from them (texture
 // registry, block models, BlockMaterials, shader sources, world generator JSON, UI theme), pushes them to
 // the renderer, and rebuilds all of it on a debug hot reload (F9). Worldgen sources are re-read
 // on reload but only take effect for worlds created afterwards (a new game).
@@ -24,10 +24,10 @@ class IRenderer;
 
 namespace lithokraft {
 
-class ResourceManager {
+class cResourceMgr {
  public:
   /// `packDirs`: lowest priority first (engine base, game pack, art pack, mods, player pack).
-  explicit ResourceManager(std::vector<std::filesystem::path> packDirs);
+  explicit cResourceMgr(std::vector<std::filesystem::path> packDirs);
 
   /// Reads every pack again and rebuilds the CPU side; logs warnings and, after the first load,
   /// what changed. Main thread. Packs that fail to open are skipped (logged).

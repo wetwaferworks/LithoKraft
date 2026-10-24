@@ -356,7 +356,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     std::vector<uint8_t> blob;
     int n = 0;
     {
-      WorldSave save(dir);
+      cWorldSave save(dir);
       save.saveDimension("wafer", wafer->chunks, sig, true);
       PlayerMeta pm{{1.5f, 90.25f, -3.f}, 0.5f, -0.25f, "organic", 4, {kRedTrace, kAir, kLamp}};
       std::string err;
@@ -366,7 +366,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
             "save: player metadata (position, look, dimension, hotbar) round trip");
     }
     {
-      WorldSave save(dir);  // a fresh process view of the same directory
+      cWorldSave save(dir);  // a fresh process view of the same directory
       n = save.loadDimension("wafer", restored, blob);
     }
     SignalSim sig2;
@@ -385,7 +385,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       std::fstream f(dir / "player.lat", std::ios::in | std::ios::out | std::ios::binary);
       f.seekp(12); f.put('\x7f'); f.close();
       std::string err;
-      WorldSave save(dir);
+      cWorldSave save(dir);
       check(!save.readPlayer(&err) && !err.empty(), "save: a damaged player.lat is detected (CRC), not misread");
     }
     {  // P2b-1 (Appendix G H1/H2 + Appendix C M2): player.lat v4 — the
@@ -418,7 +418,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         pm.inventory.gear()[kGearMind] = ItemStack{uint32_t(kStone), 64};
         pm.hasInventory = true;
         std::string err;
-        WorldSave save(pdir);
+        cWorldSave save(pdir);
         const bool wrote = save.writePlayer(pm, &err);
         const auto back = save.readPlayer(&err);
         bool same = back && back->fileVersion == PlayerMeta::kVersion && back->hasInventory && back->hotbar == pm.hotbar;
@@ -451,7 +451,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         w.u16(0);                      // stats
         w.u16(0);                      // vitals
         writeRawPlayer(pdir, w.out);
-        WorldSave save(pdir);
+        cWorldSave save(pdir);
         std::string err;
         const auto back = save.readPlayer(&err);
         check(back && back->fileVersion == 3 && !back->hasInventory && back->inventory.isEmpty() &&
@@ -482,7 +482,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         putSlot("lithokraft:no_such_item", 5);    // slot 2: unknown -> dropped
         for (int i = 3; i < kTotalSlots; ++i) putSlot("", 0);
         writeRawPlayer(pdir, w.out);
-        WorldSave save(pdir);
+        cWorldSave save(pdir);
         std::string err;
         const auto back = save.readPlayer(&err);
         check(back && back->hasInventory && back->hotbar.size() == 2 && back->hotbar[0] == kRedTrace &&
@@ -504,7 +504,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         w.u16(0);  // inventory slots
         w.u8(0xEE);  // trailing garbage
         writeRawPlayer(pdir, w.out);
-        WorldSave save(pdir);
+        cWorldSave save(pdir);
         std::string err;
         check(!save.readPlayer(&err) && err.find("trailing") != std::string::npos,
               "save (C-L1): player.lat with trailing bytes after the last block is refused");
@@ -549,7 +549,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       std::unordered_set<uint64_t> changed;
       size_t written = 0;
       {
-        WorldSave save(pdir);
+        cWorldSave save(pdir);
         written += save.saveDimension("wafer", a->chunks, sa, true, &changed);
         a->chunks.set(5, 100, 5, kLamp);       // edit column (0,0)
         a->chunks.set(70, 90, 40, kRedTrace);   // edit column (4,2)
@@ -567,7 +567,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       Dimension* c = r3.find("wafer");
       c->load(pool, 6);  // regenerated: untouched columns come from the seed
       std::vector<uint8_t> state;
-      { WorldSave save(pdir); save.loadDimension("wafer", c->chunks, state); }
+      { cWorldSave save(pdir); save.loadDimension("wafer", c->chunks, state); }
       SignalSim sc;
       sc.scan(c->chunks);
       const bool imp = sc.importState(state);
@@ -593,7 +593,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       Dimension* l = r4.find("wafer");
       l->load(pool, 6);
       std::vector<uint8_t> st2;
-      { WorldSave save(pdir); save.loadDimension("wafer", l->chunks, st2); }
+      { cWorldSave save(pdir); save.loadDimension("wafer", l->chunks, st2); }
       check(namespaced && table && sameCells(c->chunks, l->chunks),
             "save: block ids are unique 'lithokraft:' names, saves write the name table, and a legacy save (no table) migrates as the current order");
     }
@@ -613,7 +613,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       {  // C-4 recovery: torn primary + intact backup generation -> table heals, columns load.
         const auto ndir = dir / "p0b_names_recovery";
         {
-          WorldSave save(ndir);
+          cWorldSave save(ndir);
           save.saveDimension("wafer", wafer->chunks, sig, true);
           save.saveDimension("wafer", wafer->chunks, sig, true);  // second write rotates blocks.names.bak.1
         }
@@ -621,19 +621,19 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         writeGarbage(ndir / "blocks.names");
         ChunkMap rec = emptyLike(wafer->chunks);
         int rn = 0;
-        { WorldSave save(ndir); rn = save.loadDimension("wafer", rec, blobP); }
+        { cWorldSave save(ndir); rn = save.loadDimension("wafer", rec, blobP); }
         check(haveBackup && rn == int(wafer->chunks.columns().size()),
               "save (C-4): a torn blocks.names primary heals from the intact backup generation; every column loads");
       }
       {  // C-4 fail closed: torn table, NO intact generation, regions present.
         const auto fdir = dir / "p0b_names_failclosed";
-        { WorldSave save(fdir); save.saveDimension("wafer", wafer->chunks, sig, true); }  // one save: no table backup yet
+        { cWorldSave save(fdir); save.saveDimension("wafer", wafer->chunks, sig, true); }  // one save: no table backup yet
         writeGarbage(fdir / "blocks.names");
         ChunkMap fc = emptyLike(wafer->chunks);
         int fn = 0;
         bool saveRefused = false;
         {
-          WorldSave save(fdir);
+          cWorldSave save(fdir);
           fn = save.loadDimension("wafer", fc, blobP);
           saveRefused = save.saveDimension("wafer", wafer->chunks, sig, true) == 0 && !save.lastSaveOk();
         }
@@ -646,14 +646,14 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         const auto pdir2 = dir / "p0b_player";
         PlayerMeta pa{{1.5f, 111.f, -3.f}, 0.5f, -0.25f, "wafer", 1, {kLamp}};
         {
-          WorldSave save(pdir2);
+          cWorldSave save(pdir2);
           std::string err;
           save.writePlayer(pa, &err);
           PlayerMeta pb = pa; pb.pos.y = 222.f;
           save.writePlayer(pb, &err);  // rotates pa into player.lat.bak.1
         }
         corruptByte(pdir2 / "player.lat", 20);
-        WorldSave save(pdir2);
+        cWorldSave save(pdir2);
         std::string err;
         const auto back = save.readPlayer(&err);
         check(back && back->pos.y == 111.f, "save (SV-H3): a torn player.lat primary heals from the backup generation");
@@ -661,35 +661,35 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       {  // SV-H2: the seed round-trips through level.json, exactly, as uint64.
         const auto sdir = dir / "p0b_seed";
         const uint64_t kSeed = 0xFFFFFFFFFFFFFFD5ull;  // > 2^53: a JSON double could not hold this exactly
-        { WorldSave save(sdir); save.setSeed(kSeed); save.saveDimension("wafer", wafer->chunks, sig, true); }
+        { cWorldSave save(sdir); save.setSeed(kSeed); save.saveDimension("wafer", wafer->chunks, sig, true); }
         std::string serr;
-        const auto seedBack = WorldSave::readWorldSeed(sdir, &serr);
+        const auto seedBack = cWorldSave::readWorldSeed(sdir, &serr);
         check(std::filesystem::exists(sdir / "level.json") && seedBack && *seedBack == kSeed,
               "save (SV-H2): the world seed persists in level.json and reads back exactly (uint64) with no CLI seed");
         std::string aerr;
-        check(!WorldSave::readWorldArea(sdir, &aerr) && aerr.empty(),
+        check(!cWorldSave::readWorldArea(sdir, &aerr) && aerr.empty(),
               "save (fix run 3): a save with no area (as v1/v2 wrote) reads back nullopt, no error -> configured area stands");
       }
       {  // fix run 3: level.json v3 persists the sim/stream area + tick radius
         const auto adir = dir / "p0b_area";
-        WorldSave::WorldAreaMeta am;
+        cWorldSave::WorldAreaMeta am;
         am.sim = litholattice::AreaShape::Round; am.stream = litholattice::AreaShape::Square; am.tickRadius = 11;
-        { WorldSave save(adir); save.setSeed(7); save.setWorldArea(am); save.saveDimension("wafer", wafer->chunks, sig, true); }
+        { cWorldSave save(adir); save.setSeed(7); save.setWorldArea(am); save.saveDimension("wafer", wafer->chunks, sig, true); }
         std::string aerr;
-        const auto back = WorldSave::readWorldArea(adir, &aerr);
+        const auto back = cWorldSave::readWorldArea(adir, &aerr);
         check(back && aerr.empty() && back->sim == am.sim && back->stream == am.stream && back->tickRadius == 11,
               "save (fix run 3): the sim/stream area and tick radius persist in level.json v3 and read back exactly");
         const auto odir = dir / "p0b_area_old";
         std::filesystem::create_directories(odir);
         { std::ofstream f(odir / "level.json", std::ios::binary); f << "{\"saveFormatVersion\": 2, \"seed\": \"5\"}"; }
         std::string oerr;
-        check(!WorldSave::readWorldArea(odir, &oerr) && oerr.empty(),
+        check(!cWorldSave::readWorldArea(odir, &oerr) && oerr.empty(),
               "save (fix run 3): a v2 level.json (no area) is backward-compatible: nullopt, no error");
         const auto bdir = dir / "p0b_area_bad";
         std::filesystem::create_directories(bdir);
         { std::ofstream f(bdir / "level.json", std::ios::binary); f << "{\"saveFormatVersion\": 3, \"seed\": \"5\", \"simAreaShape\": \"HEX\", \"streamAreaShape\": \"Diamond\", \"tickRadius\": 6}"; }
         std::string berr;
-        const auto bad = WorldSave::readWorldArea(bdir, &berr);
+        const auto bad = cWorldSave::readWorldArea(bdir, &berr);
         check(bad && bad->sim == litholattice::AreaShape::Diamond && bad->stream == litholattice::AreaShape::Diamond && bad->tickRadius == 6 && !berr.empty(),
               "save (fix run 3): an unknown saved shape warns and falls back to diamond; parsing is case-insensitive");
       }
@@ -701,7 +701,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         const auto wdir = dir / "p0b_flush";
         bool firstOk = false, failedSave = false, retryOk = false;
         {
-          WorldSave save(wdir);
+          cWorldSave save(wdir);
           save.saveDimension("wafer", wafer->chunks, sig, true);
           firstOk = save.lastSaveOk();
           std::filesystem::create_directories(wdir / "wafer" / "r.0.0.llr.tmp");
@@ -712,14 +712,14 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         }
         ChunkMap after = emptyLike(wafer->chunks);
         int loadedAfter = 0;
-        { WorldSave save(wdir); loadedAfter = save.loadDimension("wafer", after, blobP); }
+        { cWorldSave save(wdir); loadedAfter = save.loadDimension("wafer", after, blobP); }
         check(firstOk && failedSave && retryOk && loadedAfter == int(wafer->chunks.columns().size()),
               "save (SV-H1): a failed region flush surfaces as failure (never 'on disk') and the kept pending records land on retry");
       }
     }
     {  // P1-SIGNAL gate (SW-H1 / SW-H2 / B-M3 / C-M4 / B-L7): a circuit built
        // in a column OUTSIDE the initial load square, saved, and reloaded
-       // through the streaming seam — WorldSave::loadColumn + SignalSim::
+       // through the streaming seam — cWorldSave::loadColumn + SignalSim::
        // scanColumn/importState, the exact calls Game::pumpStreaming makes on
        // insertion, plus a ChunkStreamer pass through the real job pool —
        // must come back alive with its component memory intact. (The full
@@ -745,14 +745,14 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       const auto srcState = srcSim.exportState();
       check(stValue(src.getState(326, gy, 322)) == 62 && src.getState(328, gy, 322) == 1 && !srcState.empty(),
             "p1-stream: source circuit lives before save (memor stored the decayed 62, lamp lit)");
-      { WorldSave save(pdirS); save.saveDimension("wafer", src, srcSim, true); }
+      { cWorldSave save(pdirS); save.saveDimension("wafer", src, srcSim, true); }
       // --- the streaming seam, exactly as pumpStreaming drives it ---
-      WorldSave streamSave(pdirS);
+      cWorldSave streamSave(pdirS);
       auto loaded = streamSave.loadColumn("wafer", 20, 20);
-      check(loaded.status == WorldSave::ColumnLoad::Loaded && loaded.column && !loaded.signal.empty(),
+      check(loaded.status == cWorldSave::ColumnLoad::Loaded && loaded.column && !loaded.signal.empty(),
             "p1-stream (SW-H1/C-M4): loadColumn returns the column AND its per-column SGNL payload");
       const auto neverSaved = streamSave.loadColumn("wafer", 21, 21);
-      check(neverSaved.status == WorldSave::ColumnLoad::NotSaved && !neverSaved.column,
+      check(neverSaved.status == cWorldSave::ColumnLoad::NotSaved && !neverSaved.column,
             "p1-stream (B-M3): a never-saved column reports NotSaved (generate fresh), distinct from unreadable");
       ChunkMap dst;
       dst.setRegistry(&blockRegistry());
@@ -765,7 +765,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       for (int i = 0; i < 6; ++i) dstSim.tick(dst, 20, 20, 4, noDirty);
       check(dst.getState(328, gy, 322) == 1 && stValue(dst.getState(326, gy, 322)) == 62,
             "p1-stream (SW-H1): the streamed circuit is ALIVE after reload (lamp lit, memor still holds 62)");
-      {  // Dimension path on the SAME WorldSave instance, after streamed loads.
+      {  // Dimension path on the SAME cWorldSave instance, after streamed loads.
         ChunkMap dimMap = emptyLike(src);
         std::vector<uint8_t> blob;
         const int dn = streamSave.loadDimension("wafer", dimMap, blob);
@@ -785,12 +785,12 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       {  // B-M3: corrupt name table => Unreadable per column on every call
          // (fail closed, no session latch, never mistaken for "never saved").
         const auto tdirS = dir / "p1_stream_corrupt";
-        { WorldSave save(tdirS); save.saveDimension("wafer", src, srcSim, true); }  // one save: no table backup yet
+        { cWorldSave save(tdirS); save.saveDimension("wafer", src, srcSim, true); }  // one save: no table backup yet
         { std::ofstream f(tdirS / "blocks.names", std::ios::binary | std::ios::trunc); f << "TORN-TABLE-GARBAGE-0123456789abcdef"; }
-        WorldSave corruptSave(tdirS);
+        cWorldSave corruptSave(tdirS);
         const auto bad1 = corruptSave.loadColumn("wafer", 20, 20);
         const auto bad2 = corruptSave.loadColumn("wafer", 20, 20);
-        check(bad1.status == WorldSave::ColumnLoad::Unreadable && bad2.status == WorldSave::ColumnLoad::Unreadable && !bad1.column,
+        check(bad1.status == cWorldSave::ColumnLoad::Unreadable && bad2.status == cWorldSave::ColumnLoad::Unreadable && !bad1.column,
               "p1-stream (B-M3): corrupt name table => Unreadable on every call (fail closed per column, no latch, never 'never saved')");
         // ChunkStreamer integration: the healthy path delivers disk + SGNL
         // through the real job pool (SW-H3 guard on its normal exit), and an
@@ -916,7 +916,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   }
   {  // A2 (B-M1 column eviction, 2026-10-13): the production seams composed
      // exactly as Game::evictFarColumns drives them — SGNL export before
-     // unscan, save-on-evict through WorldSave::saveColumns, ChunkMap::erase,
+     // unscan, save-on-evict through cWorldSave::saveColumns, ChunkMap::erase,
      // ChunkStreamer::forgetColumn, and selectEvictionCandidates bounding.
      // (The full Game loop is not constructed here; mesh retire is a
      // renderer-queue operation covered by the empty-verts contract.)
@@ -959,7 +959,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     const auto stateBefore = esim.exportState();
     // --- dirty eviction: save-on-evict, then unscan + erase ---------------
     {
-      WorldSave save(edir);
+      cWorldSave save(edir);
       const size_t saved = save.saveColumns("wafer", {ew.column(20, 20)}, esim, true);
       check(saved == 1 && save.lastSaveOk(),
             "evict (A2): saveColumns persists a dirty column (blocks + SGNL) before eviction");
@@ -982,9 +982,9 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       reloaded.set(340, gy - 1, 322, kWaferSilicon);
       reloaded.column(21, 20)->dirty = false; reloaded.column(21, 20)->generation = 0;
     }
-    WorldSave reloadSave(edir);
+    cWorldSave reloadSave(edir);
     auto loadedCol = reloadSave.loadColumn("wafer", 20, 20);
-    check(loadedCol.status == WorldSave::ColumnLoad::Loaded && loadedCol.column && !loadedCol.signal.empty(),
+    check(loadedCol.status == cWorldSave::ColumnLoad::Loaded && loadedCol.column && !loadedCol.signal.empty(),
           "evict (A2): loadColumn returns the evicted column with its SGNL payload");
     reloaded.insert(std::move(loadedCol.column));
     // Production scans per column on insertion; import the evicted
@@ -1253,7 +1253,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   }
 
   {  // shipped packs through the resource system: engine base (shaders) < game pack < pack_64 (resources.json)
-    ResourceManager rm(packDirs);
+    cResourceMgr rm(packDirs);
     rm.reload();
     const bool ok = packDirs.size() >= 3;
     if (!ok) std::printf("  (engine or game assets/ not found)\n");
@@ -1263,7 +1263,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     size_t icons = 0;
     for (size_t b = 1; b < blockRegistry().size(); ++b)
       if (const Image* i = rm.icon(BlockId(b)); i && i->width() == 16) ++icons;
-      else std::printf("  (no icon for %s: textures/ui/icons/%s.png)\n", blockRegistry().idOf(BlockId(b)).c_str(), ResourceManager::iconName(BlockId(b)).c_str());
+      else std::printf("  (no icon for %s: textures/ui/icons/%s.png)\n", blockRegistry().idOf(BlockId(b)).c_str(), cResourceMgr::iconName(BlockId(b)).c_str());
     check(ok && icons == blockRegistry().size() - 1, "hotbar: every block has a textures/ui/icons icon in the pack stack (16 x 16 for the HUD)");
     {  // Cortana 2026-10-16 (BUG-0003): the software texture array keeps the pack's full
        // resolution (it used to box-filter every layer to 16x16 = the software blur).
@@ -1433,7 +1433,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     for (int i = 0; i < 8; ++i) v1.u8(uint8_t(10 + i));  // out..timer
     v1.u16(2);
     v1.u8(7); v1.u8(8); v1.u8(9); v1.u8(10);  // two key pairs
-    auto v2 = WorldSave::migrateSignalV1ToV2(v1.out);
+    auto v2 = cWorldSave::migrateSignalV1ToV2(v1.out);
     bool ok = v2.has_value();
     if (ok) {
       storage::ByteReader r(v2->data(), v2->size());
@@ -1446,7 +1446,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     check(ok, "save: v1 -> v2 migration inserts channel/beacon before the key count");
     storage::Bytes bad{1, 2, 3};  // truncated: must fail, not corrupt
-    check(!WorldSave::migrateSignalV1ToV2(bad).has_value(), "save: malformed v1 state fails migration cleanly");
+    check(!cWorldSave::migrateSignalV1ToV2(bad).has_value(), "save: malformed v1 state fails migration cleanly");
   }
   if (timingHandshake) std::printf("  (selftest invoked with --timing-handshake: the handshake section below A/B-compares both modes in-process)\n");
   fails += runHandshakeSelfTest();

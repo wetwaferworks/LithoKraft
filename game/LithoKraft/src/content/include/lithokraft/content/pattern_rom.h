@@ -1,7 +1,7 @@
 // Pattern ROM screen player (playtest 2026-10-16, JD; frames by CloudAtlas).
 // A Pattern ROM holds a looping animation (frames of palette-lamp strengths plus a per-frame
 // length in SIM TICKS) and plays it on a vertical screen of colour lamps. It runs inside the
-// sim's tick (SignalWorldSimulation::tick), so it advances once per world tick: at --tps 512 the
+// sim's tick (cSignalWorldSim::tick), so it advances once per world tick: at --tps 512 the
 // loop runs 16x faster than at 32, and pausing the sim freezes it. It only rewrites cells that are
 // still colour lamps (a broken / replaced pixel is skipped), and only on a frame change.
 // Visual demo device, not a signal circuit: it writes lamp states directly, like the sim's own

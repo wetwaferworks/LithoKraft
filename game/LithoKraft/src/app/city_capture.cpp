@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
     }
 
   const std::string engineAssets = root + "/engine/assets", gameAssets = root + "/game/LithoKraft/assets";
-  lithokraft::ResourceManager rm({engineAssets, gameAssets, fs::path(gameAssets) / "packs" / "pack_64"});
+  lithokraft::cResourceMgr rm({engineAssets, gameAssets, fs::path(gameAssets) / "packs" / "pack_64"});
   rm.reload();
   const auto materialsPtr = rm.materials();
   const litholattice::BlockRegistry& blocks = lithokraft::blockRegistry();

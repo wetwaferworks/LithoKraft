@@ -180,7 +180,7 @@ class SignalSim {
   // nothing outside tick() reads cur_ between ticks, so end-of-tick flip is
   // the same state the legacy start-of-tick flip produced for the next tick.
   void hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius);  // tick() bookkeeping (no flips)
-  /// F56-7: round tick area (set by SignalWorldSimulation from TickArea::round). A change forces a full pass.
+  /// F56-7: round tick area (set by cSignalWorldSim from TickArea::round). A change forces a full pass.
   void setRoundArea(bool r) { if (r != roundArea_) { roundArea_ = r; fullPass_ = true; netsValid_ = false; } }
   void setDiamondArea(bool d) { if (d != diamondArea_) { diamondArea_ = d; fullPass_ = true; netsValid_ = false; } }  // JD 2026-10-23
   void hsFlipAndTorches(ChunkMap& w, const DirtyFn& dirty);      // collectMountPowered + tickTorches

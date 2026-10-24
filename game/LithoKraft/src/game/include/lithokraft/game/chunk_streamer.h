@@ -8,7 +8,7 @@
 //
 // ChunkStreamer closes that hole by reusing the existing machinery, not a
 // parallel system: the dimension's ColumnGenerator (same worldgen the pre-bake
-// uses), the game's JobPool, and WorldSave (per-column disk loads through the
+// uses), the game's JobPool, and cWorldSave (per-column disk loads through the
 // existing WorldStore / region format — the save format is unchanged). The Game
 // calls update() once per frame with the player position; columns inside the
 // load radius (GameConfig::tickRadius, the same radius the sim ticks) that are
@@ -37,7 +37,7 @@
 
 namespace lithokraft {
 
-class WorldSave;
+class cWorldSave;
 
 /// One finished streamed column, as handed to the Game by takeReady().
 struct StreamedColumn {
@@ -57,7 +57,7 @@ class ChunkStreamer {
   /// over fresh generation (player edits persist across sessions). Both must
   /// outlive the streamer. `initial`: keys of the columns the pre-bake already
   /// loaded, so they are never re-requested.
-  ChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, WorldSave* save,
+  ChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, cWorldSave* save,
                 std::string dimensionId, int radiusChunks, const std::unordered_set<uint64_t>& initial);
   /// Bounded wait for in-flight jobs (SW-H3): at most kDrainTimeout, then a
   /// loud log and return — never an unbounded busy-wait. Jobs hold shared_ptr
@@ -125,7 +125,7 @@ class ChunkStreamer {
   struct Retry { int attempts = 0; std::chrono::steady_clock::time_point nextTry{}; };
   litholattice::JobPool& pool_;
   std::shared_ptr<const litholattice::ColumnGenerator> gen_;
-  WorldSave* save_;  // null = generate-only (tests, --no-save)
+  cWorldSave* save_;  // null = generate-only (tests, --no-save)
   std::string dimensionId_;
   int radius_;
   bool diamond_ = false;  ///< diamond (Manhattan) stream footprint (JD 2026-10-23)

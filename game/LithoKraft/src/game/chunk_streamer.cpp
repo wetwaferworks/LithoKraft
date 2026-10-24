@@ -34,7 +34,7 @@ struct JobGuard {
 };
 }  // namespace
 
-ChunkStreamer::ChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, WorldSave* save,
+ChunkStreamer::ChunkStreamer(litholattice::JobPool& pool, std::shared_ptr<const litholattice::ColumnGenerator> gen, cWorldSave* save,
                              std::string dimensionId, int radiusChunks, const std::unordered_set<uint64_t>& initial)
     : pool_(pool),
       gen_(std::move(gen)),
@@ -70,7 +70,7 @@ ChunkStreamer::~ChunkStreamer() {
   // Mirroring the timing-handshake stop policy's spirit (bounded join, loud
   // log, no silent detach): after kDrainTimeout we log loudly and return;
   // the orphaned job still only touches shared_ptr-owned state and the
-  // generator (shared_ptr), and in every Game teardown path the WorldSave
+  // generator (shared_ptr), and in every Game teardown path the cWorldSave
   // and the JobPool outlive the streamer, so it finishes harmlessly.
   const auto deadline = std::chrono::steady_clock::now() + kDrainTimeout;
   while (inFlight_->load(std::memory_order_relaxed) > 0) {
@@ -119,7 +119,7 @@ void ChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
     if (!centreInRange(cx, cz)) continue;  // B-L2: per-column edge guard (a wide radius near the bound)
     if (!requested_.insert(key).second) continue;
     inFlight_->fetch_add(1, std::memory_order_relaxed);
-    WorldSave* save = save_;
+    cWorldSave* save = save_;
     const std::string dim = dimensionId_;
     pool_.submit([save, dim, cx, cz, key, done = done_, failed = failed_, n = inFlight_, ready = readyCount_, gen = gen_] {
       JobGuard guard{n, failed, key};  // SW-H3: decrements (and reports failure) on ALL exits
@@ -128,14 +128,14 @@ void ChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
         // back as saved, not as fresh terrain (SW-H1: its SGNL payload rides
         // along in the result and is imported by the Game on insertion).
         if (save) {
-          WorldSave::LoadedColumn loaded = save->loadColumn(dim, cx, cz);
-          if (loaded.status == WorldSave::ColumnLoad::Loaded) {
+          cWorldSave::LoadedColumn loaded = save->loadColumn(dim, cx, cz);
+          if (loaded.status == cWorldSave::ColumnLoad::Loaded) {
             done->push(StreamedColumn{std::move(loaded.column), std::move(loaded.signal), true});
             ready->fetch_add(1, std::memory_order_relaxed);
             guard.success = true;
             return;
           }
-          if (loaded.status == WorldSave::ColumnLoad::Unreadable) {
+          if (loaded.status == cWorldSave::ColumnLoad::Unreadable) {
             // B-M3 fail closed: a saved copy exists but cannot be read. Leave
             // a hole and retry later — NEVER generate over the saved column.
             logError("stream: column %d,%d: saved copy unreadable — left empty, will retry (never generated over)", cx, cz);

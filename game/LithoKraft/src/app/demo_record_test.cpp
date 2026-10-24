@@ -391,7 +391,7 @@ DrivenResult driveDemo(int ticks, bool handshake, int workers, const std::vector
   cfg.handshakePhasesPerCycle = 4;
   cfg.handshakeWorkerThreads = workers;
   SimThread st(w, blockRegistry(), std::move(sc.ws), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
-  SignalWorldSimulation& sig = static_cast<SignalWorldSimulation&>(st.simulation());
+  cSignalWorldSim& sig = static_cast<cSignalWorldSim&>(st.simulation());
 
   if (recorder) recorder->begin(st.controlStream(), *recSession);  // attached BEFORE start
   if (script) st.controlStream().submitStamped(*script);

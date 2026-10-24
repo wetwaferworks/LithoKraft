@@ -108,7 +108,7 @@ class Game {
   /// `resources` (block materials for meshing and HUD swatches; F9 reloads them), `audio` and
   /// `input` must outlive the game. The game pushes / pops input contexts (inventory, keyboard
   /// typing) on `input`.
-  Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceManager& resources, AudioEngine& audio,
+  Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceMgr& resources, AudioEngine& audio,
        InputSystem& input);
   ~Game();
   /// Saves the active dimension and the player (F5, autosave, exit, dimension switch). `wait`
@@ -371,7 +371,7 @@ class Game {
   /// Column eviction (A2 / B-M1): drops resident columns beyond the stream
   /// radius + hysteresis, bounded per call, in its own sim-stopped window
   /// at the end of pumpStreaming(). Dirty or signal-bearing columns are
-  /// saved first (WorldSave::saveColumns, SGNL exported before unscan);
+  /// saved first (cWorldSave::saveColumns, SGNL exported before unscan);
   /// a column whose save cannot complete is NOT evicted. Clean,
   /// signal-free columns evict with no save (regenerable from the seed).
   void evictFarColumns();
@@ -433,7 +433,7 @@ class Game {
   int lastPlaceHit_[3] = {INT32_MIN, INT32_MIN, INT32_MIN};
   int lastBridge_[3] = {INT32_MIN, INT32_MIN, INT32_MIN};
   IRenderer& renderer_;
-  ResourceManager& resources_;
+  cResourceMgr& resources_;
   cSoundDirector sound_;
   std::vector<SimEvent> simEvents_;
   Vec3 benchCenter_{};
@@ -443,7 +443,7 @@ class Game {
   std::unique_ptr<ChunkStreamer> streamer_;  // player-centered streaming (real game path)
   double uploadMs_ = 0;
   size_t uploadBytes_ = 0;
-  std::unique_ptr<WorldSave> save_;
+  std::unique_ptr<cWorldSave> save_;
   Clock::time_point lastSave_ = Clock::now();
   bool benchSet_ = false;
   std::vector<SoundEvent> soundBuf_;
@@ -452,7 +452,7 @@ class Game {
   Dimension* active_ = nullptr;
   Player player_;
   // --- IPlayer integration (player_adapter.h) ---
-  GamePlayerAdapter playerAdapter_;  ///< engine IPlayer view of player_: vitals + stats
+  cGamePlayerAdapter playerAdapter_;  ///< engine IPlayer view of player_: vitals + stats
   uint64_t lastVitalsTick_ = 0;      ///< sim worldTick the vitals last advanced to
   // --- Locomotion (player_locomotion.h): the local player's Entity body +
   // the engine LocomotionController stepping it, once per sim tick. ---
@@ -460,7 +460,7 @@ class Game {
   uint64_t lastLocomotionTick_ = 0;  ///< sim worldTick the body last advanced to
   litholattice::LocomotionInput pendingLocomotionInput_{};  ///< frame's intent, consumed per tick
   // --- Sprite system integration (sprite_host.h): presentation only ---
-  SpriteHost spriteHost_;            ///< sprite registry + live instances (game thread)
+  cSpriteHost spriteHost_;            ///< sprite registry + live instances (game thread)
   uint64_t lastSpriteTick_ = 0;      ///< sim worldTick the sprites last advanced to
   // --- Deceitor director: declared BEFORE aiHost_ so the AiWorld (and
   // the brains it owns) destructs first — brains unregister from the
@@ -546,7 +546,7 @@ class Game {
   AudioEngine& audio_;
   // cCamera system: owns the engine cCameraMgr (player/orbit/follow/free
   // view cameras + MCP pilot cameras). Presentation only — declared before
-  // the MCP members because mcpSenses_ borrows its PilotCameraRig.
+  // the MCP members because mcpSenses_ borrows its cPilotCameraRig.
   GameCameraController camera_;
   // MCP player control (model pilots the local player through the real input
   // path). Wired into the McpServer by Game::mcpBackends() under

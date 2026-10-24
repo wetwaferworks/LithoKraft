@@ -24,7 +24,7 @@ int runHandshakeSelfTest();
 struct ControlScenarioWorld {
   DimensionRegistry reg;
   Dimension* wafer = nullptr;
-  std::unique_ptr<SignalWorldSimulation> ws;
+  std::unique_ptr<cSignalWorldSim> ws;
   int y = 0, wireX = -1, wireZ = -1, repX = -1, repZ = -1;
 };
 ControlScenarioWorld buildControlScenarioWorld();

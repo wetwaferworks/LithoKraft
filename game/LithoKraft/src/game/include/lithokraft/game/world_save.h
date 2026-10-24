@@ -86,12 +86,12 @@ struct PlayerMeta {
 inline constexpr const char* kPlayerFileName = "player.lat";
 inline constexpr const char* kLegacyPlayerFileName = "player.dat";
 
-class WorldSave {
+class cWorldSave {
  public:
   /// `materials`: the PBR material registry (main.cpp owns it; must outlive this). When
   /// non-null the engine's MATS payload is registered, persisting per-voxel material bytes
   /// as string IDs. Null = no material persistence (tests that don't care about materials).
-  explicit WorldSave(std::filesystem::path root, const litholattice::MaterialRegistry* materials = nullptr);
+  explicit cWorldSave(std::filesystem::path root, const litholattice::MaterialRegistry* materials = nullptr);
   const std::filesystem::path& root() const { return root_; }
 
   /// FAIL-CLOSED NAME TABLE (C-4): the semantics every method below follows.
@@ -228,7 +228,7 @@ class WorldSave {
   // streamed decode can never leak into a dimension load's blob (or vice
   // versa), and no residue accumulates between calls. A decode with no sink
   // armed drops its bytes (no load path does that: every decode runs under
-  // a WorldSave load call).
+  // a cWorldSave load call).
   std::vector<uint8_t>* signalSink_ = nullptr;
   std::mutex loadMutex_;  ///< serialises loadColumn vs loadDimension (and loadColumn vs itself)
   std::map<std::string, std::unique_ptr<storage::WorldStore>> stores_;

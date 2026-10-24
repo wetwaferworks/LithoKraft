@@ -40,7 +40,7 @@ litholattice::Mat4 translation(float x, float y, float z) {
 McpSensesAdapter::McpSensesAdapter(litholattice::AudioEngine& audio,
                                    std::function<McpPlayerView::GameState()> snapshot,
                                    std::function<uint64_t()> tick,
-                                   std::shared_ptr<PilotCameraRig> rig)
+                                   std::shared_ptr<cPilotCameraRig> rig)
     : audio_(audio), snapshot_(std::move(snapshot)), tick_(std::move(tick)), rig_(std::move(rig)) {
   tapScratch_.resize(kTapScratchFrames);
   audio_.setTapEnabled(true);  // arm the mixed-output tap once; the tap hears the pilot's ears
@@ -95,7 +95,7 @@ std::vector<std::string> McpSensesAdapter::pilotIds() const { return {"player"};
 
 bool McpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, int height,
                                           VisionFrame& out) {
-  // The pilot's engine camera (PilotCameraRig) resolves the capture pose on
+  // The pilot's engine camera (cPilotCameraRig) resolves the capture pose on
   // the game thread; an unknown pilot — or one whose camera has not
   // resolved yet (no frame ticked) — fails, as an unknown pilot did before.
   CameraViewPose res;
@@ -172,7 +172,7 @@ bool McpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, int
       const litholattice::Mat4 mvp = litholattice::mul(vp, translation(mn.x, mn.y, mn.z));
       sw_.renderMesh(cm->verts.data(), cm->verts.size(), mvp.m);
     }
-    // Sprites (flat form fed by Game's SpriteHost): drawn after the world,
+    // Sprites (flat form fed by Game's cSpriteHost): drawn after the world,
     // world-anchored via the same translation trick with their own origin.
     if (!spriteVerts.empty()) {
       const litholattice::Mat4 mvp =

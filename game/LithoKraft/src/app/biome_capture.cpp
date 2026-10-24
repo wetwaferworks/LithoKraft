@@ -129,10 +129,10 @@ int main(int argc, char** argv) {
   // pack_64). Previously this tool built a default BlockMaterials (every face =
   // the missing texture, layer 0) and fed the renderer a single all-white tile,
   // so every screenshot came out white regardless of the actual textures.
-  // The ResourceManager (and the materials it builds) must outlive all meshing.
+  // The cResourceMgr (and the materials it builds) must outlive all meshing.
   const std::string engineAssets = sourceRoot() + "/engine/assets";
   const std::string gameAssets = sourceRoot() + "/game/LithoKraft/assets";
-  lithokraft::ResourceManager rm({engineAssets, gameAssets,
+  lithokraft::cResourceMgr rm({engineAssets, gameAssets,
                                   std::filesystem::path(gameAssets) / "packs" / "pack_64"});
   rm.reload();
   const auto materialsPtr = rm.materials();

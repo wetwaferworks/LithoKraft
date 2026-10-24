@@ -62,7 +62,7 @@ class NullRenderer final : public litholattice::IRenderer {
 };
 
 /// Owns everything a Game needs and constructs it headless, in main.cpp's order:
-/// JobPool, NullRenderer, ResourceManager (no packs; built-in worldgen fallbacks),
+/// JobPool, NullRenderer, cResourceMgr (no packs; built-in worldgen fallbacks),
 /// AudioEngine (no output device; commands queue harmlessly), InputSystem (default action
 /// map, no backend). Members declare in construction order; destruction runs in reverse,
 /// so the Game dies before the things that must outlive it.
@@ -93,7 +93,7 @@ class HeadlessGame {
  private:
   litholattice::JobPool pool_;
   NullRenderer renderer_;
-  ResourceManager resources_;
+  cResourceMgr resources_;
   litholattice::AudioEngine audio_;
   litholattice::InputSystem input_;
   std::unique_ptr<Game> game_;

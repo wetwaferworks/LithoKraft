@@ -100,7 +100,7 @@ class GameUi {
   void update(const HudModel& model, ui::Vec2 viewport, float dt);
   /// Paints into `hud.draws`; block icons ("block:<id>") use the material
   /// swatches / block icons, item icons ("item:<itemId>") use `itemIcon`
-  /// (the ResourceManager's per-item icon atlas, P2b-1).
+  /// (the cResourceMgr's per-item icon atlas, P2b-1).
   void paint(HudLayer& hud, const BlockMaterials& materials, const std::function<const Image*(BlockId)>& icon = {},
              const std::function<const Image*(uint32_t)>& itemIcon = {}) const;
 

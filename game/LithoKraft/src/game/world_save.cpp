@@ -13,7 +13,7 @@
 
 namespace lithokraft {
 
-std::optional<storage::Bytes> WorldSave::migrateSignalV1ToV2(const storage::Bytes& v1) {
+std::optional<storage::Bytes> cWorldSave::migrateSignalV1ToV2(const storage::Bytes& v1) {
   // v1 entry: u64 key, 8x u8 (out..timer), u16 n, 2*n key bytes.
   // v2 inserts u8 channel (=1) + u8 beacon (=0) after the 8 u8s, before the count.
   storage::ByteReader r(v1.data(), v1.size());
@@ -32,7 +32,7 @@ std::optional<storage::Bytes> WorldSave::migrateSignalV1ToV2(const storage::Byte
   return w.out;
 }
 
-WorldSave::WorldSave(std::filesystem::path root, const litholattice::MaterialRegistry* materials)
+cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::MaterialRegistry* materials)
     : root_(std::move(root)) {
   // Infinite Registry: the BLKS payload translates between the StableId voxel
   // storage and the BlockId disk codec through this registry.
@@ -53,7 +53,7 @@ WorldSave::WorldSave(std::filesystem::path root, const litholattice::MaterialReg
     // C-M4 per-call sink: append ONLY into the buffer the load call currently
     // executing has armed (loadColumn's per-column payload, or loadDimension's
     // blob). Self-delimiting entries: concatenation within one call is valid.
-    // No sink armed = no WorldSave load is running this decode; drop the bytes
+    // No sink armed = no cWorldSave load is running this decode; drop the bytes
     // rather than accumulating shared residue.
     if (signalSink_) signalSink_->insert(signalSink_->end(), b.begin(), b.end());
     return true;
@@ -143,7 +143,7 @@ bool worldMetaIntact(const std::filesystem::path& p, std::string* err) {
 }
 }  // namespace
 
-bool WorldSave::writeWorldMeta(std::string* err) const {
+bool cWorldSave::writeWorldMeta(std::string* err) const {
   if (!hasSeed_) return true;  // no seed wired (tools/tests): nothing to persist
   litholattice::Json j = litholattice::Json::object();
   j.add("saveFormatVersion", litholattice::Json::number(kWorldMetaVersion));
@@ -164,7 +164,7 @@ bool WorldSave::writeWorldMeta(std::string* err) const {
   return storage::writeFileAtomic(root_ / "level.json", reinterpret_cast<const uint8_t*>(text.data()), text.size(), err);
 }
 
-std::optional<uint64_t> WorldSave::readWorldSeed(const std::filesystem::path& root, std::string* err) {
+std::optional<uint64_t> cWorldSave::readWorldSeed(const std::filesystem::path& root, std::string* err) {
   const auto path = root / "level.json";
   if (!footprintExists(path)) return std::nullopt;  // pre-metadata save: absent, not corrupt (err stays empty)
   {
@@ -191,7 +191,7 @@ std::optional<uint64_t> WorldSave::readWorldSeed(const std::filesystem::path& ro
   return v;
 }
 
-std::optional<WorldSave::WorldClockMeta> WorldSave::readWorldClock(const std::filesystem::path& root, std::string* err) {
+std::optional<cWorldSave::WorldClockMeta> cWorldSave::readWorldClock(const std::filesystem::path& root, std::string* err) {
   // Called after readWorldSeed (which already ran crash recovery on level.json).
   const auto path = root / "level.json";
   std::error_code ec;
@@ -216,7 +216,7 @@ std::optional<WorldSave::WorldClockMeta> WorldSave::readWorldClock(const std::fi
   return c;
 }
 
-std::optional<WorldSave::WorldAreaMeta> WorldSave::readWorldArea(const std::filesystem::path& root, std::string* err) {
+std::optional<cWorldSave::WorldAreaMeta> cWorldSave::readWorldArea(const std::filesystem::path& root, std::string* err) {
   // Fix run 3. Called after readWorldSeed (crash recovery already ran on level.json).
   const auto path = root / "level.json";
   std::error_code ec;
@@ -251,14 +251,14 @@ std::optional<WorldSave::WorldAreaMeta> WorldSave::readWorldArea(const std::file
   return a;
 }
 
-storage::WorldStore& WorldSave::store(const std::string& dim) {
+storage::WorldStore& cWorldSave::store(const std::string& dim) {
   std::lock_guard l(storesMutex_);
   auto& s = stores_[dim];
   if (!s) s = std::make_unique<storage::WorldStore>(root_ / dim, payloads_);
   return *s;
 }
 
-WorldSave::LoadedColumn WorldSave::loadColumn(const std::string& dim, int cx, int cz) {
+cWorldSave::LoadedColumn cWorldSave::loadColumn(const std::string& dim, int cx, int cz) {
   LoadedColumn out;  // NotSaved until a saved column actually decodes
   if (!std::filesystem::exists(root_ / dim)) return out;
   // Serialise against loadDimension and other loadColumn calls so the SGNL
@@ -322,7 +322,7 @@ WorldSave::LoadedColumn WorldSave::loadColumn(const std::string& dim, int cx, in
   return out;
 }
 
-size_t WorldSave::saveDimension(const std::string& dim, const ChunkMap& world, const SignalSim& signal, bool wait,
+size_t cWorldSave::saveDimension(const std::string& dim, const ChunkMap& world, const SignalSim& signal, bool wait,
                                 const std::unordered_set<uint64_t>* dirty) {
   lastSaveOk_ = true;
   lastSaveError_.clear();
@@ -370,7 +370,7 @@ size_t WorldSave::saveDimension(const std::string& dim, const ChunkMap& world, c
   }
   // SV-H2: persist the world seed (+ format version) on every save, through
   // the same contract. Hooked here (not only in Game::saveWorld) so every
-  // WorldSave caller — game, tests, tools — leaves a self-describing world.
+  // cWorldSave caller — game, tests, tools — leaves a self-describing world.
   if (hasSeed_ && !writeWorldMeta(&nerr)) {
     lastSaveOk_ = false;
     lastSaveError_ = nerr;
@@ -394,7 +394,7 @@ size_t WorldSave::saveDimension(const std::string& dim, const ChunkMap& world, c
   return n;
 }
 
-size_t WorldSave::saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
+size_t cWorldSave::saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
                               const SignalSim& signal, bool wait) {
   // A2 / B-M1 save-on-evict: saveDimension's discipline, scoped to the
   // eviction candidates. Same fail-closed name-table gate, same
@@ -463,7 +463,7 @@ size_t WorldSave::saveColumns(const std::string& dim, const std::vector<const Ch
   return n;
 }
 
-int WorldSave::loadDimension(const std::string& dim, ChunkMap& world, std::vector<uint8_t>& signalState) {
+int cWorldSave::loadDimension(const std::string& dim, ChunkMap& world, std::vector<uint8_t>& signalState) {
   if (!std::filesystem::exists(root_ / dim)) return 0;
   // Serialise against streamed loadColumn calls for the whole load, so the
   // SGNL sink armed below collects exactly this dimension's payloads (C-M4).
@@ -513,7 +513,7 @@ int WorldSave::loadDimension(const std::string& dim, ChunkMap& world, std::vecto
   return inserted;
 }
 
-bool WorldSave::flush() {
+bool cWorldSave::flush() {
   bool ok = true;
   for (auto& [d, s] : stores_) ok = s->flush() && ok;
   return ok;
@@ -545,7 +545,7 @@ std::optional<uint32_t> resolveStackStringId(const std::string& sid) {
 }
 }  // namespace
 
-bool WorldSave::writePlayer(const PlayerMeta& m, std::string* err) const {
+bool cWorldSave::writePlayer(const PlayerMeta& m, std::string* err) const {
   // C-L1 (P3-2) write-side count guards: the on-disk counts are u8 (hotbar)
   // and u16 (stats / vitals / inventory slots). The old code cast silently,
   // so an oversized in-memory collection would have wrapped its count and
@@ -636,7 +636,7 @@ bool WorldSave::writePlayer(const PlayerMeta& m, std::string* err) const {
   return storage::writeFileAtomic(root_ / kPlayerFileName, file.out, err);
 }
 
-std::optional<PlayerMeta> WorldSave::readPlayer(std::string* err) const {
+std::optional<PlayerMeta> cWorldSave::readPlayer(std::string* err) const {
   // Cortana 2026-10-16 [GAME] (JD): the player save is player.lat ("litho algorithmic type").
   // A world saved before the rename only has the legacy player.dat: read it (same format, same
   // crash recovery); the next save writes player.lat, which wins from then on. The legacy file
