@@ -30,3 +30,8 @@ _private/
 
 # Local edit backups (*.orig, *.orig2, *.orig-<date>-fixN); never commit them.
 *.orig*
+
+# Backup copies of reverted edits (2026-10-24): archived to %USERPROFILE%\WetWafer-backups\, never tracked
+*.orig
+*.reverted-*
+*.spans-reverted-*
