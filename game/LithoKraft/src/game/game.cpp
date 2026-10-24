@@ -3062,6 +3062,7 @@ std::string Game::targetText() const {
   const SimStats& st = sim_->stats();
   if (!st.hit) return "-";
   std::string text = cBehaviorCatalog::get().describe(st.hitBlock, st.hitState);
+  text += "  " + std::string(blockRegistry().idOf(st.hitBlock));  // 2026-10-24 (JD): namespaced id on the look line
   if (st.hitInfo[0]) { text += "\n"; text += st.hitInfo; }  // inspector: ids, raw state, net, memory
   if (!st.inReach) text += "  (out of reach)";
   return text;
