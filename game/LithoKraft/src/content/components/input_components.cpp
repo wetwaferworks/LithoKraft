@@ -25,7 +25,7 @@ class Switch final : public ComponentBehavior {
 };
 
 /// Right-click gives a kButtonTicks-long 64 pulse on every side.
-class Button final : public ComponentBehavior {
+class cInputButton final : public ComponentBehavior {
  public:
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory& m) const override {
     const int out = m.timer > 0 ? kMaxSignal : 0;
@@ -73,7 +73,7 @@ class Keyboard final : public ComponentBehavior {
 
 void registerInputs(const Registrar& add) {
   add("switch", std::make_unique<Switch>());
-  add("button", std::make_unique<Button>());
+  add("button", std::make_unique<cInputButton>());
   add("keyboard", std::make_unique<Keyboard>());
 }
 

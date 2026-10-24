@@ -86,7 +86,7 @@ class TimedSimulation final : public IWorldSimulation {
 
 /// Holds meshes like a renderer would (bytes by key), so the stream soak sees what a real
 /// backend would keep alive.
-class NullRenderer final : public IRenderer {
+class cPerfNullRenderer final : public IRenderer {
  public:
   struct NullTextures final : ITextureArray {
     bool upload(const TextureRegistry&) override { return true; }
@@ -295,7 +295,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   std::printf("== stream soak (10 simulated minutes, 60 updates/s, null renderer)\n");
   json += "  \"stream_soak\": [";
   {
-    NullRenderer nr;
+    cPerfNullRenderer nr;
     const auto matsPtr = std::make_shared<const BlockMaterials>(blockRegistry().size());
     BenchStreamer bs(nr, pool, wafer->generator, 16, wafer->belowWorldFill, 8);
     const uint64_t ram0 = processWorkingSetBytes();
