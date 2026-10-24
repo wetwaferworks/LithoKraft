@@ -178,6 +178,26 @@ FaceLook machineTintLook(const CustomBlock& cell, const FaceMaterial& fm, bool o
   const BlockDef nb = cell.blocks.def(cell.neighbor(kDirX[bd], 0, kDirZ[bd]));
   return {kShadeTraceTint, uint8_t((ts - 1) | (nb.channel == 2 ? 0x40 : 0) | (on ? 0x80 : 0))};
 }
+// 2026-10-24 (JD): does component `nd` (state s) read or drive Trace on world side `side`
+// (the side of the component facing the Trace)? Mirrors the sim (logic_components.cpp):
+// Repeator / Fast Latch back in + front out; Keyboard front + right (Enter / Backspace);
+// Catchor its input (back) + current output side; Redirector / Thresholdor / Pulsor / Memor all four
+// (back + both sides in, front out); everything else (Switch, Button, lamps, Memor-likes) any side.
+bool tracePortFaces(const BlockDef& nd, CellState s, int side) {
+  const int f = stFacing(s);
+  switch (roleOf(nd)) {
+    case SimRole::Repeator:
+    case SimRole::FastLatch: return side == f || side == dirBack(f);
+    case SimRole::Keyboard: return side == f || side == dirRight(f);
+    case SimRole::Catchor: {
+      const int m = stAux(s) & 3;
+      if (m == 3) return true;  // not wired yet: binds to the first Trace it sees
+      const int out = m == 1 ? (f + 3) & 3 : m == 2 ? (f + 1) & 3 : f;
+      return side == dirBack(f) || side == out;
+    }
+    default: return true;
+  }
+}
 FaceSlot localSlot(int face) {  // north-facing local frame
   switch (face) { case 2: return FaceSlot::Top; case 3: return FaceSlot::Bottom; case 5: return FaceSlot::Front;
                   case 4: return FaceSlot::Back; case 0: return FaceSlot::Right; default: return FaceSlot::Left; }
@@ -483,11 +503,14 @@ void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out)
   if (roleOf(def) != SimRole::Wire) return;
   const int ch = def.channel - 1;
   const bool upBlocked = reg.has(cell.neighbor(0, 1, 0), kCutsWire);
-  int arms = 0, count = 0;
+  int arms = 0, count = 0, portArms = 0;
   for (int d = 0; d < 4; ++d) {
     const BlockDef nd = reg.def(cell.neighbor(kDirX[d], 0, kDirZ[d]));
-    bool link = (roleOf(nd) == SimRole::Wire && nd.channel == def.channel) ||
-                (roleOf(nd) != SimRole::None && roleOf(nd) != SimRole::Wire && roleOf(nd) != SimRole::Torch);
+    const bool comp = roleOf(nd) != SimRole::None && roleOf(nd) != SimRole::Wire && roleOf(nd) != SimRole::Torch;
+    // 2026-10-24 (JD): an arm runs into a component only on a face the sim really reads or drives.
+    const bool port = comp && tracePortFaces(nd, cell.neighborState(kDirX[d], 0, kDirZ[d]), dirBack(d));
+    if (port) portArms |= 1 << d;
+    bool link = (roleOf(nd) == SimRole::Wire && nd.channel == def.channel) || port;
     const BlockDef up = reg.def(cell.neighbor(kDirX[d], 1, kDirZ[d]));
     const BlockDef dn = reg.def(cell.neighbor(kDirX[d], -1, kDirZ[d]));
     if (!upBlocked && roleOf(up) == SimRole::Wire && up.channel == def.channel) link = true;
@@ -509,6 +532,23 @@ void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out)
   const FaceLook fl{uint8_t(ch ? kShadeStripTint1 : kShadeStripTint0), uint8_t(stValue(cell.state))};
   if (hanging) out.face(cell, 3, clo, chi, cell.materials.wirePiece(cell.id, piece), fl, (4 - rot) & 3);
   else out.face(cell, 2, lo, hi, cell.materials.wirePiece(cell.id, piece), fl, rot);
+  // 2026-10-24 CloudAtlas connector arms (placeholder, visual only): at each real component port
+  // the strip climbs into the component: riser [6,0,0]-[10,3,1] at that edge (north-local, turned
+  // to the port side), meeting the 2/16 slab pads at y 2..3 (full blocks: it just meets the face).
+  if (portArms && !hanging)
+    if (const FaceMaterial* am = cell.materials.named(ch ? "trace_arm_blue" : "trace_arm_red"))
+      for (int d = 0; d < 4; ++d) {
+        if (!(portArms >> d & 1)) continue;
+        for (int f = 0; f < 6; ++f) {
+          if (f == 3) continue;  // the underside sits on the floor
+          foliage::Quad q{};
+          q.lo[0] = 6; q.lo[1] = 0; q.lo[2] = 0; q.hi[0] = 10; q.hi[1] = 3; q.hi[2] = 1;
+          q.face = uint8_t(f);
+          const foliage::Quad r = foliage::rotated(q, d);
+          const int l3[3] = {r.lo[0], r.lo[1], r.lo[2]}, h3[3] = {r.hi[0], r.hi[1], r.hi[2]};
+          out.face(cell, r.face, l3, h3, *am, {}, 0);
+        }
+      }
 }
 
 void cLithoKraftAppearance::bindMaterials(const BlockDef& def, const BlockModel& model, MaterialBindings& b) const {

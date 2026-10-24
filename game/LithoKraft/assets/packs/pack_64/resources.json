@@ -95,6 +95,8 @@
   "etchor": "textures/blocks/etchor.png",
   "fast_latch_off": "textures/blocks/fast_latch_off.png",
   "fast_latch_on": "textures/blocks/fast_latch_on.png",
+  "trace_arm_red": "textures/blocks/trace_arm_red.png",
+  "trace_arm_blue": "textures/blocks/trace_arm_blue.png",
   "fast_latch_top": "textures/blocks/fast_latch_top.png",
   "fast_latch_front": "textures/blocks/fast_latch_front.png",
   "fast_latch_back": "textures/blocks/fast_latch_back.png",
