@@ -417,6 +417,26 @@ int runSignalSelfTest() {
                 (fl.screenZ1 - fl.screenZ0) / 4, changes, lampFlashes);
     check(changes >= 20 && lampFlashes >= 20, "framebuffer scene: cache controller runs and the screen shifts frames down");
   }
+  {  // 2026-10-24 (JD): the 16-wide test-area screen (same machine, pixels = 16, 4 stages) runs too.
+    ChunkMap fw;
+    fw.setRegistry(&blockRegistry());
+    for (int cz = 0; cz < 6; ++cz)
+      for (int cx = 0; cx < 6; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; fw.insert(std::move(col)); }
+    const FramebufferLayout fl = buildFramebufferScene(fw, 0, y, 0, 32, 16);
+    cSignalSim fs;
+    fs.scan(fw);
+    const int memX = 4 + 2, memZ = fl.screenZ0 + 1 + 4 * 3 - 1;  // stage 3 (the last) memory cell
+    int changes = 0, lampFlashes = 0, last = stValue(fw.getState(memX, y, memZ));
+    bool prevLit = false;
+    for (int i = 0; i < 2000; ++i) {
+      fs.tick(fw, 0, 0, 100, [](int, int, int) {});
+      const int v = stValue(fw.getState(memX, y, memZ));
+      if (v != last) { ++changes; last = v; }
+      const bool lit = stValue(fw.getState(14, y + 1, memZ + 2)) > 0;
+      lampFlashes += lit && !prevLit; prevLit = lit;
+    }
+    check(changes >= 20 && lampFlashes >= 20, "framebuffer scene 16 wide (test area): cache controller runs and the screen shifts frames down");
+  }
   {  // Incremental re-flood == full pass: same scene, one sim forced to a full pass every tick.
     auto make = [&](ChunkMap& m) {
       for (int cz = 0; cz < 8; ++cz)

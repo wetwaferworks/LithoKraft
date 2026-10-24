@@ -36,7 +36,8 @@ struct FramebufferLayout { int x0 = 0, z0 = 0, y = 0, size = 0, screenZ0 = 0, sc
 /// a frame cache of 8 Memors read in turn by 8 Pulsors, sequenced by a repeator-ring
 /// controller (instruction-cache style), so the screen scrolls a looping colour animation.
 /// A viewing stand sits south of the screen.
-FramebufferLayout buildFramebufferScene(ChunkMap& world, int x0, int y, int z0, int size);
+/// `pixels` = lamp columns per screen column (default 56, the bench / Examples size; 2026-10-24: 16 for the playtest test-area screen).
+FramebufferLayout buildFramebufferScene(ChunkMap& world, int x0, int y, int z0, int size, int pixels = 56);
 /// The same machine standing upright: lamps form a wall in the x/y plane at z = z0 + 8, the data
 /// runs, links and clock spine climb the back face as one-block wire stairs, and the frame cache +
 /// controller sit on the floor in front. Shifts upward. size <= 128 (spine fed from mid-height).

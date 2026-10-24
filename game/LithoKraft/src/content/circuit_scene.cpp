@@ -86,9 +86,10 @@ int buildRingClock(ChunkMap& w, int x0, int y, int z0, int delayIndex) {
   put(ox + 2, oz + 3, kFastLatch, S); put(ox + 2, oz + 4, kRedTrace); put(ox + 2, oz + 5, kLamp);  // toggle tap
   return placed;
 }
-FramebufferLayout buildFramebufferScene(ChunkMap& w, int x0, int y, int z0, int size) {
+FramebufferLayout buildFramebufferScene(ChunkMap& w, int x0, int y, int z0, int size, int pixels) {
   constexpr int N = 0, E = 1, S = 2, W = 3;
-  constexpr int kFrames = 8, kPixels = 56, kPitch = 64;
+  constexpr int kFrames = 8, kPitch = 64;
+  const int kPixels = std::clamp(pixels, 4, 56);  // 56 = original fixed width (bench, Examples, selftest unchanged)
   FramebufferLayout L;
   int placed = 0;
   auto put = [&](int x, int yy, int z, BlockId b, int facing = 0, int value = 0, int aux = 0) {

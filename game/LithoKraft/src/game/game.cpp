@@ -1058,6 +1058,12 @@ void Game::loadActive() {
               ccz + 5, ccx * 16, (ccx + 6) * 16 - 1, ccz * 16, (ccz + 6) * 16 - 1, refloored, names.c_str());
       logInfo("test world chunk grid: cross-chunk run %s: switch (%d,%d,%d) -> 62 red trace -> lamp (%d,%d,%d), crosses chunk borders at x %d, %d, %d, %d",
               runOk ? "placed" : "SKIPPED", rx, floorY + 1, rz, rx + 63, floorY + 1, rz, (ccx + 2) * 16, (ccx + 3) * 16, (ccx + 4) * 16, (ccx + 5) * 16);
+      // 2026-10-24 (JD "Yes, add it"): a small working wired screen, 16 lamps wide x 4 stages (12 lamp rows),
+      // the same Memor -> Pulsor -> trace -> lamp shift register + frame cache as the Examples FRAMEBUFFER, east of the grid.
+      const int fx = (ccx + 6) * 16 + 8, fz = ccz * 16 + 4;
+      const FramebufferLayout fb16 = buildFramebufferScene(cw, fx, floorY + 1, fz, 32, 16);
+      logInfo("test world wired screen 16: lamps x %d..%d z %d..%d y %d (frame cache z %d, viewing stand y %d); %d blocks", fx + 8, fx + 24,
+              fb16.screenZ0, fb16.screenZ1, floorY + 2, fb16.cacheZ, floorY + 15, fb16.blocks);
     }    if (cfg_.testWorldExamples) {  // 2026-10-24 (JD): playtest builds only
       for (const TestWorldExample& e : buildTestWorldExamples(active_->chunks, tw, sx, sz, cfg_.worldChunks * 16))
         logInfo("test world examples: %-12s x %d..%d z %d..%d  %s %d blocks%s%s", e.label.c_str(), e.x0, e.x1, e.z0, e.z1,
