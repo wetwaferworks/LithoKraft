@@ -1011,14 +1011,12 @@ void Game::loadActive() {
       ChunkMap& cw = active_->chunks;
       const auto& reg = blockRegistry();
       std::vector<BlockId> floors{kWaferSilicon};
-      for (int id = 1; id < int(reg.size()) && floors.size() < 6; ++id) {
-        const BlockDef& d = reg.def(BlockId(id));
-        const uint32_t bad = kTransparent | kCutsWire | kInteractive | kRandomTicks | kAttachable | kDirectional;
-        if (BlockId(id) == kWaferSilicon || d.shape != Shape::Cube || roleOf(d) != SimRole::None) continue;
-        if ((d.flags & (kSolid | kOpaque)) != (kSolid | kOpaque) || (d.flags & bad)) continue;
-        floors.push_back(BlockId(id));
+      // Smoke 15:44: the flag filter only found Wafer Silicon, so pick plain full blocks by name (first match wins).
+      for (const char* want : {"Stone", "Copper Block", "Ceramic", "Aluminum Block", "Dense Silicon", "Dirt", "Flecked Silicon"}) {
+        for (int id = 1; id < int(reg.size()) && floors.size() < 6; ++id)
+          if (reg.def(BlockId(id)).name == std::string_view(want) && BlockId(id) != kWaferSilicon) { floors.push_back(BlockId(id)); break; }
       }
-      const int ccx = (sx >> 4) - 3, ccz = (sz >> 4) - 3;  // chunks -3..+2 around spawn: Manhattan <= 6 (inside the 8 diamond)
+      const int ccx = std::max(0, (sx >> 4) - 3), ccz = std::max(0, (sz >> 4) - 3);  // chunks -3..+2 around spawn (Manhattan <= 6, inside the 8 diamond); clamped to generated columns (smoke 15:46: z<0 is not generated)
       auto busy = [&](int x, int z) {  // keep existing pads: anything standing within one block
         for (int dz = -1; dz <= 1; ++dz)
           for (int dx = -1; dx <= 1; ++dx)
@@ -1041,9 +1039,16 @@ void Game::loadActive() {
             }
         }
       // Cross-chunk run: Switch -> 62 Red Trace -> Lamp along the south chunk row (clear of the pads), crossing 3+ chunk borders.
-      const int rz = ccz * 16 + 8, rx = (ccx + 1) * 16 + 4;
-      bool runOk = true;
-      for (int k = 0; k <= 63 && runOk; ++k) runOk = !busy(rx + k, rz);
+      int rz = ccz * 16 + 8;
+      const int rx = (ccx + 1) * 16 + 4;
+      bool runOk = false;
+      int blockX = 0, blockZ = 0;
+      for (int zt = ccz * 16 + 2; zt <= ccz * 16 + 14 && !runOk; zt += 2) {  // first free row in the south chunk row
+        runOk = true;
+        for (int k = 0; k <= 63 && runOk; ++k) if (busy(rx + k, zt)) { runOk = false; blockX = rx + k; blockZ = zt; }
+        if (runOk) rz = zt;
+      }
+      if (!runOk) logInfo("test world chunk grid: cross-chunk run blocked, last blocker near (%d,%d)", blockX, blockZ);
       if (runOk) runOk = cw.set(rx, floorY + 1, rz, kSwitch);
       for (int k = 1; k <= 62 && runOk; ++k) runOk = cw.set(rx + k, floorY + 1, rz, kRedTrace);
       if (runOk) runOk = cw.set(rx + 63, floorY + 1, rz, kLamp);
