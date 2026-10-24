@@ -588,7 +588,7 @@ class Game {
   Vec3 menuReturnPos_{};
   float menuReturnYaw_ = 0.f, menuReturnPitch_ = 0.f;
   bool menuSnapshotValid_ = false;
-  static constexpr int kHotbarSize = kHotbarSlots;   // == kInvHotbarSlots (8)
+  static constexpr int kHotbarSize = kHotbarSlots;   // == kInvHotbarSlots (16)
   // P2b-1: NO separate hotbar array. The hotbar IS player_.inventory's
   // hotbar slots; hot_ is only the selection index into them. (The old
   // array's default contents survive as the fresh-spawn creative kit,

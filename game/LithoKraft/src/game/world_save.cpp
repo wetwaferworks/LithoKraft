@@ -721,6 +721,7 @@ std::optional<PlayerMeta> cWorldSave::readPlayer(std::string* err) const {
       if (playerLatNameOk(b.ok(), nm)) m.vitals[std::string(nm.begin(), nm.end())] = value;
     }
   }
+  bool legacyLayout = false;  // 2026-10-24: inventory written with the 8-slot hotbar
   if (v >= 4) {
     // Inventory block: (string id, count) per slot in the canonical flat
     // order. Unknown ids drop ONLY their own stack (logged); slots past
@@ -728,7 +729,10 @@ std::optional<PlayerMeta> cWorldSave::readPlayer(std::string* err) const {
     // future block can never corrupt the slots that precede it.
     const uint16_t nSlots = b.u16();
     const auto slots = m.inventory.allSlots();
-    for (uint16_t i = 0; i < nSlots; ++i) {
+    // 2026-10-24: a block written with the 8-slot hotbar (50 slots) is remapped into the 16-slot layout.
+    legacyLayout = nSlots == uint16_t(kLegacyTotalSlots) && kTotalSlots != kLegacyTotalSlots;
+    for (uint16_t i0 = 0; i0 < nSlots; ++i0) {
+      const uint16_t i = legacyLayout ? uint16_t(legacyFlatToCurrent(i0)) : i0;
       const storage::Bytes s = b.bytes();
       const uint16_t count = b.u16();
       if (!b.ok() || count == 0) continue;  // empty slot (explicit in v4)
@@ -758,7 +762,7 @@ std::optional<PlayerMeta> cWorldSave::readPlayer(std::string* err) const {
     const uint16_t nData = b.u16();
     const auto dataSlots = m.inventory.allSlots();
     for (uint16_t i = 0; i < nData; ++i) {
-      const uint16_t flat = b.u16();
+      const uint16_t flat = legacyLayout ? uint16_t(legacyFlatToCurrent(b.u16())) : b.u16();
       const storage::Bytes nm = b.bytes();
       const uint16_t nCerts = b.u16();
       std::vector<std::string> certs;

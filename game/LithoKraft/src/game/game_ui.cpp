@@ -84,7 +84,8 @@ void cGameUi::rebuildHud() {
   bar.setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -6 * k}));
   for (int i = 0; i < kHotbarSlots; ++i) {
     ui::cSlot& slot = bar.add<ui::cSlot>(ui::Vec2{40 * k * kInventoryScale, 40 * k * kInventoryScale});  // +25% (JD 2026-10-16)
-    slot.setCaption(std::to_string(i + 1)).setData(i);
+    // 2026-10-24 (JD): one row of 16; captions are the direct-select keys (1..9, 0), slots 11..16 are wheel-only.
+    slot.setCaption(i < 9 ? std::to_string(i + 1) : i == 9 ? std::string("0") : std::string()).setData(i);
     slot.on("click", [this](ui::cWidget& w) {
       if (cb_.selectSlot) cb_.selectSlot(static_cast<ui::cSlot&>(w).data());
     });
@@ -144,7 +145,7 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
   }
   if (!carry.empty()) {
     // Playtest 2026-10-16: every carry slot (42 = hotbar 8 + offhand 2 + main 32), 14 per row.
-    dlg.body().add<ui::cLabel>("Carry (42): hotbar 1-8, offhand L/R, main 1-32 - click: swap into hotbar slot " +
+    dlg.body().add<ui::cLabel>("Carry (50): hotbar 1-16, offhand L/R, main 1-32 - click: swap into hotbar slot " +
                               std::to_string(selectedSlot + 1));
     const int ccols = 14;
     auto& cgrid = dlg.body().add<ui::cGridPanel>(ccols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);

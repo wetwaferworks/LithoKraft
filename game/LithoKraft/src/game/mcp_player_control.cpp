@@ -94,7 +94,7 @@ bool cMcpPlayerController::submitFrame(std::string_view pilot, const ControlFram
     if (f.attackPressed) pressOnce(Action::Break, ev);
     if (f.placePressed) pressOnce(Action::Place, ev);
     if (f.dropPressed) pressOnce(Action::Drop, ev);
-    if (f.hotbarSlot >= 0 && f.hotbarSlot < 8)
+    if (f.hotbarSlot >= 0 && f.hotbarSlot < kHotbarKeySlots)
       pressOnce(hotbarAction(f.hotbarSlot), ev);
   }
   if (!ev.empty()) input_.stageSyntheticEvents(std::move(ev));

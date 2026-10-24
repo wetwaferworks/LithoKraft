@@ -23,7 +23,7 @@ const Row kRows[] = {
     {"place / use", {Action::Place, Action::Use}},
     {"pick block", {Action::PickBlock}},
     {"hotbar slot", {Action::Hotbar1, Action::Hotbar2, Action::Hotbar3, Action::Hotbar4, Action::Hotbar5,
-                     Action::Hotbar6, Action::Hotbar7, Action::Hotbar8, Action::Hotbar9}},
+                     Action::Hotbar6, Action::Hotbar7, Action::Hotbar8, Action::Hotbar9, Action::Hotbar10}},
     {"hotbar next / prev", {Action::HotbarNext, Action::HotbarPrev}},
     {"inventory", {Action::Inventory}},
     {"clear slot", {Action::Drop}},

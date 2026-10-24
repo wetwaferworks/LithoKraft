@@ -16,7 +16,8 @@ namespace lithokraft {
   X(Hotbar1) X(Hotbar2) X(Hotbar3) X(Hotbar4) X(Hotbar5) X(Hotbar6) X(Hotbar7) X(Hotbar8) X(Hotbar9) \
   X(HotbarNext) X(HotbarPrev) X(ToggleHUD) X(ToggleDebug) X(ToggleControls) X(CycleTPS) X(SwitchDim) \
   X(ToggleEUV) X(ReloadResources) X(ScriptEditor) X(SaveWorld) X(Pause) X(Look)                       \
-  X(Secondary) /* Cortana 2026-10-15 2215: Alt (+ right click = secondary setting); appended: ids stable */
+  X(Secondary) /* Cortana 2026-10-15 2215: Alt (+ right click = secondary setting); appended: ids stable */ \
+  X(Hotbar10)  /* 2026-10-24 (JD): 16-slot hotbar, key 0 = slot 10; appended: ids stable */
 
 #define LITHOKRAFT_INPUT_ENUMERATOR(n) n,
 /// Jump / Sneak double as fly up / down in Fly locomotion mode. Crawl asks the
@@ -27,8 +28,13 @@ enum class Action : ActionId { LITHOKRAFT_INPUT_ACTIONS(LITHOKRAFT_INPUT_ENUMERA
 
 constexpr size_t kActionCount = size_t(Action::Count);
 
-/// Hotbar1 + i.
-constexpr Action hotbarAction(int i) { return Action(int(Action::Hotbar1) + i); }
+/// 2026-10-24 (JD): slot -> key action table (data, so player rebinding can map any action to any
+/// slot later). Slots 0..9 have a direct-select action (keys 1..9, 0); slots 10..15 are wheel-only.
+inline constexpr Action kHotbarSlotActions[] = {Action::Hotbar1, Action::Hotbar2, Action::Hotbar3, Action::Hotbar4, Action::Hotbar5,
+                                                Action::Hotbar6, Action::Hotbar7, Action::Hotbar8, Action::Hotbar9, Action::Hotbar10};
+inline constexpr int kHotbarKeySlots = int(sizeof(kHotbarSlotActions) / sizeof(kHotbarSlotActions[0]));
+/// Direct-select action of hotbar slot i (0 <= i < kHotbarKeySlots).
+constexpr Action hotbarAction(int i) { return kHotbarSlotActions[i]; }
 
 /// The game's ActionSet (names as in config/input.json; Place and Use share right click).
 const ActionSet& actionSet();

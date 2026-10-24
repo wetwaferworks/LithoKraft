@@ -12,7 +12,7 @@ static_assert(std::size(kActionInfo) == kActionCount);
 using A = Action;
 constexpr A kGameplay[] = {A::MoveForward, A::MoveBack, A::MoveLeft, A::MoveRight, A::Jump, A::Sneak, A::Crawl, A::Sprint,
                            A::Break, A::Place, A::Use, A::PickBlock, A::Inventory, A::Drop, A::Hotbar1, A::Hotbar2,
-                           A::Hotbar3, A::Hotbar4, A::Hotbar5, A::Hotbar6, A::Hotbar7, A::Hotbar8, A::Hotbar9,
+                           A::Hotbar3, A::Hotbar4, A::Hotbar5, A::Hotbar6, A::Hotbar7, A::Hotbar8, A::Hotbar9, A::Hotbar10,
                            A::HotbarNext, A::HotbarPrev, A::ToggleControls, A::Pause, A::Look, A::Secondary};
 // Inventory (a UI screen: clicks and keys reach it as UI events): Inventory / Pause close it.
 constexpr A kInventory[] = {A::Inventory, A::Pause};
@@ -63,7 +63,7 @@ ActionMap defaultActionMap() {
   bind(A::Secondary, {B::key(Key::LeftAlt)});  // Cortana 2026-10-15 2215 (JD D2): Alt + right click = secondary setting
   bind(A::Inventory, {B::key(Key::E), B::pad(GB::Y)});
   bind(A::Drop, {B::key(Key::Q), B::pad(GB::DpadDown)});
-  for (int i = 0; i < 9; ++i) bind(hotbarAction(i), {B::key(Key(int(Key::Num1) + i))});
+  for (int i = 0; i < kHotbarKeySlots; ++i) bind(hotbarAction(i), {B::key(Key(int(Key::Num0) + (i + 1) % 10))});  // 1..9, then 0
   bind(A::HotbarNext, {B::wheelDown(), B::pad(GB::RightBumper)});
   bind(A::HotbarPrev, {B::wheelUp(), B::pad(GB::LeftBumper)});
   bind(A::ToggleHUD, {B::key(Key::F1)});

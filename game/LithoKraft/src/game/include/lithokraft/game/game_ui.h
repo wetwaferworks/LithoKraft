@@ -19,7 +19,7 @@
 
 namespace lithokraft {
 
-constexpr int kHotbarSlots = 8;
+constexpr int kHotbarSlots = 16;  // 2026-10-24 (JD): was 8
 
 /// What the HUD shows this frame. `hotbar` is a snapshot of the player
 /// inventory's hotbar slots (P2b-1): stacks, not bare BlockIds — a tool or

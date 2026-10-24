@@ -16,13 +16,17 @@ namespace lithokraft {
 inline uint16_t stackCapFor(uint32_t itemId);
 
 constexpr int kMaxStack = 512;       ///< max items per stack (= tick rate)
-constexpr int kInvHotbarSlots = 8;
+constexpr int kInvHotbarSlots = 16;  // 2026-10-24 (JD): was 8 (saves with the 8-slot layout are remapped on load)
+constexpr int kLegacyInvHotbarSlots = 8;
 constexpr int kMainRows = 4;
 constexpr int kMainCols = 8;
 constexpr int kMainSlots = kMainRows * kMainCols;  // 32
-constexpr int kCarrySlots = kInvHotbarSlots + 2 + kMainSlots;  // 42
+constexpr int kCarrySlots = kInvHotbarSlots + 2 + kMainSlots;  // 50 (42 before the 16-slot hotbar)
 constexpr int kGearSlots = 8;
-constexpr int kTotalSlots = kCarrySlots + kGearSlots;  // 50: every slot, gear included
+constexpr int kTotalSlots = kCarrySlots + kGearSlots;  // 58: every slot, gear included
+/// The 8-slot-hotbar layout's total (saves written before 2026-10-24): flat index >= 8 moves up by 8.
+constexpr int kLegacyTotalSlots = kLegacyInvHotbarSlots + 2 + kMainSlots + kGearSlots;  // 50
+constexpr int legacyFlatToCurrent(int i) { return i < kLegacyInvHotbarSlots ? i : i + (kInvHotbarSlots - kLegacyInvHotbarSlots); }
 
 /// Gear slot indices.
 enum GearSlot : uint8_t {
@@ -125,7 +129,7 @@ class Inventory {
   std::array<ItemStack, kGearSlots>& gear() { return gear_; }
   const std::array<ItemStack, kGearSlots>& gear() const { return gear_; }
 
-  /// Every slot in the CANONICAL FLAT ORDER (P2b-1): hotbar 0..7, offhand
+  /// Every slot in the CANONICAL FLAT ORDER (P2b-1): hotbar 0..15, offhand
   /// L, offhand R, main 0..31, gear 0..7 — 50 slots. This is the order the
   /// player.lat v4 inventory block is written in; never reorder it.
   std::array<ItemStack*, kTotalSlots> allSlots() {
