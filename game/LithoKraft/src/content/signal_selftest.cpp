@@ -935,8 +935,8 @@ int runSignalSelfTest() {
     run(6);
     check(val(42, y, 50) > 0, "jammer: ch-2 traffic passes when jammer allows ch 2");
   }
-  {  // RadioRegistry unit checks: link budget, strongest-wins, channel filter.
-    RadioRegistry r;
+  {  // cRadioReg unit checks: link budget, strongest-wins, channel filter.
+    cRadioReg r;
     int s = 0, c = 0;
     r.publish(RadioBroadcast{0, 10, 0, 1, 1, 64, 1, 256});
     r.publish(RadioBroadcast{200, 10, 0, 1, 1, 32, 2, 256});

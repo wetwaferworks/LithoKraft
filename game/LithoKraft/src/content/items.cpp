@@ -30,7 +30,7 @@ std::vector<ItemDef> buildItemTable() {
        /*maxStack*/ 512, /*tier*/ 0, "", /*model*/ "", "silica_seed", false},
       // The Fragment: starting item, day one, first tick. An editable book
       // (journal / unlocks / recipes / chip archive / images). Soulbound on
-      // Easy/Normal in lore; the state model is FragmentState/FragmentGallery.
+      // Easy/Normal in lore; the state model is FragmentState/cFragmentGallery.
       {kItemFragment, "lithokraft:fragment", "The Logbook",  // 2026-10-16 (JD): player-facing rename; id/stringId unchanged (saves)
        false, false, ToolAction::None, 0, 0, "", false,
        1, 0, "", "fragment", "fragment", /*startingItem*/ true},

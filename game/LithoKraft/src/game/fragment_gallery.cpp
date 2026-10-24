@@ -82,7 +82,7 @@ struct Reader {
 
 }  // namespace
 
-std::string FragmentGallery::makeId() {
+std::string cFragmentGallery::makeId() {
   const std::time_t t =
       std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
   std::tm tm{};
@@ -107,7 +107,7 @@ std::string FragmentGallery::makeId() {
   return id;
 }
 
-std::string FragmentGallery::add(FragmentImage img) {
+std::string cFragmentGallery::add(FragmentImage img) {
   if (img.id.empty()) img.id = makeId();
   const std::string id = img.id;
   if (!images_.count(id)) order_.push_back(id);
@@ -115,12 +115,12 @@ std::string FragmentGallery::add(FragmentImage img) {
   return id;
 }
 
-const FragmentImage* FragmentGallery::get(const std::string& id) const {
+const FragmentImage* cFragmentGallery::get(const std::string& id) const {
   const auto it = images_.find(id);
   return it == images_.end() ? nullptr : &it->second;
 }
 
-bool FragmentGallery::remove(const std::string& id) {
+bool cFragmentGallery::remove(const std::string& id) {
   const auto it = images_.find(id);
   if (it == images_.end()) return false;
   images_.erase(it);
@@ -133,12 +133,12 @@ bool FragmentGallery::remove(const std::string& id) {
   return true;
 }
 
-void FragmentGallery::clear() {
+void cFragmentGallery::clear() {
   order_.clear();
   images_.clear();
 }
 
-std::vector<uint8_t> FragmentGallery::serialize() const {
+std::vector<uint8_t> cFragmentGallery::serialize() const {
   std::vector<uint8_t> o;
   o.insert(o.end(), kMagic, kMagic + 4);
   putU16(o, kVersion);
@@ -160,7 +160,7 @@ std::vector<uint8_t> FragmentGallery::serialize() const {
   return o;
 }
 
-bool FragmentGallery::deserialize(const uint8_t* data, size_t len,
+bool cFragmentGallery::deserialize(const uint8_t* data, size_t len,
                                   std::string* err) {
   Reader r{data, len};
   for (int i = 0; i < 4; ++i) {
@@ -178,7 +178,7 @@ bool FragmentGallery::deserialize(const uint8_t* data, size_t len,
     if (err) *err = "gallery count out of range";
     return false;
   }
-  FragmentGallery tmp;
+  cFragmentGallery tmp;
   for (uint32_t i = 0; i < count && r.ok; ++i) {
     FragmentImage im;
     im.id = r.str();

@@ -14,7 +14,7 @@
 
 namespace litholattice::ui {
 class Dialog;
-class Label;
+class cLabel;
 class cListView;
 class cTextEditor;
 }  // namespace litholattice::ui
@@ -56,7 +56,7 @@ class ScriptEditor {
   ui::Dialog* dialog_ = nullptr;
   ui::cListView* list_ = nullptr;
   ui::cTextEditor* editor_ = nullptr;
-  ui::Label* statusLabel_ = nullptr;
+  ui::cLabel* statusLabel_ = nullptr;
 };
 
 }  // namespace lithokraft

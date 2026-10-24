@@ -112,24 +112,24 @@ class GameUi {
   ui::UiRoot ui_;
   float scale_ = 0;  // HUD scale the widgets were built for (0 = not built)
   ui::Widget* hud_ = nullptr;
-  ui::Panel* debugPanel_ = nullptr;
-  ui::Label* debugText_ = nullptr;
-  ui::Label* debugLook_ = nullptr;      ///< 2026-10-16 (JD): the look-at line, red
-  ui::Label* debugTextPost_ = nullptr;  ///< debug lines after the look-at line
-  ui::Panel* controlsPanel_ = nullptr;
-  ui::Label* controlsText_ = nullptr;
-  ui::Panel* banner_ = nullptr;
-  ui::Label* bannerTitle_ = nullptr;
-  ui::Label* bannerText_ = nullptr;
-  std::array<ui::Slot*, kHotbarSlots> slots_{};
-  ui::Label* slotName_ = nullptr;
-  ui::Label* lookName_ = nullptr;  ///< 2026-10-16 (JD): looked-at block, above the held-item name
-  ui::Label* splash_ = nullptr;  // "Powered by LithoLattice", bottom right for the first seconds
+  ui::cPanel* debugPanel_ = nullptr;
+  ui::cLabel* debugText_ = nullptr;
+  ui::cLabel* debugLook_ = nullptr;      ///< 2026-10-16 (JD): the look-at line, red
+  ui::cLabel* debugTextPost_ = nullptr;  ///< debug lines after the look-at line
+  ui::cPanel* controlsPanel_ = nullptr;
+  ui::cLabel* controlsText_ = nullptr;
+  ui::cPanel* banner_ = nullptr;
+  ui::cLabel* bannerTitle_ = nullptr;
+  ui::cLabel* bannerText_ = nullptr;
+  std::array<ui::cSlot*, kHotbarSlots> slots_{};
+  ui::cLabel* slotName_ = nullptr;
+  ui::cLabel* lookName_ = nullptr;  ///< 2026-10-16 (JD): looked-at block, above the held-item name
+  ui::cLabel* splash_ = nullptr;  // "Powered by LithoLattice", bottom right for the first seconds
   float age_ = 0;
   ui::Dialog* inventory_ = nullptr;
   ui::Dialog* pause_ = nullptr;
-  ui::Label* inventoryHover_ = nullptr;
-  std::vector<ui::Slot*> carrySlots_;   // playtest 2026-10-16: the dialog's carry grid
+  ui::cLabel* inventoryHover_ = nullptr;
+  std::vector<ui::cSlot*> carrySlots_;   // playtest 2026-10-16: the dialog's carry grid
   std::vector<ItemStack> carry_;        // what it shows (hover text)
   ui::Widget* menu_ = nullptr;
   float menuScale_ = 0;  // UI scale the menu was built for (0 = not built)

@@ -98,12 +98,12 @@ void testScriptBindings(Checker& check) {
     return bindings.registerApi();
   }();
   ui.setScriptHost(&bindings);
-  auto& stack = ui.root().add<ui::StackPanel>();
+  auto& stack = ui.root().add<ui::cStackPanel>();
   stack.setLayout(ui::Layout::at({0, 0}, {0, 0}, {}, {200, 200}));
   auto& btn = stack.add<ui::Button>("Go");
   btn.setId("go");
   btn.onScript("click", "void onGo(const string &in)");
-  stack.add<ui::Label>("").setId("lbl");
+  stack.add<ui::cLabel>("").setId("lbl");
   stack.add<ui::cNumberField>(0, 64, 0).setId("n");
   const bool built = scripts.loadSource("ui_test", R"(
     void onGo(const string &in id) {
@@ -117,7 +117,7 @@ void testScriptBindings(Checker& check) {
   ui.layout({800, 600});
   click(ui, center(btn));
   click(ui, center(btn));
-  auto* lbl = ui.root().findAs<ui::Label>("lbl");
+  auto* lbl = ui.root().findAs<ui::cLabel>("lbl");
   auto* n = ui.root().findAs<ui::cNumberField>("n");
   check(ready && built && lbl && lbl->text() == "clicked go" && n && n->value() == 14,
         "script bindings: widget event calls the script handler, which reads / writes widgets by id");
@@ -210,9 +210,9 @@ void testGameUi(Checker& check) {
     im.selected = 0;
     gui.update(im, {1280, 720}, 0.016f);
     ui::Widget* bar2 = gui.root().root().find("hotbar");
-    const ui::Slot* s0 = bar2 ? dynamic_cast<const ui::Slot*>(bar2->children()[0].get()) : nullptr;
-    const ui::Slot* s1 = bar2 ? dynamic_cast<const ui::Slot*>(bar2->children()[1].get()) : nullptr;
-    const ui::Slot* s2 = bar2 ? dynamic_cast<const ui::Slot*>(bar2->children()[2].get()) : nullptr;
+    const ui::cSlot* s0 = bar2 ? dynamic_cast<const ui::cSlot*>(bar2->children()[0].get()) : nullptr;
+    const ui::cSlot* s1 = bar2 ? dynamic_cast<const ui::cSlot*>(bar2->children()[1].get()) : nullptr;
+    const ui::cSlot* s2 = bar2 ? dynamic_cast<const ui::cSlot*>(bar2->children()[2].get()) : nullptr;
     check(s0 && s0->icon() == itemIconRef(kItemFragment) && s0->selected(),
           "HUD: hotbar slot 0 renders the Fragment stack with its item icon, selected");
     check(s1 && s1->icon() == itemIconRef(kItemBashor), "HUD: a tool stack renders with its item icon");
@@ -220,7 +220,7 @@ void testGameUi(Checker& check) {
     // The selected slot's name label (the label laid out above the bar).
     bool nameOk = false;
     const auto findName = [&nameOk](const auto& self, const ui::Widget& w) -> void {
-      if (const auto* l = dynamic_cast<const ui::Label*>(&w); l && l->text() == "The Logbook") nameOk = true;
+      if (const auto* l = dynamic_cast<const ui::cLabel*>(&w); l && l->text() == "The Logbook") nameOk = true;
       for (const auto& c : w.children()) self(self, *c);
     };
     findName(findName, gui.root().root());
@@ -236,7 +236,7 @@ void testGameUi(Checker& check) {
   ui::Widget* firstCell = nullptr;
   // The first slot of the inventory grid (block 1).
   const auto findSlot = [](const auto& self, ui::Widget& w) -> ui::Widget* {
-    if (dynamic_cast<ui::Slot*>(&w)) return &w;
+    if (dynamic_cast<ui::cSlot*>(&w)) return &w;
     for (const auto& c : w.children())
       if (ui::Widget* s = self(self, *c)) return s;
     return nullptr;
@@ -303,9 +303,9 @@ void testLaunchMenu(Checker& check) {
   gui.update(m, {1280, 720}, 0.016f);
   check(gui.menuOpen(), "menu: openMenu builds the overlay");
   check(gui.root().theme().style("title").textScale == 4.5f, "menu: the 'title' style gives the big title text");
-  ui::Label* title = gui.root().root().findAs<ui::Label>("menu-title");
-  ui::Label* tag = gui.root().root().findAs<ui::Label>("menu-tagline");
-  ui::Label* ver = gui.root().root().findAs<ui::Label>("menu-version");
+  ui::cLabel* title = gui.root().root().findAs<ui::cLabel>("menu-title");
+  ui::cLabel* tag = gui.root().root().findAs<ui::cLabel>("menu-tagline");
+  ui::cLabel* ver = gui.root().root().findAs<ui::cLabel>("menu-version");
   check(title && title->text() == "LITHOKRAFT", "menu: big LITHOKRAFT title");
   check(tag && tag->text() == "A LITHOLATTICE GAME", "menu: tagline reads 'A LITHOLATTICE GAME'");
   check(ver && ver->text().find("9.9.9-test") != std::string::npos, "menu: version footer shows the plumbed version");
@@ -441,7 +441,7 @@ void testSettingsDialog(Checker& check) {
   if (pbr) pbr->setSelected(3, true);
   check(fired && changed.pbrTier == 3, "settings: the PBR transparency dropdown reports changes (live tier)");
   fired = false;
-  ui::Label* pbrHint = dlg ? dlg->findAs<ui::Label>("pbr-tier-hint") : nullptr;
+  ui::cLabel* pbrHint = dlg ? dlg->findAs<ui::cLabel>("pbr-tier-hint") : nullptr;
   check(pbrHint != nullptr, "settings: PBR tier pairing hint label present");
   gui.root().handleEvent(ui::UiEvent::keyDown(ui::Key::Escape));
   check(!gui.settingsOpen(), "settings: Escape closes the dialog");

@@ -256,7 +256,7 @@ void testFileHelpers() {
 
 // -- Fragment gallery ------------------------------------------------------------
 void testFragmentGallery() {
-  FragmentGallery g;
+  cFragmentGallery g;
   FragmentImage a;
   a.caption = "wafer biome at dusk";
   a.width = 160;
@@ -285,7 +285,7 @@ void testFragmentGallery() {
         "gallery: get returns fields; unknown id -> nullptr");
 
   const std::vector<uint8_t> blob = g.serialize();
-  FragmentGallery g2;
+  cFragmentGallery g2;
   std::string err;
   bool ok = g2.deserialize(blob.data(), blob.size(), &err);
   const FragmentImage* g2a = g2.get(idA);

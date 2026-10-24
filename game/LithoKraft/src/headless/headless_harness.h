@@ -34,8 +34,8 @@ class Game;
 
 /// No-op IRenderer for headless testing. Records uploaded chunk-mesh bytes by sub-chunk key
 /// (what a real backend would keep alive) so tests can assert the mesh pipeline ran;
-/// renderFrame() is a no-op. Mirrors the NullRenderer in app/perf_headless.cpp.
-class NullRenderer final : public litholattice::IRenderer {
+/// renderFrame() is a no-op. Mirrors the cNullRenderer in app/perf_headless.cpp.
+class cNullRenderer final : public litholattice::IRenderer {
  public:
   struct NullTextures final : public litholattice::ITextureArray {
     bool upload(const litholattice::TextureRegistry&) override { return true; }
@@ -62,7 +62,7 @@ class NullRenderer final : public litholattice::IRenderer {
 };
 
 /// Owns everything a Game needs and constructs it headless, in main.cpp's order:
-/// JobPool, NullRenderer, cResourceMgr (no packs; built-in worldgen fallbacks),
+/// JobPool, cNullRenderer, cResourceMgr (no packs; built-in worldgen fallbacks),
 /// AudioEngine (no output device; commands queue harmlessly), InputSystem (default action
 /// map, no backend). Members declare in construction order; destruction runs in reverse,
 /// so the Game dies before the things that must outlive it.
@@ -84,7 +84,7 @@ class HeadlessGame {
 
   Game& game() { return *game_; }
   const Game& game() const { return *game_; }
-  NullRenderer& renderer() { return renderer_; }
+  cNullRenderer& renderer() { return renderer_; }
   /// BUG-0002: stage raw device events (e.g. a middle click) for the next frame.
   litholattice::InputSystem& input() { return input_; }
   /// Advance the game one frame on a dummy 1280x720 viewport (no window).
@@ -92,7 +92,7 @@ class HeadlessGame {
 
  private:
   litholattice::JobPool pool_;
-  NullRenderer renderer_;
+  cNullRenderer renderer_;
   cResourceMgr resources_;
   litholattice::AudioEngine audio_;
   litholattice::InputSystem input_;

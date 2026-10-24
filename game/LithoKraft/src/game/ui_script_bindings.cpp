@@ -19,7 +19,7 @@ ui::Widget* find(UiScriptBindings* b, const std::string& id) {
 
 std::string uiText(const std::string& id, UiScriptBindings* b) {
   ui::Widget* w = find(b, id);
-  if (auto* l = dynamic_cast<ui::Label*>(w)) return l->text();
+  if (auto* l = dynamic_cast<ui::cLabel*>(w)) return l->text();
   if (auto* t = dynamic_cast<ui::Button*>(w)) return t->text();
   if (auto* e = dynamic_cast<ui::cTextEditBase*>(w)) return e->text();
   if (auto* d = dynamic_cast<ui::cDropdown*>(w); d && !d->items().empty()) return d->items()[size_t(d->selected())];
@@ -29,7 +29,7 @@ std::string uiText(const std::string& id, UiScriptBindings* b) {
 
 void uiSetText(const std::string& id, const std::string& text, UiScriptBindings* b) {
   ui::Widget* w = find(b, id);
-  if (auto* l = dynamic_cast<ui::Label*>(w)) l->setText(text);
+  if (auto* l = dynamic_cast<ui::cLabel*>(w)) l->setText(text);
   else if (auto* t = dynamic_cast<ui::Button*>(w)) t->setText(text);
   else if (auto* e = dynamic_cast<ui::cTextEditBase*>(w)) e->setText(text);
 }
@@ -74,7 +74,7 @@ bool uiShow(const std::string& json, UiScriptBindings* b) {
   // Hardened path: ModUiFactory::createPanel pre-scans the JSON (depth/node
   // DoS guard), builds via the closed type table, rejects reserved style
   // classes, enforces the widget budget, and wraps everything in a badged
-  // ModPanel. Never call buildWidget directly here (bypasses all of that).
+  // cModPanel. Never call buildWidget directly here (bypasses all of that).
   std::string err;
   litholattice::Json parsed;
   if (!litholattice::Json::parse(json, parsed, &err)) {

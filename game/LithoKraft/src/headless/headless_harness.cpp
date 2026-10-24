@@ -5,7 +5,7 @@
 
 namespace lithokraft {
 
-void NullRenderer::uploadChunkMesh(const litholattice::ChunkMesh& mesh) {
+void cNullRenderer::uploadChunkMesh(const litholattice::ChunkMesh& mesh) {
   const int64_t k = litholattice::packPos(mesh.cx, mesh.sy, mesh.cz);
   if (mesh.verts.empty())
     meshes_.erase(k);
@@ -13,11 +13,11 @@ void NullRenderer::uploadChunkMesh(const litholattice::ChunkMesh& mesh) {
     meshes_[k] = mesh.verts.size() * sizeof(litholattice::PackedVertex);
 }
 
-litholattice::RenderStats NullRenderer::stats() const {
+litholattice::RenderStats cNullRenderer::stats() const {
   return {uint32_t(meshes_.size()), 0};
 }
 
-size_t NullRenderer::bytes() const {
+size_t cNullRenderer::bytes() const {
   size_t b = 0;
   for (const auto& [k, v] : meshes_) b += v;
   return b;

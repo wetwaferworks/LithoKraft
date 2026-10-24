@@ -185,7 +185,7 @@ class Game {
   /// camera); Play hands control to the player instantly, no reload.
   void enterMenu();
   void enterPlay();
-  bool inMenu() const { return menuState_ == MenuState::Menu; }
+  bool inMenu() const { return menuState_ == MenuState::cMenu; }
   const GameSettings& settings() const { return settings_; }
   /// Applies a display-mode change from the settings UI (main.cpp wires the window).
   void setDisplayModeApplier(std::function<void(DisplayMode)> f) { displayApplier_ = std::move(f); }
@@ -242,7 +242,7 @@ class Game {
   void capturePendingScreenshot();
   /// The Fragment's screenshots gallery (Fragment lore page 5). The future
   /// Fragment UI binds to this; `screenshot fragment` captures into it.
-  FragmentGallery& fragmentGallery() { return fragmentGallery_; }
+  cFragmentGallery& fragmentGallery() { return fragmentGallery_; }
   /// The Fragment book's upgrade state (A3 wiring, 2026-10-13, no-decision
   /// subset of brief B1): Game owns the ONE production instance, next to
   /// the gallery it conceptually belongs to. Game thread only (see
@@ -387,7 +387,7 @@ class Game {
   void endTyping();
   void handleTyping();
 
-  enum class MenuState { Menu, Playing };
+  enum class MenuState { cMenu, Playing };
 
   GameConfig cfg_;
   ScriptEngine scripts_;
@@ -396,7 +396,7 @@ class Game {
   std::unique_ptr<ScriptEditor> editor_;  // F10; only with a scripts folder
   litholattice::console::cConsoleReg consoleRegistry_;  // before debugConsole_
   uint64_t lastScriptTick_ = 0;  // sim world-tick counter for the lithoscript `wait` pump
-  FragmentGallery fragmentGallery_;  // the Fragment's screenshots (lore page 5)
+  cFragmentGallery fragmentGallery_;  // the Fragment's screenshots (lore page 5)
   FragmentState fragmentState_;      // the Fragment's upgrade state (A3: production-owned, C3-gated trigger/persistence)
   // A `screenshot` command armed during update(); completed by
   // capturePendingScreenshot() after the next renderFrame(), before present.
@@ -575,12 +575,12 @@ class Game {
   mutable std::mutex mcpStateMutex_;
   McpPlayerView::GameState mcpPlayerState_;  ///< refreshed per frame in update()
   McpPlayerView::GameState snapshotMcpPlayer() const;
-  MenuState menuState_ = MenuState::Menu;
+  MenuState menuState_ = MenuState::cMenu;
   GameSettings settings_;
   std::function<void(DisplayMode)> displayApplier_;
   float menuCameraT_ = 0.f;                       // cinematic dolly clock
   float menuCamX_ = 0.f, menuCamY_ = 0.f, menuCamZ_ = 0.f;  // dolly anchor (the spawn)
-  // Menu entry snapshot (audit MEDIUM): the dolly overwrites player_.pos every
+  // cMenu entry snapshot (audit MEDIUM): the dolly overwrites player_.pos every
   // menu frame; enterPlay() restores this so save/restore survives the menu.
   Vec3 menuReturnPos_{};
   float menuReturnYaw_ = 0.f, menuReturnPitch_ = 0.f;

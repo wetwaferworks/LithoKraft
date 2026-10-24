@@ -81,7 +81,7 @@ void ScriptEditor::open() {
   auto editor = std::make_unique<ui::cTextEditor>();
   editor_ = editor.get();
   split.setPane(1, std::move(editor));
-  statusLabel_ = &dlg.body().add<ui::Label>();
+  statusLabel_ = &dlg.body().add<ui::cLabel>();
 
   list_->on("select", [this](ui::Widget&) {
     const std::string* name = list_->selectedItem();
@@ -170,7 +170,7 @@ void ScriptEditor::confirmDiscard(std::function<void()> action) {
     return;
   }
   ui::Dialog& ask = ui::Dialog::show(ui_, "Unsaved changes");
-  ask.body().add<ui::Label>(file_ + " has unsaved changes. Discard them?");
+  ask.body().add<ui::cLabel>(file_ + " has unsaved changes. Discard them?");
   ask.addButton("Discard", std::move(action));
   ask.addButton("Cancel");
 }

@@ -358,7 +358,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
     b.pauseToggle = [this] {
       // The console is reachable in the menu; unpausing there breaks the
       // menu=>paused invariant (audit MEDIUM) - no-op instead.
-      if (menuState_ == MenuState::Menu) return std::string("pause: unavailable in the menu");
+      if (menuState_ == MenuState::cMenu) return std::string("pause: unavailable in the menu");
       setPaused(!paused_);
       return std::string(paused_ ? "pause: paused" : "pause: resumed");
     };
@@ -376,7 +376,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
       // The pause menu (or launch menu) owns the pause while it is up:
       // unfreezing must NOT run the sim behind it (CH-H7). The freeze is
       // still in effect; resuming play is what unfreezes.
-      if (menuState_ == MenuState::Menu)
+      if (menuState_ == MenuState::cMenu)
         return std::string("tick: still frozen (the launch menu is up; Play unfreezes)");
       if (pauseState_ == PauseState::MenuPaused)
         return std::string("tick: still frozen (the pause menu is up; resume unfreezes)");
@@ -1708,7 +1708,7 @@ void Game::handleHotbar() {
 // (no modal open) Esc exits to the desktop.
 void Game::handlePause() {
   if (!input_.pressed(Action::Pause)) return;
-  if (menuState_ == MenuState::Menu) { quit_ = true; return; }
+  if (menuState_ == MenuState::cMenu) { quit_ = true; return; }
   if (typing_) endTyping();
   else if (inventoryOpen_) setInventoryOpen(false);
   else setPaused(pauseState_ != PauseState::MenuPaused);  // Esc toggles: Esc while paused resumes
@@ -1767,7 +1767,7 @@ void Game::setPaused(bool p) {
   // The launch menu owns the pause state (audit MEDIUM): a console `pause` in
   // the menu used to pop the inventory context and unpause the sim behind the
   // menu overlay. No-op here; b.pauseToggle reports it.
-  if (menuState_ == MenuState::Menu) return;
+  if (menuState_ == MenuState::cMenu) return;
   setPauseState(p ? PauseState::MenuPaused : PauseState::Playing);
 }
 
@@ -1783,7 +1783,7 @@ void Game::onFocusChanged(bool focused) {
 // Launch menu: the world stays loaded, the sim pauses, the cursor is freed and the camera
 // runs a slow side-scrolling dolly across the wafer behind the menu overlay.
 void Game::enterMenu() {
-  menuState_ = MenuState::Menu;
+  menuState_ = MenuState::cMenu;
   menuCameraT_ = 0.f;
   // Snapshot the player BEFORE the dolly starts overwriting it (audit MEDIUM):
   // enterPlay() restores this, so the menu never eats the saved position.
@@ -2261,7 +2261,7 @@ void Game::debugShowUi(const std::string& view) {
   if (view == "menu" || view == "settings") enterMenu();
   if (view == "settings") ui_.openSettings(settings_);
   if (view == "pause") ui_.openPause();
-  // hud: the bench boots in MenuState::Menu with no menu UI open, which hides the HUD; show the
+  // hud: the bench boots in MenuState::cMenu with no menu UI open, which hides the HUD; show the
   // in-play HUD (hotbar, crosshair) plus the F3 overlay for the shot. Bench-only, never saved.
   if (view == "hud" || view == "inventory") { menuState_ = MenuState::Playing; showHud_ = true; showDebug_ = !cfg_.capture; }
   if (view == "inventory") setInventoryOpen(true);  // playtest 2026-10-16: shot of the E dialog
@@ -2362,7 +2362,7 @@ void Game::update(float dt, int width, int height) {
   if (menuState_ == MenuState::Playing)
     consoleRegistry_.dispatchKeyBinds(input_.devices(), ui_.root().wantsKeyboard());
   // Esc on the launch menu quits; a modal open over the menu (the settings dialog) takes it.
-  if (!uiEscape || (menuState_ == MenuState::Menu && !modalWasOpen)) handlePause();
+  if (!uiEscape || (menuState_ == MenuState::cMenu && !modalWasOpen)) handlePause();
   if (typing_) handleTyping();
   if (menuState_ == MenuState::Playing) {
     handleToggles();

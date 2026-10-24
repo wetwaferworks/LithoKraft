@@ -56,8 +56,8 @@ void testBootToMenu(Checker& check) {
   hg.frame();
   check(g.inMenu(), "boot: enterMenu puts the game in the Menu state");
   check(g.gameUi().menuOpen(), "boot: the launch menu overlay is open");
-  auto* title = g.gameUi().root().root().findAs<litholattice::ui::Label>("menu-title");
-  auto* tag = g.gameUi().root().root().findAs<litholattice::ui::Label>("menu-tagline");
+  auto* title = g.gameUi().root().root().findAs<litholattice::ui::cLabel>("menu-title");
+  auto* tag = g.gameUi().root().root().findAs<litholattice::ui::cLabel>("menu-tagline");
   check(title && title->text() == "LITHOKRAFT", "boot: menu shows the LITHOKRAFT title");
   check(tag && tag->text() == "A LITHOLATTICE GAME", "boot: tagline reads 'A LITHOLATTICE GAME'");
 }
@@ -244,10 +244,10 @@ void testInventoryBinding(Checker& check) {
     // HUD binding at the widget level: slot 0 of the rendered hotbar shows
     // the Fragment's item icon, and the selected slot is the game's.
     auto* bar = g.gameUi().root().root().find("hotbar");
-    const ui::Slot* s0 = bar ? dynamic_cast<const ui::Slot*>(bar->children()[0].get()) : nullptr;
+    const ui::cSlot* s0 = bar ? dynamic_cast<const ui::cSlot*>(bar->children()[0].get()) : nullptr;
     check(s0 && s0->icon() == itemIconRef(kItemFragment),
           "inventory: the HUD hotbar renders the inventory -- slot 0 shows the Fragment's item icon");
-    const ui::Slot* ssel = bar ? dynamic_cast<const ui::Slot*>(bar->children()[size_t(g.selectedHotbarSlot())].get()) : nullptr;
+    const ui::cSlot* ssel = bar ? dynamic_cast<const ui::cSlot*>(bar->children()[size_t(g.selectedHotbarSlot())].get()) : nullptr;
     check(ssel && ssel->selected(), "inventory: the HUD selection is the game's selected inventory slot");
     check(g.saveWorld("inv-test", true), "inventory: saveWorld writes the player (v4 inventory block)");
   }

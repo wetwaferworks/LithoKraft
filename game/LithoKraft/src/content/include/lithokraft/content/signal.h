@@ -59,7 +59,7 @@ struct RadioBroadcast {
 /// The wireless signal registry (game-side, sim thread only).
 /// Transmittors publish during the component tick; receivors read the previous tick's
 /// broadcasts (1-tick latency). Only loaded chunks are indexed: unload = silent.
-class RadioRegistry {
+class cRadioReg {
  public:
   void publish(RadioBroadcast b) { next_.push_back(b); }
   /// End-of-tick: this tick's broadcasts become readable next tick.
@@ -114,7 +114,7 @@ struct JammerZone {
   uint8_t channel = 1;  ///< the one channel allowed through
 };
 
-/// Active jammers, same one-tick-latency discipline as RadioRegistry.
+/// Active jammers, same one-tick-latency discipline as cRadioReg.
 class cJammerReg {
  public:
   void publish(JammerZone j) { next_.push_back(j); }
@@ -303,7 +303,7 @@ class SignalSim {
   std::unordered_map<int64_t, Comp> comps_;
   std::unordered_map<BlockId, litholattice::TickRate> classRates_;  ///< per-class tick-rate overrides (rate scaling); empty in shipped content
   mutable std::unordered_map<BlockId, litholattice::TickRate> declaredRates_;  ///< validated class-declared rates, cached per BlockId (A-H2); key-lookup only, never iterated
-  RadioRegistry radio_;
+  cRadioReg radio_;
   cJammerReg jammers_;
   litholattice::TraceStrengthBuffer strengthBuf_;  ///< Step 1: GPU strength slots
   uint8_t dim_ = 1;  ///< this sim's dimension (for cross-dimensional radio)

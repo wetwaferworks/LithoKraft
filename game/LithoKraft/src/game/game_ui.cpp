@@ -50,49 +50,49 @@ void GameUi::rebuildHud() {
   hud_->setId("hud");
   const float k = s();
 
-  debugPanel_ = &hud_->add<ui::Panel>("hud");
+  debugPanel_ = &hud_->add<ui::cPanel>("hud");
   debugPanel_->setLayout(ui::Layout::at({0, 0}, {0, 0}, {8 * k, 8 * k}));
   // 2026-10-16 (JD): the look-at line renders red so it stands out; the rest is unchanged.
-  auto& debugStack = debugPanel_->add<ui::StackPanel>(ui::Orientation::Vertical, 0.f);
-  debugText_ = &debugStack.add<ui::Label>();
-  debugLook_ = &debugStack.add<ui::Label>();
+  auto& debugStack = debugPanel_->add<ui::cStackPanel>(ui::Orientation::Vertical, 0.f);
+  debugText_ = &debugStack.add<ui::cLabel>();
+  debugLook_ = &debugStack.add<ui::cLabel>();
   debugLook_->setColor({1.f, 0.25f, 0.25f, 1.f});
-  debugTextPost_ = &debugStack.add<ui::Label>();
+  debugTextPost_ = &debugStack.add<ui::cLabel>();
 
-  controlsPanel_ = &hud_->add<ui::Panel>("hud");
+  controlsPanel_ = &hud_->add<ui::cPanel>("hud");
   // Cortana 2026-10-16 (standards review): sits ABOVE the hotbar + slot-name rows (it used to
   // overlap the hotbar at 2x GUI scale) and uses the compact hud_small text.
   controlsPanel_->setLayout(ui::Layout::at({0, 1}, {0, 1}, {8 * k, -(6 + 40 * kInventoryScale + 24 + 12) * k}));
-  controlsText_ = &controlsPanel_->add<ui::Label>("", "hud_small");
+  controlsText_ = &controlsPanel_->add<ui::cLabel>("", "hud_small");
   controlsText_->setColor({0.9f, 0.95f, 1.f, 1.f});
 
-  banner_ = &hud_->add<ui::Panel>("hud");
+  banner_ = &hud_->add<ui::cPanel>("hud");
   banner_->setLayout(ui::Layout::at({0.5f, 0.3f}, {0.5f, 0}));
-  auto& bannerStack = banner_->add<ui::StackPanel>(ui::Orientation::Vertical, 0.f);
-  bannerTitle_ = &bannerStack.add<ui::Label>();
+  auto& bannerStack = banner_->add<ui::cStackPanel>(ui::Orientation::Vertical, 0.f);
+  bannerTitle_ = &bannerStack.add<ui::cLabel>();
   bannerTitle_->setColor({1.f, 0.85f, 0.4f, 1.f});
-  bannerText_ = &bannerStack.add<ui::Label>();
+  bannerText_ = &bannerStack.add<ui::cLabel>();
   bannerText_->setColor({0.6f, 0.9f, 1.f, 1.f});
 
-  splash_ = &hud_->add<ui::Label>("Powered by LithoLattice");
+  splash_ = &hud_->add<ui::cLabel>("Powered by LithoLattice");
   splash_->setId("splash");
   splash_->setColor({0.75f, 0.85f, 1.f, 1.f});
   splash_->setLayout(ui::Layout::at({1, 1}, {1, 1}, {-8 * k, -8 * k}));
 
-  auto& bar = hud_->add<ui::StackPanel>(ui::Orientation::Horizontal, 4 * k * kInventoryScale, "hud");
+  auto& bar = hud_->add<ui::cStackPanel>(ui::Orientation::Horizontal, 4 * k * kInventoryScale, "hud");
   bar.setId("hotbar");
   bar.setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -6 * k}));
   for (int i = 0; i < kHotbarSlots; ++i) {
-    ui::Slot& slot = bar.add<ui::Slot>(ui::Vec2{40 * k * kInventoryScale, 40 * k * kInventoryScale});  // +25% (JD 2026-10-16)
+    ui::cSlot& slot = bar.add<ui::cSlot>(ui::Vec2{40 * k * kInventoryScale, 40 * k * kInventoryScale});  // +25% (JD 2026-10-16)
     slot.setCaption(std::to_string(i + 1)).setData(i);
     slot.on("click", [this](ui::Widget& w) {
-      if (cb_.selectSlot) cb_.selectSlot(static_cast<ui::Slot&>(w).data());
+      if (cb_.selectSlot) cb_.selectSlot(static_cast<ui::cSlot&>(w).data());
     });
     slots_[size_t(i)] = &slot;
   }
-  slotName_ = &hud_->add<ui::Label>();
+  slotName_ = &hud_->add<ui::cLabel>();
   slotName_->setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -(40 * kInventoryScale + 6 + 24) * k}));
-  lookName_ = &hud_->add<ui::Label>();  // 2026-10-16 (JD): one line above the held-item name
+  lookName_ = &hud_->add<ui::cLabel>();  // 2026-10-16 (JD): one line above the held-item name
   lookName_->setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -(40 * kInventoryScale + 6 + 24 + 24) * k}));
   lookName_->setColor({1.f, 1.f, 1.f, 1.f});
 }
@@ -123,7 +123,7 @@ void GameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry
                             ", shift-click: first free slot, E/Esc: close";
   ui::Dialog& dlg = ui::Dialog::show(ui_, title);
   dlg.setId("inventory");
-  auto& note = dlg.body().add<ui::Label>(
+  auto& note = dlg.body().add<ui::cLabel>(
       "Creative palette: every block in the registry. A click gives a full stack (512) "
       "into your inventory hotbar; placing blocks consumes from the stack.");
   note.setId("palette-note");
@@ -136,30 +136,30 @@ void GameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry
   auto& grid = scroll.emplaceContent<ui::cGridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
   for (int i = 0; i < count; ++i) {
     const BlockId b = BlockId(i + 1);
-    ui::Slot& slot = grid.add<ui::Slot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
+    ui::cSlot& slot = grid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
     slot.setIcon(blockIcon(b)).setData(int(b));
     slot.on("click", [this](ui::Widget& w) {
-      if (cb_.pickBlock) cb_.pickBlock(BlockId(static_cast<ui::Slot&>(w).data()), (ui_.modifiers() & ui::kModShift) != 0);
+      if (cb_.pickBlock) cb_.pickBlock(BlockId(static_cast<ui::cSlot&>(w).data()), (ui_.modifiers() & ui::kModShift) != 0);
     });
   }
   if (!carry.empty()) {
     // Playtest 2026-10-16: every carry slot (42 = hotbar 8 + offhand 2 + main 32), 14 per row.
-    dlg.body().add<ui::Label>("Carry (42): hotbar 1-8, offhand L/R, main 1-32 - click: swap into hotbar slot " +
+    dlg.body().add<ui::cLabel>("Carry (42): hotbar 1-8, offhand L/R, main 1-32 - click: swap into hotbar slot " +
                               std::to_string(selectedSlot + 1));
     const int ccols = 14;
     auto& cgrid = dlg.body().add<ui::cGridPanel>(ccols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
     for (int i = 0; i < int(carry.size()); ++i) {
-      ui::Slot& slot = cgrid.add<ui::Slot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
+      ui::cSlot& slot = cgrid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
       slot.setData(kCarryData + i);
       slot.on("click", [this](ui::Widget& w) {
-        if (cb_.pickCarry) cb_.pickCarry(static_cast<ui::Slot&>(w).data() - kCarryData);
+        if (cb_.pickCarry) cb_.pickCarry(static_cast<ui::cSlot&>(w).data() - kCarryData);
       });
       carrySlots_.push_back(&slot);
     }
     inventory_ = &dlg;  // refreshCarry needs it set
     refreshCarry(carry);
   }
-  inventoryHover_ = &dlg.body().add<ui::Label>(" ");
+  inventoryHover_ = &dlg.body().add<ui::cLabel>(" ");
   inventoryHover_->setCentered(true);
   dlg.on("close", [this](ui::Widget&) {
     inventory_ = nullptr;
@@ -193,13 +193,13 @@ void GameUi::openMenu(const std::string& version) {
   ui::Widget& m = ui_.root().add<ui::Widget>();
   m.setId("menu");
   m.setLayout(ui::Layout::fill());
-  auto& center = m.add<ui::StackPanel>(ui::Orientation::Vertical, 10 * k);
+  auto& center = m.add<ui::cStackPanel>(ui::Orientation::Vertical, 10 * k);
   center.setId("menu-center");
   center.setLayout(ui::Layout::at({0.5f, 0.44f}, {0.5f, 0.5f}));
-  auto& title = center.add<ui::Label>("LITHOKRAFT", "title");
+  auto& title = center.add<ui::cLabel>("LITHOKRAFT", "title");
   title.setId("menu-title");
   title.setCentered(true);
-  auto& tagline = center.add<ui::Label>("A LITHOLATTICE GAME", "menu_tagline");  // 2026-10-16: contrast plate
+  auto& tagline = center.add<ui::cLabel>("A LITHOLATTICE GAME", "menu_tagline");  // 2026-10-16: contrast plate
   tagline.setId("menu-tagline");
   tagline.setCentered(true);
   tagline.setColor({0.85f, 0.92f, 1.f, 1.f});  // 2026-10-16: was {0.55,0.65,0.8} (low contrast)
@@ -216,10 +216,10 @@ void GameUi::openMenu(const std::string& version) {
   exit.setId("menu-exit");
   exit.setLayout(ui::Layout::sized({600 * k, 52 * k}));
   exit.on("click", [this](ui::Widget&) { if (cb_.quit) cb_.quit(); });
-  auto& footerL = m.add<ui::Label>("v" + version_);
+  auto& footerL = m.add<ui::cLabel>("v" + version_);
   footerL.setId("menu-version");
   footerL.setLayout(ui::Layout::at({0, 1}, {0, 1}, {12 * k, -12 * k}));
-  auto& footerR = m.add<ui::Label>("singleplayer");
+  auto& footerR = m.add<ui::cLabel>("singleplayer");
   footerR.setId("menu-mode");
   footerR.setLayout(ui::Layout::at({1, 1}, {1, 1}, {-12 * k, -12 * k}));
   menu_ = &m;
@@ -249,16 +249,16 @@ void GameUi::openSettings(const GameSettings& cur) {
   tabs.setId("settings-tabs");
 
   // One vertical page per tab; each row is a fixed-width label plus the control.
-  auto page = [&tabs](const char* name) -> ui::StackPanel& {
-    auto p = std::make_unique<ui::StackPanel>(ui::Orientation::Vertical, 8.f);
-    ui::StackPanel* raw = p.get();
+  auto page = [&tabs](const char* name) -> ui::cStackPanel& {
+    auto p = std::make_unique<ui::cStackPanel>(ui::Orientation::Vertical, 8.f);
+    ui::cStackPanel* raw = p.get();
     tabs.addTab(name, std::move(p));
     return *raw;
   };
-  auto row = [k](ui::StackPanel& pg, const char* name) -> ui::StackPanel& {
-    auto& r = pg.add<ui::StackPanel>(ui::Orientation::Horizontal, 8.f);
+  auto row = [k](ui::cStackPanel& pg, const char* name) -> ui::cStackPanel& {
+    auto& r = pg.add<ui::cStackPanel>(ui::Orientation::Horizontal, 8.f);
     r.setStretch(false);
-    r.add<ui::Label>(name).setLayout(ui::Layout::sized({250 * k, 0}));
+    r.add<ui::cLabel>(name).setLayout(ui::Layout::sized({250 * k, 0}));
     return r;
   };
   auto changed = [this, state] {
@@ -267,11 +267,11 @@ void GameUi::openSettings(const GameSettings& cur) {
 
   // ---- Audio: the engine's synth buses through the master gain.
   {
-    ui::StackPanel& pg = page("Audio");
-    ui::StackPanel& vr = row(pg, "Master volume");
+    ui::cStackPanel& pg = page("Audio");
+    ui::cStackPanel& vr = row(pg, "Master volume");
     ui::cSlider& vol = vr.add<ui::cSlider>(0.f, 100.f, cur.masterVolume * 100.f, 1.f);
     vol.setId("set-volume");
-    ui::Label& volText = vr.add<ui::Label>();
+    ui::cLabel& volText = vr.add<ui::cLabel>();
     volText.setId("set-volume-text");
     auto showVol = [&volText](float v) {
       char buf[16];
@@ -295,8 +295,8 @@ void GameUi::openSettings(const GameSettings& cur) {
 
   // ---- Video: the window (display mode live, vsync at boot) and the UI scale.
   {
-    ui::StackPanel& pg = page("Video");
-    ui::StackPanel& dr = row(pg, "Display mode");
+    ui::cStackPanel& pg = page("Video");
+    ui::cStackPanel& dr = row(pg, "Display mode");
     const std::vector<std::string> dispItems{kSettingsDisplayModes, kSettingsDisplayModes + kSettingsDisplayModeCount};
     ui::cDropdown& disp = dr.add<ui::cDropdown>(dispItems, cur.displayMode);
     disp.setId("set-display");
@@ -310,7 +310,7 @@ void GameUi::openSettings(const GameSettings& cur) {
       state->vsync = static_cast<ui::cCheckbox&>(w).checked();
       changed();
     });
-    ui::StackPanel& hr = row(pg, "HUD scale");
+    ui::cStackPanel& hr = row(pg, "HUD scale");
     const std::vector<std::string> hudItems{"Auto", "1x", "2x", "3x", "4x"};  // Cortana 2026-10-16: GUI scale 1-4
     ui::cDropdown& hud = hr.add<ui::cDropdown>(hudItems, cur.hudScale);
     hud.setId("set-hud");
@@ -320,7 +320,7 @@ void GameUi::openSettings(const GameSettings& cur) {
     });
     // PBR phase 2 (Worker 3): BinaryQuad/PackedVertex coexistence. Boot-only like the
     // tick radius - switching mesh formats needs a world (re)load.
-    ui::StackPanel& mr = row(pg, "Mesher (restart)");
+    ui::cStackPanel& mr = row(pg, "Mesher (restart)");
     const std::vector<std::string> mesherItems{kSettingsMesherNames, kSettingsMesherNames + kSettingsMesherCount};
     ui::cDropdown& mesher = mr.add<ui::cDropdown>(mesherItems, cur.mesher);
     mesher.setId("set-mesher");
@@ -332,7 +332,7 @@ void GameUi::openSettings(const GameSettings& cur) {
     // setPbrTier on the active renderer - no restart needed, unlike the mesher
     // above. The tier ladder is independent of GraphicsTier by design (JD locked
     // all four tiers user-selectable); the hint only suggests a pairing.
-    ui::StackPanel& pr = row(pg, "PBR transparency (live)");
+    ui::cStackPanel& pr = row(pg, "PBR transparency (live)");
     const std::vector<std::string> pbrItems{kSettingsPbrTierNames,
                                            kSettingsPbrTierNames + kSettingsPbrTierCount};
     ui::cDropdown& pbr = pr.add<ui::cDropdown>(pbrItems, cur.pbrTier);
@@ -341,18 +341,18 @@ void GameUi::openSettings(const GameSettings& cur) {
       state->pbrTier = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
-    ui::Label& pbrHint =
-        pg.add<ui::Label>("Pairs well with GraphicsTier High/Ultra; independent setting.");
+    ui::cLabel& pbrHint =
+        pg.add<ui::cLabel>("Pairs well with GraphicsTier High/Ultra; independent setting.");
     pbrHint.setId("pbr-tier-hint");
   }
 
   // ---- Graphics: Cortana 2026-10-16 (JD): every software ("Litho") renderer fidelity
   // option, so software-only players can pick pretty vs fast. GL33/Vulkan ignore these.
   {
-    ui::StackPanel& pg = page("Graphics");
-    pg.add<ui::Label>("Software renderer quality (Auto = 30+ fps on 4-core machines)");
+    ui::cStackPanel& pg = page("Graphics");
+    pg.add<ui::cLabel>("Software renderer quality (Auto = 30+ fps on 4-core machines)");
     auto drop = [&](const char* name, const char* id, std::vector<std::string> items, int sel, auto apply) {
-      ui::StackPanel& r = row(pg, name);
+      ui::cStackPanel& r = row(pg, name);
       ui::cDropdown& d = r.add<ui::cDropdown>(items, sel);
       d.setId(id);
       d.on("change", [changed, state, apply](ui::Widget& w) { apply(*state, static_cast<ui::cDropdown&>(w).selected()); changed(); });
@@ -380,12 +380,12 @@ void GameUi::openSettings(const GameSettings& cur) {
     ui::cCheckbox& sc = pg.add<ui::cCheckbox>("World streaming: generate ahead of you (restart)", cur.streaming);
     sc.setId("set-streaming");
     sc.on("change", [changed, state](ui::Widget& w) { state->streaming = static_cast<ui::cCheckbox&>(w).checked(); changed(); });
-    ui::StackPanel& rr = row(pg, "Render / stream distance, chunks (0 = auto: Vulkan 64, others 32; restart)");
+    ui::cStackPanel& rr = row(pg, "Render / stream distance, chunks (0 = auto: Vulkan 64, others 32; restart)");
     ui::cNumberField& nf = rr.add<ui::cNumberField>(0, 64, cur.streamRadius);
     nf.setId("set-stream-radius");
     nf.on("change", [changed, state](ui::Widget& w) { state->streamRadius = static_cast<ui::cNumberField&>(w).value(); changed(); });
     // JD Vulkan push (Cortana 2026-10-16): one toggle per Vulkan effect (live; GL33 / software keep their look).
-    pg.add<ui::Label>("Vulkan effects (live; OpenGL / software unchanged)");
+    pg.add<ui::cLabel>("Vulkan effects (live; OpenGL / software unchanged)");
     struct FxBox { const char* name; const char* id; int bit; };
     static const FxBox kFxBoxes[] = {{"Normal maps (etched blocks, bulbs)", "set-vk-normal", 1},
                                      {"Per-pixel lighting", "set-vk-lighting", 2},
@@ -406,8 +406,8 @@ void GameUi::openSettings(const GameSettings& cur) {
 
   // ---- Sim: the tick rate and the EUV domain apply live; the tick radius at boot.
   {
-    ui::StackPanel& pg = page("Sim");
-    ui::StackPanel& tr = row(pg, "Tick rate (live)");
+    ui::cStackPanel& pg = page("Sim");
+    ui::cStackPanel& tr = row(pg, "Tick rate (live)");
     std::vector<std::string> tpsItems;
     int tpsSel = 0;
     for (int i = 0; i < kSettingsTpsModeCount; ++i) {
@@ -420,7 +420,7 @@ void GameUi::openSettings(const GameSettings& cur) {
       state->tps = kSettingsTpsModes[static_cast<ui::cDropdown&>(w).selected()];
       changed();
     });
-    ui::StackPanel& rr = row(pg, "Simulation distance, chunks (restart)");
+    ui::cStackPanel& rr = row(pg, "Simulation distance, chunks (restart)");
     ui::cNumberField& radius = rr.add<ui::cNumberField>(0, 512, cur.tickRadius);
     radius.setId("set-radius");
     radius.on("change", [changed, state](ui::Widget& w) {
@@ -505,7 +505,7 @@ void GameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
   bannerTitle_->setText(m.bannerLines.empty() ? std::string() : m.bannerLines.front());
   bannerText_->setText(m.bannerLines.size() > 1 ? m.bannerLines[1] : std::string());
   for (int i = 0; i < kHotbarSlots; ++i) {
-    ui::Slot& slot = *slots_[size_t(i)];
+    ui::cSlot& slot = *slots_[size_t(i)];
     const ItemStack& st = m.hotbar[size_t(i)];
     // Real stacks (P2b-1): block-backed stacks render as blocks, tools and
     // the Fragment render with their own item icons -- the Fragment in
@@ -524,7 +524,7 @@ void GameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
     lookName_->setVisible(!m.lookName.empty());
   }
   if (inventoryHover_) {
-    const auto* over = dynamic_cast<const ui::Slot*>(ui_.hover());
+    const auto* over = dynamic_cast<const ui::cSlot*>(ui_.hover());
     const bool inInventory = over && ui_.topModal() == inventory_;
     std::string hover = " ";
     if (inInventory && over->data() >= kCarryData) {  // playtest 2026-10-16: carry grid slot

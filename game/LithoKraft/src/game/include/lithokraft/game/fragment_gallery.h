@@ -3,7 +3,7 @@
 // Fragment UI exists yet; this is the model that UI will bind to — stable
 // ids, insertion order, embedded PNG bytes, capture metadata, and a binary
 // round-trip for the save system. Not a parallel bolt-on: the future
-// Fragment page reads straight from FragmentGallery.
+// Fragment page reads straight from cFragmentGallery.
 // LF line endings.
 #pragma once
 
@@ -29,7 +29,7 @@ struct FragmentImage {
 };
 
 /// An ordered gallery of Fragment images.
-class FragmentGallery {
+class cFragmentGallery {
  public:
   /// Adds an image; assigns a unique id ("img-YYYYMMDD-HHMMSS-nnn") when
   /// img.id is empty. Returns the id the image is stored under. Re-adding
