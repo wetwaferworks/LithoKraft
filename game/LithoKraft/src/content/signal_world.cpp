@@ -19,7 +19,7 @@ bool needsFloorSupport(BlockId b) {
   if (d.shape != Shape::Cube && !(d.flags & kSolid)) return true;  // partial, non-solid
   // MARKED per-block list (JD 2026-10-24): Memor needs a solid block beneath; the Keyboard is a
   // non-solid cube in data but renders as a 2/16 slab, so it is partial and needs one too.
-  return b == kMemor || b == kKeyboard;
+  return b == kMemor || b == kKeyboard || b == kFastLatch;  // Fast Latch: slab placeholder, same rule (JD 2026-10-24)
 }
 bool floorSupported(const ChunkMap& w, int x, int y, int z) { return blockRegistry().has(w.get(x, y - 1, z), kSolid); }
 }  // namespace
