@@ -202,6 +202,51 @@ void machineBox(const CustomBlock& cell, MeshWriter& out, const int lo[3], const
     out.face(cell, r.face, l, h, fm, machineTintLook(cell, fm, on), (f == 2 || f == 3) ? ((facing + topTurns) & 3) : 0);
   }
 }
+// 2026-10-24 (CloudAtlas slab models, render only): Redirector, Thresholdor, Pulsor and Catchor draw
+// as a 2/16 slab with 1/16 pads (north = front = output), instead of a full cube. Collision, flags
+// and the sim are untouched; neighbours no longer hide their faces against these cells (mesher).
+// The Redirector lane overlays and the Catchor readout are drawn on the slab top (y = 2).
+} // namespace
+bool cLithoKraftAppearance::shapedRender(const BlockDef& def) const {
+  const SimRole r = roleOf(def);
+  return def.shape == Shape::Cube &&
+         (r == SimRole::Redirector || r == SimRole::Thresholdor || r == SimRole::Pulsor || r == SimRole::Catchor);
+}
+bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out) const {
+  const BlockDef def = cell.def();
+  if (!shapedRender(def)) return false;
+  const SimRole r = roleOf(def);
+  const bool on = active(def, cell.state);
+  const int f = stFacing(cell.state);
+  const FaceMaterial frontM = cell.materials.face(cell.id, FaceSlot::Front, on);
+  const int slo[3] = {0, 0, 0}, shi[3] = {16, 2, 16};
+  machineBox(cell, out, slo, shi, on);
+  auto pad = [&](int x0, int z0, int x1, int z1, int y1 = 3) {
+    const int lo[3] = {x0, 2, z0}, hi[3] = {x1, y1, z1};
+    machineBox(cell, out, lo, hi, on, &frontM);
+  };
+  pad(6, 0, 10, 2);    // output (front, north)
+  pad(6, 14, 10, 16);  // input (back)
+  if (r == SimRole::Redirector || r == SimRole::Thresholdor) { pad(0, 6, 2, 10); pad(14, 6, 16, 10); }
+  if (r == SimRole::Pulsor) pad(6, 6, 10, 10);  // gem (CloudAtlas [6,2,5.5]-[10,3,10], rounded)
+  const int tlo[3] = {0, 0, 0}, thi[3] = {16, 2, 16};  // top overlays at slab height
+  const std::string tex(def.tex);
+  if (r == SimRole::Redirector) {
+    static constexpr const char* kRel = "nesw";
+    const bool split = stAux(cell.state) & 4;
+    auto overlay = [&](const char* colour, int rel) {
+      const std::string n = tex + "_overlay_" + colour + "_" + kRel[rel] + (on ? "" : "_off");
+      if (const FaceMaterial* m = cell.materials.named(n)) out.face(cell, 2, tlo, thi, *m, {kShadeCutout, 0}, f);
+    };
+    overlay("red", 0);
+    overlay("blue", split ? ((stAux(cell.state) & 3) - f) & 3 : 0);
+  } else if (r == SimRole::Catchor) {
+    if (const FaceMaterial* m = cell.materials.named(tex + "_readout_mask"))
+      out.face(cell, 2, tlo, thi, *m, {kShadeReadout, uint8_t((stValue(cell.state) & 127) | (stOn(cell.state) ? 128 : 0))}, f);
+  }
+  return true;
+}
+namespace {
 // Cortana 2026-10-16 [GAME] (JD): Aluminum Ramp mesh. Planar faces only: the base square, up to
 // four side faces (rectangles or triangles) and the slope (one quad when straight, two triangles
 // for inner / outer corners). 5 to 7 quads per ramp; full faces against opaque neighbours are
@@ -478,7 +523,9 @@ void cLithoKraftAppearance::bindMaterials(const BlockDef& def, const BlockModel&
 // Authored standing on the support; the mesher turns them toward the attach face.
 const char* const kTorchModel = R"({"asset": {"version": "ll-box-1"},
   "materials": [{"name": "torch", "slot": "top"}],
-  "meshes": [{"name": "stick", "boxes": [{"min": [7, 0, 7], "max": [9, 10, 9], "material": 0}]}],
+  "meshes": [{"name": "led", "boxes": [{"min": [5, 0, 5], "max": [11, 1, 11], "material": 0},
+                                       {"min": [7, 1, 7], "max": [9, 8, 9], "material": 0},
+                                       {"min": [6, 8, 6], "max": [10, 12, 10], "material": 0}]}],
   "nodes": [{"mesh": 0}]})";
 // 2026-10-24 (CloudAtlas lever, facing north): base [4,0,5]-[12,2,11]; 2x2 handle pivoting at
 // y=1 on the centre line, tilted 45 degrees, drawn as a 3-step staircase (box models have no
