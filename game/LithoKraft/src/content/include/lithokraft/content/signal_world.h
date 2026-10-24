@@ -76,7 +76,7 @@ class cSignalWorldSim final : public IWorldSim {
  private:
   void tickHandshake(ChunkMap& world, const TickArea& area, const DirtyFn& dirty);
   void applyTortureGate(ChunkMap& world, const DirtyFn& dirty);
-  bool gateSet_ = false, gateLit_ = false;
+  bool gateSet_ = false, gateLit_ = false, gateSynced_ = false;
   int gateX_ = 0, gateY_ = 0, gateZ_ = 0;
   std::vector<GatedSource> gated_;
   void onHsCommit(uint64_t phase, uint64_t cycleTick, uint32_t group);

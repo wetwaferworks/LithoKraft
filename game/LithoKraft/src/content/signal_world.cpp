@@ -49,6 +49,23 @@ bool cSignalWorldSim::canAttach(const ChunkMap& w, int x, int y, int z, BlockId 
 
 void cSignalWorldSim::applyTortureGate(ChunkMap& w, const DirtyFn& dirty) {
   const bool on = w.get(gateX_, gateY_, gateZ_) == kSwitch && stOn(w.getState(gateX_, gateY_, gateZ_));
+  if (!gateSynced_) {
+    // 2026-10-24 (JD 6:06 PM): the save restores its columns AFTER the test world is built, so a
+    // playtest save from before the lever brings the old LEDs / Repeators back and they ran with
+    // the lever off. First tick: with the lever off, lift every held source the save put back.
+    gateSynced_ = true;
+    if (!on) {
+      int lifted = 0;
+      for (const GatedSource& g : gated_) {
+        if (w.get(g.x, g.y, g.z) != g.id || !w.set(g.x, g.y, g.z, kAir)) continue;
+        w.setState(g.x, g.y, g.z, CellState(0));
+        onBlockChanged(w, g.x, g.y, g.z, kAir);
+        dirty(g.x, g.y, g.z);
+        ++lifted;
+      }
+      if (lifted) litholattice::logInfo("torture lever: off at load, lifted %d sources restored by the save", lifted);
+    }
+  }
   if (on == gateLit_) return;
   gateLit_ = on;
   for (const GatedSource& g : gated_) {
