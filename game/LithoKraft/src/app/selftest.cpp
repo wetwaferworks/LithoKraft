@@ -831,7 +831,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     std::filesystem::remove_all(dir);
   }
-  {  // P3-2 (World/save tail): B-L2 packPos range, B-L5 LightEngine clamp,
+  {  // P3-2 (World/save tail): B-L2 packPos range, B-L5 cLightEngine clamp,
      // B-M4 trace-strength keys, C-M3 region size cap, C-L2 .torn rotation,
      // C-L3 cAnvilRegion quarantine count.
     using namespace litholattice;
@@ -843,7 +843,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
               !packPosInRange(0, 0, 1 << 20) && packPos(0, 0, 1 << 20) == packPos(1, 0, -(1 << 20)),
           "packPos (B-L2): in-range coordinates round-trip exactly; z = +2^20 is out of range and aliases onto (x=1, z=-2^20)");
     // B-L5: an over-range source level clamps to kMaxLight.
-    LightEngine le(16, 16, 16);
+    cLightEngine le(16, 16, 16);
     le.addSource(8, 8, 8, 200);
     le.propagate();
     check(le.getLight(8, 8, 8) == kMaxLight, "light (B-L5): addSource level 200 clamps to kMaxLight (64)");
@@ -1319,7 +1319,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     {
       HudLayer hud;
-      HudUiRenderer r(hud, {}, [&](std::string_view) { return rm.icon(kRedTorch); });
+      cHudUiRenderer r(hud, {}, [&](std::string_view) { return rm.icon(kRedTorch); });
       r.drawImage({0, 0, 32, 32}, "block:4", {1, 1, 1, 1});
       check(hud.draws.size() > 4, "hotbar: a block icon paints as pixel rects, not a single swatch");
     }

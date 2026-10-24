@@ -63,7 +63,7 @@ void writeFile(const std::filesystem::path& p, const std::string& text) {
 void testHudRenderer(Checker& check) {
   HudLayer hud;
   hud.rects.push_back({0, 0, 10, 10, 1, 1, 1, 1});
-  HudUiRenderer r(hud, [](std::string_view name) -> std::optional<ui::Color> {
+  cHudUiRenderer r(hud, [](std::string_view name) -> std::optional<ui::Color> {
     if (name == "red") return ui::Color{1, 0, 0, 1};
     return std::nullopt;
   });

@@ -1,5 +1,5 @@
 // Cortana 2026-10-15 0455: PORT getpid on _WIN32
-// Injects fake events through ReplayInputBackend and checks what LithoKraft sees: its actions,
+// Injects fake events through cReplayInputBackend and checks what LithoKraft sees: its actions,
 // default bindings and contexts on the engine input SDK.
 #include "ui_input_bridge.h"
 #include "lithokraft/game/input_selftest.h"
@@ -24,7 +24,7 @@ using T = InputEvent::Type;
 /// Drives an InputSystem one frame at a time from scripted events.
 struct Rig {
   InputSystem input{defaultActionMap(), inputContexts()};
-  ReplayInputBackend backend;
+  cReplayInputBackend backend;
   double t = 0.0;
 
   /// Runs one frame containing `events` (their timestamps are set to this frame).
@@ -202,7 +202,7 @@ int runGameInputSelfTest() {
     }
     const std::vector<InputEvent> rec = live.input.stopRecording();
     InputSystem replayed{defaultActionMap(), inputContexts()};
-    ReplayInputBackend backend(rec);
+    cReplayInputBackend backend(rec);
     std::vector<bool> again;
     for (int i = 1; i <= 3; ++i) {
       backend.advanceTo(i / 60.0 + 1e-9);

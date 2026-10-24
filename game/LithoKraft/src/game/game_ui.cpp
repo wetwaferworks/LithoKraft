@@ -543,7 +543,7 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
 
 void cGameUi::paint(HudLayer& hud, const BlockMaterials& materials, const std::function<const Image*(BlockId)>& icon,
                    const std::function<const Image*(uint32_t)>& itemIcon) const {
-  HudUiRenderer renderer(hud, [&materials](std::string_view image) -> std::optional<ui::Color> {
+  cHudUiRenderer renderer(hud, [&materials](std::string_view image) -> std::optional<ui::Color> {
     constexpr std::string_view kPrefix = "block:";
     if (image.substr(0, kPrefix.size()) != kPrefix) return std::nullopt;
     int id = 0;

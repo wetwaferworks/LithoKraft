@@ -149,7 +149,7 @@ void recomputeTrailerChecksum(std::vector<uint8_t>& bytes) {
 std::vector<uint8_t> testRoundTrip(const std::vector<ControlEvent>& script) {
   std::printf("== demo record: round trip through a bare ControlStream\n");
   ControlStream cs;
-  DemoRecorder rec;
+  cDemoRecorder rec;
   rec.begin(cs, unitSession());
   check(rec.recording(), "demo: recorder begin turns the stream recording tap on");
   const DemoSessionInfo rs = rec.session();
@@ -186,7 +186,7 @@ std::vector<uint8_t> testRoundTrip(const std::vector<ControlEvent>& script) {
   check(allSame(p.events, script), "demo: every event round-trips field-for-field (all five kinds)");
   check(p.segmentsRecovered >= 2, "demo: at least two segments were framed and recovered");
 
-  DemoPlayer player;
+  cDemoPlayer player;
   check(player.load(bytes.data(), bytes.size()) && player.parsed().complete,
         "demo: DemoPlayer loads the round-trip bytes (complete)");
   ControlStream cs2;
@@ -208,7 +208,7 @@ void testNonPerturbation(const std::vector<ControlEvent>& script) {
   plain.extractDue(1000, outPlain);
 
   ControlStream tapped;
-  DemoRecorder rec;
+  cDemoRecorder rec;
   rec.begin(tapped, unitSession());  // attach: tap on
   rec.abort();                       // detach: tap off, no trailer
   tapped.submitStamped(script);
@@ -372,13 +372,13 @@ struct DrivenResult {
 
 // Drives the circuit scenario through the real SimThread (paused +
 // stepped, 512-tick chunks). Exactly one input source is used per arm:
-// `script` (submitStamped), `player` (DemoPlayer::submitInto), or
+// `script` (submitStamped), `player` (cDemoPlayer::submitInto), or
 // neither. When `recorder` is given it is attached BEFORE start(),
 // pumped after each 512-tick chunk, and finished (with the outcome
 // hash) before the SimThread is destroyed — its stream reference must
 // never outlive the thread's stream.
 DrivenResult driveDemo(int ticks, bool handshake, int workers, const std::vector<ControlEvent>* script,
-                       DemoPlayer* player, DemoRecorder* recorder, const DemoSessionInfo* recSession) {
+                       cDemoPlayer* player, cDemoRecorder* recorder, const DemoSessionInfo* recSession) {
   DrivenResult res;
   ControlScenarioWorld sc = buildControlScenarioWorld();
   ChunkMap& w = sc.wafer->chunks;
@@ -443,7 +443,7 @@ void testSimThreadProofs() {
   session.demoFormatVersion = uint16_t(kDemoFormatVersion);
 
   // RECORDED SESSION (legacy), recorder attached before start.
-  DemoRecorder rec;
+  cDemoRecorder rec;
   const DrivenResult recorded = driveDemo(2048, false, 0, &script, nullptr, &rec, &session);
   std::printf("  recorded (legacy): hash=%016llx applied=%llu eventsRecorded=%llu\n",
               (unsigned long long)recorded.hash, (unsigned long long)recorded.stats.applied,
@@ -469,7 +469,7 @@ void testSimThreadProofs() {
   check(bare.hash == recorded.hash, "demo-proof: non-perturbation — no-recorder hash is identical to the recorded hash");
 
   // REPLAY (legacy): a fresh SimThread fed only from the saved record.
-  DemoPlayer playerLegacy;
+  cDemoPlayer playerLegacy;
   const bool loadedLegacy = playerLegacy.loadFile("./demo_record_proof.lldemo");
   check(loadedLegacy && playerLegacy.parsed().complete && playerLegacy.parsed().trailer.present &&
             playerLegacy.parsed().trailer.finalWorldHash == recorded.hash,
@@ -486,7 +486,7 @@ void testSimThreadProofs() {
         "demo-proof: replay applied every event exactly once (dropped == 0, orderViolations == 0)");
 
   // REPLAY (handshake, 2 workers): cross-mode bit-identity.
-  DemoPlayer playerHs;
+  cDemoPlayer playerHs;
   const bool loadedHs = playerHs.loadFile("./demo_record_proof.lldemo");
   const DrivenResult replayHs = driveDemo(2048, true, 2, nullptr, &playerHs, nullptr, nullptr);
   std::printf("  replay (handshake, 2 workers): hash=%016llx applied=%llu\n", (unsigned long long)replayHs.hash,
@@ -520,7 +520,7 @@ static void testDemoArea(const std::vector<ControlEvent>& script) {
   check(unpackDemoArea(packDemoArea(rec)) == rec && !unpackDemoArea(0).known && packDemoArea(DemoAreaInfo{}) == 0,
         "demo area: pack/unpack round-trips; word 0 (pre-fix-3 file) is not recorded");
   ControlStream cs;
-  DemoRecorder r;
+  cDemoRecorder r;
   DemoSessionInfo si = unitSession();
   si.area = rec;
   r.begin(cs, si);
