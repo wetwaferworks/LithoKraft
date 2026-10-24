@@ -19,7 +19,11 @@ if(EXISTS "${COUNTER}")
     message(FATAL_ERROR "LithoKraft counter ${COUNTER}: expected one decimal integer, got '${_line}'")
   endif()
 endif()
-math(EXPR n "${n} + 1")
+# Hold rule (JD 2026-10-24): counters roll only for big repairs / new features. While
+# <COUNTER>.hold exists next to the counter file, builds keep the current number.
+if(NOT EXISTS "${COUNTER}.hold")
+  math(EXPR n "${n} + 1")
+endif()
 set(_label "Alpha")
 if(DEFINED VERSION_FILE AND EXISTS "${VERSION_FILE}")
   file(STRINGS "${VERSION_FILE}" _vl LIMIT_COUNT 1)
