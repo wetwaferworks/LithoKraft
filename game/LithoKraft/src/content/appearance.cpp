@@ -227,7 +227,17 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
   };
   pad(6, 0, 10, 2);    // output (front, north)
   pad(6, 14, 10, 16);  // input (back)
-  if (r == SimRole::Redirector || r == SimRole::Thresholdor) { pad(0, 6, 2, 10); pad(14, 6, 16, 10); }
+  if (r == SimRole::Redirector) { pad(0, 6, 2, 10); pad(14, 6, 16, 10); }
+  if (r == SimRole::Thresholdor) {
+    // 2026-10-24 state model (render only): the reference pads wear the LOW (left) / HIGH (right)
+    // face textures, and the output pad rises a pixel while the input passes (state on).
+    const FaceMaterial lowM = cell.materials.face(cell.id, FaceSlot::Left, on);
+    const FaceMaterial highM = cell.materials.face(cell.id, FaceSlot::Right, on);
+    const int llo[3] = {0, 2, 6}, lhi[3] = {2, 3, 10}, hlo[3] = {14, 2, 6}, hhi[3] = {16, 3, 10};
+    machineBox(cell, out, llo, lhi, on, &lowM);
+    machineBox(cell, out, hlo, hhi, on, &highM);
+    if (on) pad(6, 0, 10, 2, 4);
+  }
   if (r == SimRole::Pulsor) pad(6, 6, 10, 10);  // gem (CloudAtlas [6,2,5.5]-[10,3,10], rounded)
   const int tlo[3] = {0, 0, 0}, thi[3] = {16, 2, 16};  // top overlays at slab height
   const std::string tex(def.tex);
@@ -550,6 +560,10 @@ const char* const kButtonModel = R"({"asset": {"version": "ll-box-1"},
   "meshes": [{"name": "cap", "boxes": [{"min": [5, 0, 6], "max": [11, 2, 10], "material": 0}]}],
   "nodes": [{"mesh": 0}]})";
 
+const char* const kButtonPressedModel = R"({"asset": {"version": "ll-box-1"},
+  "materials": [{"name": "cap", "slot": "top"}],
+  "meshes": [{"name": "cap", "boxes": [{"min": [5, 0, 6], "max": [11, 1, 10], "material": 0}]}],
+  "nodes": [{"mesh": 0}]})";
 const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def) const {
   static const std::optional<BoxModel> torch = BoxModel::parse(kTorchModel, nullptr);
   static const std::optional<BoxModel> sw = BoxModel::parse(kSwitchModel, nullptr);
@@ -561,6 +575,12 @@ const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def) const {
 }
 
 const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def, CellState st) const {
+  if (roleOf(def) == SimRole::cButton && stOn(st)) {
+    // 2026-10-24 pressed state (render only): the cap sinks to 1/16; the top slot's active
+    // material is button_top_pressed in every pack.
+    static const std::optional<BoxModel> pressed = BoxModel::parse(kButtonPressedModel, nullptr);
+    return pressed ? &*pressed : nullptr;
+  }
   if (roleOf(def) == SimRole::Switch && stOn(st)) {
     static const std::optional<BoxModel> on = BoxModel::parse(kSwitchOnModel, nullptr);
     return on ? &*on : nullptr;
