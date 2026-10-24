@@ -283,11 +283,11 @@ void testStructures() {
   // Collect the three structure features.
   struct Found {
     std::string name;
-    const litholattice::procgen::StructureFeature* f = nullptr;
+    const litholattice::procgen::cStructureFeature* f = nullptr;
   };
   std::vector<Found> found;
   gen->pipeline().visitFeatures([&](std::string_view name, const litholattice::procgen::IFeature& f) {
-    if (const auto* s = dynamic_cast<const litholattice::procgen::StructureFeature*>(&f))
+    if (const auto* s = dynamic_cast<const litholattice::procgen::cStructureFeature*>(&f))
       found.push_back({std::string(name), s});
   });
   check(found.size() == 3, "structures: 3 structure features in the wafer pipeline");
@@ -299,12 +299,12 @@ void testStructures() {
   auto gen2 = makeWaferGen(seed);
   bool detOk = gen2 != nullptr;
   gen->pipeline().visitFeatures([&](std::string_view name, const litholattice::procgen::IFeature& f) {
-    const auto* s = dynamic_cast<const litholattice::procgen::StructureFeature*>(&f);
+    const auto* s = dynamic_cast<const litholattice::procgen::cStructureFeature*>(&f);
     if (!s) return;
-    const auto* s2 = [&]() -> const litholattice::procgen::StructureFeature* {
-      const litholattice::procgen::StructureFeature* r = nullptr;
+    const auto* s2 = [&]() -> const litholattice::procgen::cStructureFeature* {
+      const litholattice::procgen::cStructureFeature* r = nullptr;
       gen2->pipeline().visitFeatures([&](std::string_view n2, const litholattice::procgen::IFeature& f2) {
-        if (n2 == name) r = dynamic_cast<const litholattice::procgen::StructureFeature*>(&f2);
+        if (n2 == name) r = dynamic_cast<const litholattice::procgen::cStructureFeature*>(&f2);
       });
       return r;
     }();
@@ -361,7 +361,7 @@ void testStructures() {
   // the 2x2 chunks around it so the area actually contains structures.
   std::vector<std::array<int32_t, 2>> seedBases;
   gen->pipeline().visitFeatures([&](std::string_view, const litholattice::procgen::IFeature& f) {
-    if (const auto* s = dynamic_cast<const litholattice::procgen::StructureFeature*>(&f))
+    if (const auto* s = dynamic_cast<const litholattice::procgen::cStructureFeature*>(&f))
       for (const auto& b : s->basesInRect(dimSeed, -512, -512, 512, 512)) seedBases.push_back(b);
   });
   check(!seedBases.empty(), "structures: bases found for the chunk-safety area");
@@ -372,7 +372,7 @@ void testStructures() {
   std::vector<std::array<int32_t, 2>> allBases;
   std::vector<int> allReach;
   gen->pipeline().visitFeatures([&](std::string_view, const litholattice::procgen::IFeature& f) {
-    if (const auto* s = dynamic_cast<const litholattice::procgen::StructureFeature*>(&f)) {
+    if (const auto* s = dynamic_cast<const litholattice::procgen::cStructureFeature*>(&f)) {
       for (const auto& b : s->basesInRect(dimSeed, (ccx - 1) * 16 - 32, (ccz - 1) * 16 - 32,
                                          (ccx + 1) * 16 + 32, (ccz + 1) * 16 + 32)) {
         allBases.push_back(b);

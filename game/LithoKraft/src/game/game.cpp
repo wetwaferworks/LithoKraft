@@ -480,7 +480,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, cResourceM
       src.structures = [gen, dimSeed](int32_t x0, int32_t z0, int32_t x1, int32_t z1) {
         std::vector<MapMarker> markers;
         gen->pipeline().visitFeatures([&](std::string_view name, const procgen::IFeature& f) {
-          const auto* s = dynamic_cast<const procgen::StructureFeature*>(&f);
+          const auto* s = dynamic_cast<const procgen::cStructureFeature*>(&f);
           if (!s) return;
           const auto rgb = structureMarkerColor(std::string(name));
           // B-L6 (P3-2): basesInRect returns CANDIDATE bases — place()'s
