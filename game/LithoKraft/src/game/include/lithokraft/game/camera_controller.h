@@ -97,7 +97,7 @@ std::optional<GameCameraMode> parseGameCameraMode(std::string_view name);
 
 /// World + player access the controller needs from Game, as hooks so the
 /// controller never touches SimThread / Dimension directly (the same
-/// pattern GameWorldQuery and the entity behaviors use).
+/// pattern cGameWorldQuery and the entity behaviors use).
 struct GameCameraHooks {
   /// MCP pilot snapshot (the piloted player's pose; yaw/pitch radians).
   /// The pilot target adds the standard eye height on top of it, exactly

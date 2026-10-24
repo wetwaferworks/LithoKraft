@@ -173,9 +173,9 @@ class cMcpStdioTransport final : public litholattice::mcp::IStdioTransport {
 namespace lithokraft {
 
 /// The window's OS clipboard for the UI.
-class WindowClipboard final : public ui::IClipboard {
+class cWindowClipboard final : public ui::IClipboard {
  public:
-  explicit WindowClipboard(Window& w) : window_(w) {}
+  explicit cWindowClipboard(Window& w) : window_(w) {}
   std::string text() const override { return window_.clipboardText(); }
   void setText(const std::string& text) override { window_.setClipboardText(text); }
 
@@ -243,7 +243,7 @@ std::vector<std::filesystem::path> scanMods(const char* argv0) {
   // any structure registers (mods load below). Set even when mods/ is missing so
   // JD-signed structures can verify Trusted on a stock install. Until set, no
   // structure can verify Trusted.
-  litholattice::procgen::StructureRegistry::instance().setTrustedPublicKeyHex(
+  litholattice::procgen::cStructureReg::instance().setTrustedPublicKeyHex(
       litholattice::assets::kBakedPublicKeyHex);
   // Note: no mods/ directory is NOT an early return — the seal decision below must
   // still run (release with zero mods seals, fail closed). An empty ModSet falls
@@ -322,7 +322,7 @@ std::vector<std::filesystem::path> scanMods(const char* argv0) {
 #endif
     if (seal) {
       mutableBlockRegistry().content().seal();
-      litholattice::procgen::StructureRegistry::instance().seal();
+      litholattice::procgen::cStructureReg::instance().seal();
       logInfo("mods: registry sealed (%s)", reason);
     } else {
       logInfo("mods: registry open for hot-swap (%s)", reason);
@@ -1223,7 +1223,7 @@ int main(int argc, char** argv) {
     JobPool pool(std::max(1u, std::max(2u, std::thread::hardware_concurrency()) - 2));
     F.input = std::make_unique<InputSystem>(loadBindings(argv[0]), inputContexts()); InputSystem& input = *F.input;
     window->loadGamepadMappings((dataRoot(argv[0]) / "config" / "gamecontrollerdb.txt").string());  // optional
-    WindowClipboard clipboard(*window);  // UI text fields copy / paste through the OS; outlives the game
+    cWindowClipboard clipboard(*window);  // UI text fields copy / paste through the OS; outlives the game
     F.game = std::make_unique<Game>(cfg, *renderer, pool, resources, audio, input); Game& game = *F.game;
     logInfo("%s | renderer: %s", lithokraft::buildInfo().c_str(), game.rendererInfo().c_str());  // 2026-10-16 (JD)
     if (!game.ok()) return 1;
@@ -1653,10 +1653,10 @@ static bool lkStepFrame(FrameCtx& F) {
           if (secondsBetween(tStart, now) > kBenchWarmup) br.tick.push_back(ss.tickMs);
           const double f = std::max(1, br.secFrames);
           std::string streamPart;
-          if (BenchStreamer* bs = game.benchStreamer()) {
+          if (cBenchStreamer* bs = game.benchStreamer()) {
             const double genAvg = MsSamples::avg(bs->genMs.second), genP99 = MsSamples::pct(bs->genMs.second, 0.99);
             const double meshAvg = MsSamples::avg(bs->meshMs.second);
-            const BenchStreamer::Second s = bs->takeSecond();
+            const cBenchStreamer::Second s = bs->takeSecond();
             char buf[256];
             std::snprintf(buf, sizeof buf, " stream gen=%d cols (%.2f/%.2fms) meshed=%d subs (%.3fms) dropped=%d loaded=%d", s.generated,
                           genAvg, genP99, s.meshed, meshAvg, s.dropped, s.loaded);
@@ -1745,7 +1745,7 @@ static void lkShutdownTail(FrameCtx& F) {
     if (benchSeconds > 0) {
       br.memEnd = processWorkingSetBytes();
       const double avg = avgOf(benchMs), p50 = percentile(benchMs, 0.5), p99 = percentile(benchMs, 0.99), mx = percentile(benchMs, 1.0);
-      BenchStreamer* bs = game.benchStreamer();
+      cBenchStreamer* bs = game.benchStreamer();
       const double genAvg = bs ? MsSamples::avg(bs->genMs.run) : 0, genP99 = bs ? MsSamples::pct(bs->genMs.run, 0.99) : 0;
       const double meshAvg = bs ? MsSamples::avg(bs->meshMs.run) : 0, meshP99 = bs ? MsSamples::pct(bs->meshMs.run, 0.99) : 0;
       const double genRate = bs ? double(bs->totalGenerated) / benchSeconds : 0, meshRate = bs ? double(bs->totalMeshed) / benchSeconds : 0;

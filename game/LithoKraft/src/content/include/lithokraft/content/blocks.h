@@ -81,7 +81,7 @@ extern const BlockId kSilicaTilledSoil; ///< tilled silicon farmland (plantable)
 
 // Structure block (2026-10-12): JD's in-game design tool (Minecraft's structure
 // block, renamed). Modes in the cell-state value bits: 0=CORNER, 1=SAVE, 2=LOAD.
-// CORNERx2 marks a region; SAVE captures it into the StructureRegistry under a
+// CORNERx2 marks a region; SAVE captures it into the cStructureReg under a
 // name; LOAD places a named structure. Behavior "structure_block".
 extern const BlockId kStructureBlock;   ///< structure block: capture/save/load tool
 

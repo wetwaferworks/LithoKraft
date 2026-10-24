@@ -1,5 +1,5 @@
 // Cortana 2026-10-15 1010: MCP-H1 backend cap
-// GameWorldQuery backend: pause-scan-restore region queries. LF line endings.
+// cGameWorldQuery backend: pause-scan-restore region queries. LF line endings.
 #include "lithokraft/game/world_query.h"
 
 #include <algorithm>
@@ -17,7 +17,7 @@ using litholattice::console::WorldQueryResult;
 
 }  // namespace
 
-bool GameWorldQuery::pauseSim(std::string* err) {
+bool cGameWorldQuery::pauseSim(std::string* err) {
   if (!hooks_.simRunning || !hooks_.simRunning()) return true;  // no sim: chunks are game-owned
   hooks_.setSimPaused(true);
   // waitLoops guarantees a full iteration ran after our pause request, so no
@@ -30,12 +30,12 @@ bool GameWorldQuery::pauseSim(std::string* err) {
   return true;
 }
 
-void GameWorldQuery::resumeSim() {
+void cGameWorldQuery::resumeSim() {
   if (!hooks_.simRunning || !hooks_.simRunning()) return;
   hooks_.setSimPaused(hooks_.gamePaused ? hooks_.gamePaused() : false);
 }
 
-WorldQueryResult GameWorldQuery::queryBlocks(uint32_t blockId, int x1, int y1, int z1, int x2,
+WorldQueryResult cGameWorldQuery::queryBlocks(uint32_t blockId, int x1, int y1, int z1, int x2,
                                              int y2, int z2, std::string* err) {
   WorldQueryResult r;
   litholattice::ChunkMap* chunks = hooks_.chunks ? hooks_.chunks() : nullptr;
@@ -64,7 +64,7 @@ WorldQueryResult GameWorldQuery::queryBlocks(uint32_t blockId, int x1, int y1, i
   return r;
 }
 
-WorldQueryResult GameWorldQuery::queryCount(uint32_t blockId, int x1, int y1, int z1, int x2,
+WorldQueryResult cGameWorldQuery::queryCount(uint32_t blockId, int x1, int y1, int z1, int x2,
                                            int y2, int z2, std::string* err) {
   WorldQueryResult r;
   litholattice::ChunkMap* chunks = hooks_.chunks ? hooks_.chunks() : nullptr;
@@ -87,7 +87,7 @@ WorldQueryResult GameWorldQuery::queryCount(uint32_t blockId, int x1, int y1, in
   return r;
 }
 
-WorldQueryResult GameWorldQuery::queryEntities(const std::string& type, double cx, double cy,
+WorldQueryResult cGameWorldQuery::queryEntities(const std::string& type, double cx, double cy,
                                               double cz, double radius, std::string* err) {
   WorldQueryResult r;
   litholattice::EntityManager* em = hooks_.entities ? hooks_.entities() : nullptr;

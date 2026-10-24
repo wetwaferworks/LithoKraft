@@ -115,7 +115,7 @@ struct JammerZone {
 };
 
 /// Active jammers, same one-tick-latency discipline as RadioRegistry.
-class JammerRegistry {
+class cJammerReg {
  public:
   void publish(JammerZone j) { next_.push_back(j); }
   void flip() { cur_.swap(next_); next_.clear(); }
@@ -304,7 +304,7 @@ class SignalSim {
   std::unordered_map<BlockId, litholattice::TickRate> classRates_;  ///< per-class tick-rate overrides (rate scaling); empty in shipped content
   mutable std::unordered_map<BlockId, litholattice::TickRate> declaredRates_;  ///< validated class-declared rates, cached per BlockId (A-H2); key-lookup only, never iterated
   RadioRegistry radio_;
-  JammerRegistry jammers_;
+  cJammerReg jammers_;
   litholattice::TraceStrengthBuffer strengthBuf_;  ///< Step 1: GPU strength slots
   uint8_t dim_ = 1;  ///< this sim's dimension (for cross-dimensional radio)
   bool compSleep_ = false, allAwake_ = true;

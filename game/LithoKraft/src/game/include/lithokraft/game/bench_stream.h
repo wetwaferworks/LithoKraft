@@ -31,11 +31,11 @@ struct MsSamples {
   static double pct(std::vector<double> v, double q);
 };
 
-class BenchStreamer {
+class cBenchStreamer {
  public:
-  BenchStreamer(IRenderer& renderer, JobPool& pool, std::shared_ptr<const ColumnGenerator> gen, int worldChunks, BlockId belowWorld,
+  cBenchStreamer(IRenderer& renderer, JobPool& pool, std::shared_ptr<const ColumnGenerator> gen, int worldChunks, BlockId belowWorld,
                 int radiusChunks);
-  ~BenchStreamer();  ///< waits for its jobs, removes its meshes
+  ~cBenchStreamer();  ///< waits for its jobs, removes its meshes
   /// Main thread, once per frame: request / drop columns around (x, z), take finished work,
   /// upload meshes. Returns bytes uploaded this frame.
   size_t update(float x, float z, const std::shared_ptr<const BlockMaterials>& materials);

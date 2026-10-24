@@ -1,4 +1,4 @@
-// GameWorldQuery: the IWorldQuery backend for LithoKraft (v1).
+// cGameWorldQuery: the IWorldQuery backend for LithoKraft (v1).
 //
 // THREADING (the critical design point): while the sim runs, the sim thread
 // OWNS the chunks (SimThread::getBlock's own header: "fine for a handful of
@@ -32,7 +32,7 @@ class EntityManager;
 
 namespace lithokraft {
 
-class GameWorldQuery : public litholattice::console::IWorldQuery {
+class cGameWorldQuery : public litholattice::console::IWorldQuery {
  public:
   struct Hooks {
     /// Chunk storage; valid to read while the sim is paused+settled.
@@ -51,7 +51,7 @@ class GameWorldQuery : public litholattice::console::IWorldQuery {
     std::function<uint32_t(const std::string&)> entityTypeId;
   };
 
-  explicit GameWorldQuery(Hooks hooks) : hooks_(std::move(hooks)) {}
+  explicit cGameWorldQuery(Hooks hooks) : hooks_(std::move(hooks)) {}
 
   litholattice::console::WorldQueryResult queryBlocks(
       uint32_t blockId, int x1, int y1, int z1, int x2, int y2, int z2,

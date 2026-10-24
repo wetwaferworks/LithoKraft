@@ -297,7 +297,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   {
     cPerfNullRenderer nr;
     const auto matsPtr = std::make_shared<const BlockMaterials>(blockRegistry().size());
-    BenchStreamer bs(nr, pool, wafer->generator, 16, wafer->belowWorldFill, 8);
+    cBenchStreamer bs(nr, pool, wafer->generator, 16, wafer->belowWorldFill, 8);
     const uint64_t ram0 = processWorkingSetBytes();
     for (int minute = 1; minute <= 10; ++minute) {
       for (int step = 0; step < 3600; ++step) {

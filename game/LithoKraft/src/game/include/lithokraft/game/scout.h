@@ -1,6 +1,6 @@
 // Biome scouting: the `locatebiome` lithoscript command backend. Spiral search for the
 // nearest column whose dominant biome matches, using the pipeline's biome selector
-// (GeneratorPipeline::biomeAt) -- no chunk generation, so the search is fast and never
+// (cGenPipeline::biomeAt) -- no chunk generation, so the search is fast and never
 // touches the world. Deterministic: same pipeline/seed + same origin = same result.
 // LF line endings.
 #pragma once

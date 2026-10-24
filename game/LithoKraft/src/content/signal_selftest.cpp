@@ -310,7 +310,7 @@ int runSignalSelfTest() {
     const bool lit = w.getState(88, y + 3, 60) == 1 && stAttach(w.getState(87, y + 2, 60)) == 6;
     run(kButtonTicks + 4);
     check(idle && lit && w.getState(88, y + 3, 60) == 0, "attached button pulses its support (lamp on, then off) and keeps its attach face");
-    const LithoKraftAppearance look;
+    const cLithoKraftAppearance look;
     check(look.boxModel(blockRegistry().def(kButton)) != nullptr && look.boxModel(blockRegistry().def(kSwitch)) != nullptr,
           "button and switch have ll-box-1 box models");
   }

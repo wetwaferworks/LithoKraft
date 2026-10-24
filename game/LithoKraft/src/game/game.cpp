@@ -552,7 +552,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceMa
           e->vx = dx / d * 3.0;
           e->vz = dz / d * 3.0;
         }
-        e->vy = 3.5;  // a friendly arc; ItemBehavior gravity lands it
+        e->vy = 3.5;  // a friendly arc; cItemBehavior gravity lands it
         (void)ty;
       }
     };
@@ -604,7 +604,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceMa
   }
   // World queries ("SQL for voxels"): the pause-scan-restore backend.
   {
-    GameWorldQuery::Hooks h;
+    cGameWorldQuery::Hooks h;
     h.chunks = [this]() -> litholattice::ChunkMap* { return active_ ? &active_->chunks : nullptr; };
     h.entities = [this]() -> litholattice::EntityManager* { return &entities_; };
     h.simRunning = [this] { return sim_ != nullptr; };
@@ -635,7 +635,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceMa
       }
       return UINT32_MAX;
     };
-    worldQuery_ = std::make_unique<GameWorldQuery>(std::move(h));
+    worldQuery_ = std::make_unique<cGameWorldQuery>(std::move(h));
     consoleRegistry_.setWorldQuery(worldQuery_.get());
   }
   // autoexec.lth: player startup script in the config dir; silent when absent.
@@ -883,7 +883,7 @@ void Game::initScripts() {
 void Game::setBenchPath(const std::string& path) {
   benchPath_ = path;
   if ((path == "stream" || path == "soak") && active_ && active_->generator)
-    stream_ = std::make_unique<BenchStreamer>(renderer_, pool_, active_->generator, cfg_.worldChunks, active_->belowWorldFill, std::max(1, cfg_.streamRadius));
+    stream_ = std::make_unique<cBenchStreamer>(renderer_, pool_, active_->generator, cfg_.worldChunks, active_->belowWorldFill, std::max(1, cfg_.streamRadius));
 }
 
 void Game::setBenchCamera(float t) {

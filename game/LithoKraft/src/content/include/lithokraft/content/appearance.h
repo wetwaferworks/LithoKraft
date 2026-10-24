@@ -6,7 +6,7 @@
 
 namespace lithokraft {
 
-class LithoKraftAppearance final : public IBlockAppearance {
+class cLithoKraftAppearance final : public IBlockAppearance {
  public:
   bool active(const BlockDef& def, CellState state) const override;
   FaceLook faceLook(const BlockDef& def, CellState state, FaceSlot slot, bool active) const override;

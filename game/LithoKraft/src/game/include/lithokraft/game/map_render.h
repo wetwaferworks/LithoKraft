@@ -85,7 +85,7 @@ struct MapMarker {
 };
 
 /// Data sources the core needs. The lithoscript binding wires the Wafer's pipeline
-/// (batched GeneratorPipeline::sampleBiomes + the pipeline's StructureFeatures);
+/// (batched cGenPipeline::sampleBiomes + the pipeline's StructureFeatures);
 /// in-game map items will wire their own dimension later.
 struct OverviewMapSource {
   /// Batch biome query: out[i] = biome-table index at (xs[i], zs[i]).

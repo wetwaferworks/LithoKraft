@@ -11,7 +11,7 @@ namespace {
 float distanceGain(const SoundEvent& e, const Vec3& l) {
   const float dx = e.x + 0.5f - l.x, dy = e.y + 0.5f - l.y, dz = e.z + 0.5f - l.z;
   const float d = std::sqrt(dx * dx + dy * dy + dz * dz);  // EXACT (bug-fix run): audio-class revert — see spatial_audio.h
-  return std::clamp(1.f - (d - 4.f) / (SoundDirector::kHearing - 4.f), 0.f, 1.f);
+  return std::clamp(1.f - (d - 4.f) / (cSoundDirector::kHearing - 4.f), 0.f, 1.f);
 }
 
 /// Tone Block voice: SID3 pulse 25% with a short attack and a held sustain.
@@ -21,9 +21,9 @@ NoteSpec toneNote(int strength, float gain) {
 
 }  // namespace
 
-SoundDirector::SoundDirector(AudioEngine& audio) : audio_(audio), tones_(audio.musicVoiceCount())  /* Cortana 2026-10-15 1658: F-4 */ {}
+cSoundDirector::cSoundDirector(AudioEngine& audio) : audio_(audio), tones_(audio.musicVoiceCount())  /* Cortana 2026-10-15 1658: F-4 */ {}
 
-void SoundDirector::play(std::span<const SoundEvent> events, const Vec3& listener) {
+void cSoundDirector::play(std::span<const SoundEvent> events, const Vec3& listener) {
   for (const SoundEvent& e : events) {
     const float gain = distanceGain(e, listener);
     switch (e.cue) {
@@ -39,7 +39,7 @@ void SoundDirector::play(std::span<const SoundEvent> events, const Vec3& listene
   }
 }
 
-void SoundDirector::playTone(const SoundEvent& e, float gain) {
+void cSoundDirector::playTone(const SoundEvent& e, float gain) {
   const uint64_t key = uint64_t(packPos(e.x, e.y, e.z));
   if (e.value > 0) {
     audio_.post(AudioCommand::noteOn(Bus::Music, tones_.acquire(key), toneNote(e.value, gain)));
@@ -48,7 +48,7 @@ void SoundDirector::playTone(const SoundEvent& e, float gain) {
   }
 }
 
-void SoundDirector::stopAll() {
+void cSoundDirector::stopAll() {
   for (size_t v = 0; v < audio_.musicVoiceCount(); ++v)  // Cortana 2026-10-15 1658: F-4 audio_.post(AudioCommand::noteOff(Bus::Music, v));
   tones_.clear();
 }

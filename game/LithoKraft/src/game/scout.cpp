@@ -1,6 +1,6 @@
 // Biome scouting: spiral search for the nearest column of a biome type.
 // Deterministic: the spiral order is fixed and the biome query
-// (GeneratorPipeline::biomeAt) is a pure function of seed + position.
+// (cGenPipeline::biomeAt) is a pure function of seed + position.
 // LF line endings.
 #include "lithokraft/game/scout.h"
 

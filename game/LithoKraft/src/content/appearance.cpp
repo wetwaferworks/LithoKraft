@@ -39,11 +39,11 @@ bool beamFrom(const CustomBlock& cell, int d) {
 }  // namespace
 
 const IBlockAppearance& blockAppearance() {
-  static const LithoKraftAppearance appearance;
+  static const cLithoKraftAppearance appearance;
   return appearance;
 }
 
-bool LithoKraftAppearance::active(const BlockDef& def, CellState st) const {
+bool cLithoKraftAppearance::active(const BlockDef& def, CellState st) const {
   switch (roleOf(def)) {
     case SimRole::Lamp: return (st & 1) != 0;  // lamps keep "lit" in bit 0
     case SimRole::Torch: return stValue(st) != 0;
@@ -51,7 +51,7 @@ bool LithoKraftAppearance::active(const BlockDef& def, CellState st) const {
   }
 }
 
-FaceLook LithoKraftAppearance::faceLook(const BlockDef& def, CellState st, FaceSlot slot, bool active) const {
+FaceLook cLithoKraftAppearance::faceLook(const BlockDef& def, CellState st, FaceSlot slot, bool active) const {
   // Glowing trace-tree tips (kTraceTipRed = 40, kTraceTipBlue = 41): always-on
   // emissive, matched by stable block id - they are SimRole::None terrain, so
   // the role switch below would never catch them.
@@ -93,7 +93,7 @@ FaceLook LithoKraftAppearance::faceLook(const BlockDef& def, CellState st, FaceS
 // time (waferPulseParams), so the face only needs the kShadeGroundPulse tag -
 // the shader reads the blended params the mesh carries. Dead Zones use dead
 // silicon, which never takes this path: unpowered is the point.
-FaceLook LithoKraftAppearance::faceLookAt(const BlockDef& def, CellState st, FaceSlot slot, bool active,
+FaceLook cLithoKraftAppearance::faceLookAt(const BlockDef& def, CellState st, FaceSlot slot, bool active,
                                           int /*x*/, int /*y*/, int /*z*/) const {
   if (def.id == "lithokraft:silicon") return {kShadeGroundPulse, 0};
   return faceLook(def, st, slot, active);
@@ -103,7 +103,7 @@ FaceLook LithoKraftAppearance::faceLookAt(const BlockDef& def, CellState st, Fac
 // (an Emitor front facing it through a run of Laysors) takes value 1 (the renderer
 // adds a violet glow); the Etchor laser port (any side face) that the beam enters
 // through at least one Laysor turns emissive. Nothing else changes look here.
-std::optional<FaceLook> LithoKraftAppearance::faceLookCell(const CustomBlock& cell, FaceSlot slot, bool /*active*/) const {
+std::optional<FaceLook> cLithoKraftAppearance::faceLookCell(const CustomBlock& cell, FaceSlot slot, bool /*active*/) const {
   if (cell.id == kLaysor) {
     for (int d = 0; d < 4; ++d)
       if (beamFrom(cell, d)) return FaceLook{kShadeAlphaBlend, 1};
@@ -120,7 +120,7 @@ std::optional<FaceLook> LithoKraftAppearance::faceLookCell(const CustomBlock& ce
 
 // Connected via sides (same-colour via below only = top of a stack, above only = bottom, both =
 // mid, none = single; `<via>_side` when a pack lacks them) and the Redirector split faces.
-std::optional<FaceMaterial> LithoKraftAppearance::faceMaterial(const CustomBlock& cell, FaceSlot slot, bool active) const {
+std::optional<FaceMaterial> cLithoKraftAppearance::faceMaterial(const CustomBlock& cell, FaceSlot slot, bool active) const {
   const BlockDef def = cell.def();
   const std::string tex(def.tex);
   auto named = [&](const std::string& n) -> std::optional<FaceMaterial> {
@@ -145,7 +145,7 @@ std::optional<FaceMaterial> LithoKraftAppearance::faceMaterial(const CustomBlock
 
 // Redirector: transparent direction overlays over the top face (n = front, rotated with the
 // block; red and blue lanes can show together). Catchor: 7-segment readout of its match value.
-void LithoKraftAppearance::meshExtra(const CustomBlock& cell, MeshWriter& out) const {
+void cLithoKraftAppearance::meshExtra(const CustomBlock& cell, MeshWriter& out) const {
   const BlockDef def = cell.def();
   if (cell.blocks.has(cell.neighbor(0, 1, 0), kOpaque)) return;  // top face hidden
   static constexpr int lo[3] = {0, 0, 0}, hi[3] = {16, 16, 16};
@@ -345,7 +345,7 @@ void meshHighwayRamp(const CustomBlock& cell, MeshWriter& out) {
 }  // namespace
 
 // Wire: one flat piece on the cell floor, chosen from its connections and tinted by strength.
-void LithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out) const {
+void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out) const {
   const BlockRegistry& reg = cell.blocks;
   const BlockDef def = cell.def();
   if (cell.id == kAluminumRamp) { meshRamp(cell, out); return; }  // Cortana 2026-10-16
@@ -450,7 +450,7 @@ void LithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out) 
   else out.face(cell, 2, lo, hi, cell.materials.wirePiece(cell.id, piece), fl, rot);
 }
 
-void LithoKraftAppearance::bindMaterials(const BlockDef& def, const BlockModel& model, MaterialBindings& b) const {
+void cLithoKraftAppearance::bindMaterials(const BlockDef& def, const BlockModel& model, MaterialBindings& b) const {
   const int paletteRow = model.palette.valid() ? int(model.palette.value) : 0;
   switch (roleOf(def)) {
     case SimRole::Wire:
@@ -490,7 +490,7 @@ const char* const kButtonModel = R"({"asset": {"version": "ll-box-1"},
   "meshes": [{"name": "cap", "boxes": [{"min": [5, 0, 6], "max": [11, 2, 10], "material": 0}]}],
   "nodes": [{"mesh": 0}]})";
 
-const BoxModel* LithoKraftAppearance::boxModel(const BlockDef& def) const {
+const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def) const {
   static const std::optional<BoxModel> torch = BoxModel::parse(kTorchModel, nullptr);
   static const std::optional<BoxModel> sw = BoxModel::parse(kSwitchModel, nullptr);
   if (roleOf(def) == SimRole::Torch) return torch ? &*torch : nullptr;

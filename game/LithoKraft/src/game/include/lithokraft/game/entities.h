@@ -14,11 +14,11 @@ constexpr uint32_t kEntityDeceitor = 3;      ///< Deceitor visual mirror (Entity
 
 /// Item physics: gravity + engine AABB-vs-voxel collision, 8-minute despawn.
 /// Magnet + pickup are done by the game (needs the player position).
-class ItemBehavior final : public litholattice::IEntityBehavior {
+class cItemBehavior final : public litholattice::IEntityBehavior {
  public:
   using SolidFn = std::function<bool(int x, int y, int z)>;
   using FrictionFn = std::function<float(int x, int y, int z)>;
-  ItemBehavior(SolidFn isSolid, FrictionFn friction) : isSolid_(std::move(isSolid)), friction_(std::move(friction)) {}
+  cItemBehavior(SolidFn isSolid, FrictionFn friction) : isSolid_(std::move(isSolid)), friction_(std::move(friction)) {}
   void onTick(litholattice::Entity& e, double dt) override {
     ageS_ += float(dt);
     if (ageS_ > 480.f) { e.dead = true; return; }  // 8-minute despawn: 8 on its side is infinity
@@ -49,13 +49,13 @@ class ItemBehavior final : public litholattice::IEntityBehavior {
 /// to place it). At terminal velocity 24 b/s, 60 s is ~1,370 blocks of fall —
 /// far beyond any real dimension height (768 max), so no legitimate landing
 /// is affected.
-class FallingBlockBehavior final : public litholattice::IEntityBehavior {
+class cFallingBlockBehavior final : public litholattice::IEntityBehavior {
  public:
-  using SolidFn = ItemBehavior::SolidFn;
+  using SolidFn = cItemBehavior::SolidFn;
   using PlaceFn = std::function<void(int x, int y, int z, uint32_t blockId)>;
   static constexpr float kMaxFallSeconds = 60.f;
   static constexpr double kYFloor = -1024.0;  // below every dimension's bound
-  FallingBlockBehavior(SolidFn isSolid, PlaceFn place) : isSolid_(std::move(isSolid)), place_(std::move(place)) {}
+  cFallingBlockBehavior(SolidFn isSolid, PlaceFn place) : isSolid_(std::move(isSolid)), place_(std::move(place)) {}
   void onTick(litholattice::Entity& e, double dt) override {
     fallS_ += float(dt);
     if (fallS_ > kMaxFallSeconds || e.y < kYFloor) { e.dead = true; return; }
@@ -79,7 +79,7 @@ class FallingBlockBehavior final : public litholattice::IEntityBehavior {
 /// position from the AiWorld mob every frame, so the behavior does
 /// nothing (no gravity, no self-motion) — honest placeholder body
 /// until a real mob render path exists.
-class DeceitorVisualBehavior final : public litholattice::IEntityBehavior {
+class cDeceitorVisualBehavior final : public litholattice::IEntityBehavior {
  public:
   void onTick(litholattice::Entity&, double) override {}
 };
@@ -87,11 +87,11 @@ class DeceitorVisualBehavior final : public litholattice::IEntityBehavior {
 /// Factory for game entity behaviors. The game passes its solidity callback so items
 /// collide with the real world (thread-safe via SimThread::getBlock).
 inline std::unique_ptr<litholattice::IEntityBehavior> makeEntityBehavior(
-    uint32_t type, ItemBehavior::SolidFn isSolid, ItemBehavior::FrictionFn friction,
-    FallingBlockBehavior::PlaceFn place = {}) {
-  if (type == kEntityItem) return std::make_unique<ItemBehavior>(std::move(isSolid), std::move(friction));
-  if (type == kEntityFallingBlock) return std::make_unique<FallingBlockBehavior>(std::move(isSolid), std::move(place));
-  if (type == kEntityDeceitor) return std::make_unique<DeceitorVisualBehavior>();
+    uint32_t type, cItemBehavior::SolidFn isSolid, cItemBehavior::FrictionFn friction,
+    cFallingBlockBehavior::PlaceFn place = {}) {
+  if (type == kEntityItem) return std::make_unique<cItemBehavior>(std::move(isSolid), std::move(friction));
+  if (type == kEntityFallingBlock) return std::make_unique<cFallingBlockBehavior>(std::move(isSolid), std::move(place));
+  if (type == kEntityDeceitor) return std::make_unique<cDeceitorVisualBehavior>();
   return nullptr;
 }
 

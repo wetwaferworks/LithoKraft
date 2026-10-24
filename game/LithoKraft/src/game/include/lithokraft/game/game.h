@@ -136,7 +136,7 @@ class Game {
   /// across the world) at time `t` seconds. Same path for every backend and build.
   /// --bench: put the camera on a fixed, repeatable path at time `t` seconds. "orbit": a slow
   /// circle over the spawn. "stream": a straight line (+x, 32 blocks/s) out of the fixed world,
-  /// with a BenchStreamer generating / meshing / dropping columns around the camera.
+  /// with a cBenchStreamer generating / meshing / dropping columns around the camera.
   void setBenchPath(const std::string& path);
   /// Cortana 2026-10-16 (GUI overhaul tooling): open a UI view for a bench screenshot
   /// ("hud" = gameplay HUD + F3 panel, "menu", "settings", "pause") and capture the next frame
@@ -144,7 +144,7 @@ class Game {
   void debugShowUi(const std::string& view);
   void requestUiShot(const std::string& path);
   void setBenchCamera(float t);
-  BenchStreamer* benchStreamer() { return stream_.get(); }
+  cBenchStreamer* benchStreamer() { return stream_.get(); }
   /// Latest sim stats snapshot. Returns nullopt before the sim thread exists.
   /// NOTE: the returned reference aliases the triple-buffer's read slot — copy
   /// what you need immediately; the next stats_.publish() may overwrite it.
@@ -412,7 +412,7 @@ class Game {
   // First-party lithoscript population (language/population split, JD-locked):
   // settings cvars (live, archived), Decision-9 game commands, world queries.
   std::unique_ptr<SettingsCvars> settingsCvars_;
-  std::unique_ptr<GameWorldQuery> worldQuery_;
+  std::unique_ptr<cGameWorldQuery> worldQuery_;
   std::unique_ptr<litholattice::console::cDebugConsole> debugConsole_;
   std::shared_ptr<litholattice::console::ConsoleScriptContext> consoleScriptCtx_;
   std::vector<ui::UiEvent> uiEvents_;
@@ -434,12 +434,12 @@ class Game {
   int lastBridge_[3] = {INT32_MIN, INT32_MIN, INT32_MIN};
   IRenderer& renderer_;
   ResourceManager& resources_;
-  SoundDirector sound_;
+  cSoundDirector sound_;
   std::vector<SimEvent> simEvents_;
   Vec3 benchCenter_{};
   std::string benchPath_ = "orbit";
   FramebufferLayout fb_;  // --bench-scene framebuffer placement (flyover path); size 0 = none
-  std::unique_ptr<BenchStreamer> stream_;
+  std::unique_ptr<cBenchStreamer> stream_;
   std::unique_ptr<ChunkStreamer> streamer_;  // player-centered streaming (real game path)
   double uploadMs_ = 0;
   size_t uploadBytes_ = 0;

@@ -9,7 +9,7 @@
 // WHY: the viewport is how a printed chip shows its contents in-world.
 // HOW: the viewport is its own block id (kChiporViewport = 52; the plain
 //   solid Chipor is kChipor = 51), Shape::Custom so the classic mesher routes
-//   it to LithoKraftAppearance::meshCustom, which draws the opaque body
+//   it to cLithoKraftAppearance::meshCustom, which draws the opaque body
 //   (5 faces, neighbours cull against its kOpaque flag), the transparent top
 //   (kShadeGlass - the existing transparent shading path, same mode the glass
 //   blocks use) and the miniaturized model inside the top half.

@@ -11,7 +11,7 @@
 #include "litholattice/world/mesh_input.h"
 
 namespace lithokraft {
-// 0.0.1.53 [C53-1] (Proposed by JD, Built by Cortana): phase timing of BenchStreamer::update (logged with ringstats).
+// 0.0.1.53 [C53-1] (Proposed by JD, Built by Cortana): phase timing of cBenchStreamer::update (logged with ringstats).
 namespace { double g_ph[5]{}; int g_phFrames = 0; }
 
 // 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): far LOD helpers.
@@ -101,11 +101,11 @@ double MsSamples::pct(std::vector<double> v, double q) {
   return v[std::min(v.size() - 1, size_t(q * double(v.size() - 1) + 0.5))];
 }
 
-BenchStreamer::BenchStreamer(IRenderer& renderer, JobPool& pool, std::shared_ptr<const ColumnGenerator> gen, int worldChunks,
+cBenchStreamer::cBenchStreamer(IRenderer& renderer, JobPool& pool, std::shared_ptr<const ColumnGenerator> gen, int worldChunks,
                              BlockId belowWorld, int radiusChunks)
     : renderer_(renderer), pool_(pool), gen_(std::move(gen)), world_(worldChunks), radius_(radiusChunks), below_(belowWorld) {}
 
-BenchStreamer::~BenchStreamer() {
+cBenchStreamer::~cBenchStreamer() {
   while (inFlight_->load() > 0) std::this_thread::sleep_for(std::chrono::milliseconds(1));
   {  // [C53-2] give back prepared-but-unpublished slices
     std::vector<MeshOut> rest;
@@ -123,7 +123,7 @@ BenchStreamer::~BenchStreamer() {
     }
 }
 
-BenchStreamer::Second BenchStreamer::takeSecond() {
+cBenchStreamer::Second cBenchStreamer::takeSecond() {
   // JD 2026-10-16: per-ring cost (Chebyshev chunk distance from the camera) for the LOD decision.
   {
     constexpr int kEdge[4] = {-1, 16, 32, 64};
@@ -156,7 +156,7 @@ BenchStreamer::Second BenchStreamer::takeSecond() {
 
 // 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): one mesh job (snapshot under the shared lock, optional
 // LOD downsample + scale, worker-direct GPU write).
-void BenchStreamer::submitMesh(int cx, int sy, int cz, int lod, uint32_t gen, const std::shared_ptr<const BlockMaterials>& materials) {
+void cBenchStreamer::submitMesh(int cx, int sy, int cz, int lod, uint32_t gen, const std::shared_ptr<const BlockMaterials>& materials) {
   ++*inFlight_;
   pool_.submit([map = &map_, mu = mapMu_, below = below_, rend = &renderer_, materials, out = meshDone_, n = inFlight_, cx, sy, cz, lod, gen] {
     const auto t0 = Clock::now();
@@ -191,7 +191,7 @@ void BenchStreamer::submitMesh(int cx, int sy, int cz, int lod, uint32_t gen, co
   });
 }
 
-size_t BenchStreamer::update(float x, float z, const std::shared_ptr<const BlockMaterials>& materials) {
+size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const BlockMaterials>& materials) {
   // 2026-10-18 (Crew Canopy, F-B): the sparse-leaf distance origin is this streamer's camera.
   litholattice::setFoliageFocus(int(std::floor(x / 16.f)), int(std::floor(z / 16.f)));
   // Design B Stage 2: retry tombstones the upload ring refused last frame
