@@ -90,9 +90,9 @@ struct VelocitySampler {
 /// anchor (feet) and is unaffected beyond that. Velocity is the true
 /// applied movement (JD directive: no stub zero — it drives the engine's
 /// FOV kick and follow behaviour).
-class PlayerCameraTarget final : public cam::ICameraTarget {
+class cPlayerCameraTarget final : public cam::ICameraTarget {
  public:
-  PlayerCameraTarget(const Player& p, std::function<float()> eyeHeight)
+  cPlayerCameraTarget(const Player& p, std::function<float()> eyeHeight)
       : player_(p), eyeHeight_(std::move(eyeHeight)) {}
   Vec3 anchorPosition() const override { return player_.pos; }
   Vec3 eyeOffset() const override {
@@ -117,9 +117,9 @@ class PlayerCameraTarget final : public cam::ICameraTarget {
 /// eye height rides in eyeOffset, reproducing the senses adapter's
 /// tracking eye exactly. Velocity is sampled from snapshot movement the
 /// same way as the player's.
-class SnapshotCameraTarget final : public cam::ICameraTarget {
+class cSnapshotCameraTarget final : public cam::ICameraTarget {
  public:
-  explicit SnapshotCameraTarget(std::function<McpPlayerView::GameState()> snap)
+  explicit cSnapshotCameraTarget(std::function<McpPlayerView::GameState()> snap)
       : snap_(std::move(snap)) {}
   Vec3 anchorPosition() const override {
     const McpPlayerView::GameState g = snap_();
@@ -142,9 +142,9 @@ class SnapshotCameraTarget final : public cam::ICameraTarget {
 /// so first/free frames never pay for a between-ticks raycast and idle
 /// boom cameras simply ease out (the engine pulls the boom in instantly
 /// on the first engaged cast, so nothing clips).
-class GameCameraWorld final : public cam::ICameraWorld {
+class cGameCameraWorld final : public cam::ICameraWorld {
  public:
-  explicit GameCameraWorld(GameCameraHooks hooks) : hooks_(std::move(hooks)) {}
+  explicit cGameCameraWorld(GameCameraHooks hooks) : hooks_(std::move(hooks)) {}
   void setEngaged(bool e) { engaged_ = e; }
   cam::CameraRayHit castRay(Vec3 origin, Vec3 dir, float maxDist) const override {
     cam::CameraRayHit out;
@@ -255,10 +255,10 @@ struct GameCameraController::Impl {
   explicit Impl(GameCameraHooks hooks) : world(std::move(hooks)) {}
 
   cam::CameraManager manager;
-  GameCameraWorld world;
+  cGameCameraWorld world;
   std::function<McpPlayerView::GameState()> pilotSnapshot;
-  std::shared_ptr<PlayerCameraTarget> playerTarget;
-  std::shared_ptr<SnapshotCameraTarget> pilotTarget;
+  std::shared_ptr<cPlayerCameraTarget> playerTarget;
+  std::shared_ptr<cSnapshotCameraTarget> pilotTarget;
   std::shared_ptr<cam::ICamera> playerCam, orbitCam, followCam, freeCam;
   std::map<std::string, std::shared_ptr<cam::ICamera>, std::less<>> pilotCams;
   std::map<std::string, bool, std::less<>> pilotAppliedTracking;
@@ -270,9 +270,9 @@ struct GameCameraController::Impl {
 GameCameraController::GameCameraController(Player& player, GameCameraHooks hooks)
     : impl_(std::make_unique<Impl>(hooks)), player_(player) {
   impl_->pilotSnapshot = hooks.pilotSnapshot;
-  impl_->playerTarget = std::make_shared<PlayerCameraTarget>(player, hooks.playerEyeHeight);
+  impl_->playerTarget = std::make_shared<cPlayerCameraTarget>(player, hooks.playerEyeHeight);
   if (hooks.pilotSnapshot)
-    impl_->pilotTarget = std::make_shared<SnapshotCameraTarget>(hooks.pilotSnapshot);
+    impl_->pilotTarget = std::make_shared<cSnapshotCameraTarget>(hooks.pilotSnapshot);
   pilotRig_ = std::make_shared<PilotCameraRig>(hooks);
 
   cam::CameraConfig cfg;

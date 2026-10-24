@@ -43,7 +43,7 @@ int posMod(int v, int m) {
 ///  - DeadZones       -> kDeadSilicon (46, grey, unpowered); also remaps the contiguous
 ///    stone run below the top (the JSON "stone" filler/crust) so dead ground reads solid.
 /// Deterministic: seeded hash of the column position against the weights, no RNG.
-class WaferPaletteSurface final : public litholattice::procgen::ISurfaceRule {
+class cWaferPaletteSurface final : public litholattice::procgen::ISurfaceRule {
  public:
   void apply(litholattice::procgen::StageContext& ctx) const override {
     const int n = ctx.chunk.size;
@@ -93,7 +93,7 @@ class WaferPaletteSurface final : public litholattice::procgen::ISurfaceRule {
 /// world space (seamless across chunk borders), scored 1 block deep by lifting the top
 /// block. Weight-aware: the grid fades with the plains weight at blend borders.
 /// Subtle for now; the art pass comes later.
-class ScribeLineSurface final : public litholattice::procgen::ISurfaceRule {
+class cScribeLineSurface final : public litholattice::procgen::ISurfaceRule {
  public:
   void apply(litholattice::procgen::StageContext& ctx) const override {
     const int n = ctx.chunk.size;
@@ -116,7 +116,7 @@ class ScribeLineSurface final : public litholattice::procgen::ISurfaceRule {
 /// Resonator Spires: sparse crystal accents on the silicon surface (~4% of columns at full
 /// spire weight, scaled by the weight at blend borders). Deterministic hash of world
 /// coordinates, no RNG stream to keep feature seeds stable.
-class CrystalAccentSurface final : public litholattice::procgen::ISurfaceRule {
+class cCrystalAccentSurface final : public litholattice::procgen::ISurfaceRule {
  public:
   void apply(litholattice::procgen::StageContext& ctx) const override {
     const int n = ctx.chunk.size;
@@ -137,9 +137,9 @@ class CrystalAccentSurface final : public litholattice::procgen::ISurfaceRule {
 
 std::vector<std::unique_ptr<litholattice::procgen::ISurfaceRule>> waferSurfaceRules() {
   std::vector<std::unique_ptr<litholattice::procgen::ISurfaceRule>> rules;
-  rules.push_back(std::make_unique<WaferPaletteSurface>());
-  rules.push_back(std::make_unique<ScribeLineSurface>());
-  rules.push_back(std::make_unique<CrystalAccentSurface>());
+  rules.push_back(std::make_unique<cWaferPaletteSurface>());
+  rules.push_back(std::make_unique<cScribeLineSurface>());
+  rules.push_back(std::make_unique<cCrystalAccentSurface>());
   return rules;
 }
 

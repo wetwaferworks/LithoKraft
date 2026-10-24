@@ -55,9 +55,9 @@ double pct(std::vector<double> v, double q) {
 double avg(const std::vector<double>& v) { double s = 0; for (double x : v) s += x; return v.empty() ? 0 : s / double(v.size()); }
 
 /// Times every tick() of the wrapped simulation (SimThread calls it on the sim thread only).
-class TimedSimulation final : public IWorldSimulation {
+class cTimedSim final : public IWorldSimulation {
  public:
-  explicit TimedSimulation(std::unique_ptr<IWorldSimulation> s) : s_(std::move(s)) {}
+  explicit cTimedSim(std::unique_ptr<IWorldSimulation> s) : s_(std::move(s)) {}
   void scan(const ChunkMap& w) override { s_->scan(w); }
   bool canPlace(const ChunkMap& w, int x, int y, int z, BlockId b) const override { return s_->canPlace(w, x, y, z, b); }
   bool stillSupported(const ChunkMap& w, int x, int y, int z) const override { return s_->stillSupported(w, x, y, z); }
@@ -350,8 +350,8 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   const int rates[] = {32, 64, 128, 256, 512};
   for (size_t ri = 0; ri < std::size(rates); ++ri) {
     std::atomic<int> remesh{0};
-    auto timed = std::make_unique<TimedSimulation>(std::make_unique<SignalWorldSimulation>());
-    TimedSimulation* t = timed.get();
+    auto timed = std::make_unique<cTimedSim>(std::make_unique<SignalWorldSimulation>());
+    cTimedSim* t = timed.get();
     SimConfig sc;
     sc.tickRate = rates[ri]; sc.radiusChunks = 8; sc.belowWorldFill = wafer->belowWorldFill;
     sc.timingHandshake = bench.timingHandshake; sc.handshakePhasesPerCycle = bench.handshakePhases;
