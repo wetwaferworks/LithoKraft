@@ -132,6 +132,15 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       raw2 << "{\"fpsCap\": -5}\n";
       raw2.close();
       check(GameSettings::load(path).fpsCap == -1, "fps cap: settings.json load clamps -5 -> -1 (auto)");
+    check(GameSettings{}.renderer == "software", "renderer: shipped default is software (JD 2026-10-24)");
+    {
+      GameSettings rs; rs.renderer = "vulkan";
+      const std::string rp = path + ".renderer";
+      check(rs.save(rp) && GameSettings::load(rp).renderer == "vulkan", "renderer: settings.json round-trips renderer=vulkan");
+      std::ofstream(rp) << "{\"renderer\": \"dx12\"}\n";
+      check(GameSettings::load(rp).renderer == "software", "renderer: unknown value loads as software");
+      std::remove(rp.c_str());
+    }
       std::error_code ec;
       std::filesystem::remove_all(dir, ec);
     }

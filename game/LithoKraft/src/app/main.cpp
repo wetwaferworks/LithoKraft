@@ -18,6 +18,8 @@
 #endif
 #if defined(_WIN32)
 #include <io.h>  // _isatty (wheel-ink console check, 2026-10-18 JD)
+#include <process.h>  // _spawnv: renderer-switch relaunch (JD 2026-10-24)
+#include <cerrno>
 #endif
 #include <algorithm>
 #include <cstdio>
@@ -766,6 +768,38 @@ struct FrameCtx {
   double ovUpdSum = 0; int ovUpdN = 0;
 };
 
+#if !defined(__EMSCRIPTEN__)
+// JD 2026-10-24: Settings > Graphics > Renderer. After the normal exit (world saved), start the
+// same exe again with the same arguments and --renderer <new>, then this process returns.
+static std::string g_relaunchBackend;
+static void relaunchWithRenderer(int argc, char** argv, const std::string& backend) {
+  std::vector<std::string> args{argv[0]};
+  for (int i = 1; i < argc; ++i) {
+    if (!std::strcmp(argv[i], "--renderer") && i + 1 < argc) { ++i; continue; }
+    args.emplace_back(argv[i]);
+  }
+  args.emplace_back("--renderer"); args.push_back(backend);
+#if defined(_WIN32)
+  std::vector<std::string> quoted;
+  for (const auto& a : args) {
+    std::string q = "\"";
+    for (char c : a) { if (c == '"') q += '\\'; q += c; }
+    if (!q.empty() && q.back() == '\\') q += '\\';
+    q += '"'; quoted.push_back(std::move(q));
+  }
+  std::vector<const char*> av;
+  for (const auto& q : quoted) av.push_back(q.c_str());
+  av.push_back(nullptr);
+  if (_spawnv(_P_NOWAIT, argv[0], av.data()) == -1) std::fprintf(stderr, "renderer switch: relaunch failed (errno %d)\n", errno);
+#else
+  std::vector<char*> av;
+  for (auto& a : args) av.push_back(a.data());
+  av.push_back(nullptr);
+  execv(argv[0], av.data());
+  std::fprintf(stderr, "renderer switch: relaunch failed (errno %d)\n", errno);
+#endif
+}
+#endif
 static bool lkStepFrame(FrameCtx& F);
 static void lkShutdownTail(FrameCtx& F);
 #if defined(__EMSCRIPTEN__)
@@ -792,6 +826,7 @@ int main(int argc, char** argv) {
   bool mute = false;
   std::string backend = "software";  // JD's standard: the CPU path is the baseline default;
                                      // gl33/vulkan are the GPU offload, selected explicitly
+  bool rendererGiven = false;  // --renderer wins over settings.json "renderer" (JD 2026-10-24)
 #ifdef NDEBUG
   bool vkValidation = false;
 #else
@@ -979,7 +1014,7 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--pack") && i + 1 < argc) pack = argv[++i];
     else if (!std::strcmp(argv[i], "--resource-pack") && i + 1 < argc) extraPacks.emplace_back(argv[++i]);
     else if (!std::strcmp(argv[i], "--mute")) mute = true;
-    else if (!std::strcmp(argv[i], "--renderer") && i + 1 < argc) backend = argv[++i];
+    else if (!std::strcmp(argv[i], "--renderer") && i + 1 < argc) { backend = argv[++i]; rendererGiven = true; }
     else if (!std::strcmp(argv[i], "--vk-validation")) vkValidation = true;
     // Silicon Cities (Cortana 2026-10-16): --cities on|off overrides wafer.json's "enabled".
     else if (!std::strcmp(argv[i], "--cities") && i + 1 < argc) {
@@ -1020,6 +1055,7 @@ int main(int argc, char** argv) {
   // cPlayer settings (config/settings.json next to config/input.json): CLI flags win.
   const std::string settingsPath = (dataRoot(argv[0]) / "config" / "settings.json").lexically_normal().string();
   GameSettings settings = GameSettings::load(settingsPath);
+  if (!rendererGiven && benchSeconds <= 0) backend = settings.renderer;  // JD 2026-10-24: saved renderer is the startup default
   if (!hsGiven) { cfg.timingHandshake = settings.timingHandshake; cfg.handshakePhases = settings.handshakePhases; }
   if (!tpsGiven) cfg.tps = settings.tps;  // load() only yields valid modes
   if (!radiusGiven) cfg.tickRadius = settings.tickRadius;
@@ -1405,12 +1441,18 @@ int main(int argc, char** argv) {
 #endif
     while (lkStepFrame(F)) {}
     lkShutdownTail(F);
+#if !defined(__EMSCRIPTEN__)
+    if (F.game && F.game->restartRequested()) g_relaunchBackend = F.game->settings().renderer;
+#endif
     F.game.reset();   // game dies before the renderer and window, as at the old block-scope exit
     F.input.reset();
   }  // game (sim thread, mesh jobs) shuts down before the renderer and window
   display.renderer.reset();
   logInfo("exit");
   logCloseFile();
+#if !defined(__EMSCRIPTEN__)
+  if (!g_relaunchBackend.empty()) relaunchWithRenderer(argc, argv, g_relaunchBackend);
+#endif
   return 0;
 }
 

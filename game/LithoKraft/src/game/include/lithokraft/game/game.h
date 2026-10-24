@@ -181,6 +181,8 @@ class Game {
   enum class PauseState { Playing, MenuPaused, TickFrozen, HsFrozen };
   PauseState pauseState() const { return pauseState_; }
   bool quitRequested() const { return quit_; }
+  /// Settings > Graphics > Renderer changed (JD 2026-10-24): quit (the exit save runs) and relaunch with settings().renderer.
+  bool restartRequested() const { return restart_; }
   /// Launch menu state machine: boot opens the menu (world loaded, sim paused, cinematic
   /// camera); Play hands control to the player instantly, no reload.
   void enterMenu();
@@ -595,6 +597,7 @@ class Game {
   bool pausedByFocus_ = false;  // MenuPaused was entered by an alt-tab focus loss (click-in-world resumes)
   bool freePointerDown_ = false;  ///< Cortana 2026-10-15 1213: a PointerDown no widget consumed this frame
   bool paused_ = false, quit_ = false;  // paused_ mirrors pauseState_ != Playing (owned by the pause machine)
+  bool restart_ = false;  // renderer switch: relaunch after the exit save (JD 2026-10-24)
   PauseState pauseState_ = PauseState::Playing;
   bool hsFreezeLogged_ = false;  ///< the current HsFrozen episode was reported once
   uint64_t lastEntitiesTick_ = 0;  ///< sim worldTick the live entities last advanced to (ENT-3)

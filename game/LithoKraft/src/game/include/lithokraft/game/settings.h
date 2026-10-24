@@ -41,6 +41,9 @@ struct GameSettings {
   bool muted = false;
   int hudScale = 0;       ///< 0 = auto, else a fixed GUI scale (1-4)
   int displayMode = 2;    ///< index into kSettingsDisplayModes (Cortana 2026-10-15 1153: default Borderless per JD, was 0 Windowed)
+  /// Renderer backend at startup: "software" (shipped default), "gl33" or "vulkan" (JD 2026-10-24).
+  /// Settings > Graphics > Renderer saves the world and relaunches with it; --renderer still wins.
+  std::string renderer = "software";
   bool vsync = false;     ///< boot-only: the window is created with it
   int tps = 32;           ///< one of kSettingsTpsModes (kDefaultTps)
   int tickRadius = 8;     ///< simulation distance, 0..512 chunks; boot-only. F56-10 (JD 2026-10-17): default 8; 16/32 are stress-test options; env LL_SIM_TICK_RADIUS (was 16 since F55-5)

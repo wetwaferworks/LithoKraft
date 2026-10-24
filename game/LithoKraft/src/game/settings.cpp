@@ -52,6 +52,7 @@ GameSettings GameSettings::load(const std::string& path) {
   s.pbrTier = clampInt(int(json.getNum("pbrTier", s.pbrTier)), 0, 3);
   s.ambientMode = clampInt(int(json.getNum("ambientMode", s.ambientMode)), 0, 1);
   s.fpsCap = clampInt(int(json.getNum("fpsCap", s.fpsCap)), -1, 1000);  // Cortana 2026-10-15 1610: -1 = auto
+  if (const std::string r = json.getStr("renderer", s.renderer); r == "software" || r == "gl33" || r == "vulkan") s.renderer = r;  // JD 2026-10-24
   s.fpsCounter = json.getBool("fpsCounter", s.fpsCounter);
   s.timingHandshake = json.getBool("timingHandshake", s.timingHandshake);
   s.handshakePhases = clampInt(int(json.getNum("handshakePhases", s.handshakePhases)), 1, 16);
@@ -91,6 +92,7 @@ bool GameSettings::save(const std::string& path) const {
   json.add("pbrTier", litholattice::Json::number(pbrTier));
   json.add("ambientMode", litholattice::Json::number(ambientMode));
   json.add("fpsCap", litholattice::Json::number(fpsCap));
+  json.add("renderer", litholattice::Json::string(renderer));  // JD 2026-10-24
   json.add("fpsCounter", litholattice::Json::boolean(fpsCounter));  // Cortana 2026-10-15 1610
   json.add("timingHandshake", litholattice::Json::boolean(timingHandshake));
   json.add("handshakePhases", litholattice::Json::number(handshakePhases));

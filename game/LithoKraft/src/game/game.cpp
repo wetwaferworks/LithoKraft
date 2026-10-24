@@ -1929,6 +1929,10 @@ void Game::onSettingsChanged(const GameSettings& s) {
     // so the new cap applies on the next frame boundary.
     logInfo("settings: fps cap -> %d FPS (0 = off, vsync-only)", s.fpsCap);
   }
+  if (s.renderer != old.renderer) {  // JD 2026-10-24: renderer switch = save + relaunch (no live GPU teardown)
+    logInfo("settings: renderer -> %s; saving the world and relaunching", s.renderer.c_str());
+    restart_ = true; quit_ = true;
+  }
   // settings_.mesher is boot-only (world (re)load): no live action here.
   saveSettings();
   // Push UI-driven changes back into the cvars (cvar -> setting echo is

@@ -362,6 +362,10 @@ void cGameUi::openSettings(const GameSettings& cur) {
       c.setId(id);
       c.on("change", [changed, state, apply](ui::cWidget& w) { apply(*state, static_cast<ui::cCheckbox&>(w).checked()); changed(); });
     };
+    // JD 2026-10-24: renderer switch. Saves the world and relaunches the game with the new backend.
+    const int rSel = cur.renderer == "gl33" ? 1 : cur.renderer == "vulkan" ? 2 : 0;
+    drop("Renderer (saves the world and restarts)", "set-renderer", {"Software", "OpenGL 3.3", "Vulkan"}, rSel,
+         [](GameSettings& s, int i) { s.renderer = i == 1 ? "gl33" : i == 2 ? "vulkan" : "software"; });
     const int texSel = cur.texRes == 16 ? 1 : cur.texRes == 32 ? 2 : cur.texRes == 64 ? 3 : 0;
     drop("Texture resolution (F9)", "set-texres", {"Auto", "16", "32", "64"}, texSel,
          [](GameSettings& s, int i) { s.texRes = i == 1 ? 16 : i == 2 ? 32 : i == 3 ? 64 : 0; });
