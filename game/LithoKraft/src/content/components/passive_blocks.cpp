@@ -6,7 +6,7 @@
 namespace lithokraft::components {
 namespace {
 
-class Wire final : public cBlockBehavior {
+class cWire final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState s) const override {
     return std::format("{} | strength {}", d.name, stValue(s));
@@ -33,7 +33,7 @@ class cColorLamp final : public cBlockBehavior {
 }  // namespace
 
 void registerPassive(const Registrar& add) {
-  add("wire", std::make_unique<Wire>());
+  add("wire", std::make_unique<cWire>());
   add("on_off", std::make_unique<cOnOff>());
   add("color_lamp", std::make_unique<cColorLamp>());
 }

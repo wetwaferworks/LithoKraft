@@ -10,7 +10,7 @@ namespace {
 
 /// Back in -> front out, one-way. Re-boosts any input to a full 64 after a 2 / 4 / 8 / 16 tick delay.
 /// Cortana 2026-10-15 2215 (JD D4): was 1..8; encoding + lazy legacy migration in content/repeator.h.
-class Repeator final : public cCompBehavior {
+class cRepeator final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), idx = repeator::delayIndex(st), delay = repeator::kDelays[idx];
@@ -53,17 +53,17 @@ class cThresholdor final : public cCompBehavior {
 
 /// Linked (default): strongest of back / left / right / wire on top, out the front, any colour.
 /// Using it cycles the front N -> E -> S -> W.
-/// Output is always colourless: it drives red and blue Trace alike, so a Redirector transfers
+/// Output is always colourless: it drives red and blue Trace alike, so a cRedirector transfers
 /// between colours (red in, blue out and vice versa).
 /// Split (aux bit 2): red and blue Trace inputs are routed independently. The facing bits are the
 /// red lane's front, aux bits 0-1 the blue lane's; either lane can be switched off (state bits 13 /
-/// 14). A colourless input (Catchor) feeds both lanes. Using an adjacent red / blue trace switches
+/// 14). A colourless input (cCatchor) feeds both lanes. Using an adjacent red / blue trace switches
 /// to split and cycles that colour's front; using the block then cycles the red front.
-class Redirector final : public cCompBehavior {
+class cRedirector final : public cCompBehavior {
  public:
   static bool split(CellState s) { return (stAux(s) & 4) != 0; }
   static int blueFront(CellState s) { return stAux(s) & 3; }
-  // Lane off flags (split only; bits 13 / 14, free on a Redirector): an off lane takes no input and
+  // Lane off flags (split only; bits 13 / 14, free on a cRedirector): an off lane takes no input and
   // drives nothing, so a pixel's unused colour has nowhere to leak through the colourless output.
   static constexpr CellState kRedOff = 1u << 13, kBlueOff = 1u << 14;
   static CellState keep(CellState st) { return CellState(st & (kRedOff | kBlueOff)); }
@@ -77,7 +77,7 @@ class Redirector final : public cCompBehavior {
     int red = 0, blue = 0;
     for (int d = 0; d < 4; ++d) {
       // Neither live lane reads a front (its output would feed back through the colourless Trace);
-      // a colourless input (Catchor / component) feeds both lanes.
+      // a colourless input (cCatchor / component) feeds both lanes.
       if ((d == f && !(st & kRedOff)) || (d == bf && !(st & kBlueOff))) continue;
       if (in.ch[d] == 1 || in.ch[d] == 0) red = std::max(red, in.side[d]);
       if (in.ch[d] == 2 || in.ch[d] == 0) blue = std::max(blue, in.side[d]);
@@ -118,7 +118,7 @@ class Redirector final : public cCompBehavior {
 
 /// Back = data, left/right = clock. A rising clock edge with data > 0 fires a 1-tick pulse of the
 /// data strength that travels the connected wire run without decay.
-class Pulsor final : public cCompBehavior {
+class cPulsor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), data = std::min(in.back(f), kMaxSignal), clock = std::max(in.left(f), in.right(f));  // SW-H2: data is passed through as the pulse strength
@@ -136,7 +136,7 @@ class Pulsor final : public cCompBehavior {
 };
 
 /// Back = write, front = stored value (continuous), sides = clear on a rising edge. 0 = empty.
-class Memor final : public cCompBehavior {
+class cMemor final : public cCompBehavior {
  public:
   bool quiescent(CellState, const ComponentMemory&) const override { return true; }  // pure in inputs + edges
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
@@ -155,16 +155,16 @@ class Memor final : public cCompBehavior {
   }
 };
 
-/// Catchor (per-pixel address decoder). Wiring: while unwired it auto-connects to the FIRST wire
+/// cCatchor (per-pixel address decoder). Wiring: while unwired it auto-connects to the FIRST wire
 /// (red or blue) that touches one of its sides; that side becomes its input and that colour the
 /// one it catches. Output: left, right or centre (straight through) relative to the input, never
 /// up or down. The tick its input becomes exactly its match value (steady or pulse) it sends the
-/// caught value as a one-tick pulse out of the output side (a colour lamp shows it; a Redirector
+/// caught value as a one-tick pulse out of the output side (a colour lamp shows it; a cRedirector
 /// there takes it as its input). The line itself is never driven, so the signal carries on.
 /// State: value = match (1-64, 0 = disarmed), facing = direction of travel (input is behind it),
 /// aux bits 0-1 = output (0 centre, 1 left, 2 right, 3 = not wired yet), aux bit 2 = blue input.
 /// Use cycles the output (centre -> left -> right); sneak + use steps the match value.
-class Catchor final : public cCompBehavior {
+class cCatchor final : public cCompBehavior {
  public:
   static bool wired(CellState s) { return (stAux(s) & 3) != 3; }
   // Same inputs and nothing fired last tick: prevIn already equals the match result, out stays 0.
@@ -344,9 +344,9 @@ class cOverclockor final : public cCompBehavior {
 
 /// cPortor (lithography port). Defines input or output for a chip face.
 /// Simple by design: use toggles input/output. Wire color auto-detected from
-/// adjacent Trace (like Catchor). When the Lithographer prints a chip, each
+/// adjacent Trace (like cCatchor). When the Lithographer prints a chip, each
 /// cPortor maps to one face. 6 faces = 6 bits = 64 configurations.
-/// State: aux bit 0 = output (1) or input (0), aux bit 2 = blue (like Catchor).
+/// State: aux bit 0 = output (1) or input (0), aux bit 2 = blue (like cCatchor).
 class cPortor final : public cCompBehavior {
  public:
   bool quiescent(CellState, const ComponentMemory&) const override { return true; }
@@ -381,7 +381,7 @@ class cPortor final : public cCompBehavior {
 /// cFusor (circuit breaker). Trips when input signal exceeds its threshold (1-64).
 /// When tripped, output drops to 0 until reset. Protects chips from overload.
 /// State: value = trip threshold (1-64), aux bit 0 = tripped.
-/// Use cycles threshold? No — sneak+use sets threshold (like Catchor match).
+/// Use cycles threshold? No — sneak+use sets threshold (like cCatchor match).
 /// Use toggles reset (untrip).
 class cFusor final : public cCompBehavior {
  public:
@@ -420,12 +420,12 @@ class cFusor final : public cCompBehavior {
 };
 
 void registerLogic(const Registrar& add) {
-  add("repeator", std::make_unique<Repeator>());
+  add("repeator", std::make_unique<cRepeator>());
   add("thresholdor", std::make_unique<cThresholdor>());
-  add("redirector", std::make_unique<Redirector>());
-  add("pulsor", std::make_unique<Pulsor>());
-  add("memor", std::make_unique<Memor>());
-  add("catchor", std::make_unique<Catchor>());
+  add("redirector", std::make_unique<cRedirector>());
+  add("pulsor", std::make_unique<cPulsor>());
+  add("memor", std::make_unique<cMemor>());
+  add("catchor", std::make_unique<cCatchor>());
   add("signal_transmittor", std::make_unique<cSignalTransmittor>());
   add("signal_receivor", std::make_unique<cSignalReceivor>());
   add("dish", std::make_unique<cDish>());
