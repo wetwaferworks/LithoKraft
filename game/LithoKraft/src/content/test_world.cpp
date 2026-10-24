@@ -4,6 +4,7 @@
 #include <cmath>
 #include <map>
 #include "lithokraft/content/blocks.h"
+#include "lithokraft/content/circuit_scene.h"  // 2026-10-24 Examples section
 #include "lithokraft/content/repeator.h"  // WaferBeta tint demo
 #include "litholattice/world/block.h"
 
@@ -28,6 +29,31 @@ const char* glyph(char c) {
             "#.."
             "#.."
             "###"},
+      {'D', "##."
+            "#.#"
+            "#.#"
+            "#.#"
+            "##."},
+      {'F', "###"
+            "#.."
+            "##."
+            "#.."
+            "#.."},
+      {'U', "#.#"
+            "#.#"
+            "#.#"
+            "#.#"
+            "###"},
+      {'Y', "#.#"
+            "#.#"
+            ".#."
+            ".#."
+            ".#."},
+      {'-', "..."
+            "..."
+            "###"
+            "..."
+            "..."},
       {'E', "###"
             "#.."
             "##."
@@ -289,6 +315,63 @@ TestWorldLayout buildTestWorld(ChunkMap& w, int sx, int floorY, int sz, int scre
   L.spawnZ = float(sz) + 0.5f;
   L.spawnYaw = 1.5707963f;
   return L;
+}
+
+std::vector<TestWorldExample> buildTestWorldExamples(ChunkMap& w, const TestWorldLayout& tw, int sx, int sz, int worldBlocks) {
+  // Grid of slots north (+Z) of the test world (its pad ends a few blocks past the ROM screen).
+  // Each slot: a flat Wafer pad (air cleared above), a ceramic label on the floor at its south
+  // edge, the scene built by its own bench code. Slots are kSlotW apart so nothing couples.
+  constexpr int kSlotW = 80, kSlotD = 104, kCols = 6, kClear = 72;
+  const int floorY = tw.floorY, y = floorY + 1;
+  const int gx0 = sx - 40, gz0 = tw.screen.z + 24;
+  struct Def { const char* label; int w, d; };
+  // order: memory / display first, then screens, routing, machines, benchmarks (wire torture last: deepest)
+  const Def defs[] = {{"DISPLAY", 1, 1},    {"FRAMEBUFFER", 1, 1}, {"FB WALL", 1, 1},  {"WALL PIXEL", 1, 1}, {"PATTERN", 1, 1},
+                      {"SAWTOOTH", 1, 1},   {"REDIRECTOR", 1, 1},  {"LITHO", 1, 1},    {"CIRCUITS", 1, 1},  {"WIRE TORTURE", 1, 2}};
+  std::vector<TestWorldExample> out;
+  int col = 0, row = 0;
+  for (const Def& d : defs) {
+    if (col >= kCols) { col = 0; ++row; }
+    TestWorldExample e;
+    e.label = d.label;
+    e.x0 = gx0 + col * kSlotW; e.z0 = gz0 + row * kSlotD;
+    e.x1 = e.x0 + kSlotW * d.w - 9; e.z1 = e.z0 + kSlotD * d.d - 9;
+    ++col;
+    if (e.x0 < 1 || e.z0 < 1 || e.x1 >= worldBlocks - 1 || e.z1 >= worldBlocks - 1) {
+      e.note = "skipped: slot outside the loaded world";
+      out.push_back(std::move(e));
+      continue;
+    }
+    for (int z = e.z0; z <= e.z1; ++z)
+      for (int x = e.x0; x <= e.x1; ++x) {
+        for (int yy = y; yy <= floorY + kClear; ++yy) w.set(x, yy, z, kAir);
+        for (int yy = floorY - 3; yy <= floorY; ++yy) w.set(x, yy, z, kWaferSilicon);
+      }
+    int lx = e.x0 + 3 + 4 * int(e.label.size()) - 1;  // text reads left to right for a player facing +Z
+    for (char c : e.label) {
+      if (const char* gl = glyph(c))
+        for (int r = 0; r < 5; ++r)
+          for (int k = 0; k < 3; ++k)
+            if (gl[r * 3 + k] == '#') w.set(lx - k, floorY, e.z0 + 6 - r, kCeramic);
+      lx -= 4;
+    }
+    const int bx = e.x0 + 8, bz = e.z0 + 14;  // scene origin inside the slot
+    const std::string_view L = e.label;
+    if (L == "DISPLAY") e.blocks = buildDisplayScene(w, bx, y, bz, 32);
+    else if (L == "FRAMEBUFFER") e.blocks = buildFramebufferScene(w, bx, y, bz, 64).blocks;
+    else if (L == "FB WALL") e.blocks = buildFramebufferWall(w, bx, y, bz, 32).blocks;
+    else if (L == "WALL PIXEL") e.blocks = buildWallPixelScene(w, bx + 4, y, bz + 12, 16, 8).blocks;
+    else if (L == "PATTERN") e.blocks = buildPatternWall(w, bx + 4, y, bz + 22, 32, "checkers").blocks;
+    else if (L == "SAWTOOTH") e.blocks = buildSawtoothWall(w, bx + 4, y, bz + 12, 32, 8, "circles").blocks;
+    else if (L == "REDIRECTOR") e.blocks = buildRedirectorScene(w, bx + 2, y, bz + 6, 24);
+    else if (L == "LITHO") e.blocks = buildLithoMachine(w, bx + 16, y, bz + 12, false) + buildLithoMachine(w, bx + 40, y, bz + 12, true);
+    else if (L == "CIRCUITS") e.blocks = buildCircuitScene(w, bx, y, bz, 48);
+    else if (L == "WIRE TORTURE") e.blocks = buildWireTorture(w, bx + 4, y, bz).blocks;
+    e.placed = true;
+    if (L == "LITHO") e.note = "left unwired, right wired reference";
+    out.push_back(std::move(e));
+  }
+  return out;
 }
 
 }  // namespace lithokraft

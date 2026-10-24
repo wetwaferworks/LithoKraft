@@ -1122,6 +1122,9 @@ int main(int argc, char** argv) {
   }
 #endif
   if (cfg.benchScene == "testworld") {
+#ifdef LK_PLAYTEST_SPAWN
+    cfg.testWorldExamples = true;  // 2026-10-24 (JD): Examples section, playtest builds only
+#endif
     cfg.sceneSize = romScreen >= 64 ? 64 : 32;
     // The test world is rebuilt every launch; a save would restore its columns over the fresh
     // build (and never touch JD's real world). Fresh every time unless --save-dir is given.

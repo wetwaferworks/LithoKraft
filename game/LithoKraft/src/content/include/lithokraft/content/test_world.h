@@ -29,4 +29,10 @@ std::vector<BlockId> testWorldKit(int n);
 /// Build the test world around (sx, sz) with its pad top at floorY. screenSize 32 (2x) or 64 (4x).
 TestWorldLayout buildTestWorld(ChunkMap& world, int sx, int floorY, int sz, int screenSize);
 
+/// 2026-10-24 (JD, playtest builds only): the Examples section. Every historical bench scene,
+/// built by its own scene code, on flat labeled pads in a grid north (+Z) of the test world.
+/// worldBlocks = loaded square [0, worldBlocks); a slot that does not fit is skipped, not clipped.
+struct TestWorldExample { std::string label; int x0 = 0, z0 = 0, x1 = 0, z1 = 0, blocks = 0; bool placed = false; std::string note; };
+std::vector<TestWorldExample> buildTestWorldExamples(ChunkMap& world, const TestWorldLayout& tw, int sx, int sz, int worldBlocks);
+
 }  // namespace lithokraft

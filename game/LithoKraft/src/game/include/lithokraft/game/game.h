@@ -91,6 +91,7 @@ struct GameConfig {
   std::string benchScene = "default";  // "circuits" / "display": stress scenes built next to the spawn
   int sceneSize = 120;
   int sceneRows = 16;
+  bool testWorldExamples = false;  // 2026-10-24 (JD): playtest builds add the Examples section to the test world
   std::string pattern = "checkers";  // pattern-wall: checkers | circles  // wall-pixel: rows (1-16)
   bool capture = false;      // --capture (playtest 2026-10-16): F3 / controls / hint text off, for filming
   bool screenVertical = false;          // --screen-orient vertical: framebuffer as an upright wall                  // bench scene footprint (blocks per side)

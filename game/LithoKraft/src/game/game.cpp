@@ -979,6 +979,7 @@ void Game::loadActive() {
   const auto t0 = Clock::now();
   if (cfg_.benchScene != "default") {  // bench scenes: load and tick the whole scene
     cfg_.worldChunks = std::max(cfg_.worldChunks, cfg_.sceneSize / 16 + 12);
+    if (cfg_.testWorldExamples) cfg_.worldChunks = std::max(cfg_.worldChunks, 36);  // 2026-10-24: room for the Examples grid
     cfg_.tickRadius = std::max(cfg_.tickRadius, cfg_.sceneSize / 32 + 4);
   }
   Spawn sp = active_->load(pool_, cfg_.worldChunks);
@@ -1004,6 +1005,11 @@ void Game::loadActive() {
     logInfo("test world: crystal leaf grove (8 trees, red/blue-dominant) x %d..%d, y %d..%d, z %d..%d", tw.leafDemoX - 28, tw.leafDemoX,
             tw.floorY + 1, tw.floorY + 7, tw.leafDemoZ - 1, tw.leafDemoZ + 10);  // 2026-10-16 JD leaf pass
     for (BlockId b : tw.missing) logError("test world: could not place '%s'", blockRegistry().def(b).name.data());
+    if (cfg_.testWorldExamples) {  // 2026-10-24 (JD): playtest builds only
+      for (const TestWorldExample& e : buildTestWorldExamples(active_->chunks, tw, sx, sz, cfg_.worldChunks * 16))
+        logInfo("test world examples: %-12s x %d..%d z %d..%d  %s %d blocks%s%s", e.label.c_str(), e.x0, e.x1, e.z0, e.z1,
+                e.placed ? "placed" : "SKIPPED", e.blocks, e.note.empty() ? "" : " | ", e.note.c_str());
+    }
     roms.push_back(tw.screen);
   } else if (cfg_.benchScene == "framebuffer" && !cfg_.screenVertical) {
     const int cx = int(sp.x), cz = int(sp.z) + 8, n = cfg_.sceneSize;
