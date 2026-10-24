@@ -9,7 +9,7 @@
 #include "litholattice/procgen/ramp_shape.h"  // Cortana 2026-10-16: Aluminum Ramp
 
 #include <cstdlib>
-static int llP2PerfOff() { static const int v = [] { const char* e = std::getenv("LL_P2_PERF_OFF"); return e ? int(std::strtol(e, nullptr, 0)) : 0; }(); return v; }  // Cortana 2026-10-16 1520: A/B perf switch (render/display only)
+[[maybe_unused]] static int llP2PerfOff() { static const int v = [] { const char* e = std::getenv("LL_P2_PERF_OFF"); return e ? int(std::strtol(e, nullptr, 0)) : 0; }(); return v; }  // Cortana 2026-10-16 1520: A/B perf switch (render/display only)
 
 namespace lithokraft {
 namespace {

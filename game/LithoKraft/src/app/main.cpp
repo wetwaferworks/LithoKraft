@@ -1283,7 +1283,6 @@ int main(int argc, char** argv) {
     if (benchSeconds <= 0) game.enterMenu();
 
     F.tStart = Clock::now(); F.tLast = F.tStart; F.tTitle = F.tStart; F.tPerf = F.tStart;
-    auto& tStart = F.tStart; auto& tLast = F.tLast; auto& tTitle = F.tTitle; auto& tPerf = F.tPerf;
     constexpr double kBenchWarmup = 3.0;  // world load + first meshes settle before measuring
     // Cortana 2026-10-16 (BUG-0004): --ui-shot only ran inside a bench, so a plain
     // --ui-shot launch never wrote its PNG and never exited. It now implies a short
@@ -1295,7 +1294,7 @@ int main(int argc, char** argv) {
     if (benchSeconds > 0) runSeconds = kBenchWarmup + benchSeconds;
     if (benchSeconds > 0) game.setBenchPath(benchPath);
     if (benchSeconds > 0 && !uiShot.empty()) game.debugShowUi(uiView);
-    F.uiShotDone = uiShot.empty() || benchSeconds <= 0; auto& uiShotDone = F.uiShotDone;
+    F.uiShotDone = uiShot.empty() || benchSeconds <= 0;
     const std::string rname = renderer->name();
     const std::string present = rname == "Vulkan"    ? renderer->presentMode()
                                 : rname == "software" ? renderer->presentMode() + (vsync ? " (swap-interval-1)" : " (swap-interval-0)")
@@ -1303,13 +1302,10 @@ int main(int argc, char** argv) {
     logInfo("present: %s (%s)", present.c_str(), renderer->name());
     BenchRun& br = F.br;
     br.memStart = processWorkingSetBytes();
-    double &msInput = F.msInput, &msUpdate = F.msUpdate, &msRender = F.msRender, &msPresent = F.msPresent;
-    auto& perfMs = F.perfMs; auto& benchMs = F.benchMs;  // this second's frame times (p99), the bench's
-    int &frames = F.frames, &perfFrames = F.perfFrames, &hitches = F.hitches; double &worstMs = F.worstMs, &perfSumMs = F.perfSumMs, &perfMaxMs = F.perfMaxMs, &avgFrameMs = F.avgFrameMs;
     // Cortana 2026-10-15 1925 (bug: test windows steal focus): benches are unattended -- never
   // force the foreground (raiseAndFocus toggles topmost to beat the Windows foreground lock).
   if (benchSeconds <= 0) window->raiseAndFocus();  // launch-focus fix: come to the front on first show
-    F.wasFocused = window->focused(); auto& wasFocused = F.wasFocused;
+    F.wasFocused = window->focused();
     // Frame pacer (render.fps_cap, D-M3 game-side wiring 2026-10-13):
     // configured from Settings at init (0 = off, vsync-only — the default)
     // and reconfigured live whenever the settings value changes (the
@@ -1323,14 +1319,11 @@ int main(int argc, char** argv) {
     const int initialCap = benchSeconds > 0 ? 0 : settings.fpsCap;
     pacer.setCapFps(initialCap > 0 ? initialCap : 0);
     F.appliedFpsCap = initialCap; auto& appliedFpsCap = F.appliedFpsCap;
-    auto& autoFrames = F.autoFrames; auto& autoRenderSum = F.autoRenderSum;
     // Debug Overlay (Cortana 2026-10-15 1610, ENGINE): the full strip only in
     // Debug builds, --bench runs, or creative mode. Survival may show only
     // the minimal FPS/TPS counter (settings fpsCounter, off by default).
     auto& ovMs = F.ovMs;  ovMs.reserve(240);  // ring for the 1% low
-    auto& ovHead = F.ovHead; F.ovPrev = Clock::now(); auto& ovPrev = F.ovPrev; auto& ovFps = F.ovFps; auto& ovFrameMs = F.ovFrameMs; auto& ovFrames = F.ovFrames; F.ovT = F.ovPrev; auto& ovT = F.ovT;
-    auto& ovSaved = F.ovSaved;
-    auto& ovUpdSum = F.ovUpdSum; auto& ovUpdN = F.ovUpdN;  // F56-4 (Cortana 2026-10-17): main-thread update ms for the perf readout
+    F.ovPrev = Clock::now(); F.ovT = F.ovPrev;
     if (appliedFpsCap > 0) logInfo("fps cap: %d FPS (render.fps_cap)", appliedFpsCap);
     litholattice::locktiming::markMainThread();  // 0.0.1.60 diagnostic lock timing (LL_LOCK_TIMING=1; Proposed by JD; co-implemented by JD and Cortana)
     // ---- Three-way split timing handshake (LL_THREEWAY=1, default OFF; Vulkan only). Proposed by JD; co-implemented by JD and Cortana.
@@ -1685,7 +1678,6 @@ static void lkShutdownTail(FrameCtx& F) {
   Game& game = *F.game;
   RenderWorker& rw = F.rw;
   SwRenderWorker& sw = F.sw;
-  const bool& threewayOn = F.threewayOn;
   const bool& swThreewayOn = F.swThreewayOn;
   double& benchSeconds = F.benchSeconds;
   const std::string& benchPath = F.benchPath;
