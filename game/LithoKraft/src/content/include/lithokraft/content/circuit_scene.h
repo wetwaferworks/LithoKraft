@@ -19,6 +19,13 @@ int buildLithoMachine(ChunkMap& world, int cx, int y, int cz, bool wired);
 /// strength down a wire into a row of 64-color lamps: an animated screen. size x size footprint;
 /// (size - 8) / 4 banks of size - 6 lamps. Returns the number of blocks placed.
 int buildDisplayScene(ChunkMap& world, int x0, int y, int z0, int size);
+/// 2026-10-24 test area Clocks pad: the display scene's self-running ring clock (four Repeators
+/// at delay index delayIndex 0..3 = 2/4/8/16 ticks, kicked once by a Pulsor) with two taps:
+/// a pulse lamp at (x0+4, y, z0+5) and a Fast Latch at (x0+6, y, z0+4) toggling a lamp at
+/// (x0+6, y, z0+6) once per lap. Footprint 7 x 7 from (x0, z0). Returns blocks placed.
+int buildRingClock(ChunkMap& world, int x0, int y, int z0, int delayIndex);
+/// Measured lap period in ticks (= 4 x delay; the latch lamp blinks at twice this) for each delay index (signal selftest checks these).
+inline constexpr int kRingClockPeriod[4] = {8, 16, 32, 64};
 
 /// Where the framebuffer scene put things (for the flyover camera and the viewing stand).
 struct FramebufferLayout { int x0 = 0, z0 = 0, y = 0, size = 0, screenZ0 = 0, screenZ1 = 0, cacheZ = 0, columns = 0, blocks = 0;

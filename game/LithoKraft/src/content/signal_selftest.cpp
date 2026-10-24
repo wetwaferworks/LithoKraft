@@ -359,6 +359,32 @@ int runSignalSelfTest() {
     std::printf("  display scene: lamp lit %d / 400 ticks, %d flashes\n", litTicks, edges);
     check(edges >= 8, "display scene: ring clock runs and the bank fires its stored colour repeatedly");
   }
+  {  // 2026-10-24 test area Clocks pad: each ring clock self-runs; the latch toggles once per lap.
+    for (int di = 0; di < 4; ++di) {
+      ChunkMap cw;
+      cw.setRegistry(&blockRegistry());
+      for (int cz = 0; cz < 2; ++cz)
+        for (int cx = 0; cx < 2; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; cw.insert(std::move(col)); }
+      for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x) cw.set(x, y - 1, z, kWaferSilicon);
+      buildRingClock(cw, 2, y, 2, di);
+      cSignalSim cs;
+      cs.scan(cw);
+      int toggles = 0, last = -1, period = -1, pulses = 0; bool stable = true, prevOn = false, prevLamp = false;
+      for (int i = 0; i < 800; ++i) {
+        cs.tick(cw, 0, 0, 100, [](int, int, int) {});
+        const bool on = stOn(cw.getState(2 + 6, y, 2 + 4));
+        if (on != prevOn) {
+          if (last >= 0 && toggles >= 2) { const int p = i - last; if (period < 0) period = p; else if (p != period) stable = false; }
+          last = i; ++toggles; prevOn = on;
+        }
+        const bool lamp = stValue(cw.getState(2 + 4, y, 2 + 5)) > 0;
+        pulses += lamp && !prevLamp; prevLamp = lamp;
+      }
+      std::printf("  clocks pad: delay %d -> latch toggled %d times in 800 ticks, lap period %d ticks (%s), pulse lamp %d flashes\n",
+                  repeator::kDelays[di], toggles, period, stable ? "steady" : "UNSTEADY", pulses);
+      check(toggles >= 4 && stable && period == kRingClockPeriod[di], "clocks pad: ring clock self-runs at its labelled period");
+    }
+  }
   {  // Framebuffer scene: the controller ring sequences the frame cache and the screen scrolls.
     ChunkMap fw;
     fw.setRegistry(&blockRegistry());

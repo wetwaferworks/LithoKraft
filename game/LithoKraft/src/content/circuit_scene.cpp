@@ -4,6 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include "lithokraft/content/blocks.h"
+#include "lithokraft/content/repeator.h"
 
 namespace lithokraft {
 
@@ -64,6 +65,25 @@ int buildDisplayScene(ChunkMap& w, int x0, int y, int z0, int size) {
     for (int x = px + 1; x <= px + width; ++x) put(x, y, z + 1, kRedTrace);
     for (int x = px + 2; x <= px + width; ++x) put(x, y, z + 2, kColorLamp64);
   }
+  return placed;
+}
+int buildRingClock(ChunkMap& w, int x0, int y, int z0, int delayIndex) {
+  constexpr int N = 0, E = 1, S = 2, W = 3;
+  int placed = 0;
+  auto put = [&](int x, int z, BlockId b, int facing = 0) {
+    if (w.set(x, y, z, b)) { if (facing) w.setState(x, y, z, makeState(0, facing)); ++placed; }
+  };
+  auto rep = [&](int x, int z, int f) { if (w.set(x, y, z, kRepeator)) { w.setState(x, y, z, repeator::encode(0, f, delayIndex, false)); ++placed; } };
+  // Same layout as the display scene's clock (kick Pulsor + 3 x 3 ring), shifted so the kick fits.
+  const int ox = x0 + 4, oz = z0 + 1;
+  put(ox - 3, oz, kRedTorch); put(ox - 2, oz, kRedTrace); put(ox - 1, oz, kPulsor, E);
+  put(ox - 1, oz + 1, kBlueTrace); put(ox - 2, oz + 1, kBlueTorch);
+  put(ox, oz, kBlueTrace);         rep(ox + 1, oz, E);
+  put(ox + 2, oz, kBlueTrace);     rep(ox + 2, oz + 1, S);
+  put(ox + 2, oz + 2, kBlueTrace); rep(ox + 1, oz + 2, W);
+  put(ox, oz + 2, kBlueTrace);     rep(ox, oz + 1, N);
+  put(ox, oz + 3, kBlueTrace); put(ox, oz + 4, kLamp);                          // pulse tap
+  put(ox + 2, oz + 3, kFastLatch, S); put(ox + 2, oz + 4, kRedTrace); put(ox + 2, oz + 5, kLamp);  // toggle tap
   return placed;
 }
 FramebufferLayout buildFramebufferScene(ChunkMap& w, int x0, int y, int z0, int size) {

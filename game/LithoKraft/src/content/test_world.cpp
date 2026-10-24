@@ -124,6 +124,41 @@ const char* glyph(char c) {
             "###"
             "###"
             "#.#"},
+      {'4', "#.#"
+            "#.#"
+            "###"
+            "..#"
+            "..#"},
+      {'5', "###"
+            "#.."
+            "###"
+            "..#"
+            "###"},
+      {'6', "###"
+            "#.."
+            "###"
+            "#.#"
+            "###"},
+      {'7', "###"
+            "..#"
+            "..#"
+            "..#"
+            "..#"},
+      {'8', "###"
+            "#.#"
+            "###"
+            "#.#"
+            "###"},
+      {'9', "###"
+            "#.#"
+            "###"
+            "..#"
+            "###"},
+      {'X', "#.#"
+            "#.#"
+            ".#."
+            "#.#"
+            "#.#"},
       {'0', "###"
             "#.#"
             "#.#"
@@ -327,7 +362,8 @@ std::vector<TestWorldExample> buildTestWorldExamples(ChunkMap& w, const TestWorl
   struct Def { const char* label; int w, d; };
   // order: memory / display first, then screens, routing, machines, benchmarks (wire torture last: deepest)
   const Def defs[] = {{"DISPLAY", 1, 1},    {"FRAMEBUFFER", 1, 1}, {"FB WALL", 1, 1},  {"WALL PIXEL", 1, 1}, {"PATTERN", 1, 1},
-                      {"SAWTOOTH", 1, 1},   {"REDIRECTOR", 1, 1},  {"LITHO", 1, 1},    {"CIRCUITS", 1, 1},  {"WIRE TORTURE", 1, 2}};
+                      {"SAWTOOTH", 1, 1},   {"REDIRECTOR", 1, 1},  {"LITHO", 1, 1},    {"CIRCUITS", 1, 1},  {"WIRE TORTURE", 1, 2},
+                      {"CLOCKS", 1, 1},     {"PIXEL DISPLAY", 2, 1}};
   std::vector<TestWorldExample> out;
   int col = 0, row = 0;
   for (const Def& d : defs) {
@@ -367,6 +403,29 @@ std::vector<TestWorldExample> buildTestWorldExamples(ChunkMap& w, const TestWorl
     else if (L == "LITHO") e.blocks = buildLithoMachine(w, bx + 16, y, bz + 12, false) + buildLithoMachine(w, bx + 40, y, bz + 12, true);
     else if (L == "CIRCUITS") e.blocks = buildCircuitScene(w, bx, y, bz, 48);
     else if (L == "WIRE TORTURE") e.blocks = buildWireTorture(w, bx + 4, y, bz).blocks;
+    else if (L == "CLOCKS") {
+      // Four self-running Repeator ring clocks (delay 2 / 4 / 8 / 16), each labelled with its
+      // measured lap period in ticks ("T"); pulse lamp left, Fast Latch toggle lamp right.
+      for (int i = 0; i < 4; ++i) {
+        const int cx = bx + 2 + 14 * i, cz = bz + 10;
+        e.blocks += buildRingClock(w, cx, y, cz, i);
+        const std::string t = std::to_string(kRingClockPeriod[i]) + "T";
+        int tx = cx + 1 + 4 * int(t.size()) - 1;
+        for (char c : t) {
+          if (const char* gl = glyph(c))
+            for (int r = 0; r < 5; ++r)
+              for (int k = 0; k < 3; ++k)
+                if (gl[r * 3 + k] == '#') w.set(tx - k, floorY, cz - 2 - r, kCeramic);
+          tx -= 4;
+        }
+      }
+      e.note = "ring clocks, periods measured by the signal selftest";
+    } else if (L == "PIXEL DISPLAY") {
+      // Small working displays (the display bench scene: ring clock -> Pulsor reads Memor -> row of
+      // Color Lamps): a 4-row and an 8-row; the east half of the pad is left blank for bigger ones.
+      e.blocks = buildDisplayScene(w, bx, y, bz, 24) + buildDisplayScene(w, bx, y, bz + 30, 40);
+      e.note = "4-row + 8-row display (one colour per row); east half blank for wiring";
+    }
     e.placed = true;
     if (L == "LITHO") e.note = "left unwired, right wired reference";
     out.push_back(std::move(e));
