@@ -7,8 +7,24 @@
 
 namespace lithokraft {
 
+namespace {
+// 2026-10-24 (JD): "Any block that's classified as a partial block is going to need a support block
+// unless it's partial and solid." Partial = Shape other than Cube, from the registry. Partial and
+// non-solid blocks already have their own rules (flat wires: wireSupported; LEDs, switches, plants:
+// kAttachable / canAttach), so the data-driven rule only covers ones that have neither. The Memor
+// is a full solid cube by its data, so JD's explicit ruling puts it on a MARKED per-block list.
+bool needsFloorSupport(BlockId b) {
+  const BlockDef& d = blockRegistry().def(b);
+  if (b == kAir || isFlatWire(b) || (d.flags & kAttachable)) return false;
+  if (d.shape != Shape::Cube && !(d.flags & kSolid)) return true;  // partial, non-solid
+  return b == kMemor;  // MARKED per-block list (JD 2026-10-24): Memor needs a solid block beneath
+}
+bool floorSupported(const ChunkMap& w, int x, int y, int z) { return blockRegistry().has(w.get(x, y - 1, z), kSolid); }
+}  // namespace
+
 bool cSignalWorldSim::canPlace(const ChunkMap& w, int x, int y, int z, BlockId block) const {
   if (isFlatWire(block)) return wireSupported(w, x, y, z);
+  if (needsFloorSupport(block)) return floorSupported(w, x, y, z);  // 2026-10-24: Memor floor-only
   // Proposed by JD, Built by Cortana: the Highway Ramp needs room for its second half (any side).
   if (block == kHighwayRamp)
     return w.get(x + 1, y, z) == kAir || w.get(x - 1, y, z) == kAir || w.get(x, y, z + 1) == kAir || w.get(x, y, z - 1) == kAir;
@@ -16,7 +32,9 @@ bool cSignalWorldSim::canPlace(const ChunkMap& w, int x, int y, int z, BlockId b
 }
 
 bool cSignalWorldSim::stillSupported(const ChunkMap& w, int x, int y, int z) const {
-  return !isFlatWire(w.get(x, y, z)) || wireSupported(w, x, y, z);
+  const BlockId b = w.get(x, y, z);
+  if (needsFloorSupport(b)) return floorSupported(w, x, y, z);  // 2026-10-24: pops (drops) like a Trace
+  return !isFlatWire(b) || wireSupported(w, x, y, z);
 }
 
 bool cSignalWorldSim::canAttach(const ChunkMap& w, int x, int y, int z, BlockId block, int face) const {

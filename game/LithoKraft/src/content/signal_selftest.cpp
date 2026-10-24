@@ -909,6 +909,23 @@ int runSignalSelfTest() {
     check(onFloor && underCeiling && !floating && viaFree && kept && !sim.stillSupported(sw, 2, y, 2),
           "wire support: on a block or under a ceiling only; vias need none; removing the support un-supports it");
   }
+  {  // 2026-10-24 (JD): the Memor needs a solid block beneath it; losing it pops the Memor.
+    ChunkMap sw;
+    sw.setRegistry(&blockRegistry());
+    { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; sw.insert(std::move(col)); }
+    cSignalWorldSim sim;
+    sw.set(2, y - 1, 2, kWaferSilicon); sw.set(4, y + 1, 2, kGlass); sw.set(8, y, 2, kWaferSilicon);
+    const bool onFloor = sim.canPlace(sw, 2, y, 2, kMemor);
+    const bool underCeiling = sim.canPlace(sw, 4, y, 2, kMemor), floating = sim.canPlace(sw, 6, y, 2, kMemor);
+    const bool besideWall = sim.canPlace(sw, 7, y, 2, kMemor);  // a wall beside it is no support
+    sw.set(2, y, 2, kMemor);
+    const bool kept = sim.stillSupported(sw, 2, y, 2);
+    sw.set(2, y - 1, 2, kAir);
+    check(onFloor && !underCeiling && !floating && !besideWall && kept && !sim.stillSupported(sw, 2, y, 2),
+          "memor support: placeable only on top of a solid block; removing the block beneath un-supports it (pops)");
+    const bool fullStillFree = sim.canPlace(sw, 6, y, 2, kStone);
+    check(fullStillFree, "memor support: full blocks keep free placement");
+  }
   {  // 2026-10-16 (JD): a Red/Blue LED hangs from the bottom face of a block (attach face 2).
     ChunkMap sw;
     sw.setRegistry(&blockRegistry());
