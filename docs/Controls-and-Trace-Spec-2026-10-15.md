@@ -130,3 +130,13 @@ game/game.cpp handleWorldActions, game/actions.cpp, engine sim_thread.h, player_
   - Reward (placeholder): +2% of the static needed for the next level (staticTotalForLevel(L+1) - staticTotalForLevel(L)), minimum 1. Scaled by Charge sign later (open).
   - New save fields (player.dat, version bump needed): `prayerDay` (u32) and `prayersToday` (u8). Charge already rides on the stat block, if stats are saved (verify).
   - Charge: separate morality meter -64..+64, not touched by prayer unless JD decides otherwise.
+
+## Trace support rule (JD 2026-10-24)
+JD: "wire is a block that requires support, so it's a partial block that requires support."
+
+- Trace (Red Trace, Blue Trace: the flat wires) is a **partial block that requires support**. It is not a full block and cannot stand on its own.
+- Valid support: a solid block directly beneath it (floor) or directly above it (ceiling, the wire hangs). A wall beside it is not support.
+- Placement: refused unless a floor or ceiling is present (`cSignalWorldSim::canPlace` -> `wireSupported`).
+- Removal: when the block beneath or above changes and neither support remains, the Trace pops off (`cSimThread::popAttached` -> `stillSupported` -> `wireSupported`), and this cascades.
+- Vias (Red Via, Blue Via) are the exception: they are free-standing and need no support.
+- Verified 2026-10-24: selftest "wire support: on a block or under a ceiling only; vias need none; removing the support un-supports it" passes, and the pop path in `sim_thread.cpp` uses the same rule.

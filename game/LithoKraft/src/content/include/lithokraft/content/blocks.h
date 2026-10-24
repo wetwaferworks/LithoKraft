@@ -199,7 +199,9 @@ inline bool isVia(BlockId b) { return b == kRedVia || b == kBlueVia; }
 /// reads "power from an adjacent wire" uses isFlatWire.
 inline bool isWire(BlockId b) { return roleOf(b) == SimRole::Wire; }
 inline bool isFlatWire(BlockId b) { return isWire(b) && !isVia(b); }
-/// Wire (not vias) must lie on a solid block or hang under one (a ceiling); anything else floats.
+/// Trace (flat wire, not vias) is a PARTIAL BLOCK THAT REQUIRES SUPPORT (JD 2026-10-24): it must lie on a
+/// solid block or hang under one (a ceiling); a wall beside it is no support. Placement is refused without
+/// support, and losing both supports pops it (cSimThread::popAttached -> stillSupported). Vias need none.
 template <class Map> bool wireSupported(const Map& w, int x, int y, int z) {
   return blockDef(w.get(x, y - 1, z)).flags & kSolid || blockDef(w.get(x, y + 1, z)).flags & kSolid;
 }
