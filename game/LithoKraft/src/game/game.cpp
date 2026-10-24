@@ -671,6 +671,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
   renderer_.setModelDither(settings_.modelDither, settings_.modelDitherNear,
                             settings_.modelDitherFar);  // near-camera fade, JD 2026-10-13
   renderer_.setAaMode(settings_.aaMode.c_str());        // AA ladder, JD 2026-10-13
+  renderer_.setTextureFiltering(settings_.texFilter, settings_.anisotropy);  // PROVISIONAL JD 2026-10-24
   renderer_.setBloom(resolvedBloom(settings_));          // Cortana 2026-10-16: render.bloom
   renderer_.setAo(settings_.ao);                         // Cortana 2026-10-16: render.ao
   renderer_.setShimmer(settings_.shimmer);               // Cortana 2026-10-16: render.shimmer
@@ -1900,6 +1901,11 @@ void Game::onSettingsChanged(const GameSettings& s) {
   if (s.aaMode != old.aaMode) {
     renderer_.setAaMode(s.aaMode.c_str());
     logInfo("settings: render.aa -> %s", s.aaMode.c_str());
+  }
+  if (s.texFilter != old.texFilter || s.anisotropy != old.anisotropy) {  // PROVISIONAL JD 2026-10-24: live
+    renderer_.setTextureFiltering(s.texFilter, s.anisotropy);
+    logInfo("settings: render.tex_filter -> %d, render.anisotropy -> %dx (device max %dx)", s.texFilter, s.anisotropy,
+            renderer_.maxAnisotropy());
   }
   if (s.emissiveLight != old.emissiveLight) { renderer_.setEmissiveLight(s.emissiveLight); logInfo("settings: render.emissive_light -> %s", s.emissiveLight ? "on" : "off"); }
   if (s.mipmaps != old.mipmaps) { renderer_.setMipmaps(s.mipmaps); logInfo("settings: render.mipmaps -> %s", s.mipmaps ? "on" : "off"); }

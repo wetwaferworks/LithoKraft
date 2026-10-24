@@ -373,6 +373,16 @@ void cGameUi::openSettings(const GameSettings& cur) {
     const int aaSel = cur.aaMode == "fxaa" ? 1 : cur.aaMode == "cmaa" ? 2 : cur.aaMode == "ssaa2x" ? 3 : 0;
     drop("Anti-aliasing", "set-aa", {"Off", "FXAA", "CMAA", "SSAA 2x"}, aaSel,
          [](GameSettings& s, int i) { s.aaMode = i == 1 ? "fxaa" : i == 2 ? "cmaa" : i == 3 ? "ssaa2x" : "off"; });
+    // PROVISIONAL (JD 2026-10-24): texture-filtering stand-ins. OpenGL 3.3 / Vulkan only.
+    if (cur.renderer == "gl33" || cur.renderer == "vulkan") {
+      drop("Texture filter (provisional)", "set-tex-filter", {"Sharp", "Bilinear", "Trilinear"}, std::clamp(cur.texFilter, 0, 2),
+           [](GameSettings& s, int i) { s.texFilter = i; });
+      const int afSel = cur.anisotropy >= 16 ? 4 : cur.anisotropy >= 8 ? 3 : cur.anisotropy >= 4 ? 2 : cur.anisotropy >= 2 ? 1 : 0;
+      drop("Anisotropic filtering (provisional, capped at GPU max)", "set-anisotropy", {"Off", "2x", "4x", "8x", "16x"}, afSel,
+           [](GameSettings& s, int i) { s.anisotropy = i == 0 ? 1 : 1 << i; });
+    } else {
+      pg.add<ui::cLabel>("Texture filter / anisotropic filtering: OpenGL 3.3 and Vulkan only (provisional)").setId("tex-filter-note");
+    }
     drop("Bloom", "set-bloom", {"Auto", "Off", "On"}, cur.bloom < 0 ? 0 : cur.bloom == 0 ? 1 : 2,
          [](GameSettings& s, int i) { s.bloom = i == 0 ? -1 : i == 1 ? 0 : 1; });
     box("Corner ambient occlusion", "set-ao", cur.ao, [](GameSettings& s, bool v) { s.ao = v; });

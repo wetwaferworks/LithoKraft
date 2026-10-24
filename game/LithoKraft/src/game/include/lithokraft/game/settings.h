@@ -141,6 +141,8 @@ struct GameSettings {
                                 ///< (blocks) at/above which geometry is
                                 ///< rendered untouched.
 
+  int texFilter = 0;   ///< PROVISIONAL (JD 2026-10-24) render.tex_filter: 0 sharp, 1 bilinear, 2 trilinear (GPU backends)
+  int anisotropy = 8;  ///< PROVISIONAL (JD 2026-10-24) render.anisotropy: 1 (off), 2, 4, 8, 16; clamped to the device max
   std::string aaMode = "off";  ///< render.aa: software-renderer AA ladder
                                ///< ("off" | "fxaa" | "cmaa" | "ssaa2x"),
                                ///< JD 2026-10-13. Default off — JD reviews

@@ -275,6 +275,17 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
          s.aaMode = (v == "fxaa" || v == "cmaa" || v == "ssaa2x") ? v : "off";
        },
        CVarType::String},
+      {"render.tex_filter",  // PROVISIONAL (JD 2026-10-24): texture-filtering stand-in
+       [](const GameSettings& s) { return std::string(s.texFilter == 1 ? "bilinear" : s.texFilter == 2 ? "trilinear" : "sharp"); },
+       [](GameSettings& s, const std::string& v) { s.texFilter = v == "bilinear" ? 1 : v == "trilinear" ? 2 : 0; },
+       CVarType::String},
+      {"render.anisotropy",  // PROVISIONAL (JD 2026-10-24): 1 = off, 2/4/8/16; GPU backends clamp to the device max
+       [](const GameSettings& s) { return std::to_string(s.anisotropy); },
+       [](GameSettings& s, const std::string& v) {
+         const int a = int(toFloat(v));
+         s.anisotropy = a >= 16 ? 16 : a >= 8 ? 8 : a >= 4 ? 4 : a >= 2 ? 2 : 1;
+       },
+       CVarType::Int},
       {"render.fps_cap",
        [](const GameSettings& s) { return std::to_string(s.fpsCap); },
        // Frame-rate cap (engine cFramePacer, D-M3; game-side wiring
@@ -387,6 +398,8 @@ void SettingsCvars::syncFrom(const GameSettings& s) {
   registry_->setCVar("render.model_dither_near", std::to_string(s.modelDitherNear));
   registry_->setCVar("render.model_dither_far", std::to_string(s.modelDitherFar));
   registry_->setCVar("render.aa", s.aaMode);
+  registry_->setCVar("render.tex_filter", s.texFilter == 1 ? "bilinear" : s.texFilter == 2 ? "trilinear" : "sharp");
+  registry_->setCVar("render.anisotropy", std::to_string(s.anisotropy));
   registry_->setCVar("render.ascii", s.asciiMode ? "1" : "0");
   registry_->setCVar("render.ascii_cols", std::to_string(s.asciiCols));
   registry_->setCVar("render.ascii_set", s.asciiSet);
