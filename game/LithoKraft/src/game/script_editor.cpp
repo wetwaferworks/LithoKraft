@@ -73,7 +73,7 @@ void ScriptEditor::open() {
   closeItem.action = [this] { close(); };
   bar.addMenu("File", {save, reload, ui::MenuItem::separatorItem(), closeItem});
 
-  auto& split = dlg.body().add<ui::Splitter>(ui::Orientation::Horizontal, 0.2f);
+  auto& split = dlg.body().add<ui::cSplitter>(ui::Orientation::Horizontal, 0.2f);
   split.layout().flex = 1;
   auto list = std::make_unique<ui::ListView>();
   list_ = list.get();

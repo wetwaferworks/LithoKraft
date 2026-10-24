@@ -401,7 +401,7 @@ void testSettingsDialog(Checker& check) {
   check(gui.settingsOpen(), "settings: openSettings shows the dialog");
   ui::Widget* dlg = gui.root().topModal();
   check(dlg && dlg->id() == "settings", "settings: the dialog is the top modal");
-  ui::TabView* tabs = dlg ? dlg->findAs<ui::TabView>("settings-tabs") : nullptr;
+  ui::cTabView* tabs = dlg ? dlg->findAs<ui::cTabView>("settings-tabs") : nullptr;
   check(tabs && tabs->count() == 4, "settings: Audio / Video / Graphics / Sim tabs");  // Cortana 2026-10-16: + Graphics
   ui::Slider* vol = dlg ? dlg->findAs<ui::Slider>("set-volume") : nullptr;
   check(vol && std::fabs(vol->value() - 75.f) < 0.01f, "settings: volume slider initialised from the current settings");

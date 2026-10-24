@@ -130,10 +130,10 @@ void GameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry
   const int cols = 9, count = int(blockRegistry().size()) - 1;  // every block type except air
   const int rows = (count + cols - 1) / cols;
   const float cell = 40 * k * kInventoryScale;  // Cortana 2026-10-16: +25% slots/icons (JD)
-  auto& scroll = dlg.body().add<ui::ScrollView>();
+  auto& scroll = dlg.body().add<ui::cScrollView>();
   const float gridH = float(rows) * cell;
   scroll.setLayout(ui::Layout::sized({float(cols) * cell + ui::ScrollBar::kThickness, std::min(gridH, 5 * cell)}));
-  auto& grid = scroll.emplaceContent<ui::GridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
+  auto& grid = scroll.emplaceContent<ui::cGridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
   for (int i = 0; i < count; ++i) {
     const BlockId b = BlockId(i + 1);
     ui::Slot& slot = grid.add<ui::Slot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
@@ -147,7 +147,7 @@ void GameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry
     dlg.body().add<ui::Label>("Carry (42): hotbar 1-8, offhand L/R, main 1-32 - click: swap into hotbar slot " +
                               std::to_string(selectedSlot + 1));
     const int ccols = 14;
-    auto& cgrid = dlg.body().add<ui::GridPanel>(ccols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
+    auto& cgrid = dlg.body().add<ui::cGridPanel>(ccols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
     for (int i = 0; i < int(carry.size()); ++i) {
       ui::Slot& slot = cgrid.add<ui::Slot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
       slot.setData(kCarryData + i);
@@ -203,7 +203,7 @@ void GameUi::openMenu(const std::string& version) {
   tagline.setId("menu-tagline");
   tagline.setCentered(true);
   tagline.setColor({0.85f, 0.92f, 1.f, 1.f});  // 2026-10-16: was {0.55,0.65,0.8} (low contrast)
-  center.add<ui::Divider>(ui::Orientation::Horizontal, 2.f * k).setId("menu-divider");
+  center.add<ui::cDivider>(ui::Orientation::Horizontal, 2.f * k).setId("menu-divider");
   auto& play = center.add<ui::Button>("Play");
   play.setId("menu-play");
   play.setLayout(ui::Layout::sized({600 * k, 52 * k}));
@@ -245,7 +245,7 @@ void GameUi::openSettings(const GameSettings& cur) {
   auto state = std::make_shared<GameSettings>(cur);
   ui::Dialog& dlg = ui::Dialog::show(ui_, "Settings");
   dlg.setId("settings");
-  auto& tabs = dlg.body().add<ui::TabView>();
+  auto& tabs = dlg.body().add<ui::cTabView>();
   tabs.setId("settings-tabs");
 
   // One vertical page per tab; each row is a fixed-width label plus the control.

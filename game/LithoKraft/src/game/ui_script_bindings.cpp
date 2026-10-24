@@ -47,7 +47,7 @@ float uiValue(const std::string& id, UiScriptBindings* b) {
   ui::Widget* w = find(b, id);
   if (auto* s = dynamic_cast<ui::Slider*>(w)) return s->value();
   if (auto* n = dynamic_cast<ui::NumberField*>(w)) return float(n->value());
-  if (auto* p = dynamic_cast<ui::ProgressBar*>(w)) return p->value();
+  if (auto* p = dynamic_cast<ui::cProgressBar*>(w)) return p->value();
   if (auto* d = dynamic_cast<ui::Dropdown*>(w)) return float(d->selected());
   if (auto* l = dynamic_cast<ui::ListView*>(w)) return float(l->selected());
   return 0.f;
@@ -57,7 +57,7 @@ void uiSetValue(const std::string& id, float v, UiScriptBindings* b) {
   ui::Widget* w = find(b, id);
   if (auto* s = dynamic_cast<ui::Slider*>(w)) s->setValue(v);
   else if (auto* n = dynamic_cast<ui::NumberField*>(w)) n->setValue(int(v));
-  else if (auto* p = dynamic_cast<ui::ProgressBar*>(w)) p->setValue(v);
+  else if (auto* p = dynamic_cast<ui::cProgressBar*>(w)) p->setValue(v);
   else if (auto* d = dynamic_cast<ui::Dropdown*>(w)) d->setSelected(int(v));
   else if (auto* l = dynamic_cast<ui::ListView*>(w)) l->setSelected(int(v));
 }

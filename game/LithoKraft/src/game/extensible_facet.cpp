@@ -4,7 +4,7 @@
 // symbol (LITHOLATTICE_EXTENSIBLE_QUERY_SYMBOL, "LithoLattice_QueryExtensible")
 // so the DLL-era loader resolves it with dlsym; for v1 static linking the
 // engine's mod boot path takes its address directly when it wires
-// ExtensionLoader into the game's mod startup (builder seam: that wiring is
+// cExtensionLoader into the game's mod startup (builder seam: that wiring is
 // not done yet — main.cpp's loadModDirectory only reads mod.json so far).
 #include "litholattice/mods/extensible_interface.h"
 #include "litholattice/mods/mod_interface.h"  // LITHOLATTICE_SDK_VERSION
@@ -21,7 +21,7 @@ uint32_t extSdkVersionFn() { return LITHOLATTICE_SDK_VERSION; }
 
 // The parent's API surface for its future extensions: logging + version
 // queries only (the v1 child API). Extensions never see the full
-// LithoLatticeModApi — capability scoping is enforced by ExtensionLoader.
+// LithoLatticeModApi — capability scoping is enforced by cExtensionLoader.
 const LithoLatticeExtensionApi kLithoKraftChildApi = {
     sizeof(LithoLatticeExtensionApi),
     LITHOLATTICE_SDK_VERSION,

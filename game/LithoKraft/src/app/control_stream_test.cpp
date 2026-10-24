@@ -198,14 +198,14 @@ void testFormat() {
   check(!bad.ok && bad.events.empty(), "control: a flipped payload byte fails the checksum, whole parse refused");
   std::vector<uint8_t> badMagic = bytes;
   badMagic[0] = 'X';
-  const uint64_t sum = DeterministicScheduler::hashBytes(badMagic.data(), badMagic.size() - 8);
+  const uint64_t sum = cDeterministicScheduler::hashBytes(badMagic.data(), badMagic.size() - 8);
   for (int i = 0; i < 8; ++i) badMagic[badMagic.size() - 8 + size_t(i)] = uint8_t((sum >> (8 * i)) & 0xff);
   const ControlStreamParse bm = parseControlStream(badMagic.data(), badMagic.size());
   check(!bm.ok, "control: bad magic refused even with a valid checksum");
   // Unknown kind with a valid checksum: rewrite event 0's kind byte.
   std::vector<uint8_t> badKind = bytes;
   badKind[48 + 16] = 0xEE;  // first record: header(48) + seq(8) + tick(8) -> kind byte
-  const uint64_t sum2 = DeterministicScheduler::hashBytes(badKind.data(), badKind.size() - 8);
+  const uint64_t sum2 = cDeterministicScheduler::hashBytes(badKind.data(), badKind.size() - 8);
   for (int i = 0; i < 8; ++i) badKind[badKind.size() - 8 + size_t(i)] = uint8_t((sum2 >> (8 * i)) & 0xff);
   const ControlStreamParse bk = parseControlStream(badKind.data(), badKind.size());
   check(!bk.ok && bk.events.empty(), "control: unknown event kind refused (fail-closed)");

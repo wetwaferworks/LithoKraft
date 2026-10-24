@@ -138,8 +138,8 @@ bool cGamePlayerAdapter::alive() const { return enginePlayer().alive(); }
 
 std::vector<std::pair<std::string, double>> cGamePlayerAdapter::namedStats() const {
   const litholattice::IPlayer& p = enginePlayer();
-  const litholattice::VitalRegistry& vreg = manager_.vitals();
-  const litholattice::StatRegistry& reg = manager_.stats();
+  const litholattice::cVitalReg& vreg = manager_.vitals();
+  const litholattice::cStatReg& reg = manager_.stats();
   std::vector<std::pair<std::string, double>> out;
   auto seen = [&](const char* name) {
     for (const auto& [n, v] : out)
@@ -171,7 +171,7 @@ std::vector<std::pair<std::string, double>> cGamePlayerAdapter::namedStats() con
 
 std::map<std::string, int32_t> cGamePlayerAdapter::statsForSave() const {
   const litholattice::IPlayer& p = enginePlayer();
-  const litholattice::StatRegistry& reg = manager_.stats();
+  const litholattice::cStatReg& reg = manager_.stats();
   std::map<std::string, int32_t> out;
   for (uint32_t id : reg.touchedStats(p.playerId())) {
     const litholattice::StatDef* def = reg.statDef(id);
@@ -182,7 +182,7 @@ std::map<std::string, int32_t> cGamePlayerAdapter::statsForSave() const {
 
 void cGamePlayerAdapter::applySavedStats(const std::map<std::string, int32_t>& saved) {
   const uint64_t pid = enginePlayer().playerId();
-  litholattice::StatRegistry& reg = manager_.stats();
+  litholattice::cStatReg& reg = manager_.stats();
   for (const auto& [name, value] : saved) {
     const uint32_t id = reg.findStat(name);
     if (id) reg.set(pid, id, value);  // unknown names ignored; set() clamps
@@ -191,7 +191,7 @@ void cGamePlayerAdapter::applySavedStats(const std::map<std::string, int32_t>& s
 
 std::map<std::string, int32_t> cGamePlayerAdapter::vitalsForSave() const {
   const litholattice::IPlayer& p = enginePlayer();
-  const litholattice::VitalRegistry& reg = manager_.vitals();
+  const litholattice::cVitalReg& reg = manager_.vitals();
   std::map<std::string, int32_t> out;
   for (uint32_t id : reg.touchedVitals(p.playerId())) {
     const litholattice::VitalDef* def = reg.vitalDef(id);
@@ -202,7 +202,7 @@ std::map<std::string, int32_t> cGamePlayerAdapter::vitalsForSave() const {
 
 void cGamePlayerAdapter::applySavedVitals(const std::map<std::string, int32_t>& saved) {
   const uint64_t pid = enginePlayer().playerId();
-  litholattice::VitalRegistry& reg = manager_.vitals();
+  litholattice::cVitalReg& reg = manager_.vitals();
   for (const auto& [name, value] : saved) {
     const uint32_t id = reg.findVital(name);
     if (id) reg.set(pid, id, value);  // unknown names ignored; set() clamps

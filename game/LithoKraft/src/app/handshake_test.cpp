@@ -35,7 +35,7 @@
 namespace lithokraft {
 namespace {
 
-using litholattice::DeterministicScheduler;
+using litholattice::cDeterministicScheduler;
 using Clock = std::chrono::steady_clock;
 
 int gFails = 0;
@@ -55,16 +55,16 @@ void check(bool ok, const char* what) {
 // (xor does not distribute over multiplication), so it loops per cell.
 uint64_t hashAirSubChunk(uint64_t h) {
   uint64_t primePow8 = 1;
-  for (int i = 0; i < 8; ++i) primePow8 *= DeterministicScheduler::kFnvPrime;
+  for (int i = 0; i < 8; ++i) primePow8 *= cDeterministicScheduler::kFnvPrime;
   for (int i = 0; i < kSubChunkVolume; ++i) {
-    h = DeterministicScheduler::hashU64(kAirStableId, h);
+    h = cDeterministicScheduler::hashU64(kAirStableId, h);
     h *= primePow8;  // hashU64(0, h), closed form
   }
   return h;
 }
 
 uint64_t hashWorld(const ChunkMap& world, const SignalSim& sig, uint64_t ticks) {
-  uint64_t h = DeterministicScheduler::kFnvOffset;
+  uint64_t h = cDeterministicScheduler::kFnvOffset;
   std::vector<uint64_t> keys;
   keys.reserve(world.columns().size());
   for (const auto& [k, col] : world.columns()) keys.push_back(k);
@@ -75,17 +75,17 @@ uint64_t hashWorld(const ChunkMap& world, const SignalSim& sig, uint64_t ticks) 
       const SubChunk* sc = col->subs[size_t(sy)].get();
       if (!sc) { h = hashAirSubChunk(h); continue; }
       for (int i = 0; i < kSubChunkVolume; ++i) {
-        h = DeterministicScheduler::hashU64(sc->blocks.at(size_t(i)), h);
-        h = DeterministicScheduler::hashU64(uint64_t(sc->state[size_t(i)]), h);
+        h = cDeterministicScheduler::hashU64(sc->blocks.at(size_t(i)), h);
+        h = cDeterministicScheduler::hashU64(uint64_t(sc->state[size_t(i)]), h);
       }
     }
   }
   for (const auto& [k, bytes] : sig.exportState()) {
-    h = DeterministicScheduler::hashU64(k, h);
-    h = DeterministicScheduler::hashBytes(bytes.data(), bytes.size(), h);
+    h = cDeterministicScheduler::hashU64(k, h);
+    h = cDeterministicScheduler::hashBytes(bytes.data(), bytes.size(), h);
   }
-  h = DeterministicScheduler::hashU64(uint64_t(sig.componentCount()), h);
-  h = DeterministicScheduler::hashU64(ticks, h);
+  h = cDeterministicScheduler::hashU64(uint64_t(sig.componentCount()), h);
+  h = cDeterministicScheduler::hashU64(ticks, h);
   return h;
 }
 
@@ -252,9 +252,9 @@ void testWait() {
   std::vector<uint64_t> heavyStates, lightStates;
   const bool okHeavy = runArm(true, heavyStats, heavyStates);
   const bool okLight = runArm(false, lightStats, lightStates);
-  uint64_t hHeavy = DeterministicScheduler::kFnvOffset, hLight = DeterministicScheduler::kFnvOffset;
-  for (uint64_t v : heavyStates) hHeavy = DeterministicScheduler::hashU64(v, hHeavy);
-  for (uint64_t v : lightStates) hLight = DeterministicScheduler::hashU64(v, hLight);
+  uint64_t hHeavy = cDeterministicScheduler::kFnvOffset, hLight = cDeterministicScheduler::kFnvOffset;
+  for (uint64_t v : heavyStates) hHeavy = cDeterministicScheduler::hashU64(v, hHeavy);
+  for (uint64_t v : lightStates) hLight = cDeterministicScheduler::hashU64(v, hLight);
   check(okHeavy && okLight, "WAIT: all 64 phases commit in both arms (nothing skipped)");
   check(hHeavy == hLight, "WAIT: outcome hash identical despite overruns (schedule preserved)");
   check(heavyStats.overrunPhases >= 1, "WAIT: overrun phases counted");
@@ -353,8 +353,8 @@ void testFreezeBare() {
     auth.start();
     bool ok = true;
     for (uint64_t ph = 0; ph < 3; ++ph) ok = auth.runPhase(ph, 0, 0) && ok;
-    uint64_t h = DeterministicScheduler::kFnvOffset;
-    for (uint64_t v : states) h = DeterministicScheduler::hashU64(v, h);
+    uint64_t h = cDeterministicScheduler::kFnvOffset;
+    for (uint64_t v : states) h = cDeterministicScheduler::hashU64(v, h);
     hashOut = h;
     const auto t0 = Clock::now();
     frozeOut = !auth.runPhase(3, 0, 0);
@@ -1177,8 +1177,8 @@ int runHandshakeSelfTest() {
   {  // the air-sub-chunk shortcut must equal the naive per-cell loop
     uint64_t naive = 12345;
     for (int i = 0; i < kSubChunkVolume; ++i) {
-      naive = DeterministicScheduler::hashU64(kAirStableId, naive);
-      naive = DeterministicScheduler::hashU64(0, naive);
+      naive = cDeterministicScheduler::hashU64(kAirStableId, naive);
+      naive = cDeterministicScheduler::hashU64(0, naive);
     }
     check(hashAirSubChunk(12345) == naive, "handshake: outcome-hash air sub-chunk matches the naive loop");
   }

@@ -142,7 +142,7 @@ void writeU64LE(uint8_t* p, uint64_t v) {
 // ALL file bytes preceding the trailer, stored in the trailer's last
 // field (trailer offset +32 = file size - 8 for a 40-byte trailer).
 void recomputeTrailerChecksum(std::vector<uint8_t>& bytes) {
-  const uint64_t sum = DeterministicScheduler::hashBytes(bytes.data(), bytes.size() - 40);
+  const uint64_t sum = cDeterministicScheduler::hashBytes(bytes.data(), bytes.size() - 40);
   writeU64LE(bytes.data() + bytes.size() - 8, sum);
 }
 
