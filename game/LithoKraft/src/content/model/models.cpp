@@ -1,5 +1,5 @@
 // The first eight models, authored cell-by-cell at level 6 (the full 64^3
-// micro-detail volume of one block) through ModelBuilder. All authoring is
+// micro-detail volume of one block) through cModelBuilder. All authoring is
 // deterministic: fixed call order and a seeded PRNG, so re-authoring yields
 // byte-identical .lthm files (a tested property).
 //
@@ -21,19 +21,19 @@ constexpr const char* kAuthor = "LithoKraft workstream 5";
 
 using namespace palette;
 
-void box(ModelBuilder& b, int x0, int y0, int z0, int x1, int y1, int z1,
+void box(cModelBuilder& b, int x0, int y0, int z0, int x1, int y1, int z1,
          uint8_t m) {
   b.fillBox(LV, x0, y0, z0, x1, y1, z1, m);
 }
-void carve(ModelBuilder& b, int x0, int y0, int z0, int x1, int y1, int z1) {
+void carve(cModelBuilder& b, int x0, int y0, int z0, int x1, int y1, int z1) {
   b.fillBox(LV, x0, y0, z0, x1, y1, z1, 0);
 }
-void px(ModelBuilder& b, int x, int y, int z, uint8_t m) {
+void px(cModelBuilder& b, int x, int y, int z, uint8_t m) {
   b.setCell(LV, x, y, z, m);
 }
 
 // 3D Bresenham line. r > 0 stamps a (2r+1)^3 cube per step (builder-clamped).
-void line(ModelBuilder& b, int x0, int y0, int z0, int x1, int y1, int z1,
+void line(cModelBuilder& b, int x0, int y0, int z0, int x1, int y1, int z1,
           uint8_t m, int r = 0) {
   int x = x0, y = y0, z = z0;
   const int dx = std::abs(x1 - x0), dy = std::abs(y1 - y0),
@@ -112,7 +112,7 @@ struct Rng {
 };
 
 // Shared tool-handle: wooden shaft with copper grip bands.
-void toolHandle(ModelBuilder& b, int cx, int cz, int y0, int y1) {
+void toolHandle(cModelBuilder& b, int cx, int cz, int y0, int y1) {
   box(b, cx - 1, y0, cz - 1, cx + 2, y1, cz + 2, kHandleWood);
   const int b1 = y0 + 6, b2 = y0 + 14;
   box(b, cx - 2, b1, cz - 2, cx + 3, b1 + 2, cz + 3, kCopper);
@@ -159,7 +159,7 @@ const char* palette::name(uint8_t m) {
 Model authorBashor() {
   // Bashor: hammer. Chunky head, steel striking face, stepped peen, and a
   // bash-prompt ">_" etched in glowing trace on the head's face.
-  ModelBuilder b("Bashor", kAuthor);
+  cModelBuilder b("Bashor", kAuthor);
   toolHandle(b, 31, 31, 4, 38);
   box(b, 29, 0, 29, 34, 3, 34, kCopper);            // pommel cap
   box(b, 28, 37, 28, 35, 40, 35, kCopper);          // head collar
@@ -179,7 +179,7 @@ Model authorBashor() {
 Model authorPickor() {
   // Pickor: pickaxe. Long head bar with twin downward-curving points,
   // blue-hot tips, red trace inlay along the bar.
-  ModelBuilder b("Pickor", kAuthor);
+  cModelBuilder b("Pickor", kAuthor);
   toolHandle(b, 31, 30, 4, 36);
   box(b, 29, 0, 28, 34, 3, 33, kCopper);
   box(b, 28, 35, 28, 35, 44, 33, kCopper);          // center mount collar
@@ -200,7 +200,7 @@ Model authorPickor() {
 Model authorChopor() {
   // Chopor: axe. Broad flared blade with a bright edge, hammer poll on the
   // back, and a zigzag "chops code" trace inlay on the blade.
-  ModelBuilder b("Chopor", kAuthor);
+  cModelBuilder b("Chopor", kAuthor);
   toolHandle(b, 30, 30, 4, 40);
   box(b, 28, 0, 28, 33, 3, 33, kCopper);
   box(b, 27, 36, 27, 34, 41, 34, kCopper);          // collar
@@ -218,7 +218,7 @@ Model authorChopor() {
 Model authorHeapor() {
   // Heapor: shovel. T-grip, long shaft, cupped scoop with a bright digging
   // lip and a glowing blue rim.
-  ModelBuilder b("Heapor", kAuthor);
+  cModelBuilder b("Heapor", kAuthor);
   box(b, 26, 54, 29, 37, 56, 32, kHandleWood);      // T-grip
   box(b, 30, 30, 30, 33, 54, 33, kHandleWood);       // shaft
   box(b, 29, 22, 29, 34, 30, 34, kHeadMetal);       // socket
@@ -240,7 +240,7 @@ Model authorHeapor() {
 Model authorSeedor() {
   // Seedor: hoe. Angled copper tines with blue-hot points, and a scatter
   // of floating procgen seeds above the bar.
-  ModelBuilder b("Seedor", kAuthor);
+  cModelBuilder b("Seedor", kAuthor);
   toolHandle(b, 31, 30, 14, 46);
   box(b, 29, 46, 28, 34, 49, 33, kHandleWood);      // grip cap
   box(b, 28, 8, 28, 35, 16, 33, kCopper);           // collar
@@ -261,7 +261,7 @@ Model authorSeedor() {
 Model authorSlicor() {
   // Slicor: sword. Long bright blade with a glowing fuller, copper guard,
   // banded grip, and a red gem set in the pommel.
-  ModelBuilder b("Slicor", kAuthor);
+  cModelBuilder b("Slicor", kAuthor);
   box(b, 30, 18, 30, 33, 52, 33, kBladeEdge);       // blade
   for (int y = 22; y <= 48; ++y) {                  // glowing fuller
     px(b, 30, y, 31, kTraceBlue);
@@ -292,7 +292,7 @@ Model authorSlicor() {
 Model authorFirewall() {
   // Firewall: shield. Broad steel plate with a copper rim, a central boss,
   // and a red/blue trace cross inlay on the front face -- the lingo bows.
-  ModelBuilder b("Firewall", kAuthor);
+  cModelBuilder b("Firewall", kAuthor);
   box(b, 20, 10, 29, 43, 53, 32, kHeadMetal);       // plate
   box(b, 18, 8, 28, 45, 55, 33, kCopper);           // rim (behind plate edge)
   box(b, 20, 10, 29, 43, 53, 32, kHeadMetal);       // plate face over rim core
@@ -308,7 +308,7 @@ Model authorFirewall() {
 Model authorPing() {
   // Ping: bow. Stepped curved limbs of handle wood with copper tips, a taut
   // trace-blue string, and a notched packet (arrow) resting at the grip.
-  ModelBuilder b("Ping", kAuthor);
+  cModelBuilder b("Ping", kAuthor);
   box(b, 30, 28, 30, 33, 36, 33, kHandleWood);      // grip
   box(b, 29, 30, 29, 34, 34, 34, kCopper);          // grip wrap
   // Upper limb, curving forward (+z) as it rises.
@@ -334,7 +334,7 @@ Model authorCallback() {
   // Callback: the returning thrown weapon (trident role). Long shaft, three
   // prongs with blue-hot tips, and the copper return ring around the shaft --
   // thrown, and it always comes back.
-  ModelBuilder b("Callback", kAuthor);
+  cModelBuilder b("Callback", kAuthor);
   box(b, 30, 4, 30, 33, 40, 33, kHandleWood);       // shaft
   box(b, 29, 10, 29, 34, 12, 34, kCopper);          // shaft bands
   box(b, 29, 20, 29, 34, 22, 34, kCopper);
@@ -358,7 +358,7 @@ Model authorCallback() {
 Model authorDebuggor() {
   // Debuggor: the debug stick. A wand whose head is a free rotation ring
   // around a dial core -- it rotates blocks after placement.
-  ModelBuilder b("Debuggor", kAuthor);
+  cModelBuilder b("Debuggor", kAuthor);
   box(b, 30, 4, 30, 33, 34, 33, kHandleWood);       // wand shaft
   box(b, 29, 8, 29, 34, 10, 34, kCopper);           // grip bands
   box(b, 29, 16, 29, 34, 18, 34, kCopper);
@@ -383,7 +383,7 @@ Model authorFragment() {
   // The Fragment: the starting book. Dark bound cover, pale page block, a
   // copper clasp, and the fragment glyph -- a broken trace square -- inlaid
   // in red/blue on the front cover.
-  ModelBuilder b("Fragment", kAuthor);
+  cModelBuilder b("Fragment", kAuthor);
   box(b, 18, 8, 26, 45, 55, 30, kShellDark);        // back cover + spine mass
   box(b, 20, 10, 30, 45, 53, 36, kShellPlate);      // page block
   box(b, 18, 8, 36, 45, 55, 38, kShellDark);        // front cover
@@ -402,7 +402,7 @@ Model authorFragment() {
 Model authorSniffor() {
   // Sniffor: handheld early signal receiver. Body with a glowing screen, a
   // small dish on top and a whip antenna -- it transcodes ambient Signal.
-  ModelBuilder b("Sniffor", kAuthor);
+  cModelBuilder b("Sniffor", kAuthor);
   box(b, 24, 10, 28, 39, 38, 35, kShellDark);       // body
   box(b, 26, 24, 35, 37, 36, 36, kTraceBlue);       // screen (lit face)
   for (int x = 28; x <= 35; ++x) px(b, x, 30, 36, kTraceRed);  // signal trace on screen
@@ -422,7 +422,7 @@ Model authorSniffor() {
 Model authorAtlas() {
   // Atlas: the in-game map. A framed tablet: copper frame, pale chart face,
   // and a red/blue route line with grid ticks inlaid on the chart.
-  ModelBuilder b("Atlas", kAuthor);
+  cModelBuilder b("Atlas", kAuthor);
   box(b, 12, 14, 29, 51, 49, 32, kCopper);          // frame
   box(b, 15, 17, 32, 48, 46, 34, kShellPlate);      // chart face
   for (int x = 19; x <= 44; x += 5)                   // chart grid (vertical ticks)
@@ -443,7 +443,7 @@ Model authorAtlas() {
 namespace {
 // One forked trace branch: 2-3 segments per depth level, copper tube,
 // forking in two at each joint, ending in a glowing red/blue tip.
-void treeBranch(ModelBuilder& b, Rng& rng, int x, int y, int z, int dx, int dy,
+void treeBranch(cModelBuilder& b, Rng& rng, int x, int y, int z, int dx, int dy,
                 int dz, int depth, int& tipFlip) {
   const int segs = depth == 2 ? 1 : 2;
   const int r = depth == 0 ? 1 : 0;
@@ -492,7 +492,7 @@ void treeBranch(ModelBuilder& b, Rng& rng, int x, int y, int z, int dx, int dy,
 }
 
 // One surface root: two-segment meander with a red-hot tip.
-void treeRoot(ModelBuilder& b, Rng& rng, int dx, int dz) {
+void treeRoot(cModelBuilder& b, Rng& rng, int dx, int dz) {
   const int len = rng.range(9, 12);
   const int mx = 32 + dx * (len / 2) + rng.range(-2, 2);
   const int mz = 32 + dz * (len / 2) + rng.range(-2, 2);
@@ -508,7 +508,7 @@ Model authorTraceTree() {
   // Trace tree: the hero organic. Via-trunk (stepped copper column with via
   // collars and glowing via rings), root flare on a substrate disc, and
   // forking trace branches tipped in alternating red/blue glow.
-  ModelBuilder b("Trace Tree", kAuthor);
+  cModelBuilder b("Trace Tree", kAuthor);
   Rng rng(0x7A11CE);
 
   // Substrate disc (dark PCB the tree grows from).
@@ -568,7 +568,7 @@ namespace {
 // Domed shell: half-ellipsoid surface with panel seams. Seam color follows
 // the panel index (red/blue alternating, like the concept art's Faraday
 // cage panels).
-void domeShell(ModelBuilder& b, int cx, int cy, int cz, int rx, int ry, int rz,
+void domeShell(cModelBuilder& b, int cx, int cy, int cz, int rx, int ry, int rz,
                int panels, uint8_t plateMat, uint8_t seamA, uint8_t seamB) {
   constexpr double kPi = 3.14159265358979323846;
   for (int x = cx - rx; x <= cx + rx; ++x)
@@ -598,7 +598,7 @@ Model authorTurtlor() {
   // Turtlor: the turtle. Domed faceted shell with red/blue glowing Faraday
   // panel seams, plastron belly, blue-eyed head with antennae, four chunky
   // trace-striped legs — and a smaller turtle riding on its back.
-  ModelBuilder b("Turtlor", kAuthor);
+  cModelBuilder b("Turtlor", kAuthor);
 
   // Shell: half-ellipsoid, 10 Faraday panels.
   domeShell(b, 32, 12, 30, 16, 12, 20, 10, kShellDark, kSeamRed, kSeamBlue);

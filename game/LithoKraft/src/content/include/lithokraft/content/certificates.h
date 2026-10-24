@@ -3,7 +3,7 @@
 //
 // Design sources (do not re-lock anything here):
 //  - Certificate signing is LOCKED as a design (Lore Addendum: Certificate
-//    Signing & Systerian, 2026-10-12): LithoKraft's enchanting analogue,
+//    Signing & cSysterian, 2026-10-12): LithoKraft's enchanting analogue,
 //    performed at the certificate table; output is the item with the
 //    certificate applied. Terminology fence: certificate table (this) is
 //    NOT the mod signature and NOT the Litho asset-provenance certificate.

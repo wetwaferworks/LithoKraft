@@ -1,6 +1,6 @@
 // First authored models for LithoKraft's sub-block subdivision pipeline.
 // Workstream 5 (2026-10-11): the armory (6 tools), the trace tree, Turtlor.
-// Authored in code through lithokraft::model::ModelBuilder (workstream 3's
+// Authored in code through lithokraft::model::cModelBuilder (workstream 3's
 // format), saved as versioned .lthm files under assets/models/.
 //
 // Materials are opaque uint8 palette indices in the .lthm format ("mesher

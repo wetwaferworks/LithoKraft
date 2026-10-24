@@ -1,6 +1,6 @@
 // Certificate-table signing flow (wiring pass 2026-10-13, Team B item B7).
 //
-// Locked design (Lore Addendum: Certificate Signing & Systerian,
+// Locked design (Lore Addendum: Certificate Signing & cSysterian,
 // 2026-10-12): signing is LithoKraft's enchanting analogue, performed at
 // the certificate table -- spend the "static" stat, apply a "Certificate
 // of X" to an item. The stat stores TOTAL static; the level is derived

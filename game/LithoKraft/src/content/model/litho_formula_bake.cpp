@@ -32,7 +32,7 @@ bool bakeLithoFormulaGallery(const std::string& jsonPath,
       if (err) *err = "preset \"" + p.name + "\" voxelized to nothing";
       return false;
     }
-    ModelBuilder b(p.name, kBakeAuthor);
+    cModelBuilder b(p.name, kBakeAuthor);
     const int level = levelForResolution(vr.resolution);
     for (const auto& cell : vr.filled)
       b.setCell(level, cell[0], cell[1], cell[2], p.material);

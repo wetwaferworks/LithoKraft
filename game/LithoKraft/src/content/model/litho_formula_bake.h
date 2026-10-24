@@ -5,7 +5,7 @@
 // ambition of No Man's Sky (Hello Games).
 
 // Baking path for the Litho Formula preset gallery: voxelize each preset and
-// build a .lthm Model through ModelBuilder. Shared by the bake_litho_formula
+// build a .lthm Model through cModelBuilder. Shared by the bake_litho_formula
 // CLI and the gallery self-test.
 
 #pragma once

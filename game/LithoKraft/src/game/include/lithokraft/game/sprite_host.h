@@ -1,5 +1,5 @@
 // cSpriteHost: LithoKraft's host for the engine sprite system
-// (litholattice::sprite). Owns the game's cSpriteReg + SpriteSystem,
+// (litholattice::sprite). Owns the game's cSpriteReg + cSpriteSystem,
 // registers the starter sprite defs (proving every image source the core
 // offers), ticks instances from the game's sim-tick stream, and converts
 // each frame's emitted quads into the two draw forms the game feeds:
@@ -57,7 +57,7 @@ class cSpriteHost {
   ///     star image (Image source), three def tints.
   ///   fx:flower      - Litho Formula 2D flower (Image source, alpha blend).
   ///   fx:diamond     - Litho Formula 2D diamond via SVG text (SVG source).
-  ///   fx:glyph_a     - Systerian glyph 'A', violet on dark (Image source).
+  ///   fx:glyph_a     - cSysterian glyph 'A', violet on dark (Image source).
   ///   fx:icon_certificate_table - the certificate table's pack icon,
   ///     decoded from textures/ui/icons/certificate_table.png by the
   ///     cResourceMgr (Image source; the raw PNG entry points are
@@ -96,7 +96,7 @@ class cSpriteHost {
 
   litholattice::sprite::ISpriteReg& registry() { return registry_; }
   const litholattice::sprite::ISpriteReg& registry() const { return registry_; }
-  litholattice::sprite::SpriteSystem& system() { return system_; }
+  litholattice::sprite::cSpriteSystem& system() { return system_; }
   size_t instanceCount() const { return system_.instanceCount(); }
 
  private:
@@ -106,7 +106,7 @@ class cSpriteHost {
   std::array<float, 3> avgColorFor(uint32_t defId);
 
   litholattice::sprite::cSpriteReg registry_;
-  litholattice::sprite::SpriteSystem system_;
+  litholattice::sprite::cSpriteSystem system_;
   std::vector<litholattice::SpriteDrawQuad> drawQuads_;
   std::vector<litholattice::PackedVertex> softwareVerts_;
   litholattice::Vec3 softwareOrigin_{};

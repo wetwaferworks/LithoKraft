@@ -53,7 +53,7 @@ void writeBytes(const std::string& path, const std::vector<uint8_t>& data) {
 using Store = subdiv::SubdivStore;
 
 mdl::Model makeTestModel() {
-  mdl::ModelBuilder b("Test Cube", "Elfie");
+  mdl::cModelBuilder b("Test Cube", "Elfie");
   b.fillBox(1, 0, 0, 0, 1, 1, 1, 3);  // full block at level 1, material 3
   b.setCell(3, 5, 5, 5, 7);           // one detailed cell at level 3
   b.setCell(2, 0, 0, 0, 9);           // overwrite one level-1 octant's corner
@@ -85,7 +85,7 @@ void testDeterminism() {
 
 void testEmptyModel() {
   const std::string path = tmpPath("lthm_empty.lthm");
-  mdl::ModelBuilder b("Empty");
+  mdl::cModelBuilder b("Empty");
   mdl::Model m = b.build();
   check(m.geometry.empty(), "empty builder => empty geometry");
   check(m.maxLevel == 0, "empty model maxLevel 0");
@@ -179,7 +179,7 @@ void testMissingFile() {
 }
 
 void testBuilderSemantics() {
-  mdl::ModelBuilder b("Semantics");
+  mdl::cModelBuilder b("Semantics");
   b.fillBox(1, 0, 0, 0, 1, 1, 1, 1);
   b.fillBox(1, 0, 0, 0, 0, 0, 0, 2);  // overwrite one octant
   // Reversed bounds must behave like normalized bounds.
@@ -196,7 +196,7 @@ void testBuilderSemantics() {
   check(m.maxLevel == 2, "maxLevel tracks finest level");
 
   // clearCell removes the cell.
-  mdl::ModelBuilder c("Clear");
+  mdl::cModelBuilder c("Clear");
   c.setCell(2, 1, 1, 1, 6);
   c.clearCell(2, 1, 1, 1);
   mdl::Model cm = c.build();
@@ -220,7 +220,7 @@ void testPlaceModelMerge() {
     store.setBlockOctree(7, 5, 6, n);
   }
 
-  mdl::ModelBuilder b("Stamp");
+  mdl::cModelBuilder b("Stamp");
   b.setCell(2, 0, 0, 0, 21);  // overwrites the pre-existing 11
   b.setCell(1, 1, 1, 1, 22);  // new cell
   mdl::Model m = b.build();
@@ -238,7 +238,7 @@ void testPlaceModelMerge() {
   check(n != nullptr && n->get(1, 0, 0, 0) == 13, "neighbor block untouched");
 
   // Empty model is a no-op.
-  mdl::ModelBuilder e("Empty");
+  mdl::cModelBuilder e("Empty");
   mdl::Model em = e.build();
   const size_t before = t->leafCount();
   mdl::placeModel(store, 4, 5, 6, em);
@@ -259,7 +259,7 @@ void testPlaceModelMerge() {
 
 void testCopyIsolation() {
   // Value semantics: mutating a copy must not affect the original.
-  mdl::ModelBuilder b("Copy");
+  mdl::cModelBuilder b("Copy");
   b.setCell(2, 1, 1, 1, 5);
   mdl::Model a = b.build();
   mdl::Model c = a;  // copy
@@ -281,7 +281,7 @@ void testModelEquals() {  mdl::Model a = makeTestModel();
   b.maxLevel = 99;
   check(!mdl::modelEquals(a, b), "maxLevel difference detected");
   b = makeTestModel();
-  mdl::ModelBuilder extra("x");
+  mdl::cModelBuilder extra("x");
   extra.setCell(0, 0, 0, 0, 1);
   b.geometry = extra.build().geometry;
   check(!mdl::modelEquals(a, b), "geometry difference detected");
@@ -289,7 +289,7 @@ void testModelEquals() {  mdl::Model a = makeTestModel();
 
 void testUtf8Names() {
   const std::string path = tmpPath("lthm_utf8.lthm");
-  mdl::ModelBuilder b("T\xc3\xabr\xc3\xa4ger-Modell", "J\xc3\xb6rg");
+  mdl::cModelBuilder b("T\xc3\xabr\xc3\xa4ger-Modell", "J\xc3\xb6rg");
   b.setCell(0, 0, 0, 0, 1);
   mdl::Model m = b.build();
   check(mdl::saveModel(path, m), "utf8 save");

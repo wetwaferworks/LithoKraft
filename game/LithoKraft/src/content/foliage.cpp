@@ -28,7 +28,7 @@ struct Grid {
   std::vector<model::Model> build(const std::string& name) const {
     std::vector<model::Model> out;
     for (int b = 0; b < nb; ++b) {
-      model::ModelBuilder mb(name + "_" + std::to_string(b), "Cortana for JD (foliage 2026-10-15)");
+      model::cModelBuilder mb(name + "_" + std::to_string(b), "Cortana for JD (foliage 2026-10-15)");
       for (int y = 0; y < 16; ++y)
         for (int z = 0; z < 16; ++z)
           for (int x = 0; x < 16; ++x)

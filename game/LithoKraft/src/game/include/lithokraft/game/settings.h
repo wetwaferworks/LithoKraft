@@ -148,7 +148,7 @@ struct GameSettings {
                                ///< clamped 40..400.
   std::string asciiSet = "ascii";  ///< render.ascii_set: glyph set for the
                                ///< ASCII pipeline — "ascii" | "systerian"
-                               ///< (the Systerian renderer, JD 2026-10-13).
+                               ///< (the cSysterian renderer, JD 2026-10-13).
   int asciiValueSpan = 255;    ///< render.ascii_value_span: luminance ->
                                ///< level span (JD amendment 2026-10-13:
                                ///< full 0-255 range by default, a deliberate

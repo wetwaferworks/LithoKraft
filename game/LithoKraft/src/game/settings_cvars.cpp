@@ -301,7 +301,7 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
       {"render.ascii_set",
        [](const GameSettings& s) { return s.asciiSet; },
        // Glyph set for the ASCII pipeline (JD 2026-10-13): "ascii" or
-       // "systerian" — the Systerian renderer draws the certificate
+       // "systerian" — the cSysterian renderer draws the certificate
        // script's glyphs through the engine's ASCII->Systerian map.
        // String, default "ascii". Applied via IRenderer::setAsciiGlyphSet.
        [](GameSettings& s, const std::string& v) {
@@ -310,7 +310,7 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
        CVarType::String},
       {"render.ascii_value_span",
        [](const GameSettings& s) { return std::to_string(s.asciiValueSpan); },
-       // Value span for the ASCII/Systerian luminance -> level mapping
+       // Value span for the ASCII/cSysterian luminance -> level mapping
        // (JD-RULED AMENDMENT 2026-10-13): the FULL 0-255 range by
        // default (clamped 16..255) — a deliberate exception to the
        // game's 64-scale conventions, for more variance in the

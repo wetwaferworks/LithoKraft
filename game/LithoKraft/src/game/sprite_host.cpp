@@ -134,9 +134,9 @@ void cSpriteHost::registerStarterSprites(const cResourceMgr& resources) {
   } else {
     litholattice::logError("sprite: litho preset 'diamond' not found");
   }
-  // Systerian glyph 'A' (violet on dark), rasterized by ISysterian.
+  // cSysterian glyph 'A' (violet on dark), rasterized by ISysterian.
   {
-    litholattice::systerian::Systerian sys;
+    litholattice::systerian::cSysterian sys;
     std::optional<Image> glyph =
         sys.pngForChar('A', litholattice::systerian::SysterianStyle::violetOnDark(), 100, 140, &err);
     if (glyph) {

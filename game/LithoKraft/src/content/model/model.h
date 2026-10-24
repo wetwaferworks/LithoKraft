@@ -91,9 +91,9 @@ void placeModel(litholattice::subdiv::SubdivStore& store, int bx, int by,
 /// Authoring helper for building Models in code (workstream 5 authors the
 /// first models through this). Deterministic: the same call sequence always
 /// yields the same Model, hence a byte-identical .lthm file.
-class ModelBuilder {
+class cModelBuilder {
  public:
-  explicit ModelBuilder(std::string name, std::string author = "");
+  explicit cModelBuilder(std::string name, std::string author = "");
 
   void setAuthor(std::string author) { author_ = std::move(author); }
 

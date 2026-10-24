@@ -3,7 +3,7 @@
 //   * the starter defs register from every image-source kind the core
 //     offers (Image, SVG text, PNG file, PNG bytes), first-wins intact;
 //   * tinted variants are distinct defs over one generated image;
-//   * spawn / burst / tick / lifetime / clear drive the SpriteSystem;
+//   * spawn / burst / tick / lifetime / clear drive the cSpriteSystem;
 //   * emitQuads ordering + animation frame advance on sim ticks;
 //   * the atlas builds with a version and per-frame rects;
 //   * the software (MCP vision) form of a spawned sprite actually lands in

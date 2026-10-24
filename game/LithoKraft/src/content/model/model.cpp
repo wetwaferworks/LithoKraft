@@ -1,4 +1,4 @@
-// .lthm serialization: saveModel / loadModel / modelEquals / ModelBuilder.
+// .lthm serialization: saveModel / loadModel / modelEquals / cModelBuilder.
 
 #include "model.h"
 
@@ -310,17 +310,17 @@ void placeModel(litholattice::subdiv::SubdivStore& store, int bx, int by,
   store.setBlockOctree(bx, by, bz, std::move(target));
 }
 
-ModelBuilder::ModelBuilder(std::string name, std::string author)
+cModelBuilder::cModelBuilder(std::string name, std::string author)
     : name_(std::move(name)), author_(std::move(author)) {}
 
-void ModelBuilder::setCell(int level, int x, int y, int z, uint8_t material) {
+void cModelBuilder::setCell(int level, int x, int y, int z, uint8_t material) {
   if (level < 0 || level > kMaxLevel) return;
   const int span = 1 << level;
   if (x < 0 || x >= span || y < 0 || y >= span || z < 0 || z >= span) return;
   tree_.set(level, x, y, z, material);
 }
 
-void ModelBuilder::fillBox(int level, int x0, int y0, int z0, int x1, int y1,
+void cModelBuilder::fillBox(int level, int x0, int y0, int z0, int x1, int y1,
                            int z1, uint8_t material) {
   if (level < 0 || level > kMaxLevel) return;
   const int span = 1 << level;
@@ -338,7 +338,7 @@ void ModelBuilder::fillBox(int level, int x0, int y0, int z0, int x1, int y1,
       for (int x = x0; x <= x1; ++x) tree_.set(level, x, y, z, material);
 }
 
-Model ModelBuilder::build() const {
+Model cModelBuilder::build() const {
   Model m;
   m.name = name_;
   m.author = author_;
