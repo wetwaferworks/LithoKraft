@@ -81,11 +81,11 @@ void testHudRenderer(Checker& check) {
   // legacy rect (6) + full rect (6) + clipped rect (6) + 2 glyphs inside x 20..30 at 8 px (6 each) + 2 images (12).
   bool clipped = v.size() == 6 + 6 + 6 + 12 + 12;
   for (size_t i = 12; i < 30 && i < v.size(); ++i) clipped = clipped && v[i].x >= 20 && v[i].x <= 30 && v[i].y >= 10 && v[i].y <= 30;
-  check(clipped, "HudUiRenderer: draws after the legacy HUD, nested clips intersect, glyphs cut (" + std::to_string(v.size()) + " verts)");
+  check(clipped, "cHudUiRenderer: draws after the legacy HUD, nested clips intersect, glyphs cut (" + std::to_string(v.size()) + " verts)");
   const bool order = v.size() >= 12 && v[6].b == 1.f && v[0].r == 1.f && v[0].b == 1.f;
   const bool images = hud.draws.size() == 5 && hud.draws[3].r == 1 && hud.draws[3].a == 0.5f && hud.draws[4].g == 0 &&
                       hud.draws[4].r == 1 && hud.draws[4].b == 1;
-  check(order && images, "HudUiRenderer: paint order kept; images resolve to swatches (magenta if unknown)");
+  check(order && images, "cHudUiRenderer: paint order kept; images resolve to swatches (magenta if unknown)");
 }
 
 void testScriptBindings(Checker& check) {

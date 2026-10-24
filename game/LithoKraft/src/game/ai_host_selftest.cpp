@@ -60,7 +60,7 @@ int runAiHostSelfTest() {
 
   host.setEnabled(true);
   check(host.enabled() && host.constructed() && host.world() != nullptr && host.nav() != nullptr,
-        "ai host: enabling constructs the AiWorld + WalkCache over the live map");
+        "ai host: enabling constructs the AiWorld + cWalkCache over the live map");
   check(host.world() && host.world()->config().hz >= 8 && host.world()->config().hz <= 16,
         "ai host: AiWorld rate is the engine-clamped 8..16 Hz");
 

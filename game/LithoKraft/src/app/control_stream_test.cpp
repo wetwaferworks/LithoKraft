@@ -315,7 +315,7 @@ bool recordMatches(const std::vector<ControlEvent>& record, const std::vector<Co
 }
 
 void testDeterminism() {
-  std::printf("== control determinism: circuit scenario through SimThread + the stream (2048 ticks)\n");
+  std::printf("== control determinism: circuit scenario through cSimThread + the stream (2048 ticks)\n");
   ControlScenarioWorld probe = buildControlScenarioWorld();
   check(probe.wireX >= 0 && probe.repX >= 0, "control: scenario world built (trace + repeator found)");
   const std::vector<ControlEvent> script = scenarioScript(probe, true);

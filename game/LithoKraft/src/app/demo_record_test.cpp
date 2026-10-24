@@ -147,7 +147,7 @@ void recomputeTrailerChecksum(std::vector<uint8_t>& bytes) {
 }
 
 std::vector<uint8_t> testRoundTrip(const std::vector<ControlEvent>& script) {
-  std::printf("== demo record: round trip through a bare ControlStream\n");
+  std::printf("== demo record: round trip through a bare cControlStream\n");
   cControlStream cs;
   cDemoRecorder rec;
   rec.begin(cs, unitSession());
@@ -188,14 +188,14 @@ std::vector<uint8_t> testRoundTrip(const std::vector<ControlEvent>& script) {
 
   cDemoPlayer player;
   check(player.load(bytes.data(), bytes.size()) && player.parsed().complete,
-        "demo: DemoPlayer loads the round-trip bytes (complete)");
+        "demo: cDemoPlayer loads the round-trip bytes (complete)");
   cControlStream cs2;
   std::vector<ControlEvent> replayed;
   const bool submitted = player.submitInto(cs2);
   cs2.prePhase(0);
   cs2.extractDue(125, replayed);
   check(submitted && allSame(replayed, script),
-        "demo: DemoPlayer submitInto reproduces the exact stamped stream on a fresh stream");
+        "demo: cDemoPlayer submitInto reproduces the exact stamped stream on a fresh stream");
   return bytes;
 }
 
@@ -426,7 +426,7 @@ DrivenResult driveDemo(int ticks, bool handshake, int workers, const std::vector
 }
 
 void testSimThreadProofs() {
-  std::printf("== demo proofs: recorded SimThread session, non-perturbation, replay (2048 ticks)\n");
+  std::printf("== demo proofs: recorded cSimThread session, non-perturbation, replay (2048 ticks)\n");
   ControlScenarioWorld probe = buildControlScenarioWorld();
   const std::vector<ControlEvent> script = scenarioScript(probe);
   probe.ws.reset();  // the probe world is done; arms rebuild their own
@@ -473,7 +473,7 @@ void testSimThreadProofs() {
   const bool loadedLegacy = playerLegacy.loadFile("./demo_record_proof.lldemo");
   check(loadedLegacy && playerLegacy.parsed().complete && playerLegacy.parsed().trailer.present &&
             playerLegacy.parsed().trailer.finalWorldHash == recorded.hash,
-        "demo-proof: DemoPlayer loads the saved record (complete, trailer hash matches)");
+        "demo-proof: cDemoPlayer loads the saved record (complete, trailer hash matches)");
   const uint64_t trailerHash = playerLegacy.parsed().trailer.finalWorldHash;
   const DrivenResult replayLegacy = driveDemo(2048, false, 0, nullptr, &playerLegacy, nullptr, nullptr);
   std::printf("  replay (legacy): hash=%016llx applied=%llu dropped=%llu violations=%llu\n",

@@ -387,7 +387,7 @@ void testFreezeBare() {
 
 // ---- §6.3 FREEZE end-to-end (real cSimThread + save/reload while frozen) ----
 void testFreezeEndToEnd() {
-  std::printf("== handshake FREEZE end-to-end (SimThread -> paused -> save/reload)\n");
+  std::printf("== handshake FREEZE end-to-end (cSimThread -> paused -> save/reload)\n");
   Scenario sc = buildScenario();
   ChunkMap& w = sc.wafer->chunks;
   const uint64_t hPre = hashWorld(w, sc.ws->signal(), 0);
@@ -424,7 +424,7 @@ void testFreezeEndToEnd() {
     if (!pausedSeen) std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   check(hangStarted.load(), "FREEZE e2e: hang component started on a pull worker");
-  check(pausedSeen, "FREEZE e2e: SimThread paused() is true — freeze landed on the tick-debugger machinery");
+  check(pausedSeen, "FREEZE e2e: cSimThread paused() is true — freeze landed on the tick-debugger machinery");
   check(sim->handshakeFrozen(), "FREEZE e2e: authority freeze latch is set");
   bool reportSeen = false;
   for (const litholattice::LogRecord& r : litholattice::engineLogTap().snapshot())
@@ -845,7 +845,7 @@ void testRateShuffleInvariance() {
 
 // ---- rate scaling: game layer (cSignalSim per-class rates, mini circuit) ----
 void testRateGameLayer() {
-  std::printf("== handshake rate game layer (SignalSim class tick rates on a mini circuit)\n");
+  std::printf("== handshake rate game layer (cSignalSim class tick rates on a mini circuit)\n");
   struct Mini { ChunkMap w; cSignalSim sim; };  // built in place per arm (cSignalSim is not movable)
   const cSignalSim::DirtyFn noDirty = [](int, int, int) {};
   auto buildMini = [](Mini& m) {
@@ -1085,7 +1085,7 @@ void testRateMemorChaining() {
 
 // ---- rate scaling: perf-headless style snapshot on the real cSimThread ----
 void testRatePerfSnapshot() {
-  std::printf("== handshake rate perf snapshot (512 TPS SimThread, div8 + mul4 components)\n");
+  std::printf("== handshake rate perf snapshot (512 TPS cSimThread, div8 + mul4 components)\n");
   Scenario sc = buildScenario();
   ChunkMap& w = sc.wafer->chunks;
   litholattice::SimConfig cfg;

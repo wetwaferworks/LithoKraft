@@ -802,7 +802,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         for (int i = 0; i < 500 && !got; ++i) { got = good.hasReady(); if (!got) std::this_thread::sleep_for(std::chrono::milliseconds(10)); }
         auto readyCols = good.takeReady();
         check(got && readyCols.size() == 1 && readyCols[0].fromDisk && readyCols[0].column && readyCols[0].column->cx == 20 && !readyCols[0].signal.empty(),
-              "p1-stream (SW-H1/H3): ChunkStreamer delivers the disk column with its SGNL payload through the job pool");
+              "p1-stream (SW-H1/H3): cChunkStreamer delivers the disk column with its SGNL payload through the job pool");
         cChunkStreamer bad(pool, wafer->generator, &corruptSave, "wafer", 0, {});
         bad.update(20, 20);
         bool erased = false;
@@ -910,7 +910,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       storage::cAnvilRegion ar2(ap, 0, 0);
       std::string e;
       check(ar2.open(&e) && ar2.quarantinedEntryCount() == 1 && ar2.count() == before,
-            "storage (C-L3): a malformed AnvilRegion index entry is normalised to absent, logged and counted (not silent)");
+            "storage (C-L3): a malformed cAnvilRegion index entry is normalised to absent, logged and counted (not silent)");
     }
     std::filesystem::remove_all(pdir);
   }
@@ -1044,7 +1044,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       // forgetColumn makes an evicted column requestable again.
       cChunkStreamer fs(pool, wafer->generator, nullptr, "wafer", 0, {ChunkKey::make(50, 50)});
       fs.forgetColumn(50, 50);
-      check(fs.requestedCount() == 0, "evict (A2): ChunkStreamer::forgetColumn removes the requested_ entry (re-streamable)");
+      check(fs.requestedCount() == 0, "evict (A2): cChunkStreamer::forgetColumn removes the requested_ entry (re-streamable)");
       {  // fix 3b (JD t2279u): requests go nearest-first by diamond distance, ties deterministic
         std::vector<std::pair<int, uint64_t>> order;
         for (int dz = -6; dz <= 6; ++dz)
