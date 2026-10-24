@@ -837,6 +837,9 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
       // 2026-10-24 (JD): an on switch also drives every Trace touching the switch itself (all 6
       // faces, red and blue alike), not only through its mount block.
       for (auto& d : k6) seed(x + d[0], y + d[1], z + d[2], kMaxSignal, 0);
+      // 2026-10-24 (JD 5:57 PM): ...and diagonally, the 4 same-level diagonal neighbours.
+      for (int ddx = -1; ddx <= 1; ddx += 2)
+        for (int ddz = -1; ddz <= 1; ddz += 2) seed(x + ddx, y, z + ddz, kMaxSignal, 0);
       continue;
     }
     for (int d = 0; d < 4; ++d) {
@@ -986,6 +989,9 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
       // 2026-10-24 (JD): an on switch also drives every Trace touching the switch itself (all 6
       // faces, red and blue alike), not only through its mount block.
       for (auto& d : k6) seed(x + d[0], y + d[1], z + d[2], kMaxSignal, 0);
+      // 2026-10-24 (JD 5:57 PM): ...and diagonally, the 4 same-level diagonal neighbours.
+      for (int ddx = -1; ddx <= 1; ddx += 2)
+        for (int ddz = -1; ddz <= 1; ddz += 2) seed(x + ddx, y, z + ddz, kMaxSignal, 0);
       continue;
     }
     for (int d = 0; d < 4; ++d) {

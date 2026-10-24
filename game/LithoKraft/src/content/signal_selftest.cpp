@@ -320,6 +320,16 @@ int runSignalSelfTest() {
     run(4);
     check(off && val(42, y, 62) == 64 && val(40, y, 62) == 64, "attached switch powers red and blue Trace on its own sides (64)");
   }
+  {  // 2026-10-24 (JD 5:57 PM): an on switch also powers Trace on its 4 same-level diagonals.
+    for (int x = 44; x <= 45; ++x) for (int z = 61; z <= 62; ++z) put(x, y - 1, z, kWaferSilicon);
+    w.set(44, y, 62, kSwitch); w.setState(44, y, 62, withAttach(0, 1)); sim.onBlockChanged(44, y, 62, kSwitch);
+    put(45, y, 61, kRedTrace);
+    run(3);
+    const bool off = val(45, y, 61) == 0;
+    sim.use(w, 44, y, 62, none);
+    run(4);
+    check(off && val(45, y, 61) == 64, "attached switch powers a diagonal (same level) Trace (64)");
+  }
   {  // 2026-10-24 lever: on each of the 6 faces (floor / ceiling in all 4 facings) the switch keeps
      // its attach face and facing through ticks and toggles and powers its support (lamp beside it).
     const int sup[3] = {4, y + 4, 48};
