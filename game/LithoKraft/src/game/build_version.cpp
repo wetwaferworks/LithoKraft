@@ -8,12 +8,13 @@
 
 namespace lithokraft {
 const char* buildVersion() { return LITHOKRAFT_ALPHA_VERSION; }
+const char* gameCounter() { return LITHOKRAFT_GAME_COUNTER; }
 std::string buildInfo() {
 #ifdef NDEBUG
   const char* type = "Release";
 #else
   const char* type = "Debug";
 #endif
-  return std::string("LithoKraft ") + LITHOKRAFT_ALPHA_VERSION + " (" + LITHOKRAFT_COMMIT + ") " + type + " built " + __DATE__ + " " + __TIME__;
+  return std::string("LithoKraft ") + LITHOKRAFT_GAME_COUNTER + " | " + LITHOKRAFT_ALPHA_VERSION + " (" + LITHOKRAFT_COMMIT + ") " + type + " built " + __DATE__ + " " + __TIME__;
 }
 }  // namespace lithokraft

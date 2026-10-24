@@ -19,6 +19,9 @@ inline std::array<int, 4> bumpBuildVersion(std::array<int, 4> v) {
 
 /// "<public label> build N" of this build, e.g. "Alpha 0.0.1 build 7" (generated header).
 const char* buildVersion();
+/// 2026-10-24 (JD): four-place game counter "a.b.c.d" (base-64 wheels of the same count), shown as
+/// "LithoKraft a.b.c.d", separate from the engine's 8-place "Litho Engine" counter.
+const char* gameCounter();
 /// "LithoKraft Alpha a.b.c.d (commit) Release|Debug built <date time>".
 std::string buildInfo();
 

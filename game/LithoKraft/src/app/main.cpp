@@ -1176,6 +1176,7 @@ int main(int argc, char** argv) {
   // fix 3b (Elfie P3): the log line is always the plain counter (no raw ANSI escapes in log files /
   // web consoles); the wheel ink is printed to a real terminal only.
   logInfo("rolling build counter: %s", kJdBuildCounterDisplay);
+  logInfo("game counter: LithoKraft %s (%s)", lithokraft::gameCounter(), lithokraft::buildVersion());  // 2026-10-24 (JD)
   if (jdConsoleColor()) std::printf("rolling build counter (ink): %s\n", jdCounterDisplay().c_str());  // 2026-10-18 (JD): 8 wheels, base 64, every build rolls it; wheel-inked on terminals (jdCounterDisplay)
   logInfo("sim tick radius %d chunks (from %s), %s area (from %s), %s stream area (from %s)", cfg.tickRadius, radiusSource,
           cfg.diamondSimArea ? "diamond" : cfg.roundSimArea ? "round" : "square", roundSource,
