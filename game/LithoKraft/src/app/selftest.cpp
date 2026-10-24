@@ -833,7 +833,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   }
   {  // P3-2 (World/save tail): B-L2 packPos range, B-L5 LightEngine clamp,
      // B-M4 trace-strength keys, C-M3 region size cap, C-L2 .torn rotation,
-     // C-L3 AnvilRegion quarantine count.
+     // C-L3 cAnvilRegion quarantine count.
     using namespace litholattice;
     // B-L2: packPos round-trips inside its range and ALIASES outside it
     // (the alias pair is the documented hazard the bounds protect against).
@@ -897,17 +897,17 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
                 readAll(tp.string() + ".torn.1") == storage::Bytes{'H', 'H'},
             "storage (C-L2): two recoveries keep BOTH torn primaries (.torn and .torn.1); the first evidence is never overwritten");
     }
-    {  // C-L3: a malformed AnvilRegion index entry is quarantined + counted.
+    {  // C-L3: a malformed cAnvilRegion index entry is quarantined + counted.
       const auto ap = pdir / "r.0.0.llar";
       size_t before = 0;
-      { storage::AnvilRegion ar(ap, 0, 0); std::string e; ar.open(&e); ar.put(1, 1, storage::AnvilRegion::kCodecNone, storage::Bytes{7, 7, 7}, &e); before = ar.count(); }
+      { storage::cAnvilRegion ar(ap, 0, 0); std::string e; ar.open(&e); ar.put(1, 1, storage::cAnvilRegion::kCodecNone, storage::Bytes{7, 7, 7}, &e); before = ar.count(); }
       {  // entry 7 (lx=7, lz=0): nonzero offset with a zero count = malformed
         std::fstream f(ap, std::ios::in | std::ios::out | std::ios::binary);
         f.seekp(16 + 4 * 7);
         const char bad[4] = {0, 0, 5, 0};
         f.write(bad, 4);
       }
-      storage::AnvilRegion ar2(ap, 0, 0);
+      storage::cAnvilRegion ar2(ap, 0, 0);
       std::string e;
       check(ar2.open(&e) && ar2.quarantinedEntryCount() == 1 && ar2.count() == before,
             "storage (C-L3): a malformed AnvilRegion index entry is normalised to absent, logged and counted (not silent)");
