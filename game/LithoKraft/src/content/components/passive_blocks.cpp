@@ -14,14 +14,14 @@ class Wire final : public cBlockBehavior {
 };
 
 /// Torches and plain lamps: state 1 = lit.
-class OnOff final : public cBlockBehavior {
+class cOnOff final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState s) const override {
     return std::format("{} | {}", d.name, (s & 1) ? "ON" : "off");
   }
 };
 
-class ColorLamp final : public cBlockBehavior {
+class cColorLamp final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState s) const override {
     const int v = stValue(s);
@@ -34,8 +34,8 @@ class ColorLamp final : public cBlockBehavior {
 
 void registerPassive(const Registrar& add) {
   add("wire", std::make_unique<Wire>());
-  add("on_off", std::make_unique<OnOff>());
-  add("color_lamp", std::make_unique<ColorLamp>());
+  add("on_off", std::make_unique<cOnOff>());
+  add("color_lamp", std::make_unique<cColorLamp>());
 }
 
 }  // namespace lithokraft::components

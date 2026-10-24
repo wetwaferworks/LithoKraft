@@ -211,7 +211,7 @@ class Catchor final : public cCompBehavior {
   }
 };
 /// T flip-flop: each rising edge at the back toggles; the front outputs 64 while on.
-class FastLatch final : public cCompBehavior {
+class cFastLatch final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st);
@@ -430,7 +430,7 @@ void registerLogic(const Registrar& add) {
   add("signal_receivor", std::make_unique<SignalReceivor>());
   add("dish", std::make_unique<Dish>());
   add("overclockor", std::make_unique<Overclockor>());
-  add("fast_latch", std::make_unique<FastLatch>());
+  add("fast_latch", std::make_unique<cFastLatch>());
   add("portor", std::make_unique<Portor>());
   add("fusor", std::make_unique<Fusor>());
 }

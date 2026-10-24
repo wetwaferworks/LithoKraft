@@ -22,7 +22,7 @@
 namespace lithokraft::components {
 namespace {
 
-class EtchorBehavior final : public cBlockBehavior {
+class cEtchorBehavior final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState /*s*/) const override { return std::string(d.name); }
 };
@@ -30,7 +30,7 @@ class EtchorBehavior final : public cBlockBehavior {
 }  // namespace
 
 void registerEtchor(const Registrar& add) {
-  add("etchor", std::make_unique<EtchorBehavior>());
+  add("etchor", std::make_unique<cEtchorBehavior>());
 }
 
 }  // namespace lithokraft::components

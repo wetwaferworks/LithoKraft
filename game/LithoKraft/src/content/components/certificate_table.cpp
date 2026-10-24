@@ -28,7 +28,7 @@
 namespace lithokraft::components {
 namespace {
 
-class CertificateTableBehavior final : public cBlockBehavior {
+class cCertificateTableBehavior final : public cBlockBehavior {
  public:
   // Readout is the plain block name for now -- the signing pass extends it
   // (e.g. with the player's static balance). No fake state is shown.
@@ -38,7 +38,7 @@ class CertificateTableBehavior final : public cBlockBehavior {
 }  // namespace
 
 void registerCertificateTable(const Registrar& add) {
-  add("certificate_table", std::make_unique<CertificateTableBehavior>());
+  add("certificate_table", std::make_unique<cCertificateTableBehavior>());
 }
 
 }  // namespace lithokraft::components
