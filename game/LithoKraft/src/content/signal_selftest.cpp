@@ -124,7 +124,17 @@ int runSignalSelfTest() {
   run(4);
   check(val(3, y, 34) == 62 && val(5, y, 34) == 64 && val(8, y, 34) == 61, "repeator re-boosts 62 -> 64 into the other colour");
   check(val(1, y, 36) == 64 && val(3, y, 36) == 0, "repeator is one-way (front never feeds back)");
-  put(0, y, 38, kSwitch); put(1, y, 38, kRedTrace); putF(2, y, 38, kRepeator, E); put(3, y, 38, kRedTrace);
+  {  // 2026-10-24 (JD): "LED powers the Repeator" - an LED directly behind a Repeator feeds it 64.
+    put(80, y, 60, kRedTorch); putF(81, y, 60, kRepeator, E); put(82, y, 60, kRedTrace);   // behind
+    putF(81, y, 56, kRepeator, E); put(81, y, 57, kBlueTorch); put(82, y, 56, kRedTrace); // beside
+    putF(84, y, 52, kRepeator, E); put(85, y, 52, kRedTorch); put(83, y, 52, kRedTrace);  // in front
+    run(12);
+    const int behind = val(82, y, 60), beside = val(82, y, 56), front = val(83, y, 52);
+    put(80, y, 60, kAir);
+    run(12);
+    check(behind == 64 && beside == 0 && front == 0 && val(82, y, 60) == 0,
+          "led -> repeator: an LED behind feeds 64; beside or in front does nothing; breaking it drops the output");
+  }  put(0, y, 38, kSwitch); put(1, y, 38, kRedTrace); putF(2, y, 38, kRepeator, E); put(3, y, 38, kRedTrace);
   put(0, y, 40, kSwitch); put(1, y, 40, kRedTrace); putF(2, y, 40, kRepeator, E); put(3, y, 40, kRedTrace);
   // Cortana 2026-10-15 2215 [GAME] (JD D4): delays are 2/4/8/16; a fresh (legacy-encoded) repeator
   // reads as delay 1 -> nearest 2. One click -> 4; three more wrap 8, 16 and back to 2.
