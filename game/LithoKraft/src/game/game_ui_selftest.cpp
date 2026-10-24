@@ -104,7 +104,7 @@ void testScriptBindings(Checker& check) {
   btn.setId("go");
   btn.onScript("click", "void onGo(const string &in)");
   stack.add<ui::Label>("").setId("lbl");
-  stack.add<ui::NumberField>(0, 64, 0).setId("n");
+  stack.add<ui::cNumberField>(0, 64, 0).setId("n");
   const bool built = scripts.loadSource("ui_test", R"(
     void onGo(const string &in id) {
       ui_setText("lbl", "clicked " + id);
@@ -118,7 +118,7 @@ void testScriptBindings(Checker& check) {
   click(ui, center(btn));
   click(ui, center(btn));
   auto* lbl = ui.root().findAs<ui::Label>("lbl");
-  auto* n = ui.root().findAs<ui::NumberField>("n");
+  auto* n = ui.root().findAs<ui::cNumberField>("n");
   check(ready && built && lbl && lbl->text() == "clicked go" && n && n->value() == 14,
         "script bindings: widget event calls the script handler, which reads / writes widgets by id");
   scripts.callHook("void onLoad()");
@@ -154,7 +154,7 @@ void testScriptEditor(Checker& check) {
                       editor.editor()->text().find("v1") != std::string::npos && !editor.modified();
   check(opened && scripts.lastLog() == "v1", "script editor: opens with the first scripts/*.as file");
 
-  ui::TextEditor& ed = *editor.editor();
+  ui::cTextEditor& ed = *editor.editor();
   ed.focus();
   ed.buffer().selectAll();
   ed.buffer().insert("void onLoad() { log(\"v2\"); }\n");
@@ -403,40 +403,40 @@ void testSettingsDialog(Checker& check) {
   check(dlg && dlg->id() == "settings", "settings: the dialog is the top modal");
   ui::cTabView* tabs = dlg ? dlg->findAs<ui::cTabView>("settings-tabs") : nullptr;
   check(tabs && tabs->count() == 4, "settings: Audio / Video / Graphics / Sim tabs");  // Cortana 2026-10-16: + Graphics
-  ui::Slider* vol = dlg ? dlg->findAs<ui::Slider>("set-volume") : nullptr;
+  ui::cSlider* vol = dlg ? dlg->findAs<ui::cSlider>("set-volume") : nullptr;
   check(vol && std::fabs(vol->value() - 75.f) < 0.01f, "settings: volume slider initialised from the current settings");
   if (vol) vol->setValue(40.f, true);
   check(fired && std::fabs(changed.masterVolume - 0.4f) < 1e-6, "settings: the volume slider reports changes");
   fired = false;
-  ui::Checkbox* mute = dlg ? dlg->findAs<ui::Checkbox>("set-mute") : nullptr;
+  ui::cCheckbox* mute = dlg ? dlg->findAs<ui::cCheckbox>("set-mute") : nullptr;
   check(mute && mute->checked(), "settings: mute checkbox initialised");
   if (mute) mute->setChecked(false, true);
   check(fired && !changed.muted, "settings: the mute checkbox reports changes");
   fired = false;
-  ui::Dropdown* disp = dlg ? dlg->findAs<ui::Dropdown>("set-display") : nullptr;
+  ui::cDropdown* disp = dlg ? dlg->findAs<ui::cDropdown>("set-display") : nullptr;
   check(disp && disp->selected() == 3, "settings: display mode dropdown initialised (Fullscreen)");
   if (disp) disp->setSelected(1, true);
   check(fired && changed.displayMode == 1, "settings: the display dropdown reports changes");
   fired = false;
-  ui::Dropdown* hud = dlg ? dlg->findAs<ui::Dropdown>("set-hud") : nullptr;
+  ui::cDropdown* hud = dlg ? dlg->findAs<ui::cDropdown>("set-hud") : nullptr;
   if (hud) hud->setSelected(0, true);
   check(fired && changed.hudScale == 0, "settings: the HUD scale dropdown reports changes");
   fired = false;
-  ui::Dropdown* tps = dlg ? dlg->findAs<ui::Dropdown>("set-tps") : nullptr;
+  ui::cDropdown* tps = dlg ? dlg->findAs<ui::cDropdown>("set-tps") : nullptr;
   check(tps && tps->selected() == 2, "settings: tick rate dropdown initialised (128)");
   if (tps) tps->setSelected(4, true);
   check(fired && changed.tps == 512, "settings: the tick rate dropdown reports changes");
   fired = false;
-  ui::NumberField* radius = dlg ? dlg->findAs<ui::NumberField>("set-radius") : nullptr;
+  ui::cNumberField* radius = dlg ? dlg->findAs<ui::cNumberField>("set-radius") : nullptr;
   check(radius && radius->value() == 12, "settings: tick radius field initialised");
   if (radius) radius->setValue(16, true);
   check(fired && changed.tickRadius == 16, "settings: the tick radius field reports changes");
   fired = false;
-  ui::Checkbox* euv = dlg ? dlg->findAs<ui::Checkbox>("set-euv") : nullptr;
+  ui::cCheckbox* euv = dlg ? dlg->findAs<ui::cCheckbox>("set-euv") : nullptr;
   if (euv) euv->setChecked(true, true);
   check(fired && changed.euv, "settings: the EUV checkbox reports changes");
   fired = false;
-  ui::Dropdown* pbr = dlg ? dlg->findAs<ui::Dropdown>("set-pbrtier") : nullptr;
+  ui::cDropdown* pbr = dlg ? dlg->findAs<ui::cDropdown>("set-pbrtier") : nullptr;
   check(pbr && pbr->selected() == cur.pbrTier, "settings: PBR transparency dropdown initialised from the current settings");
   if (pbr) pbr->setSelected(3, true);
   check(fired && changed.pbrTier == 3, "settings: the PBR transparency dropdown reports changes (live tier)");

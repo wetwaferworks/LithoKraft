@@ -132,7 +132,7 @@ void GameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry
   const float cell = 40 * k * kInventoryScale;  // Cortana 2026-10-16: +25% slots/icons (JD)
   auto& scroll = dlg.body().add<ui::cScrollView>();
   const float gridH = float(rows) * cell;
-  scroll.setLayout(ui::Layout::sized({float(cols) * cell + ui::ScrollBar::kThickness, std::min(gridH, 5 * cell)}));
+  scroll.setLayout(ui::Layout::sized({float(cols) * cell + ui::cScrollBar::kThickness, std::min(gridH, 5 * cell)}));
   auto& grid = scroll.emplaceContent<ui::cGridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
   for (int i = 0; i < count; ++i) {
     const BlockId b = BlockId(i + 1);
@@ -269,7 +269,7 @@ void GameUi::openSettings(const GameSettings& cur) {
   {
     ui::StackPanel& pg = page("Audio");
     ui::StackPanel& vr = row(pg, "Master volume");
-    ui::Slider& vol = vr.add<ui::Slider>(0.f, 100.f, cur.masterVolume * 100.f, 1.f);
+    ui::cSlider& vol = vr.add<ui::cSlider>(0.f, 100.f, cur.masterVolume * 100.f, 1.f);
     vol.setId("set-volume");
     ui::Label& volText = vr.add<ui::Label>();
     volText.setId("set-volume-text");
@@ -280,15 +280,15 @@ void GameUi::openSettings(const GameSettings& cur) {
     };
     showVol(vol.value());
     vol.on("change", [changed, state, showVol, &volText](ui::Widget& w) {
-      const float v = static_cast<ui::Slider&>(w).value();
+      const float v = static_cast<ui::cSlider&>(w).value();
       state->masterVolume = v / 100.f;
       showVol(v);
       changed();
     });
-    ui::Checkbox& mute = pg.add<ui::Checkbox>("Mute audio", cur.muted);
+    ui::cCheckbox& mute = pg.add<ui::cCheckbox>("Mute audio", cur.muted);
     mute.setId("set-mute");
     mute.on("change", [changed, state](ui::Widget& w) {
-      state->muted = static_cast<ui::Checkbox&>(w).checked();
+      state->muted = static_cast<ui::cCheckbox&>(w).checked();
       changed();
     });
   }
@@ -298,34 +298,34 @@ void GameUi::openSettings(const GameSettings& cur) {
     ui::StackPanel& pg = page("Video");
     ui::StackPanel& dr = row(pg, "Display mode");
     const std::vector<std::string> dispItems{kSettingsDisplayModes, kSettingsDisplayModes + kSettingsDisplayModeCount};
-    ui::Dropdown& disp = dr.add<ui::Dropdown>(dispItems, cur.displayMode);
+    ui::cDropdown& disp = dr.add<ui::cDropdown>(dispItems, cur.displayMode);
     disp.setId("set-display");
     disp.on("change", [changed, state](ui::Widget& w) {
-      state->displayMode = static_cast<ui::Dropdown&>(w).selected();
+      state->displayMode = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
-    ui::Checkbox& vsync = pg.add<ui::Checkbox>("VSync (applies on restart)", cur.vsync);
+    ui::cCheckbox& vsync = pg.add<ui::cCheckbox>("VSync (applies on restart)", cur.vsync);
     vsync.setId("set-vsync");
     vsync.on("change", [changed, state](ui::Widget& w) {
-      state->vsync = static_cast<ui::Checkbox&>(w).checked();
+      state->vsync = static_cast<ui::cCheckbox&>(w).checked();
       changed();
     });
     ui::StackPanel& hr = row(pg, "HUD scale");
     const std::vector<std::string> hudItems{"Auto", "1x", "2x", "3x", "4x"};  // Cortana 2026-10-16: GUI scale 1-4
-    ui::Dropdown& hud = hr.add<ui::Dropdown>(hudItems, cur.hudScale);
+    ui::cDropdown& hud = hr.add<ui::cDropdown>(hudItems, cur.hudScale);
     hud.setId("set-hud");
     hud.on("change", [changed, state](ui::Widget& w) {
-      state->hudScale = static_cast<ui::Dropdown&>(w).selected();
+      state->hudScale = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
     // PBR phase 2 (Worker 3): BinaryQuad/PackedVertex coexistence. Boot-only like the
     // tick radius - switching mesh formats needs a world (re)load.
     ui::StackPanel& mr = row(pg, "Mesher (restart)");
     const std::vector<std::string> mesherItems{kSettingsMesherNames, kSettingsMesherNames + kSettingsMesherCount};
-    ui::Dropdown& mesher = mr.add<ui::Dropdown>(mesherItems, cur.mesher);
+    ui::cDropdown& mesher = mr.add<ui::cDropdown>(mesherItems, cur.mesher);
     mesher.setId("set-mesher");
     mesher.on("change", [changed, state](ui::Widget& w) {
-      state->mesher = static_cast<ui::Dropdown&>(w).selected();
+      state->mesher = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
     // PBR phase 2 (Worker 4): the PBR transparency tier applies live via
@@ -335,10 +335,10 @@ void GameUi::openSettings(const GameSettings& cur) {
     ui::StackPanel& pr = row(pg, "PBR transparency (live)");
     const std::vector<std::string> pbrItems{kSettingsPbrTierNames,
                                            kSettingsPbrTierNames + kSettingsPbrTierCount};
-    ui::Dropdown& pbr = pr.add<ui::Dropdown>(pbrItems, cur.pbrTier);
+    ui::cDropdown& pbr = pr.add<ui::cDropdown>(pbrItems, cur.pbrTier);
     pbr.setId("set-pbrtier");
     pbr.on("change", [changed, state](ui::Widget& w) {
-      state->pbrTier = static_cast<ui::Dropdown&>(w).selected();
+      state->pbrTier = static_cast<ui::cDropdown&>(w).selected();
       changed();
     });
     ui::Label& pbrHint =
@@ -353,14 +353,14 @@ void GameUi::openSettings(const GameSettings& cur) {
     pg.add<ui::Label>("Software renderer quality (Auto = 30+ fps on 4-core machines)");
     auto drop = [&](const char* name, const char* id, std::vector<std::string> items, int sel, auto apply) {
       ui::StackPanel& r = row(pg, name);
-      ui::Dropdown& d = r.add<ui::Dropdown>(items, sel);
+      ui::cDropdown& d = r.add<ui::cDropdown>(items, sel);
       d.setId(id);
-      d.on("change", [changed, state, apply](ui::Widget& w) { apply(*state, static_cast<ui::Dropdown&>(w).selected()); changed(); });
+      d.on("change", [changed, state, apply](ui::Widget& w) { apply(*state, static_cast<ui::cDropdown&>(w).selected()); changed(); });
     };
     auto box = [&](const char* name, const char* id, bool on, auto apply) {
-      ui::Checkbox& c = pg.add<ui::Checkbox>(name, on);
+      ui::cCheckbox& c = pg.add<ui::cCheckbox>(name, on);
       c.setId(id);
-      c.on("change", [changed, state, apply](ui::Widget& w) { apply(*state, static_cast<ui::Checkbox&>(w).checked()); changed(); });
+      c.on("change", [changed, state, apply](ui::Widget& w) { apply(*state, static_cast<ui::cCheckbox&>(w).checked()); changed(); });
     };
     const int texSel = cur.texRes == 16 ? 1 : cur.texRes == 32 ? 2 : cur.texRes == 64 ? 3 : 0;
     drop("Texture resolution (F9)", "set-texres", {"Auto", "16", "32", "64"}, texSel,
@@ -377,13 +377,13 @@ void GameUi::openSettings(const GameSettings& cur) {
          [](GameSettings& s, int i) { s.bulbShellSolid = i == 1; });
     box("Emissive block light", "set-emissive-light", cur.emissiveLight, [](GameSettings& s, bool v) { s.emissiveLight = v; });
     // JD 2026-10-16: world streaming and render / stream distance (boot-only).
-    ui::Checkbox& sc = pg.add<ui::Checkbox>("World streaming: generate ahead of you (restart)", cur.streaming);
+    ui::cCheckbox& sc = pg.add<ui::cCheckbox>("World streaming: generate ahead of you (restart)", cur.streaming);
     sc.setId("set-streaming");
-    sc.on("change", [changed, state](ui::Widget& w) { state->streaming = static_cast<ui::Checkbox&>(w).checked(); changed(); });
+    sc.on("change", [changed, state](ui::Widget& w) { state->streaming = static_cast<ui::cCheckbox&>(w).checked(); changed(); });
     ui::StackPanel& rr = row(pg, "Render / stream distance, chunks (0 = auto: Vulkan 64, others 32; restart)");
-    ui::NumberField& nf = rr.add<ui::NumberField>(0, 64, cur.streamRadius);
+    ui::cNumberField& nf = rr.add<ui::cNumberField>(0, 64, cur.streamRadius);
     nf.setId("set-stream-radius");
-    nf.on("change", [changed, state](ui::Widget& w) { state->streamRadius = static_cast<ui::NumberField&>(w).value(); changed(); });
+    nf.on("change", [changed, state](ui::Widget& w) { state->streamRadius = static_cast<ui::cNumberField&>(w).value(); changed(); });
     // JD Vulkan push (Cortana 2026-10-16): one toggle per Vulkan effect (live; GL33 / software keep their look).
     pg.add<ui::Label>("Vulkan effects (live; OpenGL / software unchanged)");
     struct FxBox { const char* name; const char* id; int bit; };
@@ -414,28 +414,28 @@ void GameUi::openSettings(const GameSettings& cur) {
       tpsItems.push_back(std::to_string(kSettingsTpsModes[i]));
       if (kSettingsTpsModes[i] == cur.tps) tpsSel = i;
     }
-    ui::Dropdown& tps = tr.add<ui::Dropdown>(tpsItems, tpsSel);
+    ui::cDropdown& tps = tr.add<ui::cDropdown>(tpsItems, tpsSel);
     tps.setId("set-tps");
     tps.on("change", [changed, state](ui::Widget& w) {
-      state->tps = kSettingsTpsModes[static_cast<ui::Dropdown&>(w).selected()];
+      state->tps = kSettingsTpsModes[static_cast<ui::cDropdown&>(w).selected()];
       changed();
     });
     ui::StackPanel& rr = row(pg, "Simulation distance, chunks (restart)");
-    ui::NumberField& radius = rr.add<ui::NumberField>(0, 512, cur.tickRadius);
+    ui::cNumberField& radius = rr.add<ui::cNumberField>(0, 512, cur.tickRadius);
     radius.setId("set-radius");
     radius.on("change", [changed, state](ui::Widget& w) {
-      state->tickRadius = static_cast<ui::NumberField&>(w).value();
+      state->tickRadius = static_cast<ui::cNumberField&>(w).value();
       changed();
     });
     {  // F56-7 (Proposed by JD, Built by Cortana): round sim area
-      ui::Checkbox& rnd = pg.add<ui::Checkbox>("Round simulation area (restart)", cur.roundSimArea);
+      ui::cCheckbox& rnd = pg.add<ui::cCheckbox>("Round simulation area (restart)", cur.roundSimArea);
       rnd.setId("set-round-sim");
-      rnd.on("change", [changed, state](ui::Widget& w) { state->roundSimArea = static_cast<ui::Checkbox&>(w).checked(); changed(); });
+      rnd.on("change", [changed, state](ui::Widget& w) { state->roundSimArea = static_cast<ui::cCheckbox&>(w).checked(); changed(); });
     }
-    ui::Checkbox& euv = pg.add<ui::Checkbox>("EUV domain (live)", cur.euv);
+    ui::cCheckbox& euv = pg.add<ui::cCheckbox>("EUV domain (live)", cur.euv);
     euv.setId("set-euv");
     euv.on("change", [changed, state](ui::Widget& w) {
-      state->euv = static_cast<ui::Checkbox&>(w).checked();
+      state->euv = static_cast<ui::cCheckbox&>(w).checked();
       changed();
     });
   }

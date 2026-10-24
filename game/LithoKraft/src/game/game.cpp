@@ -2028,7 +2028,7 @@ void Game::updateUi(float dt, int width, int height) {
     ui_.applyTheme(resources_.theme());
   }
   // Text entry (script editor, focused text field) gets every key: push the opaque UiText context.
-  const bool wantText = editorOpen() || dynamic_cast<const ui::TextEditBase*>(ui_.root().focus()) != nullptr;
+  const bool wantText = editorOpen() || dynamic_cast<const ui::cTextEditBase*>(ui_.root().focus()) != nullptr;
   if (wantText != uiText_) {
     uiText_ = wantText;
     if (wantText) input_.push(InputContext::UiText);

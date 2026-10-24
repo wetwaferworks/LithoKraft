@@ -21,9 +21,9 @@ std::string uiText(const std::string& id, UiScriptBindings* b) {
   ui::Widget* w = find(b, id);
   if (auto* l = dynamic_cast<ui::Label*>(w)) return l->text();
   if (auto* t = dynamic_cast<ui::Button*>(w)) return t->text();
-  if (auto* e = dynamic_cast<ui::TextEditBase*>(w)) return e->text();
-  if (auto* d = dynamic_cast<ui::Dropdown*>(w); d && !d->items().empty()) return d->items()[size_t(d->selected())];
-  if (auto* l = dynamic_cast<ui::ListView*>(w); l && l->selectedItem()) return *l->selectedItem();
+  if (auto* e = dynamic_cast<ui::cTextEditBase*>(w)) return e->text();
+  if (auto* d = dynamic_cast<ui::cDropdown*>(w); d && !d->items().empty()) return d->items()[size_t(d->selected())];
+  if (auto* l = dynamic_cast<ui::cListView*>(w); l && l->selectedItem()) return *l->selectedItem();
   return {};
 }
 
@@ -31,35 +31,35 @@ void uiSetText(const std::string& id, const std::string& text, UiScriptBindings*
   ui::Widget* w = find(b, id);
   if (auto* l = dynamic_cast<ui::Label*>(w)) l->setText(text);
   else if (auto* t = dynamic_cast<ui::Button*>(w)) t->setText(text);
-  else if (auto* e = dynamic_cast<ui::TextEditBase*>(w)) e->setText(text);
+  else if (auto* e = dynamic_cast<ui::cTextEditBase*>(w)) e->setText(text);
 }
 
 bool uiChecked(const std::string& id, UiScriptBindings* b) {
-  auto* c = dynamic_cast<ui::Checkbox*>(find(b, id));
+  auto* c = dynamic_cast<ui::cCheckbox*>(find(b, id));
   return c && c->checked();
 }
 
 void uiSetChecked(const std::string& id, bool on, UiScriptBindings* b) {
-  if (auto* c = dynamic_cast<ui::Checkbox*>(find(b, id))) c->setChecked(on);
+  if (auto* c = dynamic_cast<ui::cCheckbox*>(find(b, id))) c->setChecked(on);
 }
 
 float uiValue(const std::string& id, UiScriptBindings* b) {
   ui::Widget* w = find(b, id);
-  if (auto* s = dynamic_cast<ui::Slider*>(w)) return s->value();
-  if (auto* n = dynamic_cast<ui::NumberField*>(w)) return float(n->value());
+  if (auto* s = dynamic_cast<ui::cSlider*>(w)) return s->value();
+  if (auto* n = dynamic_cast<ui::cNumberField*>(w)) return float(n->value());
   if (auto* p = dynamic_cast<ui::cProgressBar*>(w)) return p->value();
-  if (auto* d = dynamic_cast<ui::Dropdown*>(w)) return float(d->selected());
-  if (auto* l = dynamic_cast<ui::ListView*>(w)) return float(l->selected());
+  if (auto* d = dynamic_cast<ui::cDropdown*>(w)) return float(d->selected());
+  if (auto* l = dynamic_cast<ui::cListView*>(w)) return float(l->selected());
   return 0.f;
 }
 
 void uiSetValue(const std::string& id, float v, UiScriptBindings* b) {
   ui::Widget* w = find(b, id);
-  if (auto* s = dynamic_cast<ui::Slider*>(w)) s->setValue(v);
-  else if (auto* n = dynamic_cast<ui::NumberField*>(w)) n->setValue(int(v));
+  if (auto* s = dynamic_cast<ui::cSlider*>(w)) s->setValue(v);
+  else if (auto* n = dynamic_cast<ui::cNumberField*>(w)) n->setValue(int(v));
   else if (auto* p = dynamic_cast<ui::cProgressBar*>(w)) p->setValue(v);
-  else if (auto* d = dynamic_cast<ui::Dropdown*>(w)) d->setSelected(int(v));
-  else if (auto* l = dynamic_cast<ui::ListView*>(w)) l->setSelected(int(v));
+  else if (auto* d = dynamic_cast<ui::cDropdown*>(w)) d->setSelected(int(v));
+  else if (auto* l = dynamic_cast<ui::cListView*>(w)) l->setSelected(int(v));
 }
 
 void uiSetVisible(const std::string& id, bool on, UiScriptBindings* b) {

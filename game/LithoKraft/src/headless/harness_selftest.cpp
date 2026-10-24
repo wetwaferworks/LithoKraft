@@ -84,12 +84,12 @@ void testSettingsApply(Checker& check) {
   hg.frame();
   check(g.gameUi().settingsOpen(), "settings: the dialog opens from the game");
   auto* dlg = g.gameUi().root().topModal();
-  auto* vol = dlg ? dlg->findAs<litholattice::ui::Slider>("set-volume") : nullptr;
+  auto* vol = dlg ? dlg->findAs<litholattice::ui::cSlider>("set-volume") : nullptr;
   check(vol != nullptr, "settings: the volume slider exists");
   if (vol) vol->setValue(40.f, true);  // fires settingsChanged -> Game::onSettingsChanged
   check(std::fabs(g.settings().masterVolume - 0.4f) < 1e-6,
         "settings: the volume change applies to the live game settings");
-  auto* mute = dlg ? dlg->findAs<litholattice::ui::Checkbox>("set-mute") : nullptr;
+  auto* mute = dlg ? dlg->findAs<litholattice::ui::cCheckbox>("set-mute") : nullptr;
   if (mute) mute->setChecked(true, true);
   check(g.settings().muted, "settings: the mute change applies to the live game settings");
   g.gameUi().closeSettings();

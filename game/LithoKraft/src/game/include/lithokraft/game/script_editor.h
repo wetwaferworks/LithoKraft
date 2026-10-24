@@ -1,5 +1,5 @@
 // Debug in-game script editor (F10): a modal dialog with a menu bar, the scripts/*.as files on
-// the left and a TextEditor on the right. Save (Ctrl+S) writes the file and hot-reloads all
+// the left and a cTextEditor on the right. Save (Ctrl+S) writes the file and hot-reloads all
 // scripts through the ScriptEngine (on a compile error the previous scripts stay active and the
 // caret jumps to the first error). Only files listed from the scripts folder can be opened or
 // written: the editor never takes a path from the user.
@@ -15,8 +15,8 @@
 namespace litholattice::ui {
 class Dialog;
 class Label;
-class ListView;
-class TextEditor;
+class cListView;
+class cTextEditor;
 }  // namespace litholattice::ui
 
 namespace lithokraft {
@@ -37,7 +37,7 @@ class ScriptEditor {
   bool modified() const;
   const std::string& currentFile() const { return file_; }
   const std::string& status() const { return status_; }
-  ui::TextEditor* editor() const { return editor_; }
+  ui::cTextEditor* editor() const { return editor_; }
 
  private:
   void refreshFiles();
@@ -54,8 +54,8 @@ class ScriptEditor {
   std::string file_, status_;
   uint64_t savedRevision_ = 0;
   ui::Dialog* dialog_ = nullptr;
-  ui::ListView* list_ = nullptr;
-  ui::TextEditor* editor_ = nullptr;
+  ui::cListView* list_ = nullptr;
+  ui::cTextEditor* editor_ = nullptr;
   ui::Label* statusLabel_ = nullptr;
 };
 

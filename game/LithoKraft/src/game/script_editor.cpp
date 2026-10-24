@@ -59,7 +59,7 @@ void ScriptEditor::open() {
     return false;
   });
 
-  auto& bar = dlg.body().add<ui::MenuBar>();
+  auto& bar = dlg.body().add<ui::cMenuBar>();
   ui::MenuItem save;
   save.label = "Save + reload";
   save.shortcut = "Ctrl+S";
@@ -75,10 +75,10 @@ void ScriptEditor::open() {
 
   auto& split = dlg.body().add<ui::cSplitter>(ui::Orientation::Horizontal, 0.2f);
   split.layout().flex = 1;
-  auto list = std::make_unique<ui::ListView>();
+  auto list = std::make_unique<ui::cListView>();
   list_ = list.get();
   split.setPane(0, std::move(list));
-  auto editor = std::make_unique<ui::TextEditor>();
+  auto editor = std::make_unique<ui::cTextEditor>();
   editor_ = editor.get();
   split.setPane(1, std::move(editor));
   statusLabel_ = &dlg.body().add<ui::Label>();
