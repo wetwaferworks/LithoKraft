@@ -211,7 +211,8 @@ bool cLithoKraftAppearance::shapedRender(const BlockDef& def) const {
   const SimRole r = roleOf(def);
   return def.shape == Shape::Cube &&
          (r == SimRole::Redirector || r == SimRole::Thresholdor || r == SimRole::Pulsor || r == SimRole::Catchor ||
-          r == SimRole::Keyboard);  // 2026-10-24 (JD): Keyboard = repeater-size slab (CloudAtlas keyboard.json)
+          r == SimRole::Keyboard ||
+          r == SimRole::FastLatch);  // 2026-10-24 (JD approved placeholder): CloudAtlas fastlatch.json, out N + in S pads  // 2026-10-24 (JD): Keyboard = repeater-size slab (CloudAtlas keyboard.json)
 }
 bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out) const {
   const BlockDef def = cell.def();

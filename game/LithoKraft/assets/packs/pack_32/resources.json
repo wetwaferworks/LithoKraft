@@ -95,6 +95,15 @@
   "etchor": "textures/blocks/etchor.png",
   "fast_latch_off": "textures/blocks/fast_latch_off.png",
   "fast_latch_on": "textures/blocks/fast_latch_on.png",
+  "fast_latch_top": "textures/blocks/fast_latch_top.png",
+  "fast_latch_front": "textures/blocks/fast_latch_front.png",
+  "fast_latch_back": "textures/blocks/fast_latch_back.png",
+  "fast_latch_side": "textures/blocks/fast_latch_side.png",
+  "fast_latch_bottom": "textures/blocks/fast_latch_bottom.png",
+  "fast_latch_top_on": "textures/blocks/fast_latch_top_on.png",
+  "fast_latch_front_on": "textures/blocks/fast_latch_front_on.png",
+  "fast_latch_back_on": "textures/blocks/fast_latch_back_on.png",
+  "fast_latch_side_on": "textures/blocks/fast_latch_side_on.png",
   "formula_shrub_311": "textures/blocks/formula_shrub_311.png",
   "formula_shrub_314": "textures/blocks/formula_shrub_314.png",
   "frosted_glass": "textures/blocks/frosted_glass.png",
@@ -564,10 +573,17 @@
   },
   "fast_latch": {
    "faces": {
-    "all": "fast_latch_off"
+    "back": "fast_latch_back",
+    "bottom": "fast_latch_bottom",
+    "front": "fast_latch_front",
+    "side": "fast_latch_side",
+    "top": "fast_latch_top"
    },
    "active": {
-    "all": "fast_latch_on"
+    "back": "fast_latch_back_on",
+    "front": "fast_latch_front_on",
+    "side": "fast_latch_side_on",
+    "top": "fast_latch_top_on"
    }
   },
   "formula_shrub_311": {
