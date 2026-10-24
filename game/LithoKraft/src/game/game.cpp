@@ -1060,7 +1060,8 @@ void Game::loadActive() {
               runOk ? "placed" : "SKIPPED", rx, floorY + 1, rz, rx + 63, floorY + 1, rz, (ccx + 2) * 16, (ccx + 3) * 16, (ccx + 4) * 16, (ccx + 5) * 16);
       // 2026-10-24 (JD "Yes, add it"): a small working wired screen, 16 lamps wide x 4 stages (12 lamp rows),
       // the same Memor -> Pulsor -> trace -> lamp shift register + frame cache as the Examples FRAMEBUFFER, east of the grid.
-      const int fx = (ccx + 6) * 16 + 8, fz = ccz * 16 + 4;
+      // 2026-10-24 5:00 PM (JD "Yes, move it in"): south of the grid, chunks x 2..4 z 6..7, fully inside sim distance 6 of spawn chunk (3,2).
+      const int fx = (ccx + 2) * 16 + 8, fz = (ccz + 6) * 16 + 2;
       const FramebufferLayout fb16 = buildFramebufferScene(cw, fx, floorY + 1, fz, 32, 16);
       logInfo("test world wired screen 16: lamps x %d..%d z %d..%d y %d (frame cache z %d, viewing stand y %d); %d blocks", fx + 8, fx + 24,
               fb16.screenZ0, fb16.screenZ1, floorY + 2, fb16.cacheZ, floorY + 15, fb16.blocks);
