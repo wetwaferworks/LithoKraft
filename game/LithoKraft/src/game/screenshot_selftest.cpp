@@ -104,8 +104,8 @@ bool pngDims(const std::vector<uint8_t>& png, int& w, int& h) {
 
 // -- Command registration / parsing ------------------------------------------
 void testCommandParsing() {
-  using litholattice::console::ConsoleRegistry;
-  ConsoleRegistry r;
+  using litholattice::console::cConsoleReg;
+  cConsoleReg r;
   std::vector<ScreenshotRequest> seen;
   std::vector<std::string> printed;
   r.setOutput([&](const std::string& line) { printed.push_back(line); });
@@ -319,9 +319,9 @@ void testFragmentGallery() {
 
 // -- Session tier (P1b, App. F M6): quit/save/map refused for restricted masks --
 void testSessionTier() {
-  using litholattice::console::ConsoleRegistry;
+  using litholattice::console::cConsoleReg;
   using litholattice::console::kCallerFullAuthority;
-  ConsoleRegistry r;
+  cConsoleReg r;
   std::vector<std::string> printed;
   r.setOutput([&](const std::string& line) { printed.push_back(line); });
   int quits = 0, saves = 0, maps = 0;

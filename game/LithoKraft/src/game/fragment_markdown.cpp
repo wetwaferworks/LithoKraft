@@ -544,7 +544,7 @@ std::string extractMarkdownSource(const std::string& text, std::string* err) {
   std::string local;
   std::string* errPtr = err ? err : &local;
   const std::vector<std::string> bodies =
-      litholattice::console::ConsoleRegistry::extractComments(text, errPtr);
+      litholattice::console::cConsoleReg::extractComments(text, errPtr);
   std::string out;
   for (size_t k = 0; k < bodies.size(); ++k) {
     if (k) out += '\n';

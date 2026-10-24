@@ -45,7 +45,7 @@
 #include "lithokraft/game/screenshot.h"  // ScreenshotRequest
 
 namespace litholattice::console {
-class ConsoleRegistry;
+class cConsoleReg;
 }  // namespace litholattice::console
 
 namespace lithokraft {
@@ -125,7 +125,7 @@ struct GameCommandBindings {
 
 /// Registers the Decision-9 commands on `r`. give/kill are cheat-flagged;
 /// hotswap_refresh is debug-only (#ifndef NDEBUG) and cheat-flagged.
-void registerGameCommands(litholattice::console::ConsoleRegistry& r,
+void registerGameCommands(litholattice::console::cConsoleReg& r,
                           GameCommandBindings b);
 
 }  // namespace lithokraft

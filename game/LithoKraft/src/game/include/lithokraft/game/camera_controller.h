@@ -1,5 +1,5 @@
 // GameCameraController: LithoKraft's integration of the engine camera system
-// (litholattice::camera). Owns the game's CameraManager and its cameras:
+// (litholattice::camera). Owns the game's cCameraMgr and its cameras:
 //
 //   - the player camera, attached to the local player through a
 //     PlayerCameraTarget adapter. The target's ANCHOR is the player's
@@ -30,7 +30,7 @@
 //
 // FP-BYPASS SCOPE (CAM-4, review 2026-10-13): "the camera system drives the
 // view" is true for the NON-first-person modes and for MCP pilots — those
-// render from the CameraManager's resolved poses. FIRST PERSON is a
+// render from the cCameraMgr's resolved poses. FIRST PERSON is a
 // deliberate bypass (for pre-system exactness): viewPose() composes the FP
 // pose directly from the player (eye position via playerEyePos at the live
 // eye height, forward/yaw/pitch, the fixed 1.2 rad FOV) and does NOT read
@@ -64,7 +64,7 @@
 namespace litholattice {
 class InputSystem;
 namespace console {
-class ConsoleRegistry;
+class cConsoleReg;
 }  // namespace console
 namespace camera {
 struct CameraCvarValues;  // camera/camera.h — full definition in the .cpp
@@ -246,6 +246,6 @@ struct CameraCommandBindings {
   std::function<std::string(std::string_view modeName)> setModeByName;
   std::function<std::string()> status;
 };
-void registerCameraCommands(litholattice::console::ConsoleRegistry& r, CameraCommandBindings b);
+void registerCameraCommands(litholattice::console::cConsoleReg& r, CameraCommandBindings b);
 
 }  // namespace lithokraft

@@ -254,7 +254,7 @@ void PilotCameraRig::publishResolved(std::string_view pilot, const CameraViewPos
 struct GameCameraController::Impl {
   explicit Impl(GameCameraHooks hooks) : world(std::move(hooks)) {}
 
-  cam::CameraManager manager;
+  cam::cCameraMgr manager;
   cGameCameraWorld world;
   std::function<McpPlayerView::GameState()> pilotSnapshot;
   std::shared_ptr<cPlayerCameraTarget> playerTarget;
@@ -278,7 +278,7 @@ GameCameraController::GameCameraController(Player& player, GameCameraHooks hooks
   cam::CameraConfig cfg;
   cfg.fovDeg = kGameFovDeg;
   auto makeCam = [&](cam::CameraMode mode, bool attachPlayer) {
-    auto c = std::make_shared<cam::Camera>(cfg);
+    auto c = std::make_shared<cam::cCamera>(cfg);
     c->setMode(mode);
     if (attachPlayer) c->attach(impl_->playerTarget);
     return c;
@@ -415,7 +415,7 @@ void GameCameraController::update(const litholattice::InputSystem& in, float dt,
       if (!slot) {
         auto cfg = cam::CameraConfig{};
         cam::applyCameraCvars(im.cvars, cfg);
-        slot = std::make_shared<cam::Camera>(cfg);
+        slot = std::make_shared<cam::cCamera>(cfg);
         im.manager.addCamera("pilot:" + name, slot);
         im.pilotAppliedTracking[name] = false;
       }
@@ -531,14 +531,14 @@ std::optional<GameCameraMode> parseGameCameraMode(std::string_view name) {
   return std::nullopt;
 }
 
-void registerCameraCommands(litholattice::console::ConsoleRegistry& r, CameraCommandBindings b) {
+void registerCameraCommands(litholattice::console::cConsoleReg& r, CameraCommandBindings b) {
   using litholattice::console::ConsoleArgs;
-  using litholattice::console::ConsoleRegistry;
+  using litholattice::console::cConsoleReg;
   std::string err;
   r.registerCommand(
       "camera",
       "camera [first|third|follow|free] - view camera mode (no arg = current mode)",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (a.size() == 1) {
           r.print(b.status());
           return;

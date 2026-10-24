@@ -13,7 +13,7 @@ namespace {
 
 using litholattice::console::CommandFlags;
 using litholattice::console::ConsoleArgs;
-using litholattice::console::ConsoleRegistry;
+using litholattice::console::cConsoleReg;
 
 uint32_t parseU32(const std::string& s, bool& ok) {
   try {
@@ -43,7 +43,7 @@ int parseInt(const std::string& s, bool& ok) {
 
 }  // namespace
 
-void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
+void registerGameCommands(cConsoleReg& r, GameCommandBindings b) {
   CommandFlags cheat;
   cheat.cheat = true;
   // Session tier (P1b, 2026-10-13, Appendix F M6): quit/save/map are not
@@ -57,7 +57,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // give <itemId> [count] — cheat.
   r.registerCommand(
       "give", "give <itemId> [count] - add items to the player inventory (cheat)",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (a.size() < 2 || a.size() > 3) {
           r.print("usage: give <itemId> [count]");
           return;
@@ -80,7 +80,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // kill — cheat; respawn until the health system lands.
   r.registerCommand(
       "kill", "kill - respawn the player at spawn (cheat; provisional)",
-      [b](ConsoleRegistry& r, const ConsoleArgs&) { r.print(b.kill()); }, cheat,
+      [b](cConsoleReg& r, const ConsoleArgs&) { r.print(b.kill()); }, cheat,
       &err);
 
   // fly [on|off] — cheat; toggles the player's locomotion Fly mode. The
@@ -88,7 +88,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // touched by this.
   r.registerCommand(
       "fly", "fly [on|off] - toggle player flight (locomotion Fly mode; cheat)",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (a.size() > 2) {
           r.print("usage: fly [on|off]");
           return;
@@ -104,7 +104,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // the verb, joined by single spaces (a name field is one line).
   r.registerCommand(
       "etch", "etch <name...> - etch a Chipor from a blank wafer, bearing the name field",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (a.size() < 2) {
           r.print("usage: etch <name...>");
           return;
@@ -119,11 +119,11 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   if (b.etchScan)
     r.registerCommand(
         "etchscan", "etchscan - diagnose the nearest lithography machine (laser, expose/mask bits, wafers)",
-        [b](ConsoleRegistry& r, const ConsoleArgs&) { r.print(b.etchScan()); }, session, &err);
+        [b](cConsoleReg& r, const ConsoleArgs&) { r.print(b.etchScan()); }, session, &err);
   if (b.etchLoad)
     r.registerCommand(
         "etchload", "etchload [n] - load blank wafers (Wafer Silicon) into the nearest machine's back buffer",
-        [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+        [b](cConsoleReg& r, const ConsoleArgs& a) {
           int n = 64;
           if (a.size() >= 2) n = std::atoi(a[1].c_str());
           r.print(b.etchLoad(n));
@@ -135,7 +135,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // stack. Session-tier: it spends a player resource.
   r.registerCommand(
       "sign", "sign <certificate> - sign the selected hotbar item (spends static levels; see: certificates)",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (a.size() != 2) {
           r.print("usage: sign <certificate>  (see: certificates)");
           return;
@@ -152,7 +152,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // provokes mobs from the console.
   r.registerCommand(
       "deceitor", "deceitor <spawn|interact|attack> - Deceitor mob test paths (cheat; needs ai.enabled)",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (a.size() != 2) {
           r.print("usage: deceitor <spawn|interact|attack>");
           return;
@@ -167,14 +167,14 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // certificates — the registry + the player's standing. Read-only.
   r.registerCommand(
       "certificates", "certificates - list signable certificates and your static level",
-      [b](ConsoleRegistry& r, const ConsoleArgs&) { r.print(b.listCertificates()); },
+      [b](cConsoleReg& r, const ConsoleArgs&) { r.print(b.listCertificates()); },
       CommandFlags{}, &err);
 
   // map [dimension] — not a cheat (navigation, like HL1), but session-tier:
   // switching dimension is a session action restricted callers cannot run.
   r.registerCommand(
       "map", "map [dimension] - switch dimension, or list dimensions",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (a.size() > 2) {
           r.print("usage: map [dimension]");
           return;
@@ -192,21 +192,21 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
 
   // save — not a cheat, but session-tier (writes the world to disk).
   r.registerCommand("save", "save - save the world now",
-                    [b](ConsoleRegistry& r, const ConsoleArgs&) {
+                    [b](cConsoleReg& r, const ConsoleArgs&) {
                       r.print(b.save());
                     },
                     session, &err);
 
   // pause — not a cheat.
   r.registerCommand("pause", "pause - toggle pause",
-                    [b](ConsoleRegistry& r, const ConsoleArgs&) {
+                    [b](cConsoleReg& r, const ConsoleArgs&) {
                       r.print(b.pauseToggle());
                     },
                     &err);
 
   // quit — not a cheat, but session-tier (ends the session).
   r.registerCommand("quit", "quit - quit to desktop",
-                    [b](ConsoleRegistry&, const ConsoleArgs&) { b.quit(); }, session, &err);
+                    [b](cConsoleReg&, const ConsoleArgs&) { b.quit(); }, session, &err);
 
   // screenshot — not a cheat. Captures the current framebuffer to PNG; the
   // capture lands on the next rendered frame (the command runs during
@@ -222,7 +222,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
       "screenshot",
       "screenshot [path] [lowres] | screenshot fragment [lowres] [caption...] - "
       "capture the framebuffer to PNG (lowres = mcp.vision_width x mcp.vision_height)",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (!b.screenshot) {
           r.print("screenshot: unavailable");
           return;
@@ -275,7 +275,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // resolves the name against the active dimension's biome list.
   r.registerCommand(
       "locatebiome", "locatebiome <biome> - find the nearest <biome> column from the player",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (!b.locateBiome) {
           r.print("locatebiome: unavailable");
           return;
@@ -298,7 +298,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // blocks across; granularity is the required blocks-per-pixel (8/16/32/64).
   r.registerCommand(
       "genmap", "genmap <path> <center> <zoom> <granularity> - render a top-down biome/structure overview map to PNG",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (!b.genmap) {
           r.print("genmap: unavailable");
           return;
@@ -333,7 +333,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // tick freeze — pause the tick engine (creative-mode contraption debugger).
   r.registerCommand(
       "tick_freeze", "tick_freeze - freeze the tick engine (pause all ticks)",
-      [b](ConsoleRegistry& r, const ConsoleArgs&) {
+      [b](cConsoleReg& r, const ConsoleArgs&) {
         if (!b.tickFreeze) { r.print("tick_freeze: unavailable"); return; }
         r.print(b.tickFreeze());
       },
@@ -342,7 +342,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // tick unfreeze — resume the tick engine.
   r.registerCommand(
       "tick_unfreeze", "tick_unfreeze - unfreeze the tick engine (resume ticks)",
-      [b](ConsoleRegistry& r, const ConsoleArgs&) {
+      [b](cConsoleReg& r, const ConsoleArgs&) {
         if (!b.tickUnfreeze) { r.print("tick_unfreeze: unavailable"); return; }
         r.print(b.tickUnfreeze());
       },
@@ -351,7 +351,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // tick step <n> — advance n ticks while frozen (tick-by-tick debugger).
   r.registerCommand(
       "tick_step", "tick_step <n> - advance <n> ticks while frozen (default 1)",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (!b.tickStep) { r.print("tick_step: unavailable"); return; }
         uint64_t n = 1;
         if (a.size() >= 2) {
@@ -371,7 +371,7 @@ void registerGameCommands(ConsoleRegistry& r, GameCommandBindings b) {
   // sim ticks via the binding. Cheat: mutates content at runtime.
   r.registerCommand(
       "hotswap_refresh", "hotswap_refresh - apply staged block-definition updates (debug only; cheat)",
-      [b](ConsoleRegistry& r, const ConsoleArgs&) {
+      [b](cConsoleReg& r, const ConsoleArgs&) {
         if (!b.hotswapRefresh) { r.print("hotswap_refresh: unavailable"); return; }
         r.print(b.hotswapRefresh());
       },

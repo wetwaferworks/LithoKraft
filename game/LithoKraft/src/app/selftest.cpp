@@ -161,7 +161,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     {  // Cvar flow: render.fps_cap registered by SettingsCvars; a console
        // set flows through the apply path with the clamp, like a UI edit.
-      litholattice::console::ConsoleRegistry reg;
+      litholattice::console::cConsoleReg reg;
       GameSettings applied;
       SettingsCvars bridge([&](const GameSettings& s) { applied = s; }, [] { return GameSettings{}; });
       bridge.registerOn(reg);

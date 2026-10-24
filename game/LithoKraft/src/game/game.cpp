@@ -157,7 +157,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceMa
   // Debug console (tilde key): available in all builds, wired before anything
   // else so engine log lines from startup are already in the tap when it opens.
   litholattice::console::registerConsoleScriptBindings();
-  debugConsole_ = std::make_unique<litholattice::console::DebugConsole>(consoleRegistry_);
+  debugConsole_ = std::make_unique<litholattice::console::cDebugConsole>(consoleRegistry_);
   debugConsole_->attach(ui_.root());
   if (!cfg_.settingsPath.empty()) {
     // exec/saveArchived sandbox: the console may only touch .lth scripts (and
@@ -561,7 +561,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, JobPool& pool, ResourceMa
     };
     deceitorDirector_.setHooks(std::move(h));
   }
-  // Camera command (view-only, not a cheat — same standing as `map`):
+  // cCamera command (view-only, not a cheat — same standing as `map`):
   // `camera [first|third|follow|free]` drives the GameCameraController.
   {
     CameraCommandBindings cb;
@@ -1478,7 +1478,7 @@ int Game::surfaceYAt(int x, int z) {
   return y;
 }
 
-// Camera spring-arm collision (camera_controller.h's ICameraWorld hook).
+// cCamera spring-arm collision (camera_controller.h's ICameraWorld hook).
 // Runs at most once per frame, only while third person is live (the engine
 // casts only for the orbit boom; the controller disengages otherwise).
 // Cortana 2026-10-15 1900: world + signal reads for the lithography scan. Call only on the sim
@@ -1604,7 +1604,7 @@ void Game::setMcpServer(litholattice::mcp::McpServer* server) {
   std::string err;
   consoleRegistry_.registerCommand(
       "mcp", "mcp grant|revoke <perm...> | mcp agent - MCP agent permission approval (cheat)",
-      [this](litholattice::console::ConsoleRegistry& r, const litholattice::console::ConsoleArgs& a) {
+      [this](litholattice::console::cConsoleReg& r, const litholattice::console::ConsoleArgs& a) {
         if (!mcpServer_) {
           r.print("mcp: no server running (start with --mcp-stdio)");
           return;
@@ -2599,7 +2599,7 @@ void Game::update(float dt, int width, int height) {
                           cvarInt("render.two_tier", 0) != 0,
                           std::clamp(cvarFloat("render.two_tier_outer_deg", 10.f), 0.f, 30.f)});
   }
-  // Camera system (presentation only): sync the camera.* cvars into the
+  // cCamera system (presentation only): sync the camera.* cvars into the
   // camera configs, then advance the cameras — samples the player's true
   // velocity, feeds orbit/free input, resolves MCP pilot cameras. Placed
   // before the interaction ray below so third person's camera-facing sync
@@ -2872,7 +2872,7 @@ void Game::uploadMeshes() {
 FrameParams Game::frameParams(int width, int height) const {
   FrameParams p;
   p.width = width; p.height = height;
-  // Camera system: the view pose comes from the active engine camera. In
+  // cCamera system: the view pose comes from the active engine camera. In
   // first person the pose IS the player's (same values, same expressions
   // as the pre-camera-system path: perspective 1.2 rad, lookDir eye/forward).
   const CameraViewPose view = activeCameraPose();

@@ -62,8 +62,8 @@ std::shared_ptr<const litholattice::ColumnGenerator> makeWaferGen(uint64_t seed)
 
 // -- command parsing -----------------------------------------------------------
 void testCommandParsing() {
-  using litholattice::console::ConsoleRegistry;
-  ConsoleRegistry r;
+  using litholattice::console::cConsoleReg;
+  cConsoleReg r;
   r.setCheatsAllowed(true);  // locatebiome/genmap are cheat-gated like give/kill
   std::vector<std::string> biomeSeen;
   std::vector<GenMapRequest> mapSeen;

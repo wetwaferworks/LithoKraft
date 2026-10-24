@@ -5,7 +5,7 @@
 // available inside comments — `// # Heading`, `// - [ ] todo`,
 // `/* multi-line markdown */` — so the script parser never breaks on
 // markdown. This module extracts comment bodies (via
-// ConsoleRegistry::extractComments, Workstream 1) and renders them as a
+// cConsoleReg::extractComments, Workstream 1) and renders them as a
 // tight, correct markdown SUBSET into a structured model (NOT HTML strings)
 // that the future Fragment UI will bind to. No Fragment UI exists yet; this
 // is the model that UI will bind to. LF line endings.
@@ -81,7 +81,7 @@ struct FragmentRenderResult {
 };
 
 /// Extracts the markdown source from the Fragment's full text: comment
-/// bodies in source order (see ConsoleRegistry::extractComments), joined
+/// bodies in source order (see cConsoleReg::extractComments), joined
 /// with '\n'. On an unterminated `/*`, `err` (when non-null) is set to
 /// "unterminated block comment" and the bodies extracted so far are still
 /// returned. `err` is set only on error, never cleared.

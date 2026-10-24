@@ -29,7 +29,7 @@ int runAiHostSelfTest() {
   };
 
   {  // The gate: ai.enabled exists, Bool, default "0" (off), archived.
-    console::ConsoleRegistry reg;
+    console::cConsoleReg reg;
     registerAiCvars(reg);
     const console::CVar* cv = reg.findCVar("ai.enabled");
     check(cv && cv->value == "0", "ai host: ai.enabled cvar registered, default 0 (off)");

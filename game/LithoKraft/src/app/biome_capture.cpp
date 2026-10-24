@@ -483,7 +483,7 @@ int main(int argc, char** argv) {
       continue;
     }
 
-    // Camera: elevated, looking down at the biome center at an angle.
+    // cCamera: elevated, looking down at the biome center at an angle.
     litholattice::SoftwareRenderer sw;
     sw.setPerPixelShading(true);  // diffuse-lit with the real pack textures
     sw.setTextures(texBuffer.data(), layerCount);

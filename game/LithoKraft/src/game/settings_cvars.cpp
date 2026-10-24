@@ -14,7 +14,7 @@
 namespace lithokraft {
 namespace {
 
-using litholattice::console::ConsoleRegistry;
+using litholattice::console::cConsoleReg;
 using litholattice::console::CVarFlags;
 using litholattice::console::CVarType;
 
@@ -38,7 +38,7 @@ SettingsCvars::SettingsCvars(std::function<void(const GameSettings&)> apply,
                              std::function<GameSettings()> read)
     : apply_(std::move(apply)), read_(std::move(read)) {}
 
-void SettingsCvars::registerOn(ConsoleRegistry& r) {
+void SettingsCvars::registerOn(cConsoleReg& r) {
   registry_ = &r;
   const GameSettings cur = read_();
 
@@ -334,7 +334,7 @@ void SettingsCvars::registerOn(ConsoleRegistry& r) {
     // set flows through the apply path; the guard stops cvar->setting->cvar echo.
     const std::string name = row.name;
     auto setFn = row.set;
-    r.setCVarChangeFn(name, [this, name, setFn](ConsoleRegistry&, const auto& cv) {
+    r.setCVarChangeFn(name, [this, name, setFn](cConsoleReg&, const auto& cv) {
       if (syncing_) return;
       GameSettings s = read_();
       try {
@@ -398,7 +398,7 @@ void SettingsCvars::syncFrom(const GameSettings& s) {
 // MCP pilot-senses cvars (mcp.* / camera.*). These are MCP-host knobs, not
 // player preferences, so they live outside GameSettings — but they follow
 // the same registration pattern: int cvars, archived to config.lth.
-void registerMcpSensesCvars(litholattice::console::ConsoleRegistry& r) {
+void registerMcpSensesCvars(litholattice::console::cConsoleReg& r) {
   struct Row {
     const char* name;
     const char* def;
@@ -427,7 +427,7 @@ void registerMcpSensesCvars(litholattice::console::ConsoleRegistry& r) {
   // The hook re-sets only when out of range, so it terminates: the clamped
   // set fires onChange again but passes through unchanged.
   auto clampHook = [](int lo, int hi) {
-    return [lo, hi](ConsoleRegistry& reg, const auto& c) {
+    return [lo, hi](cConsoleReg& reg, const auto& c) {
       int v = 0;
       try {
         v = std::stoi(c.value);
@@ -450,7 +450,7 @@ void registerMcpSensesCvars(litholattice::console::ConsoleRegistry& r) {
 // knobs above. Game reads it per frame in update() (the same read pattern
 // as mcp.*) and drives AiHost::setEnabled. Default OFF: no AiWorld is
 // constructed in the live game until the host turns it on. Archived.
-void registerAiCvars(litholattice::console::ConsoleRegistry& r) {
+void registerAiCvars(litholattice::console::cConsoleReg& r) {
   std::string err;
   // Args: name, type, default, archived=true, help, flags.
   if (!r.registerCVar("ai.enabled", CVarType::Bool, "0", true,

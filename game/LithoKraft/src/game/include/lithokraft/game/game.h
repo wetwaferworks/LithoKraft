@@ -394,7 +394,7 @@ class Game {
   GameUi ui_;                          // before uiScripts_ / editor_, which reference it
   UiScriptBindings uiScripts_;
   std::unique_ptr<ScriptEditor> editor_;  // F10; only with a scripts folder
-  litholattice::console::ConsoleRegistry consoleRegistry_;  // before debugConsole_
+  litholattice::console::cConsoleReg consoleRegistry_;  // before debugConsole_
   uint64_t lastScriptTick_ = 0;  // sim world-tick counter for the lithoscript `wait` pump
   FragmentGallery fragmentGallery_;  // the Fragment's screenshots (lore page 5)
   FragmentState fragmentState_;      // the Fragment's upgrade state (A3: production-owned, C3-gated trigger/persistence)
@@ -413,7 +413,7 @@ class Game {
   // settings cvars (live, archived), Decision-9 game commands, world queries.
   std::unique_ptr<SettingsCvars> settingsCvars_;
   std::unique_ptr<GameWorldQuery> worldQuery_;
-  std::unique_ptr<litholattice::console::DebugConsole> debugConsole_;
+  std::unique_ptr<litholattice::console::cDebugConsole> debugConsole_;
   std::shared_ptr<litholattice::console::ConsoleScriptContext> consoleScriptCtx_;
   std::vector<ui::UiEvent> uiEvents_;
   int themeRevision_ = -1;
@@ -544,7 +544,7 @@ class Game {
 
   InputSystem& input_;
   AudioEngine& audio_;
-  // Camera system: owns the engine CameraManager (player/orbit/follow/free
+  // cCamera system: owns the engine cCameraMgr (player/orbit/follow/free
   // view cameras + MCP pilot cameras). Presentation only — declared before
   // the MCP members because mcpSenses_ borrows its PilotCameraRig.
   GameCameraController camera_;

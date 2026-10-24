@@ -96,7 +96,7 @@ using namespace lithokraft;
 
 #if !defined(_WIN32)
 // MCP stdio transport for --mcp-stdio (P2c, F-M9): raw-fd, poll-based.
-// Two properties the engine's FdStdioTransport does not have, both needed
+// Two properties the engine's cFdStdioTransport does not have, both needed
 // for a clean in-game wiring:
 //  - it writes to a SAVED copy of the real stdout fd, so main() can point
 //    fd 1 at stderr for the process's log output (logInfo writes to

@@ -21,7 +21,7 @@
 #include "lithokraft/game/settings.h"
 
 namespace litholattice::console {
-class ConsoleRegistry;
+class cConsoleReg;
 }  // namespace litholattice::console
 
 namespace lithokraft {
@@ -30,13 +30,13 @@ namespace lithokraft {
 /// mcp.audio_tier, camera.chunk_radius). MCP-host knobs, not player
 /// preferences, so they are not part of GameSettings; registered alongside
 /// the settings cvars and archived to config.lth.
-void registerMcpSensesCvars(litholattice::console::ConsoleRegistry& r);
+void registerMcpSensesCvars(litholattice::console::cConsoleReg& r);
 
 /// AiWorld host cvar (ai.enabled). A host knob like the MCP senses knobs
 /// above — not a player preference, so not part of GameSettings. Bool,
 /// default 0 (OFF): the production AiWorld is constructed only when the
 /// player/host turns it on (brief B6 wiring, 2026-10-13). Archived.
-void registerAiCvars(litholattice::console::ConsoleRegistry& r);
+void registerAiCvars(litholattice::console::cConsoleReg& r);
 
 class SettingsCvars {
  public:
@@ -48,7 +48,7 @@ class SettingsCvars {
 
   /// Registers all cvars on `r` with their current values as defaults.
   /// Archived cvars persist to config.lth via saveArchived().
-  void registerOn(litholattice::console::ConsoleRegistry& r);
+  void registerOn(litholattice::console::cConsoleReg& r);
 
   /// Pushes current settings values into the cvars (call after UI edits).
   void syncFrom(const GameSettings& s);
@@ -56,7 +56,7 @@ class SettingsCvars {
  private:  std::function<void(const GameSettings&)> apply_;
   std::function<GameSettings()> read_;
   bool syncing_ = false;
-  litholattice::console::ConsoleRegistry* registry_ = nullptr;
+  litholattice::console::cConsoleReg* registry_ = nullptr;
 };
 
 }  // namespace lithokraft

@@ -329,14 +329,14 @@ void SpriteHost::buildFrame(Vec3 camPos, Vec3 camFwd, Vec3 camUp) {
   }
 }
 
-void registerSpriteCommands(litholattice::console::ConsoleRegistry& r, SpriteCommandBindings b) {
+void registerSpriteCommands(litholattice::console::cConsoleReg& r, SpriteCommandBindings b) {
   using litholattice::console::ConsoleArgs;
-  using litholattice::console::ConsoleRegistry;
+  using litholattice::console::cConsoleReg;
   std::string err;
   r.registerCommand(
       "sprite",
       "sprite list | sprite spawn <name> [count] | sprite burst <name> | sprite clear",
-      [b](ConsoleRegistry& r, const ConsoleArgs& a) {
+      [b](cConsoleReg& r, const ConsoleArgs& a) {
         if (a.size() == 1 || (a.size() == 2 && a[1] == "list")) {
           r.print(b.list());
           return;

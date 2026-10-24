@@ -39,7 +39,7 @@
 
 namespace litholattice {
 namespace console {
-class ConsoleRegistry;
+class cConsoleReg;
 }  // namespace console
 }  // namespace litholattice
 
@@ -125,7 +125,7 @@ struct SpriteCommandBindings {
   std::function<std::string()> clear;
   std::function<std::string()> list;
 };
-void registerSpriteCommands(litholattice::console::ConsoleRegistry& r, SpriteCommandBindings b);
+void registerSpriteCommands(litholattice::console::cConsoleReg& r, SpriteCommandBindings b);
 
 /// Host self-test (app selftest section): registration from every source
 /// kind, spawn/tick/emit counts, atlas build, and a software-renderer
