@@ -210,7 +210,8 @@ void machineBox(const CustomBlock& cell, MeshWriter& out, const int lo[3], const
 bool cLithoKraftAppearance::shapedRender(const BlockDef& def) const {
   const SimRole r = roleOf(def);
   return def.shape == Shape::Cube &&
-         (r == SimRole::Redirector || r == SimRole::Thresholdor || r == SimRole::Pulsor || r == SimRole::Catchor);
+         (r == SimRole::Redirector || r == SimRole::Thresholdor || r == SimRole::Pulsor || r == SimRole::Catchor ||
+          r == SimRole::Keyboard);  // 2026-10-24 (JD): Keyboard = repeater-size slab (CloudAtlas keyboard.json)
 }
 bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out) const {
   const BlockDef def = cell.def();
@@ -226,6 +227,9 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
     machineBox(cell, out, lo, hi, on, &frontM);
   };
   pad(6, 0, 10, 2);    // output (front, north)
+  // 2026-10-24 Keyboard (CloudAtlas keyboard.json): out_pad_north [6,2,0]-[10,3,2] (key pulses, front) and
+  // ctrl_pad_east [14,2,6]-[16,3,10] (Enter / Backspace, the right side); no back input.
+  if (r == SimRole::Keyboard) { pad(14, 6, 16, 10); return true; }
   pad(6, 14, 10, 16);  // input (back)
   if (r == SimRole::Redirector) { pad(0, 6, 2, 10); pad(14, 6, 16, 10); }
   if (r == SimRole::Thresholdor) {
