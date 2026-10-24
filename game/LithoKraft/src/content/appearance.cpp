@@ -176,7 +176,15 @@ FaceLook machineTintLook(const CustomBlock& cell, const FaceMaterial& fm, bool o
   if (!ts) return {};
   const int bd = dirBack(stFacing(cell.state));
   const BlockDef nb = cell.blocks.def(cell.neighbor(kDirX[bd], 0, kDirZ[bd]));
-  return {kShadeTraceTint, uint8_t((ts - 1) | (nb.channel == 2 ? 0x40 : 0) | (on ? 0x80 : 0))};
+  // 2026-10-24 (JD 6:13 PM: red flash when a blue-fed Repeator depowers): when the back source is
+  // gone or colourless (LED lifted / off), keep the colour of the Trace it drives instead of
+  // falling back to red for the delay ticks it stays on.
+  int ch = nb.channel;
+  if (ch == 0) {
+    const int fd = stFacing(cell.state);
+    ch = cell.blocks.def(cell.neighbor(kDirX[fd], 0, kDirZ[fd])).channel;
+  }
+  return {kShadeTraceTint, uint8_t((ts - 1) | (ch == 2 ? 0x40 : 0) | (on ? 0x80 : 0))};
 }
 // 2026-10-24 (JD): does component `nd` (state s) read or drive Trace on world side `side`
 // (the side of the component facing the Trace)? Mirrors the sim (logic_components.cpp):
