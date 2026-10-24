@@ -111,7 +111,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   fails += runSpriteHostSelfTest(packDirs);
   fails += runLocomotionSelfTest();
   {  // render.fps_cap (A4 / brief B7, 2026-10-13): the game-side wiring of
-     // the engine cFramePacer — Settings field, JSON persistence, the
+     // the engine cFramePacer Ã¢â‚¬â€ Settings field, JSON persistence, the
      // render.fps_cap cvar flow, and pacer drive semantics. Deterministic
      // by construction: the pacer's returned sleep is computed from
      // explicit time points; the single measured check is bounded wide.
@@ -150,7 +150,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       const auto t0 = cFramePacer::Clock::now();
       off.beginFrame(t0);
       check(!off.enabled() && off.capFps() == 0 && off.endFrameAndWait(t0) == cFramePacer::Clock::duration::zero(),
-            "fps cap: pacer default off — endFrameAndWait is a no-op");
+            "fps cap: pacer default off Ã¢â‚¬â€ endFrameAndWait is a no-op");
       cFramePacer p;
       p.setCapFps(5000);
       check(p.capFps() == 1000 && p.enabled(), "fps cap: pacer clamps cap to 1000");
@@ -247,7 +247,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     // Upper bound included (P2b-2, review G-L6): feet may stand at most
     // ~1 block above the surface cell's top (sy+1 is standing ON it).
     // The old check had no upper bound and passed with the G-M1 spawn
-    // floating 11+ blocks up — it could not fail for that class of bug.
+    // floating 11+ blocks up Ã¢â‚¬â€ it could not fail for that class of bug.
     check(sy >= 0 && sp.y > float(sy) && sp.y <= float(sy) + 2.f && wafer->chunks.get(sx, sy, sz) != kAir && wafer->chunks.get(sx, int(sp.y), sz) == kAir,
           "spawn: wafer spawn resolves to air just above the surface at its column (no float)");
   }
@@ -344,7 +344,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
           // the palette representation. A save/load round trip rebuilds
           // palettes in scan order, so insertion order legitimately
           // differs for structure/edit-bearing sub-chunks while every
-          // voxel is identical — the old `x->blocks != y->blocks`
+          // voxel is identical Ã¢â‚¬â€ the old `x->blocks != y->blocks`
           // (VoxelPalette::operator==, representation equality) failed 4
           // round-trip checks on bit-perfect data. operator== itself is
           // NOT changed: representation equality is legitimately used
@@ -397,9 +397,9 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       cWorldSave save(dir);
       check(!save.readPlayer(&err) && !err.empty(), "save: a damaged player.lat is detected (CRC), not misread");
     }
-    {  // P2b-1 (Appendix G H1/H2 + Appendix C M2): player.lat v4 — the
+    {  // P2b-1 (Appendix G H1/H2 + Appendix C M2): player.lat v4 Ã¢â‚¬â€ the
        // canonical 42+8 inventory persists, the hotbar is stored as string
-       // ids and name-remapped on load, and v1–v3 files keep loading.
+       // ids and name-remapped on load, and v1Ã¢â‚¬â€œv3 files keep loading.
       const auto pdir = dir / "p2b1_player";
       auto f32w = [](storage::ByteWriter& w, float v) { uint32_t u; std::memcpy(&u, &v, 4); w.u32(u); };
       auto writeRawPlayer = [&](const std::filesystem::path& d, const storage::Bytes& body) {
@@ -415,8 +415,8 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         const ItemStack& s = inv.slotAt(flat);
         return s.itemId == id && s.count == count;
       };
-      {  // v4 round trip: every slot kind filled — hotbar incl. the Fragment
-         // and a tool, an offhand, main, and gear — comes back identical.
+      {  // v4 round trip: every slot kind filled Ã¢â‚¬â€ hotbar incl. the Fragment
+         // and a tool, an offhand, main, and gear Ã¢â‚¬â€ comes back identical.
         PlayerMeta pm{{2.5f, 80.f, 7.f}, 0.25f, 0.5f, "wafer", 3, {kLamp, kAir, kRedTrace}};
         pm.inventory.hotbar()[0] = ItemStack{kItemFragment, 1};
         pm.inventory.hotbar()[1] = ItemStack{uint32_t(kLamp), 33};
@@ -445,7 +445,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
           noDup = reloaded.countOf(kItemFragment) == 1 && !grantStartingItems(reloaded) &&
                   reloaded.countOf(kItemFragment) == 1;
         }
-        check(noDup, "save (P2b-1): a saved Fragment is kept across save/load — the boot grant does not duplicate it");
+        check(noDup, "save (P2b-1): a saved Fragment is kept across save/load Ã¢â‚¬â€ the boot grant does not duplicate it");
       }
       {  // v3 file (hand-built, the old layout: raw u16 hotbar, stats,
          // vitals, NO inventory block): loads with an empty inventory and
@@ -728,9 +728,9 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     {  // P1-SIGNAL gate (SW-H1 / SW-H2 / B-M3 / C-M4 / B-L7): a circuit built
        // in a column OUTSIDE the initial load square, saved, and reloaded
-       // through the streaming seam — cWorldSave::loadColumn + cSignalSim::
+       // through the streaming seam Ã¢â‚¬â€ cWorldSave::loadColumn + cSignalSim::
        // scanColumn/importState, the exact calls Game::pumpStreaming makes on
-       // insertion, plus a cChunkStreamer pass through the real job pool —
+       // insertion, plus a cChunkStreamer pass through the real job pool Ã¢â‚¬â€
        // must come back alive with its component memory intact. (The full
        // Game-level loop is NOT driven here: no Game/cSimThread is constructed
        // in this test, so mesh submission and the stop/start seam itself are
@@ -784,7 +784,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
               "p1-stream (C-M4): loadDimension on the same instance after streamed loads returns exactly the dimension's state (no residue, no cross-path sweep)");
       }
       // SW-H2: a hand-edited wire value of 100 in the streamed column clamps
-      // TO 64 at the component input — the memor stores 64, never 100, and no
+      // TO 64 at the component input Ã¢â‚¬â€ the memor stores 64, never 100, and no
       // out-of-range output is produced (the pre-fix code indexed buckets_[100]).
       dst.setState(325, gy, 322, CellState(100));
       dstSim.invalidateNetwork();
@@ -822,7 +822,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         }
         check(erased, "p1-stream (B-M3/B-L7): an unreadable streamed column is not delivered, not generated over, and its key is un-requested for a backed-off retry");
       }
-      {  // B-M2 (P3-2): takeReadyUpTo bounds every drain — a burst of
+      {  // B-M2 (P3-2): takeReadyUpTo bounds every drain Ã¢â‚¬â€ a burst of
          // finished columns can no longer land in one insertion window.
         cChunkStreamer many(pool, wafer->generator, nullptr, "wafer", 1, {});
         many.update(40, 40);  // 3x3 around chunk (40,40), generate-only
@@ -924,7 +924,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     std::filesystem::remove_all(pdir);
   }
   {  // A2 (B-M1 column eviction, 2026-10-13): the production seams composed
-     // exactly as Game::evictFarColumns drives them — SGNL export before
+     // exactly as Game::evictFarColumns drives them Ã¢â‚¬â€ SGNL export before
      // unscan, save-on-evict through cWorldSave::saveColumns, ChunkMap::erase,
      // cChunkStreamer::forgetColumn, and selectEvictionCandidates bounding.
      // (The full Game loop is not constructed here; mesh retire is a
@@ -953,7 +953,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     {
       ChunkColumn plain; plain.cx = 21; plain.cz = 20;
       // Rebuild via the map so the column exists, then reset its flags to the
-      // worldgen state (clean) — the fixture's terrain is seed-equivalent.
+      // worldgen state (clean) Ã¢â‚¬â€ the fixture's terrain is seed-equivalent.
       ew.set(340, gy - 1, 322, kWaferSilicon);
       ew.column(21, 20)->dirty = false; ew.column(21, 20)->generation = 0;
     }
@@ -1148,19 +1148,19 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     };
     double mx; bool al;
     shoot(kDirt, 30, mx, al);
-    check(al && mx > 13, "density (A5): penetration 30 pierces a dirt wall (density 20) — density flows from block data");
+    check(al && mx > 13, "density (A5): penetration 30 pierces a dirt wall (density 20) Ã¢â‚¬â€ density flows from block data");
     shoot(kDirt, 10, mx, al);
     check(!al && mx < 10, "density (A5): penetration 10 stops and despawns at a dirt wall (density 20)");
     shoot(kCeramic, 30, mx, al);
     check(!al && mx < 10, "density (A5): penetration 30 stops at a ceramic wall (density 80) that dirt let through");
     shoot(kCeramic, 90, mx, al);
-    check(al && mx > 13, "density (A5): penetration 90 pierces ceramic (density 80) — the pierce rule discriminates by data");
+    check(al && mx > 13, "density (A5): penetration 90 pierces ceramic (density 80) Ã¢â‚¬â€ the pierce rule discriminates by data");
   }
   const BlockMaterials checker(blockRegistry().size());  // no pack: every face is the missing texture
   {  // Mesher check (P2b-2, review B-L8/D-M9): mesh column (2,2) at ITS OWN
      // topmost sub-chunk that yields quads. The old check meshed (2,2) at
      // the GLOBAL max surfaceSy (a resonator-spire column's height), where
-     // (2,2) has no sub-chunk at all — 0 verts, a test bug, not a mesher
+     // (2,2) has no sub-chunk at all Ã¢â‚¬â€ 0 verts, a test bug, not a mesher
      // bug (the mesher's own unit tests pass). Walk (2,2)'s sub-chunks
      // from the top; the first that meshes non-empty is by construction a
      // sub-chunk containing a non-air block with an exposed face.
@@ -1200,7 +1200,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     const VulkanProbe vk = probeVulkan();  // headless: no window, instance + device list only
     if (!vk.loaderFound) std::printf("  [SKIP] vulkan: %s\n", vk.summary.c_str());
     // Loader present but no usable device on this machine (GPU-less box:
-    // VK_ERROR_INCOMPATIBLE_DRIVER / 0 devices) is environmental — SKIP,
+    // VK_ERROR_INCOMPATIBLE_DRIVER / 0 devices) is environmental Ã¢â‚¬â€ SKIP,
     // not a permanent FAIL that trains readers to ignore the suite
     // (P2b-2, review G-L6). Genuine init failures still FAIL via vk.ok.
     else if (vk.noDevices) std::printf("  [SKIP] vulkan: no usable device on this machine (%s)\n", vk.summary.c_str());
@@ -1357,9 +1357,9 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
               face(kMemor, FaceSlot::Top, false) == "memor_top_empty" && face(kMemor, FaceSlot::Top, true) == "memor_top",
           "block models: front/back/left/right files, active top, side and slab fallbacks (as before the refactor)");
     const auto anim = tex.findAnimation("pulsor_top_firing");
-    check(ok && anim && tex.animation(*anim).frameCount == 6 && tex.animation(*anim).timing.frameMs == 50 &&
+    check(ok && anim && tex.animation(*anim).frameCount == 7 && tex.animation(*anim).timing.frameMs == 31 /* 2026-10-24: Pulsor v2 strip */ &&
               mats->face(kPulsor, FaceSlot::Top, true).animated() && !mats->face(kPulsor, FaceSlot::Top, false).animated(),
-          "pulsor firing strip: 6 frames at 50 ms from its .json sidecar, animated only while active");
+          "pulsor firing strip: 7 frames at 31 ms (v2) from its .json sidecar, animated only while active");
     const auto toneAnim = tex.findAnimation("tone_block_front_playing");
     check(ok && toneAnim && tex.animation(*toneAnim).frameCount == 4 && tex.animation(*toneAnim).timing.frameMs == 100 &&
               tex.animation(*toneAnim).timing.loop && mats->face(kToneBlock, FaceSlot::Front, true).animated() &&

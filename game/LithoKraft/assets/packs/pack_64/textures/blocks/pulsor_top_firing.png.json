@@ -1,14 +1,15 @@
 {
- "frametime_ms": 50,
+ "frametime_ms": 31,
  "frames": [
   0,
   1,
   2,
   3,
   4,
-  5
+  5,
+  6
  ],
  "interpolate": false,
  "loop": false,
- "note": "play once per fired pulse (the pulse itself is 1 tick); engine returns to pulsar_top when done"
+ "note": "v2 (2026-10-24): 7 frames, 31 ms each (engine frametime is integer ms; CloudAtlas 31.25 = 1 tick at 32 TPS). play once per fired pulse; 7 frames x 1 engine tick, synced to kPulsorAnimTicks=7. Format is ms-only: 31.25 ms = 1 tick at 32 TPS. GOAL: tick-based timing (1 frame per tick) so it stays synced at higher TPS; engine returns to pulsor_top when done"
 }
