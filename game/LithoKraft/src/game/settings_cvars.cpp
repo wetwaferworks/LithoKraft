@@ -286,6 +286,10 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
          s.anisotropy = a >= 16 ? 16 : a >= 8 ? 8 : a >= 4 ? 4 : a >= 2 ? 2 : 1;
        },
        CVarType::Int},
+      {"render.swap_images",
+       [](const GameSettings& s) { return std::to_string(s.swapImages); },
+       [](GameSettings& s, const std::string& v) { s.swapImages = std::clamp(toInt(v), 2, 3); },  // 2026-10-24 (JD): Vulkan buffering, on restart
+       CVarType::Int},
       {"render.fps_cap",
        [](const GameSettings& s) { return std::to_string(s.fpsCap); },
        // Frame-rate cap (engine cFramePacer, D-M3; game-side wiring
@@ -405,6 +409,7 @@ void SettingsCvars::syncFrom(const GameSettings& s) {
   registry_->setCVar("render.ascii_set", s.asciiSet);
   registry_->setCVar("render.ascii_value_span", std::to_string(s.asciiValueSpan));
   registry_->setCVar("render.fps_cap", std::to_string(s.fpsCap));
+  registry_->setCVar("render.swap_images", std::to_string(s.swapImages));
   syncing_ = false;
 }
 

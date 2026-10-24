@@ -116,7 +116,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
      // by construction: the pacer's returned sleep is computed from
      // explicit time points; the single measured check is bounded wide.
     using litholattice::cFramePacer;
-    check(GameSettings{}.fpsCap == -1, "fps cap: Settings default is -1 (auto 60/30; Cortana 2026-10-15 1610)");
+    check(GameSettings{}.fpsCap == 30 && GameSettings{}.vsync && GameSettings{}.swapImages == 3 && GameSettings{}.streamRadius == 16, "pacing: defaults 30 FPS cap, V-sync on, triple buffering, render distance 16 (JD 2026-10-24)");
     {  // JSON round-trip + load-side clamp (0..1000).
       const auto dir = uniqueTempDir("lithokraft-fpscap");
       const std::string path = (dir / "settings.json").string();
@@ -175,7 +175,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       SettingsCvars bridge([&](const GameSettings& s) { applied = s; }, [] { return GameSettings{}; });
       bridge.registerOn(reg);
       const auto* cv = reg.findCVar("render.fps_cap");
-      check(cv && cv->value == "-1", "fps cap: render.fps_cap cvar registered, default -1 (auto)");
+      check(cv && cv->value == "30", "fps cap: render.fps_cap cvar registered, default 30");
       check(reg.setCVar("render.fps_cap", "120") && applied.fpsCap == 120,
             "fps cap: cvar set 120 flows through the settings apply path");
       check(reg.setCVar("render.fps_cap", "99999") && applied.fpsCap == 1000,

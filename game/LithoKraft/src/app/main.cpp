@@ -412,7 +412,7 @@ struct Display {
 // created for OpenGL, whose context the presenter borrows purely as the blit mechanism — if
 // that present path cannot be built, software falls back to gl33 the same loud way.
 Display createDisplay(const std::string& backend, bool vsync, bool validation, const std::string& present, const DisplayDesc& disp,
-                      const std::string& vkArena, bool glArena) {
+                      const std::string& vkArena, bool glArena, int swapImages = 0) {
   Display d;
   if (backend == "software") {
     d.window = Window::create({1280, 720, "LithoKraft", vsync, GraphicsApi::OpenGL33, disp});
@@ -443,6 +443,7 @@ Display createDisplay(const std::string& backend, bool vsync, bool validation, c
       desc.surface.instanceExtensions = w.vulkanInstanceExtensions();
       desc.surface.createSurface = [&w](void* instance) { return w.createVulkanSurface(instance); };
       desc.vsync = vsync;
+      desc.swapImages = swapImages;
       desc.presentMode = present;
       desc.vertexArena = vkArena;
       desc.validation = validation;
@@ -1237,7 +1238,7 @@ int main(int argc, char** argv) {
   if (scripts.dir.empty()) logError("scripts: no scripts/ folder (%s)", scripts.reason.c_str());
   else logInfo("scripts: %s (%s; the F10 editor saves here)", scripts.dir.c_str(), scripts.reason.c_str());
 
-  Display display = createDisplay(backend, vsync, vkValidation, presentMode, display0, vkArena, glArena);
+  Display display = createDisplay(backend, vsync, vkValidation, presentMode, display0, vkArena, glArena, settings.swapImages);
   if (!display.window || !display.renderer) return 1;
   Window* const window = display.window.get();
   IRenderer* const renderer = display.renderer.get();

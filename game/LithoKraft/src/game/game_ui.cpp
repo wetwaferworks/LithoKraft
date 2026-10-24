@@ -310,6 +310,26 @@ void cGameUi::openSettings(const GameSettings& cur) {
       state->vsync = static_cast<ui::cCheckbox&>(w).checked();
       changed();
     });
+    {  // 2026-10-24 (JD): frame cap + buffering
+      ui::cStackPanel& fr = row(pg, "Frame cap");
+      const std::vector<std::string> capItems{"30", "60", "Uncapped", "Auto"};
+      const int capSel = cur.fpsCap == 60 ? 1 : cur.fpsCap == 0 ? 2 : cur.fpsCap < 0 ? 3 : 0;
+      ui::cDropdown& cap = fr.add<ui::cDropdown>(capItems, capSel);
+      cap.setId("set-fpscap");
+      cap.on("change", [changed, state](ui::cWidget& w) {
+        static const int kCaps[4] = {30, 60, 0, -1};
+        state->fpsCap = kCaps[std::clamp(static_cast<ui::cDropdown&>(w).selected(), 0, 3)];
+        changed();
+      });
+      ui::cStackPanel& br = row(pg, "Buffering (Vulkan, on restart)");
+      const std::vector<std::string> bufItems{"Double (2)", "Triple (3)"};
+      ui::cDropdown& buf = br.add<ui::cDropdown>(bufItems, cur.swapImages >= 3 ? 1 : 0);
+      buf.setId("set-buffering");
+      buf.on("change", [changed, state](ui::cWidget& w) {
+        state->swapImages = static_cast<ui::cDropdown&>(w).selected() == 1 ? 3 : 2;
+        changed();
+      });
+    }
     ui::cStackPanel& hr = row(pg, "HUD scale");
     const std::vector<std::string> hudItems{"Auto", "1x", "2x", "3x", "4x"};  // Cortana 2026-10-16: GUI scale 1-4
     ui::cDropdown& hud = hr.add<ui::cDropdown>(hudItems, cur.hudScale);

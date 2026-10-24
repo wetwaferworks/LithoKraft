@@ -44,7 +44,7 @@ struct GameSettings {
   /// Renderer backend at startup: "software" (shipped default), "gl33" or "vulkan" (JD 2026-10-24).
   /// Settings > Graphics > Renderer saves the world and relaunches with it; --renderer still wins.
   std::string renderer = "software";
-  bool vsync = false;     ///< boot-only: the window is created with it
+  bool vsync = true;      ///< 2026-10-24 (JD): default ON. boot-only: the window is created with it
   int tps = 32;           ///< one of kSettingsTpsModes (kDefaultTps)
   int tickRadius = 8;     ///< simulation distance, 0..512 chunks; boot-only. F56-10 (JD 2026-10-17): default 8; 16/32 are stress-test options; env LL_SIM_TICK_RADIUS (was 16 since F55-5)
   bool euv = true;        ///< the lithographed EUV-tier sim domain
@@ -109,7 +109,7 @@ struct GameSettings {
   float vkBloomStrength = 1.f;
   float vkHeartbeatGlow = 1.75f;
   bool vkFarLod = true;  ///< 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): far LOD for the 33-64 ring (render-only, live)  ///< 0.0.1.53 [C53-3] (Proposed by JD, Built by Cortana): wafer heartbeat bloom gain (0..4)
-  int streamRadius = 0;   ///< render / stream distance in chunks, 0 = auto (Vulkan 64, others 32), max 64; boot-only
+  int streamRadius = 16;  ///< 2026-10-24 (JD): default 16. render / stream distance in chunks, 0 = auto (Vulkan 64, others 32), max 64; boot-only
   bool bulbShellSolid = false;  ///< 2026-10-16 1551 (JD): render.bulb_shell - Trace Bulb shell Ghostly (false, default) / Solid (true); render-only, saved
   bool emissiveLight = false;  ///< Cortana 2026-10-16: render.emissive_light - software local light from emitters (live). Default OFF: ~2x frame cost on the Trace-dense test world.
   int texRes = 0;       ///< Cortana 2026-10-16: render.tex_res 0 auto / 16 / 32 / 64 (software; next texture load or F9)
@@ -120,7 +120,8 @@ struct GameSettings {
                           ///< toggle, no remesh; default on, independent
                           ///< of groundPulse.
   // Cortana 2026-10-15 1610 (ENGINE): fpsCap -1 = auto (60 if the machine renders <=14 ms, else 30; the new default), 0 = off, N = cap.
-  int fpsCap = -1;         ///< render.fps_cap: frame-rate cap in FPS for the
+  int swapImages = 3;      ///< 2026-10-24 (JD): render.swap_images 2 (double) / 3 (triple, default); Vulkan, boot-only
+  int fpsCap = 30;         ///< 2026-10-24 (JD): default 30. render.fps_cap: frame-rate cap in FPS for the
   bool fpsCounter = false;  ///< Cortana 2026-10-15 1610; F56-4 (2026-10-17): perf readout on every backend (FPS, avg/p99 ms, update ms, GPU ms; off by default)
   bool roundSimArea = true;  ///< F56-7 (Proposed by JD, Built by Cortana): round sim area (disc r^2+r); boot-only; env LL_SIM_ROUND_AREA
   bool diamondSimArea = true;  ///< diamond (Manhattan) sim area (JD 2026-10-23); boot-only; env LL_SIM_AREA=diamond. DEFAULT since fix run 3 (JD t2262u)
