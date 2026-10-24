@@ -36,15 +36,15 @@ constexpr float kSplashSeconds = 5.f;
 constexpr int kCarryData = 1 << 20;  // playtest 2026-10-16: carry-grid slot data base (> any BlockId)
 std::string blockIcon(BlockId b) { return "block:" + std::to_string(int(b)); }
 
-GameUi::GameUi(Callbacks callbacks) : cb_(std::move(callbacks)) {}
+cGameUi::cGameUi(Callbacks callbacks) : cb_(std::move(callbacks)) {}
 
-void GameUi::applyTheme(const ui::Theme& theme) {
+void cGameUi::applyTheme(const ui::Theme& theme) {
   ui::Theme t = theme;
   t.setScale(ui_.theme().scale());
   ui_.setTheme(std::move(t));
 }
 
-void GameUi::rebuildHud() {
+void cGameUi::rebuildHud() {
   if (hud_) ui_.destroyLater(ui_.root().removeChild(*hud_));
   hud_ = &ui_.root().add<ui::Widget>();
   hud_->setId("hud");
@@ -97,9 +97,9 @@ void GameUi::rebuildHud() {
   lookName_->setColor({1.f, 1.f, 1.f, 1.f});
 }
 
-void GameUi::openInventory(int selectedSlot) { openInventory(selectedSlot, {}); }
+void cGameUi::openInventory(int selectedSlot) { openInventory(selectedSlot, {}); }
 
-void GameUi::refreshCarry(const std::vector<ItemStack>& carry) {
+void cGameUi::refreshCarry(const std::vector<ItemStack>& carry) {
   if (!inventory_ || carrySlots_.empty()) return;
   carry_ = carry;
   for (size_t i = 0; i < carrySlots_.size() && i < carry_.size(); ++i) {
@@ -109,7 +109,7 @@ void GameUi::refreshCarry(const std::vector<ItemStack>& carry) {
   }
 }
 
-void GameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry) {
+void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry) {
   if (inventory_) return;
   carrySlots_.clear();
   carry_.clear();
@@ -170,7 +170,7 @@ void GameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry
   inventory_ = &dlg;
 }
 
-void GameUi::openPause() {
+void cGameUi::openPause() {
   if (pause_) return;
   ui::Dialog& dlg = ui::Dialog::show(ui_, "Paused");
   dlg.setId("pause");
@@ -185,7 +185,7 @@ void GameUi::openPause() {
   pause_ = &dlg;
 }
 
-void GameUi::openMenu(const std::string& version) {
+void cGameUi::openMenu(const std::string& version) {
   if (menu_) return;
   version_ = version;
   const float k = std::max(1.f, s());
@@ -227,19 +227,19 @@ void GameUi::openMenu(const std::string& version) {
   ui_.setFocus(&play);
 }
 
-void GameUi::closeMenu() {
+void cGameUi::closeMenu() {
   if (!menu_) return;
   ui::Widget* m = menu_;
   menu_ = nullptr;
   ui_.destroyLater(ui_.root().removeChild(*m));
 }
 
-void GameUi::rebuildMenu() {
+void cGameUi::rebuildMenu() {
   closeMenu();
   openMenu(version_);
 }
 
-void GameUi::openSettings(const GameSettings& cur) {
+void cGameUi::openSettings(const GameSettings& cur) {
   if (settings_) return;
   const float k = std::max(1.f, s());
   auto state = std::make_shared<GameSettings>(cur);
@@ -448,7 +448,7 @@ void GameUi::openSettings(const GameSettings& cur) {
   settings_ = &dlg;
 }
 
-void GameUi::closeSettings() {
+void cGameUi::closeSettings() {
   if (!settings_) return;
   ui::Dialog* d = settings_;
   settings_ = nullptr;  // closeModal emits no "close": no callback for a close the game asked for
@@ -456,14 +456,14 @@ void GameUi::closeSettings() {
   if (menu_) menu_->setVisible(true);  // 2026-10-16: restore the menu hidden by openSettings
 }
 
-void GameUi::closePause() {
+void cGameUi::closePause() {
   if (!pause_) return;
   ui::Dialog* d = pause_;
   pause_ = nullptr;
   ui_.closeModal(*d);
 }
 
-void GameUi::closeInventory() {
+void cGameUi::closeInventory() {
   if (!inventory_) return;
   ui::Dialog* d = inventory_;
   inventory_ = nullptr;  // close() emits "close": no callback for a close the game asked for
@@ -472,7 +472,7 @@ void GameUi::closeInventory() {
   ui_.closeModal(*d);
 }
 
-void GameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
+void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
   const float k = float(effectiveGuiScale(hudScalePref_, viewport.x, viewport.y));
   if (k != scale_) {
     scale_ = k;
@@ -541,7 +541,7 @@ void GameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
   ui_.layout(viewport);
 }
 
-void GameUi::paint(HudLayer& hud, const BlockMaterials& materials, const std::function<const Image*(BlockId)>& icon,
+void cGameUi::paint(HudLayer& hud, const BlockMaterials& materials, const std::function<const Image*(BlockId)>& icon,
                    const std::function<const Image*(uint32_t)>& itemIcon) const {
   HudUiRenderer renderer(hud, [&materials](std::string_view image) -> std::optional<ui::Color> {
     constexpr std::string_view kPrefix = "block:";

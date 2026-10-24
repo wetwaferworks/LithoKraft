@@ -33,7 +33,7 @@ namespace lithokraft {
 struct LithoReader {
   std::function<BlockId(int, int, int)> block;
   std::function<CellState(int, int, int)> state;
-  std::function<bool(int, int, int)> strongPowered;  ///< SignalSim::strongPowered in the game
+  std::function<bool(int, int, int)> strongPowered;  ///< cSignalSim::strongPowered in the game
 };
 
 constexpr int kLithoTopCount = 3, kLithoBottomCount = 5, kLithoLaserReach = 16;

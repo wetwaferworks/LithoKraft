@@ -1,6 +1,6 @@
 // The game's screens on the retained UI: HUD (debug panel, controls panel, keyboard-capture
 // banner), the hotbar and the block palette (a modal dialog). The game hands in a
-// HudModel each frame and reacts to callbacks; GameUi owns the widgets and the UiRoot.
+// HudModel each frame and reacts to callbacks; cGameUi owns the widgets and the UiRoot.
 #pragma once
 #include "lithokraft/game/engine.h"
 #include <array>
@@ -34,7 +34,7 @@ struct HudModel {
   std::string lookName;                    ///< 2026-10-16 (JD): looked-at block name (empty: hidden)
 };
 
-class GameUi {
+class cGameUi {
  public:
   struct Callbacks {
     std::function<void(int slot)> selectSlot;              ///< hotbar slot clicked
@@ -51,7 +51,7 @@ class GameUi {
     std::function<void(int carryIndex)> pickCarry;
   };
 
-  explicit GameUi(Callbacks callbacks);
+  explicit cGameUi(Callbacks callbacks);
   ui::UiRoot& root() { return ui_; }
   const ui::UiRoot& root() const { return ui_; }
 

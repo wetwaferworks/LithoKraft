@@ -73,7 +73,7 @@ class cTimedSim final : public IWorldSimulation {
   size_t activeCount() const override { return s_->activeCount(); }
   void takeEvents(std::vector<SimEvent>& out) override { s_->takeEvents(out); }
   void registerHandshake(litholattice::TimingHandshakeAuthority& a) override { s_->registerHandshake(a); }
-  SignalSim* signalSim() {  // phase-split timings for the sweep (hs-design §7)
+  cSignalSim* signalSim() {  // phase-split timings for the sweep (hs-design §7)
     auto* sw = dynamic_cast<cSignalWorldSim*>(s_.get());
     return sw ? &sw->signal() : nullptr;
   }
@@ -172,7 +172,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   for (size_t si = 0; si < std::size(sizes); ++si) {
     const int size = sizes[si];
     wafer->load(pool, size);
-    SignalSim sig;
+    cSignalSim sig;
     sig.scan(wafer->chunks);
     const auto dir = std::filesystem::temp_directory_path() / ("lithokraft_perf_save_" + std::to_string(size));
     std::filesystem::remove_all(dir);
@@ -374,8 +374,8 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
       hsOverruns = hs.overrunPhases; hsOverrunNs = hs.overrunNsTotal;
       hsBarrierNs = hs.barrierWaitNsTotal; hsPhases = hs.phases;
     }
-    if (SignalSim* sig = t->signalSim()) {
-      const SignalSim::PhaseMs pm = sig->takePhaseMs();
+    if (cSignalSim* sig = t->signalSim()) {
+      const cSignalSim::PhaseMs pm = sig->takePhaseMs();
       phComps = pm.comps; phMark = pm.mark; phWires = pm.wires; phLamps = pm.lamps;
     }
     sim.stop();

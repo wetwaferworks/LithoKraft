@@ -79,7 +79,7 @@ void testSettingsApply(Checker& check) {
   g.enterMenu();
   hg.frame();
   // Drive the REAL settings dialog through the game's own callback wiring
-  // (GameUi -> Game::onSettingsChanged), not a bare GameUi.
+  // (cGameUi -> Game::onSettingsChanged), not a bare cGameUi.
   g.gameUi().openSettings(g.settings());
   hg.frame();
   check(g.gameUi().settingsOpen(), "settings: the dialog opens from the game");

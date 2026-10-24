@@ -1102,7 +1102,7 @@ void Game::loadActive() {
     // logged with its loaded count, plus the signal state, so streaming distance cannot change what is hashed.
     const uint64_t at = std::strtoull(hashAt, nullptr, 10);
     ChunkMap* cm = &active_->chunks;
-    SignalSim* sig = &static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
+    cSignalSim* sig = &static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
     SimThread* simp = sim_.get();
     int rcx = 3, rcz = 2;  // LL_HASH_REGION=cx,cz (default: the test world's spawn / circuit chunk)
     if (const char* e = std::getenv("LL_HASH_REGION")) std::sscanf(e, "%d,%d", &rcx, &rcz);
@@ -1318,7 +1318,7 @@ void Game::pumpStreaming() {
   constexpr size_t kStreamInsertBudget = 4;
   std::vector<StreamedColumn> fresh = streamer_->takeReadyUpTo(kStreamInsertBudget);
   if (fresh.empty()) return;  // hold released by the lock's destructor
-  SignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
+  cSignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   size_t added = 0;
   for (auto& sc : fresh) {
     std::unique_ptr<ChunkColumn> col = std::move(sc.column);
@@ -1428,7 +1428,7 @@ void Game::evictFarColumns() {
               sim_->handshakeFrozen() ? "timing handshake frozen" : "handshake workers outstanding");
     return;
   }
-  SignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
+  cSignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   size_t evicted = 0;
   for (uint64_t key : candidates) {
     const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
@@ -1485,7 +1485,7 @@ int Game::surfaceYAt(int x, int z) {
 // thread between ticks (inside SimThread::runBetweenTicks): the sim owns the map while ticking.
 LithoReader Game::lithoReader() {
   ChunkMap& ch = active_->chunks;
-  const SignalSim& sig = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
+  const cSignalSim& sig = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   return LithoReader{[&ch](int x, int y, int z) { return ch.get(x, y, z); },
                      [&ch](int x, int y, int z) { return ch.getState(x, y, z); },
                      [&ch, &sig](int x, int y, int z) { return sig.strongPowered(ch, x, y, z); }};
@@ -1570,7 +1570,7 @@ void Game::reloadResources() {
 }
 
 // MCP wiring (P2c 2026-10-13, review F-M9): the backend bundle + the
-// grant/revoke console commands the engine McpServer header assumes the
+// grant/revoke console commands the engine cMcpServer header assumes the
 // game exposes. The server itself (and its stdio thread) is owned by
 // main.cpp under --mcp-stdio; without the flag none of this runs and the
 // `mcp` command does not exist.
@@ -1588,7 +1588,7 @@ litholattice::mcp::McpBackends Game::mcpBackends() {
   return b;
 }
 
-void Game::setMcpServer(litholattice::mcp::McpServer* server) {
+void Game::setMcpServer(litholattice::mcp::cMcpServer* server) {
   mcpServer_ = server;
   if (!server || mcpCommandsRegistered_) return;
   mcpCommandsRegistered_ = true;
@@ -3001,7 +3001,7 @@ std::string Game::releaseInfo() {
   return buildInfo();  // build_version.h: "LithoKraft Alpha a.b.c.d (commit) Release|Debug built ..."
 }
 
-// HUD content; the widgets live in GameUi.
+// HUD content; the widgets live in cGameUi.
 HudModel Game::hudModel() const {
   HudModel m;
   // The HUD hotbar is a snapshot of the player inventory's hotbar slots —

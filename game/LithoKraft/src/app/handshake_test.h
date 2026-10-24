@@ -29,5 +29,5 @@ struct ControlScenarioWorld {
 };
 ControlScenarioWorld buildControlScenarioWorld();
 /// The §6.4 outcome hash (identical definition to the handshake harness).
-uint64_t hashControlWorld(const litholattice::ChunkMap& world, const SignalSim& sig, uint64_t ticks);
+uint64_t hashControlWorld(const litholattice::ChunkMap& world, const cSignalSim& sig, uint64_t ticks);
 }  // namespace lithokraft

@@ -23,7 +23,7 @@ int sixbitCode(char32_t c) {
 }
 char sixbitChar(int code) { return (code >= 0 && code < 64) ? char(code + 32) : '?'; }
 
-std::map<uint64_t, std::vector<uint8_t>> SignalSim::exportState() const {
+std::map<uint64_t, std::vector<uint8_t>> cSignalSim::exportState() const {
   std::map<int64_t, const Comp*> sorted;  // deterministic order
   for (const auto& [k, c] : comps_) sorted.emplace(k, &c);
   std::map<uint64_t, storage::ByteWriter> cols;
@@ -42,7 +42,7 @@ std::map<uint64_t, std::vector<uint8_t>> SignalSim::exportState() const {
   return out;
 }
 
-bool SignalSim::importState(const std::vector<uint8_t>& b) {
+bool cSignalSim::importState(const std::vector<uint8_t>& b) {
   struct Entry { int64_t key; ComponentMemory mem; };
   std::vector<Entry> entries;
   storage::ByteReader r(b.data(), b.size());
@@ -70,7 +70,7 @@ bool SignalSim::importState(const std::vector<uint8_t>& b) {
 
 namespace {
 // Index every signal cell of ONE column (shared by scan() and scanColumn()).
-void scanOneColumn(SignalSim& sim, const ChunkColumn& col, const BlockRegistry& reg) {
+void scanOneColumn(cSignalSim& sim, const ChunkColumn& col, const BlockRegistry& reg) {
   std::vector<BlockId> lut;  // StableId palette -> BlockId, resolved once per sub-chunk
   for (int sy = 0; sy < kSubChunks; ++sy) {
     const SubChunk* s = col.subs[sy].get();
@@ -93,19 +93,19 @@ void scanOneColumn(SignalSim& sim, const ChunkColumn& col, const BlockRegistry& 
 }
 }  // namespace
 
-void SignalSim::scan(const ChunkMap& w) {
+void cSignalSim::scan(const ChunkMap& w) {
   torches_.clear(); wires_.clear(); lamps_.clear(); comps_.clear();
   const BlockRegistry& reg = blockRegistry();
   for (const auto& [k, col] : w.columns()) scanOneColumn(*this, *col, reg);
 }
 
-void SignalSim::scanColumn(const ChunkMap& w, int cx, int cz) {
+void cSignalSim::scanColumn(const ChunkMap& w, int cx, int cz) {
   const ChunkColumn* col = w.column(cx, cz);
   if (!col) return;
   scanOneColumn(*this, *col, blockRegistry());
 }
 
-std::vector<uint8_t> SignalSim::exportColumnState(int cx, int cz) const {
+std::vector<uint8_t> cSignalSim::exportColumnState(int cx, int cz) const {
   const auto all = exportState();
   const auto it = all.find(ChunkKey::make(cx, cz));
   return it == all.end() ? std::vector<uint8_t>{} : it->second;
@@ -126,9 +126,9 @@ void eraseColumnKeys(Set& s, int cx, int cz) {
 }
 }  // namespace
 
-bool SignalSim::hasIndexedCells(int cx, int cz) const { return indexedCellCount(cx, cz) != 0; }
+bool cSignalSim::hasIndexedCells(int cx, int cz) const { return indexedCellCount(cx, cz) != 0; }
 
-size_t SignalSim::indexedCellCount(int cx, int cz) const {
+size_t cSignalSim::indexedCellCount(int cx, int cz) const {
   size_t n = 0;
   for (int64_t k : torches_) n += keyInColumn(k, cx, cz) ? 1 : 0;
   for (int64_t k : wires_) n += keyInColumn(k, cx, cz) ? 1 : 0;
@@ -137,7 +137,7 @@ size_t SignalSim::indexedCellCount(int cx, int cz) const {
   return n;
 }
 
-void SignalSim::unscanColumn(int cx, int cz) {
+void cSignalSim::unscanColumn(int cx, int cz) {
   // Removed wires keep a trace-strength slot in the buffer (slots are
   // never recycled); zero them so a stale strength can never be read for
   // a cell that no longer exists. A re-streamed column's wires get their
@@ -171,7 +171,7 @@ void SignalSim::unscanColumn(int cx, int cz) {
   netsValid_ = false;
 }
 
-void SignalSim::onBlockChanged(int x, int y, int z, BlockId now) {
+void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now) {
   const int64_t k = packPos(x, y, z);
   fullPass_ = true; netsValid_ = false;
   torches_.erase(k); wires_.erase(k); lamps_.erase(k); comps_.erase(k); lampHold_.erase(k);
@@ -185,14 +185,14 @@ void SignalSim::onBlockChanged(int x, int y, int z, BlockId now) {
 // Minecraft-style strong power: a lit torch (either colour) powers the solid opaque block above it.
 // An attached (wall / floor / ceiling) switch that is on strongly powers its support block.
 // (Attached switches / buttons are found once per pass by collectMountPowered, not per call.)
-bool SignalSim::strongPowered(const ChunkMap& w, int x, int y, int z) const {
+bool cSignalSim::strongPowered(const ChunkMap& w, int x, int y, int z) const {
   const auto& reg = blockRegistry();
   if (!reg.hasAll(w.get(x, y, z), kSolid | kOpaque | kPowerable)) return false;
   if (reg.def(w.get(x, y - 1, z)).role == SimRole::Torch && stValue(w.getState(x, y - 1, z)) > 0) return true;
   return !mountPowered_.empty() && mountPowered_.contains(packPos(x, y, z));
 }
 
-void SignalSim::collectMountPowered(const ChunkMap& w) {
+void cSignalSim::collectMountPowered(const ChunkMap& w) {
   // B-L1 acceptance (P3-2): unordered comps_ iteration — the result is a
   // membership SET (mountPowered_); iteration order cannot leak anywhere.
   mountPowered_.clear();
@@ -227,7 +227,7 @@ static void torchSupport(CellState s, int x, int y, int z, int& sx, int& sy, int
   sx = x + dx; sy = y + dy; sz = z + dz;
 }
 
-bool SignalSim::blockPowered(const ChunkMap& w, int x, int y, int z) const {
+bool cSignalSim::blockPowered(const ChunkMap& w, int x, int y, int z) const {
   const auto& reg = blockRegistry();
   if (!reg.has(w.get(x, y, z), kPowerable)) return false;
   if (strongPowered(w, x, y, z)) return true;
@@ -237,12 +237,12 @@ bool SignalSim::blockPowered(const ChunkMap& w, int x, int y, int z) const {
   return false;
 }
 
-int SignalSim::emitToward(const ChunkMap& w, int x, int y, int z, int dir) const {
+int cSignalSim::emitToward(const ChunkMap& w, int x, int y, int z, int dir) const {
   const auto it = comps_.find(packPos(x, y, z));
   return it == comps_.end() ? 0 : it->second.behavior->emitToward(dir, w.getState(x, y, z), it->second.mem);
 }
 
-int SignalSim::inputFrom(const ChunkMap& w, int x, int y, int z, int d) const {
+int cSignalSim::inputFrom(const ChunkMap& w, int x, int y, int z, int d) const {
   const int nx = x + kDirX[d], nz = z + kDirZ[d];
   const BlockDef nd = blockRegistry().def(w.get(nx, y, nz));
   const CellState s = w.getState(nx, y, nz);
@@ -261,7 +261,7 @@ static int emitDirOfCatchor(CellState s) {
   return m == 1 ? (f + 3) & 3 : m == 2 ? (f + 1) & 3 : f;
 }
 
-bool SignalSim::use(ChunkMap& w, int x, int y, int z, const DirtyFn& dirty, bool alt) {
+bool cSignalSim::use(ChunkMap& w, int x, int y, int z, const DirtyFn& dirty, bool alt) {
   const auto it = comps_.find(packPos(x, y, z));
   if (it == comps_.end()) {  // using a wire: the first neighbouring component that reacts to its colour
     const BlockDef wd = blockRegistry().def(w.get(x, y, z));
@@ -303,7 +303,7 @@ bool SignalSim::use(ChunkMap& w, int x, int y, int z, const DirtyFn& dirty, bool
   return true;
 }
 
-std::string SignalSim::inspect(const ChunkMap& w, int x, int y, int z) const {
+std::string cSignalSim::inspect(const ChunkMap& w, int x, int y, int z) const {
   static constexpr const char* kDir = "NESW";
   const BlockId b = w.get(x, y, z);
   const CellState s = w.getState(x, y, z);
@@ -324,12 +324,12 @@ std::string SignalSim::inspect(const ChunkMap& w, int x, int y, int z) const {
   return r;
 }
 
-void SignalSim::keyPulse(int x, int y, int z, int front, int control) {
+void cSignalSim::keyPulse(int x, int y, int z, int front, int control) {
   if (const auto it = comps_.find(packPos(x, y, z)); it != comps_.end())
   { it->second.mem.keys.push_back({uint8_t(front), uint8_t(control)}); fullPass_ = true; }
 }
 
-void SignalSim::tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty) {
+void cSignalSim::tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty) {
   // Reassembled from the hs* pieces (hs-design §3.2); the handshake path in
   // cSignalWorldSim drives the identical pieces through the authority.
   hsBeginCycle(w, pcx, pcz, radius);
@@ -351,7 +351,7 @@ void SignalSim::tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& d
   hsCommit();
 }
 
-void SignalSim::hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius) {
+void cSignalSim::hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius) {
   ++tickNo_;
   // NOTE: radio_/jammers_ flips are NOT here any more — they are hsCommit()
   // at cycle end, in both modes (D12; see signal.h).
@@ -371,18 +371,18 @@ void SignalSim::hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius) {
   hsSkip_ = false;
 }
 
-void SignalSim::hsFlipAndTorches(ChunkMap& w, const DirtyFn& dirty) {
+void cSignalSim::hsFlipAndTorches(ChunkMap& w, const DirtyFn& dirty) {
   collectMountPowered(w);
   tickTorches(w, dirty);
 }
 
-void SignalSim::hsComponents(ChunkMap& w, const DirtyFn& dirty) {
+void cSignalSim::hsComponents(ChunkMap& w, const DirtyFn& dirty) {
   const auto c0 = std::chrono::steady_clock::now();
   tickComponents(w, dirty);
   phase_.comps += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - c0).count();
 }
 
-void SignalSim::hsMark(ChunkMap& w) {
+void cSignalSim::hsMark(ChunkMap& w) {
   const auto m0 = std::chrono::steady_clock::now();
   // Next tick's wake set: around every changed source; the readers of every re-flooded network.
   allAwake_ = fullPass_ || !compSleep_ || !netsValid_;
@@ -445,18 +445,18 @@ void SignalSim::hsMark(ChunkMap& w) {
   populateWake();
 }
 
-void SignalSim::hsFinishCycle(ChunkMap& w) {
+void cSignalSim::hsFinishCycle(ChunkMap& w) {
   if (fullPass_) allAwake_ = true;  // a full pass may change any wire: everyone ticks next
   if (fullPass_ && !netsValid_) buildNets(w);
   fullPass_ = false;
 }
 
-void SignalSim::hsCommit() {
+void cSignalSim::hsCommit() {
   radio_.flip();    // this cycle's broadcasts become readable next cycle (1-tick wireless latency)
   jammers_.flip();  // this cycle's jammer zones become active
 }
 
-void SignalSim::wakeAround(int64_t k) {
+void cSignalSim::wakeAround(int64_t k) {
   int x, y, z; unpackPos(k, x, y, z);
   for (int dy = -1; dy <= 2; ++dy)  // +2: a torch powers the block above it, read beside that block
     for (int dz = -1; dz <= 1; ++dz)
@@ -466,7 +466,7 @@ void SignalSim::wakeAround(int64_t k) {
       }
 }
 
-void SignalSim::wireLinks(const ChunkMap& w, int x, int y, int z, std::vector<int64_t>& out) const {
+void cSignalSim::wireLinks(const ChunkMap& w, int x, int y, int z, std::vector<int64_t>& out) const {
   const auto& reg = blockRegistry();
   const uint8_t channel = reg.def(w.get(x, y, z)).channel;
   const bool selfVia = isVia(w.get(x, y, z));
@@ -496,7 +496,7 @@ static CellState* statePtr(ChunkMap& w, int x, int y, int z) {
   return s ? &s->state[size_t(SubChunk::index(x & 15, y & 15, z & 15))] : nullptr;
 }
 
-void SignalSim::buildNets(ChunkMap& w) {
+void cSignalSim::buildNets(ChunkMap& w) {
   wireNet_.clear(); nets_.clear(); netLamps_.clear(); srcReach_.clear();
   wireNet_.reserve(wires_.size());
   std::vector<int64_t> stack, links;
@@ -599,7 +599,7 @@ void SignalSim::buildNets(ChunkMap& w) {
   netMarkedBits_.assign((nets_.size() + 31) / 32, 0);
   netsValid_ = true;
 }
-void SignalSim::tickTorches(ChunkMap& w, const DirtyFn& dirty) {
+void cSignalSim::tickTorches(ChunkMap& w, const DirtyFn& dirty) {
   // 1) Torches: decide from the previous tick's state, then apply together.
   torchNext_.clear();
   torchNext_.reserve(torches_.size());
@@ -631,7 +631,7 @@ uint32_t ratePhaseFor(int64_t key, uint32_t divide) {
 }
 }  // namespace
 
-litholattice::TickRate SignalSim::classTickRate(BlockId block, const cCompBehavior* behavior) const {
+litholattice::TickRate cSignalSim::classTickRate(BlockId block, const cCompBehavior* behavior) const {
   // An installed override was admitted only when valid and non-neutral
   // (setClassTickRate), so it needs no re-validation here.
   if (const auto it = classRates_.find(block); it != classRates_.end()) return it->second;
@@ -655,7 +655,7 @@ litholattice::TickRate SignalSim::classTickRate(BlockId block, const cCompBehavi
   return resolved;
 }
 
-void SignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
+void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
   // 2) Components: new outputs from the previous tick's inputs (computed first, applied together).
   struct Next { int64_t k; Comp* c; ComponentStep step; };
   std::vector<Next> compNext;
@@ -776,7 +776,7 @@ struct HsTimer {
 
 // ---- propagate: full pass (affine; the legacy propagateWires fullPass_ branch) ----
 
-void SignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
+void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
   HsTimer timer{hsWiresNs_};
   const auto& reg = blockRegistry();
   // 3) Wires: reset, then bucket BFS from all sources (strongest first => max strength wins).
@@ -931,7 +931,7 @@ void SignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
 // interleaving in the legacy global bucket loop cannot change a net's final
 // state: nets are disjoint, and a net's entries keep their relative order).
 
-void SignalSim::hsPrepIncremental(ChunkMap& w) {
+void cSignalSim::hsPrepIncremental(ChunkMap& w) {
   HsTimer timer{hsWiresNs_};
   const auto& reg = blockRegistry();
   if (hsNetWork_.size() != netArr_.size()) hsNetWork_.assign(netArr_.size(), NetWork{});
@@ -999,7 +999,7 @@ void SignalSim::hsPrepIncremental(ChunkMap& w) {
 // shared buckets, slotFor/TraceStrengthBuffer, or the real DirtyFn (the
 // incremental flood reports through the strength buffer only, as legacy).
 
-void SignalSim::hsPropagateNet(ChunkMap& /*w*/, int32_t netId, const DirtyFn& /*dirty*/) {
+void cSignalSim::hsPropagateNet(ChunkMap& /*w*/, int32_t netId, const DirtyFn& /*dirty*/) {
   HsTimer timer{hsWiresNs_};
   NetArr& a = netArr_[size_t(netId)];
   NetWork& nw = hsNetWork_[size_t(netId)];
@@ -1056,7 +1056,7 @@ void SignalSim::hsPropagateNet(ChunkMap& /*w*/, int32_t netId, const DirtyFn& /*
     }
 }
 
-void SignalSim::hsApplyStrengthPending() {
+void cSignalSim::hsApplyStrengthPending() {
   HsTimer timer{hsWiresNs_};
   for (int32_t id : hsMarkedNets_) {
     NetWork& nw = hsNetWork_[size_t(id)];
@@ -1067,12 +1067,12 @@ void SignalSim::hsApplyStrengthPending() {
 
 // ---- lamps ----
 
-std::vector<SignalSim::LampHoldUpdate>& SignalSim::hsTlsLampHolds() {
+std::vector<cSignalSim::LampHoldUpdate>& cSignalSim::hsTlsLampHolds() {
   thread_local std::vector<LampHoldUpdate> v;
   return v;
 }
 
-void SignalSim::hsApplyLampHolds(const std::vector<LampHoldUpdate>& updates) {
+void cSignalSim::hsApplyLampHolds(const std::vector<LampHoldUpdate>& updates) {
   for (const LampHoldUpdate& u : updates) {
     if (u.erase) lampHold_.erase(u.key);
     else {
@@ -1082,7 +1082,7 @@ void SignalSim::hsApplyLampHolds(const std::vector<LampHoldUpdate>& updates) {
   }
 }
 
-void SignalSim::hsLampsBatch(const std::vector<int64_t>& keys, ChunkMap& w, const DirtyFn& dirty) {
+void cSignalSim::hsLampsBatch(const std::vector<int64_t>& keys, ChunkMap& w, const DirtyFn& dirty) {
   HsTimer timer{hsLampsNs_};
   const auto& reg = blockRegistry();
   std::vector<LampHoldUpdate>& holds = hsTlsLampHolds();

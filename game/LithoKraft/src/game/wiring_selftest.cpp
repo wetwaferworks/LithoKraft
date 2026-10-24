@@ -485,7 +485,7 @@ int runWiringSelfTest() {
       }
     buildLithoMachine(w, 24, 10, 24, true);   // wired reference copy
     buildLithoMachine(w, 64, 10, 24, false);  // unwired copy
-    SignalSim sim;
+    cSignalSim sim;
     for (int cz = 0; cz < 4; ++cz)
       for (int cx = 0; cx < 6; ++cx) sim.scanColumn(w, cx, cz);
     for (int i = 0; i < 12; ++i) sim.tick(w, 0, 0, 100, [](int, int, int) {});

@@ -8,14 +8,14 @@
 // is a pre-existing environment fact, not an MCP gap.
 //
 // What this DOES exercise, in-process, against the REAL Game (headless
-// harness fixture) and the REAL engine McpServer:
+// harness fixture) and the REAL engine cMcpServer:
 //   1. Game::mcpBackends() fills the controller/player/vision/audio seams
 //      from the game's live adapters (non-null, right objects).
 //   2. Game::setMcpServer() accepts the server (the grant/revoke console
 //      commands register on that call — the registry itself is private,
 //      so registration success is checked via the call not failing; the
 //      grant EFFECT is checked through the server's mask in step 4).
-//   3. A full JSON-RPC round trip through McpServer::handleMessage:
+//   3. A full JSON-RPC round trip through cMcpServer::handleMessage:
 //      initialize handshake, then tools/list after the initialized
 //      notification — the same dispatch the stdio thread runs.
 //   4. The permission flow end to end at the server level: a gated tool
@@ -77,7 +77,7 @@ int main() {
         "unwired seams stay null (honest 'not wired')");
 
   // 2. Server + setMcpServer.
-  mcp::McpServer server(game.mcpBackends());
+  mcp::cMcpServer server(game.mcpBackends());
   game.setMcpServer(&server);
   check(server.permissionMask() == 0, "agent starts deny-by-default (mask 0)");
 
@@ -110,7 +110,7 @@ int main() {
 
   // 5. runStdio over a scripted transport (the thread's loop, minus fds).
   {
-    mcp::McpServer stdioServer(game.mcpBackends());
+    mcp::cMcpServer stdioServer(game.mcpBackends());
     ScriptedTransport t;
     t.in = {R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"stdio-test","version":"0"}}})",
             R"({"jsonrpc":"2.0","method":"notifications/initialized"})",

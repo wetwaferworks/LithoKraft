@@ -3,7 +3,7 @@
 //
 // This is the general game-testing fixture, not a one-off runner: future gameplay tests
 // (inventory, combat, dimensions, lithography) live here. Tests drive the REAL Game and the
-// REAL retained UI (GameUi) — clicks go through UiRoot exactly like the app's event loop —
+// REAL retained UI (cGameUi) — clicks go through UiRoot exactly like the app's event loop —
 // so a passing harness test means the wiring works, not just the widgets.
 //
 // Note (G-L3, corrected 2026-10-13): earlier versions of this comment claimed

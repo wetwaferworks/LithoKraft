@@ -192,7 +192,7 @@ class Game {
   /// OS clipboard for UI text fields (optional; a process-local one otherwise). Must outlive the game.
   void setClipboard(ui::IClipboard* clipboard) { ui_.root().setClipboard(clipboard); }
   /// The game's UI (HUD, hotbar, inventory, script editor); for tools and tests.
-  GameUi& gameUi() { return ui_; }
+  cGameUi& gameUi() { return ui_; }
   /// MCP player-control adapters (used by mcpBackends() below; also
   /// directly accessible for tests).
   cMcpPlayerController& mcpPlayerController() { return mcpController_; }
@@ -213,7 +213,7 @@ class Game {
   std::string spawnDeceitorCmd();
   std::string deceitorInteractCmd();
   std::string deceitorAttackCmd();
-  /// The MCP backend bundle for the engine McpServer (P2c 2026-10-13,
+  /// The MCP backend bundle for the engine cMcpServer (P2c 2026-10-13,
   /// review F-M9): the game's existing adapters — player control, player
   /// view, pilot vision, pilot audio. Every other seam stays null, so
   /// tools backed by an unwired seam answer "not wired" honestly (the
@@ -227,7 +227,7 @@ class Game {
   /// permission flow — the commands the engine headers assume. Call on
   /// the game thread before the frame loop; pass nullptr on shutdown.
   /// Without a server (no --mcp-stdio) the commands do not exist.
-  void setMcpServer(litholattice::mcp::McpServer* server);
+  void setMcpServer(litholattice::mcp::cMcpServer* server);
   /// The engine projectile manager (P2c 2026-10-13, ENT-1): ticked once
   /// per world tick from updateEntities(), with its voxel seam over the
   /// sim's block reads and its chunk seam over the cChunkStreamer. No
@@ -391,7 +391,7 @@ class Game {
 
   GameConfig cfg_;
   ScriptEngine scripts_;
-  GameUi ui_;                          // before uiScripts_ / editor_, which reference it
+  cGameUi ui_;                          // before uiScripts_ / editor_, which reference it
   cUiScriptBindings uiScripts_;
   std::unique_ptr<cScriptEditor> editor_;  // F10; only with a scripts folder
   litholattice::console::cConsoleReg consoleRegistry_;  // before debugConsole_
@@ -549,7 +549,7 @@ class Game {
   // the MCP members because mcpSenses_ borrows its cPilotCameraRig.
   cGameCameraController camera_;
   // MCP player control (model pilots the local player through the real input
-  // path). Wired into the McpServer by Game::mcpBackends() under
+  // path). Wired into the cMcpServer by Game::mcpBackends() under
   // main.cpp's --mcp-stdio flag (P2c, F-M9).
   cMcpPlayerController mcpController_;
   cMcpPlayerView mcpView_;
@@ -562,7 +562,7 @@ class Game {
   // destroying either. Only the `mcp` console commands read it, on the
   // game thread; the server's grant/revoke methods are internally
   // synchronized for exactly this cross-thread approval flow.
-  litholattice::mcp::McpServer* mcpServer_ = nullptr;
+  litholattice::mcp::cMcpServer* mcpServer_ = nullptr;
   bool mcpCommandsRegistered_ = false;
   // Projectile system (P2c, ENT-1): engine manager, game-thread owned,
   // ticked per world tick in updateEntities(). Seams are installed in

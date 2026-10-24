@@ -4,14 +4,14 @@
 // behaviour is describe-only and signing does not exist yet.
 //
 // Why a plain cBlockBehavior and not a cCompBehavior: the standard use path
-// (Game -> IWorldSimulation::use -> SignalSim::use) only reaches blocks that
-// sit in SignalSim's component map, and that map is fed inconsistently for a
+// (Game -> IWorldSimulation::use -> cSignalSim::use) only reaches blocks that
+// sit in cSignalSim's component map, and that map is fed inconsistently for a
 // SimRole::None block -- onBlockChanged (placement) admits any block whose
 // behaviour is a cCompBehavior, but scan() (world load) pre-filters to
 // SimRole != None. A cCompBehavior here would make right-click work when
 // the table is placed yet silently stop after a reload: a broken seam.
 // As a describe-only cBlockBehavior, BehaviorCatalog::component() stays
-// nullptr, SignalSim::use returns false (the framework's not-usable result)
+// nullptr, cSignalSim::use returns false (the framework's not-usable result)
 // uniformly, and the look-at readout resolves through the standard path --
 // exactly the structure block's current behaviour, but with the name anchored
 // on a real class instead of dangling.

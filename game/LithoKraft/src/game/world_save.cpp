@@ -39,7 +39,7 @@ cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::MaterialR
   payloads_.setRegistry(&blockRegistry());
   storage::PayloadType sig;
   sig.tag = kSignalTag;
-  sig.version = SignalSim::kStateVersion;
+  sig.version = cSignalSim::kStateVersion;
   sig.migrate[1] = [](const storage::Bytes& v1) -> std::optional<storage::Bytes> {
     return migrateSignalV1ToV2(v1);
   };
@@ -322,7 +322,7 @@ cWorldSave::LoadedColumn cWorldSave::loadColumn(const std::string& dim, int cx, 
   return out;
 }
 
-size_t cWorldSave::saveDimension(const std::string& dim, const ChunkMap& world, const SignalSim& signal, bool wait,
+size_t cWorldSave::saveDimension(const std::string& dim, const ChunkMap& world, const cSignalSim& signal, bool wait,
                                 const std::unordered_set<uint64_t>* dirty) {
   lastSaveOk_ = true;
   lastSaveError_.clear();
@@ -395,7 +395,7 @@ size_t cWorldSave::saveDimension(const std::string& dim, const ChunkMap& world, 
 }
 
 size_t cWorldSave::saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
-                              const SignalSim& signal, bool wait) {
+                              const cSignalSim& signal, bool wait) {
   // A2 / B-M1 save-on-evict: saveDimension's discipline, scoped to the
   // eviction candidates. Same fail-closed name-table gate, same
   // table/metadata-first ordering, same exporting_ enqueue protocol —

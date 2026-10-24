@@ -120,18 +120,18 @@ class cWorldSave {
   /// table/metadata write failed — inspect lastSaveOk()/lastSaveError()).
   /// When a seed was set via setSeed(), the world metadata (level.json) is
   /// written through the file contract as part of the save (SV-H2).
-  size_t saveDimension(const std::string& dim, const ChunkMap& world, const SignalSim& signal, bool wait,
+  size_t saveDimension(const std::string& dim, const ChunkMap& world, const cSignalSim& signal, bool wait,
                        const std::unordered_set<uint64_t>* dirty = nullptr);
   /// Column eviction save (A2 / B-M1): saves ONLY the given columns
   /// (blocks + their SGNL state, exported from `signal` inside this call)
   /// through the same store path and fail-closed discipline as
   /// saveDimension. The caller (Game::evictFarColumns) invokes this BEFORE
-  /// SignalSim::unscanColumn drops the columns' sim state, in the same
+  /// cSignalSim::unscanColumn drops the columns' sim state, in the same
   /// sim-stopped window as insertion. Returns the number of columns queued
   /// (0 when refused — inspect lastSaveOk()/lastSaveError()); with
   /// wait=true a 0/short return or !lastSaveOk() means the eviction of the
   /// unsaved columns must NOT proceed.
-  size_t saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols, const SignalSim& signal,
+  size_t saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols, const cSignalSim& signal,
                      bool wait);
   /// Outcome of the most recent saveDimension: false when the save was
   /// refused (fail-closed name table), the table/metadata write failed, or —
@@ -143,7 +143,7 @@ class cWorldSave {
   /// Replaces each column of `world` that has a saved copy; returns how many
   /// (only columns actually inserted are counted — L6). Returns -1 when the
   /// load was REFUSED (fail-closed name table, see above). The saved signal
-  /// state is returned in `signalState` for SignalSim::importState() after scan().
+  /// state is returned in `signalState` for cSignalSim::importState() after scan().
   int loadDimension(const std::string& dim, ChunkMap& world, std::vector<uint8_t>& signalState);
 
   /// World metadata (level.json, SV-H2): the world seed + save format

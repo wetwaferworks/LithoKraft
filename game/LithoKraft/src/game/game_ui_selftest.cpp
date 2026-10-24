@@ -186,7 +186,7 @@ void testGameUi(Checker& check) {
   int selected = -1, closed = 0;
   BlockId picked = kAir;
   bool shift = false;
-  GameUi gui({[&](int s) { selected = s; }, [&](BlockId b, bool sh) { picked = b; shift = sh; }, [&] { ++closed; },
+  cGameUi gui({[&](int s) { selected = s; }, [&](BlockId b, bool sh) { picked = b; shift = sh; }, [&] { ++closed; },
               {}, {}, {}, {}, {}, {}});
   HudModel m;
   m.hotbar = {ItemStack{1, 1}, ItemStack{2, 1}, ItemStack{3, 1}, {}, {}, {}, {}, {}};
@@ -296,7 +296,7 @@ void testSettingsFile(Checker& check) {
 
 void testLaunchMenu(Checker& check) {
   bool played = false, quit = false, settingsOpened = false;
-  GameUi gui({{}, {}, {}, {}, [&] { quit = true; }, [&] { played = true; }, {}, [&] { settingsOpened = true; }, {}});
+  cGameUi gui({{}, {}, {}, {}, [&] { quit = true; }, [&] { played = true; }, {}, [&] { settingsOpened = true; }, {}});
   HudModel m;
   m.visible = false;  // the game hides the HUD under the menu overlay
   gui.openMenu("9.9.9-test");
@@ -334,12 +334,12 @@ void testLaunchMenu(Checker& check) {
   check(gui.root().theme().scale() == 1.f, "menu: HUD scale 0 falls back to auto");
   // Cortana 2026-10-16 (JD GUI overhaul): whole-number auto scale from the framebuffer, user 1-4
   // capped to what fits, and integer glyph scales (crisp text at any theme textScale).
-  check(GameUi::effectiveGuiScale(0, 1280, 720) == 1 && GameUi::effectiveGuiScale(0, 1920, 1080) == 2 &&
-            GameUi::effectiveGuiScale(0, 2560, 1080) == 2 && GameUi::effectiveGuiScale(0, 1024, 768) == 1 &&
-            GameUi::effectiveGuiScale(0, 3840, 2160) == 4 && GameUi::effectiveGuiScale(0, 640, 360) == 1,
+  check(cGameUi::effectiveGuiScale(0, 1280, 720) == 1 && cGameUi::effectiveGuiScale(0, 1920, 1080) == 2 &&
+            cGameUi::effectiveGuiScale(0, 2560, 1080) == 2 && cGameUi::effectiveGuiScale(0, 1024, 768) == 1 &&
+            cGameUi::effectiveGuiScale(0, 3840, 2160) == 4 && cGameUi::effectiveGuiScale(0, 640, 360) == 1,
         "gui scale: auto = largest whole scale fitting 960x540 (720p 1, 1080p 2, 4K 4, min 1)");
-  check(GameUi::effectiveGuiScale(4, 3840, 2160) == 4 && GameUi::effectiveGuiScale(4, 1280, 720) == 2 &&
-            GameUi::effectiveGuiScale(3, 1920, 1080) == 3 && GameUi::effectiveGuiScale(1, 3840, 2160) == 1,
+  check(cGameUi::effectiveGuiScale(4, 3840, 2160) == 4 && cGameUi::effectiveGuiScale(4, 1280, 720) == 2 &&
+            cGameUi::effectiveGuiScale(3, 1920, 1080) == 3 && cGameUi::effectiveGuiScale(1, 3840, 2160) == 1,
         "gui scale: a fixed 1-4 choice is kept, capped to the 640x360 safe canvas");
   {
     ui::Theme t = ui::Theme::defaults();
@@ -358,7 +358,7 @@ void testLaunchMenu(Checker& check) {
 
 void testPauseMenu(Checker& check) {
   bool resumed = false, quit = false, toMenu = false, settingsOpened = false;
-  GameUi gui({{}, {}, {}, [&] { resumed = true; }, [&] { quit = true; },
+  cGameUi gui({{}, {}, {}, [&] { resumed = true; }, [&] { quit = true; },
               {}, [&] { toMenu = true; }, [&] { settingsOpened = true; }, {}});
   HudModel m;
   const auto pauseButton = [&](const char* id) {
@@ -391,7 +391,7 @@ void testPauseMenu(Checker& check) {
 void testSettingsDialog(Checker& check) {
   GameSettings changed;
   bool fired = false;
-  GameUi gui({{}, {}, {}, {}, {}, {}, {}, {}, [&](const GameSettings& s) { changed = s; fired = true; }});
+  cGameUi gui({{}, {}, {}, {}, {}, {}, {}, {}, [&](const GameSettings& s) { changed = s; fired = true; }});
   HudModel m;
   GameSettings cur;
   cur.masterVolume = 0.75f; cur.muted = true; cur.hudScale = 2; cur.displayMode = 3;

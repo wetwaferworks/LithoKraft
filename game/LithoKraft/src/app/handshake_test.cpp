@@ -63,7 +63,7 @@ uint64_t hashAirSubChunk(uint64_t h) {
   return h;
 }
 
-uint64_t hashWorld(const ChunkMap& world, const SignalSim& sig, uint64_t ticks) {
+uint64_t hashWorld(const ChunkMap& world, const cSignalSim& sig, uint64_t ticks) {
   uint64_t h = cDeterministicScheduler::kFnvOffset;
   std::vector<uint64_t> keys;
   keys.reserve(world.columns().size());
@@ -456,7 +456,7 @@ void testFreezeEndToEnd() {
     cWorldSave save(dir);
     save.loadDimension("wafer", restored, blob);
   }
-  SignalSim sig2;
+  cSignalSim sig2;
   sig2.scan(restored);
   const bool imported = sig2.importState(blob);
   const uint64_t hReload = hashWorld(restored, sig2, 0);
@@ -843,11 +843,11 @@ void testRateShuffleInvariance() {
   check(a.absent == UINT32_MAX && b.absent == UINT32_MAX, "RATE: componentIdByName('rate.absent') == UINT32_MAX in both arms");
 }
 
-// ---- rate scaling: game layer (SignalSim per-class rates, mini circuit) ----
+// ---- rate scaling: game layer (cSignalSim per-class rates, mini circuit) ----
 void testRateGameLayer() {
   std::printf("== handshake rate game layer (SignalSim class tick rates on a mini circuit)\n");
-  struct Mini { ChunkMap w; SignalSim sim; };  // built in place per arm (SignalSim is not movable)
-  const SignalSim::DirtyFn noDirty = [](int, int, int) {};
+  struct Mini { ChunkMap w; cSignalSim sim; };  // built in place per arm (cSignalSim is not movable)
+  const cSignalSim::DirtyFn noDirty = [](int, int, int) {};
   auto buildMini = [](Mini& m) {
     m.w.setRegistry(&blockRegistry());
     for (int cz = 0; cz < 2; ++cz)
@@ -926,7 +926,7 @@ void testRateGameLayer() {
 
 // ---- rate scaling: A-H2 — a class-declared tickRate() is validated ----
 // tickComponents resolves every placed component's rate through
-// SignalSim::classTickRate(block, behavior); the catalog binds behaviours
+// cSignalSim::classTickRate(block, behavior); the catalog binds behaviours
 // to blocks statically, so the resolution seam is where a test behaviour
 // can be exercised directly (that seam is exactly what tickComponents
 // consumes — the sub-pull loops below it only ever see its result).
@@ -954,7 +954,7 @@ void testRateInvalidClassRates() {
   {  // {0,1,0}: multiply 0 would run zero sub-pulls and publish the
      // default ComponentStep{} (state 0) — the state wipe of A-H2.
     DeclaredRateBehavior beh{TickRate{0, 1, 0}};
-    SignalSim sim;
+    cSignalSim sim;
     const TickRate a = sim.classTickRate(kRepeator, &beh);
     const TickRate b = sim.classTickRate(kRepeator, &beh);  // second resolution: cached, no second log
     check(isNeutral(a) && isNeutral(b), "RATE/A-H2: class rate {0,1,0} is substituted with the neutral rate");
@@ -962,7 +962,7 @@ void testRateInvalidClassRates() {
   }
   {  // Oversized multiply: substituted, so a firing executes ONE pull.
     DeclaredRateBehavior beh{TickRate{1u << 20, 1, 0}};
-    SignalSim sim;
+    cSignalSim sim;
     const TickRate r = sim.classTickRate(kRepeator, &beh);
     uint64_t exec = 0;
     for (uint32_t s = 0; s < r.multiply; ++s) ++exec;  // the tickComponents loop shape
@@ -971,19 +971,19 @@ void testRateInvalidClassRates() {
   }
   {  // Non-pow2 divide 3.
     DeclaredRateBehavior beh{TickRate{1, 3, 0}};
-    SignalSim sim;
+    cSignalSim sim;
     check(isNeutral(sim.classTickRate(kRepeator, &beh)), "RATE/A-H2: class rate divide 3 (non-pow2) is refused/substituted");
     check(invalidLogCount() == logs0 + 3, "RATE/A-H2: divide 3 logs an error once");
   }
   {  // Oversized divide 2^31 (pow2, past the /1024 cap): would starve.
     DeclaredRateBehavior beh{TickRate{1, 1u << 31, 0}};
-    SignalSim sim;
+    cSignalSim sim;
     check(isNeutral(sim.classTickRate(kRepeator, &beh)), "RATE/A-H2: class rate divide 2^31 (past cap) is refused/substituted");
     check(invalidLogCount() == logs0 + 4, "RATE/A-H2: oversized divide logs an error once");
   }
   {  // A VALID declared rate passes through untouched and unlogged.
     DeclaredRateBehavior beh{TickRate{2, 4, 1}};
-    SignalSim sim;
+    cSignalSim sim;
     const TickRate r = sim.classTickRate(kRepeator, &beh);
     check(r.multiply == 2 && r.divide == 4 && r.phase == 1, "RATE/A-H2: valid class rate {2,4,1} passes through verbatim");
     check(invalidLogCount() == logs0 + 4, "RATE/A-H2: a valid class rate logs no error");
@@ -1006,7 +1006,7 @@ void testRateInvalidClassRates() {
         const cCompBehavior* inner_;
       };
       MemorWithBadRate beh{memor};
-      SignalSim sim;
+      cSignalSim sim;
       const TickRate r = sim.classTickRate(kMemor, &beh);
       ComponentInputs in;
       in.side[3] = 17;  // west of an east-facing Memor is its back (write) input
@@ -1027,8 +1027,8 @@ void testRateInvalidClassRates() {
 // the published final step silently discarded the store.
 void testRateMemorChaining() {
   std::printf("== handshake rate A-H3 (CellState chaining across sub-pulls; Memor at x1/x2/x4)\n");
-  struct Mini { ChunkMap w; SignalSim sim; };
-  const SignalSim::DirtyFn noDirty = [](int, int, int) {};
+  struct Mini { ChunkMap w; cSignalSim sim; };
+  const cSignalSim::DirtyFn noDirty = [](int, int, int) {};
   auto buildBase = [](Mini& m) {
     m.w.setRegistry(&blockRegistry());
     for (int cz = 0; cz < 2; ++cz)
@@ -1159,7 +1159,7 @@ ControlScenarioWorld buildControlScenarioWorld() {
   return out;
 }
 
-uint64_t hashControlWorld(const ChunkMap& world, const SignalSim& sig, uint64_t ticks) {
+uint64_t hashControlWorld(const ChunkMap& world, const cSignalSim& sig, uint64_t ticks) {
   return hashWorld(world, sig, ticks);
 }
 

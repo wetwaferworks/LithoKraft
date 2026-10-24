@@ -736,7 +736,7 @@ struct FrameCtx {
   // aliases there), destroyed after the shutdown tail runs.
   std::unique_ptr<Game> game;
   std::unique_ptr<InputSystem> input;
-  std::unique_ptr<litholattice::mcp::McpServer> mcpServer;
+  std::unique_ptr<litholattice::mcp::cMcpServer> mcpServer;
   std::thread mcpThread;
   std::shared_ptr<std::atomic<bool>> mcpDone;  // set by the MCP thread as it exits (R-RACE-1)
 #if !defined(_WIN32)
@@ -1241,7 +1241,7 @@ int main(int argc, char** argv) {
     auto& mcpSavedStdoutFd = F.mcpSavedStdoutFd;
 #endif
     if (mcpStdio) {
-      mcpServer = std::make_unique<litholattice::mcp::McpServer>(game.mcpBackends());
+      mcpServer = std::make_unique<litholattice::mcp::cMcpServer>(game.mcpBackends());
       mcpServer->setLogSink([](std::string_view line) {
         std::fprintf(stderr, "[mcp] %.*s\n", int(line.size()), line.data());
       });
@@ -1255,14 +1255,14 @@ int main(int argc, char** argv) {
       if (mcpSavedStdoutFd >= 0) ::dup2(STDERR_FILENO, STDOUT_FILENO);
       const int outFd = mcpSavedStdoutFd >= 0 ? mcpSavedStdoutFd : STDOUT_FILENO;
       mcpTransport = std::make_unique<cMcpStdioTransport>(outFd);
-      litholattice::mcp::McpServer* srv = mcpServer.get();
+      litholattice::mcp::cMcpServer* srv = mcpServer.get();
       cMcpStdioTransport* tr = mcpTransport.get();
       mcpThread = std::thread([srv, tr] { srv->runStdio(*tr); });
 #else
       // Windows: the engine's own stdio transport (blocking std::cin);
       // the thread is detached at shutdown — process exit ends it. The
       // poll-based clean join above is the POSIX path this build targets.
-      litholattice::mcp::McpServer* srv = mcpServer.get();
+      litholattice::mcp::cMcpServer* srv = mcpServer.get();
       // Fix run 2 (R-RACE-1): the thread flags its exit so shutdown can cancel
       // the blocking stdin read and JOIN it before the server is freed.
       F.mcpDone = std::make_shared<std::atomic<bool>>(false);

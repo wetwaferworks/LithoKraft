@@ -292,7 +292,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     check(maskSame && colorDiff && filled == 156,
           "spawn garden: seeds 311/314 share one alpha mask (156 filled px) and differ in colour");
   }
-  SignalSim sig;
+  cSignalSim sig;
   sig.scan(wafer->chunks);
   for (int i = 0; i < 12; ++i) sig.tick(wafer->chunks, 2, 2, 12, [](int, int, int) {});
   int lamps = 0, lit = 0, clamps = 0, clit = 0, subs = 0, crustSubs = 0, surfaceSy = 0;
@@ -369,7 +369,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       cWorldSave save(dir);  // a fresh process view of the same directory
       n = save.loadDimension("wafer", restored, blob);
     }
-    SignalSim sig2;
+    cSignalSim sig2;
     sig2.scan(restored);
     const bool imported = sig2.importState(blob);
     check(n == int(wafer->chunks.columns().size()) && imported && memBytes > 0 && sameCells(wafer->chunks, restored) &&
@@ -544,7 +544,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       // Partial saves: save (nothing changed: only component columns), edit, save the changed
       // column, edit + tick, save again; a fresh load (regenerate + overlay the save) must match.
       const auto pdir = dir / "partial";
-      SignalSim sa;
+      cSignalSim sa;
       sa.scan(a->chunks);
       std::unordered_set<uint64_t> changed;
       size_t written = 0;
@@ -568,7 +568,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       c->load(pool, 6);  // regenerated: untouched columns come from the seed
       std::vector<uint8_t> state;
       { cWorldSave save(pdir); save.loadDimension("wafer", c->chunks, state); }
-      SignalSim sc;
+      cSignalSim sc;
       sc.scan(c->chunks);
       const bool imp = sc.importState(state);
       check(written < 3 * a->chunks.columns().size() && imp && sameCells(a->chunks, c->chunks) && sc.exportState() == sa.exportState(),
@@ -719,7 +719,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     {  // P1-SIGNAL gate (SW-H1 / SW-H2 / B-M3 / C-M4 / B-L7): a circuit built
        // in a column OUTSIDE the initial load square, saved, and reloaded
-       // through the streaming seam — cWorldSave::loadColumn + SignalSim::
+       // through the streaming seam — cWorldSave::loadColumn + cSignalSim::
        // scanColumn/importState, the exact calls Game::pumpStreaming makes on
        // insertion, plus a cChunkStreamer pass through the real job pool —
        // must come back alive with its component memory intact. (The full
@@ -739,7 +739,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       src.set(326, gy, 322, kMemor); src.setState(326, gy, 322, makeState(0, 1));  // facing E: back reads the wire run, front drives on
       src.set(327, gy, 322, kRedTrace);
       src.set(328, gy, 322, kLamp);
-      SignalSim srcSim;
+      cSignalSim srcSim;
       srcSim.scan(src);
       for (int i = 0; i < 6; ++i) srcSim.tick(src, 20, 20, 4, noDirty);
       const auto srcState = srcSim.exportState();
@@ -757,7 +757,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       ChunkMap dst;
       dst.setRegistry(&blockRegistry());
       dst.insert(std::move(loaded.column));
-      SignalSim dstSim;
+      cSignalSim dstSim;
       dstSim.scanColumn(dst, 20, 20);
       const bool impOk = dstSim.importState(loaded.signal);
       check(impOk && dstSim.exportState() == srcState,
@@ -769,7 +769,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         ChunkMap dimMap = emptyLike(src);
         std::vector<uint8_t> blob;
         const int dn = streamSave.loadDimension("wafer", dimMap, blob);
-        SignalSim dimSim;
+        cSignalSim dimSim;
         dimSim.scan(dimMap);
         check(dn == 2 && dimSim.importState(blob) && dimSim.exportState() == srcState,
               "p1-stream (C-M4): loadDimension on the same instance after streamed loads returns exactly the dimension's state (no residue, no cross-path sweep)");
@@ -857,7 +857,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     tm.set(51, 100, 50, kRedTrace);
     tm.set(52, 100, 50, kRedTrace);
     tm.set(53, 100, 50, kLamp);
-    SignalSim ts;
+    cSignalSim ts;
     ts.scan(tm);
     for (int i = 0; i < 6; ++i) ts.tick(tm, 3, 3, 4, [](int, int, int) {});
     auto& tbuf = ts.strengthBuffer();
@@ -950,7 +950,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     check(ew.column(20, 20)->dirty && ew.column(20, 20)->generation > 0,
           "evict (A2): ChunkMap::set marks the resident column dirty and bumps its generation");
-    SignalSim esim;
+    cSignalSim esim;
     esim.scan(ew);
     for (int i = 0; i < 6; ++i) esim.tick(ew, 20, 20, 4, evNoDirty);
     check(esim.hasIndexedCells(20, 20) && !esim.exportColumnState(20, 20).empty(),
@@ -989,7 +989,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     reloaded.insert(std::move(loadedCol.column));
     // Production scans per column on insertion; import the evicted
     // column's payload after its scanColumn, as pumpStreaming does.
-    SignalSim rsim2;
+    cSignalSim rsim2;
     rsim2.scanColumn(reloaded, 20, 20);
     const bool impOk = rsim2.importState(loadedCol.signal);
     check(impOk && rsim2.exportState() == stateBefore,
@@ -1002,7 +1002,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     { auto c = std::make_unique<ChunkColumn>(); c->cx = 30; c->cz = 30; cleanMap.insert(std::move(c)); }
     cleanMap.set(481, 90, 481, kStone);  // fixture edit, then restore clean flags (worldgen-equivalent)
     cleanMap.column(30, 30)->dirty = false; cleanMap.column(30, 30)->generation = 0;
-    SignalSim csim;
+    cSignalSim csim;
     csim.scan(cleanMap);
     const uint64_t cleanHash = hashControlWorld(cleanMap, csim, 0);
     check(!cleanMap.column(30, 30)->dirty && !csim.hasIndexedCells(30, 30) && cleanMap.erase(30, 30),
@@ -1012,7 +1012,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     { auto c = std::make_unique<ChunkColumn>(); c->cx = 30; c->cz = 30; cleanBack.insert(std::move(c)); }
     cleanBack.set(481, 90, 481, kStone);
     cleanBack.column(30, 30)->dirty = false; cleanBack.column(30, 30)->generation = 0;
-    SignalSim csim2;
+    cSignalSim csim2;
     csim2.scan(cleanBack);
     check(hashControlWorld(cleanBack, csim2, 0) == cleanHash,
           "evict (A2): clean column evict/reload equality (regenerated column hashes identically)");
@@ -1267,7 +1267,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     check(ok && icons == blockRegistry().size() - 1, "hotbar: every block has a textures/ui/icons icon in the pack stack (16 x 16 for the HUD)");
     {  // Cortana 2026-10-16 (BUG-0003): the software texture array keeps the pack's full
        // resolution (it used to box-filter every layer to 16x16 = the software blur).
-      CpuTextureArray cta;
+      cCpuTextureArray cta;
       cta.setMaxTile(64);
       cta.upload(rm.textures());
       const auto src = rm.textures().textures();
@@ -1291,7 +1291,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       }
       const std::string msg = "software textures (BUG-0003): full pack resolution kept, texel == source pixel (tile " + std::to_string(cta.tileSize()) + ")";
       check(ok && exact && checked > 0, msg.c_str());
-      CpuTextureArray c32;
+      cCpuTextureArray c32;
       c32.setMaxTile(32);
       c32.upload(rm.textures());
       check(ok && c32.tileSize() == std::min(32, srcMax), "software textures: render.tex_res 32 cap (Chromebook tier) honoured");

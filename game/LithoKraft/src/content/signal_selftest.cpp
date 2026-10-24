@@ -27,10 +27,10 @@ int runSignalSelfTest() {
   const int y = 10;  // flat floor at y-1
   for (int z = 0; z < 64; ++z)
     for (int x = 0; x < 96; ++x) w.set(x, y - 1, z, kWaferSilicon);
-  SignalSim sim;
+  cSignalSim sim;
   auto put = [&](int x, int yy, int z, BlockId b) { w.set(x, yy, z, b); sim.onBlockChanged(x, yy, z, b); };
   auto run = [&](int n) { for (int i = 0; i < n; ++i) sim.tick(w, 0, 0, 100, [](int, int, int) {}); };
-  const SignalSim::DirtyFn none = [](int, int, int) {};
+  const cSignalSim::DirtyFn none = [](int, int, int) {};
   auto putF = [&](int x, int yy, int z, BlockId b, int f) { w.set(x, yy, z, b); w.setState(x, yy, z, makeState(0, f)); sim.onBlockChanged(x, yy, z, b); };
   auto setW = [&](int x, int yy, int z, int s) { w.setState(x, yy, z, CellState(s)); sim.invalidateNetwork(); };  // drive a wire for one tick
   auto val = [&](int x, int yy, int z) { return stValue(w.getState(x, yy, z)); };
@@ -320,7 +320,7 @@ int runSignalSelfTest() {
     for (int cz = 0; cz < 4; ++cz)
       for (int cx = 0; cx < 4; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; dw.insert(std::move(col)); }
     buildDisplayScene(dw, 0, y, 0, 40);
-    SignalSim ds;
+    cSignalSim ds;
     ds.scan(dw);
     int litTicks = 0, edges = 0; bool prev = false;
     for (int i = 0; i < 400; ++i) {
@@ -337,7 +337,7 @@ int runSignalSelfTest() {
     for (int cz = 0; cz < 8; ++cz)
       for (int cx = 0; cx < 6; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; fw.insert(std::move(col)); }
     const FramebufferLayout fl = buildFramebufferScene(fw, 0, y, 0, 64);
-    SignalSim fs;
+    cSignalSim fs;
     fs.scan(fw);
     const int memX = 4 + 2, memZ = fl.screenZ0 + 1 + 4 * 3 - 1;  // stage 3's memory cell
     int changes = 0, lampFlashes = 0, last = stValue(fw.getState(memX, y, memZ));
@@ -364,7 +364,7 @@ int runSignalSelfTest() {
     a.setRegistry(&blockRegistry());
     b.setRegistry(&blockRegistry());
     make(a); make(b);
-    SignalSim sa, sb;
+    cSignalSim sa, sb;
     sa.scan(a); sb.scan(b);
     sa.setLampHoldTicks(5); sb.setLampHoldTicks(5);
     int mismatch = 0;
@@ -383,7 +383,7 @@ int runSignalSelfTest() {
     for (int cz = 0; cz < 4; ++cz)
       for (int cx = 0; cx < 6; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; vw.insert(std::move(col)); }
     const FramebufferLayout vl = buildFramebufferWall(vw, 0, y, 0, 64);
-    SignalSim vs;
+    cSignalSim vs;
     vs.scan(vw);
     vs.setLampHoldTicks(17);  // as in game at 512 TPS
     int litTicks = 0;
@@ -410,7 +410,7 @@ int runSignalSelfTest() {
       for (int cx = 0; cx < 3; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; rw.insert(std::move(col)); }
     constexpr int n = 8, x0 = 4, z0 = 4;
     buildRedirectorScene(rw, x0, y, z0, n);
-    SignalSim rs;
+    cSignalSim rs;
     rs.scan(rw);
     auto runR = [&](int k) { for (int i = 0; i < k; ++i) rs.tick(rw, 0, 0, 100, [](int, int, int) {}); };
     auto lamp = [&](int i) { return stValue(rw.getState(x0 + 2 * i + 1, y, z0 + 1)); };  // pixel i
@@ -444,7 +444,7 @@ int runSignalSelfTest() {
     vw.set(2, y + 4, 1, kRedTrace); vw.set(3, y + 4, 1, kBlueTrace);
     vw.set(4, y, 3, kRedTorch); vw.set(5, y, 3, kRedTrace); vw.set(6, y + 1, 3, kRedTrace); vw.set(5, y + 1, 3, kGlass);
     vw.set(4, y, 5, kRedTorch); vw.set(5, y, 5, kRedTrace); vw.set(6, y + 1, 5, kRedTrace);
-    SignalSim vs;
+    cSignalSim vs;
     vs.scan(vw);
     for (int i = 0; i < 4; ++i) vs.tick(vw, 0, 0, 100, [](int, int, int) {});
     const int bot = stValue(vw.getState(2, y, 1)), top = stValue(vw.getState(2, y + 4, 1));
@@ -464,7 +464,7 @@ int runSignalSelfTest() {
         for (int cx = 0; cx < 4; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; ww.insert(std::move(col)); }
       constexpr int px0 = 24, zw = 44, n = 16, yb = 60;
       buildWallPixelScene(ww, px0, yb, zw, n, rows);
-      SignalSim ws;
+      cSignalSim ws;
       ws.scan(ww);
       std::vector<int> first(size_t(n * rows), -1), count(size_t(n * rows), 0);
       bool alone = true, value = true;
@@ -511,7 +511,7 @@ int runSignalSelfTest() {
       { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; m.insert(std::move(col)); }
       for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) m.set(x, Y - 1, z, kWaferSilicon);
       build(m);
-      SignalSim s; s.scan(m);
+      cSignalSim s; s.scan(m);
       for (int t = 0; t < ticks; ++t) s.tick(m, 0, 0, 100, [](int, int, int) {});
       return m;
     };
@@ -588,7 +588,7 @@ int runSignalSelfTest() {
         if (up) m.set(x, Y, z, kWaferSilicon);
         if ((z % 2 == 0) || x == ((z / 2) % 2 ? 2 : 49)) { m.set(x, up ? Y + 1 : Y, z, kRedTrace); ++wires; }
       }
-      SignalSim s; s.scan(m);
+      cSignalSim s; s.scan(m);
       const auto t0 = std::chrono::steady_clock::now();
       int lit = 0;
       for (int t = 0; t < 400; ++t) {
@@ -616,7 +616,7 @@ int runSignalSelfTest() {
         else if (c.kind == 2) buildWallPixelScene(*m, 24, 60, 44, 16, 16);
         else buildSawtoothWall(*m, 8, 60, 20, 16, 4, "circles");
       }
-      SignalSim sa, sb; sa.setComponentSleep(true); sb.setComponentSleep(false);
+      cSignalSim sa, sb; sa.setComponentSleep(true); sb.setComponentSleep(false);
       sa.scan(a); sb.scan(b);
       int diffTicks = 0; size_t ticked = 0, total = 0;
       const auto t0 = std::chrono::steady_clock::now(); double msA = 0, msB = 0;
@@ -648,7 +648,7 @@ int runSignalSelfTest() {
       { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; m->insert(std::move(col)); }
       for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) m->set(x, Y - 1, z, kWaferSilicon);
       build(*m);
-      SignalSim s; s.scan(*m);
+      cSignalSim s; s.scan(*m);
       for (int t = 0; t < 12; ++t) s.tick(*m, 0, 0, 100, [](int, int, int) {});
       return m;
     };
@@ -680,7 +680,7 @@ int runSignalSelfTest() {
       m->set(4, Y, 12, kCatchor); m->setState(4, Y, 12, makeState(kMaxSignal, 0, 3));
       m->set(5, Y, 12, kRedirector); m->setState(5, Y, 12, makeState(0, 0, 4 | 2));
       m->set(5, Y, 11, kColorLamp64); m->set(5, Y, 13, kColorLamp64);
-      SignalSim s; s.scan(*m);
+      cSignalSim s; s.scan(*m);
       for (int t = 0; t < 12; ++t) {
         s.tick(*m, 0, 0, 100, [](int, int, int) {});
         north = std::max(north, int(stValue(m->getState(5, Y, 11)))); south = std::max(south, int(stValue(m->getState(5, Y, 13))));
@@ -694,7 +694,7 @@ int runSignalSelfTest() {
     for (int cz = 0; cz < 7; ++cz) for (int cx = 0; cx < 5; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; m.insert(std::move(col)); }
     constexpr int X = 8, Yt = 60, Z = 8;
     buildWireTorture(m, X, Yt, Z);
-    SignalSim s; s.scan(m);
+    cSignalSim s; s.scan(m);
     int flips = 0, prev = -1, catchFires = 0, hard = 0;
     const auto t0 = std::chrono::steady_clock::now();
     constexpr int kT = 300;
@@ -725,7 +725,7 @@ int runSignalSelfTest() {
     // Full image
     ChunkMap full;
     full.setRegistry(&blockRegistry());
-    make(full); SignalSim fs; fs.scan(full);
+    make(full); cSignalSim fs; fs.scan(full);
     for (int t = 0; t < 40; ++t) fs.tick(full, 0, 0, 100, [](int, int, int) {});
     int wrongFull = 0, crosstalk = 0;
     for (int r = 0; r < Rr; ++r) for (int i = 0; i < W; ++i)
@@ -737,7 +737,7 @@ int runSignalSelfTest() {
       make(one);
       for (int rr = 0; rr < Rr; ++rr) for (int ii = 0; ii < W; ++ii)
         if (rr != r || ii != i) one.setState(px0 + ii, yb + 1 + 2 * rr, zw + kSawtoothRun + 1, makeState(0, 0));
-      SignalSim os; os.scan(one);
+      cSignalSim os; os.scan(one);
       for (int t = 0; t < 40; ++t) os.tick(one, 0, 0, 100, [](int, int, int) {});
       for (int rr = 0; rr < Rr; ++rr) for (int ii = 0; ii < W; ++ii)
         if ((rr == r && ii == i) != (lampAt(one, ii, rr) > 0)) ++crosstalk;
@@ -758,7 +758,7 @@ int runSignalSelfTest() {
         for (int cx = 0; cx < 7; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; pw.insert(std::move(col)); }
       constexpr int px0 = 16, zw = 44, yb = 60;
       buildPatternWall(pw, px0, yb, zw, sz, pat);
-      SignalSim ps;
+      cSignalSim ps;
       ps.scan(pw);
       std::vector<int> count(size_t(sz * sz), 0);
       int wrong = 0;
@@ -798,7 +798,7 @@ int runSignalSelfTest() {
     cw.setRegistry(&blockRegistry());
     { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; cw.insert(std::move(col)); }
     for (int x = 0; x < 12; ++x) for (int z = 0; z < 8; ++z) cw.set(x, y - 1, z, kWaferSilicon);
-    SignalSim cs;
+    cSignalSim cs;
     auto setB = [&](int x, int z, BlockId b, CellState st = 0) { cw.set(x, y, z, b); if (st) cw.setState(x, y, z, st); cs.onBlockChanged(x, y, z, b); };
     auto lit = [&](int x, int z) { return stValue(cw.getState(x, y, z)) > 0; };
     cw.set(2, y, 3, kCatchor); cw.setState(2, y, 3, makeState(64, 0, 3));  // unwired, catches 64
@@ -964,7 +964,7 @@ int runSignalSelfTest() {
     const int qy = 10;
     for (int z = 0; z < 32; ++z)
       for (int x = 0; x < 64; ++x) q.set(x, qy - 1, z, kWaferSilicon);
-    SignalSim qs;
+    cSignalSim qs;
     auto qput = [&](int x, int z, BlockId b) { q.set(x, qy, z, b); qs.onBlockChanged(x, qy, z, b); };
     auto qrun = [&](int n) { for (int i = 0; i < n; ++i) qs.tick(q, 0, 0, 100, [](int, int, int) {}); };
     auto qval = [&](int x, int z) { return stValue(q.getState(x, qy, z)); };

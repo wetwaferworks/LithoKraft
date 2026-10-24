@@ -134,7 +134,7 @@ class cJammerReg {
   std::vector<JammerZone> cur_, next_;
 };
 
-class SignalSim {
+class cSignalSim {
  public:
   using DirtyFn = std::function<void(int x, int y, int z)>;  // a cell's look changed
 

@@ -63,12 +63,12 @@ class cSignalWorldSim final : public IWorldSimulation {
   size_t activeCount() const override { return signal_.componentCount(); }
   void takeEvents(std::vector<SimEvent>& out) override;
 
- SignalSim& signal() { return signal_; }  ///< only while the SimThread is stopped (save / load)
+ cSignalSim& signal() { return signal_; }  ///< only while the SimThread is stopped (save / load)
 
  private:
   void tickHandshake(ChunkMap& world, const TickArea& area, const DirtyFn& dirty);
   void onHsCommit(uint64_t phase, uint64_t cycleTick, uint32_t group);
-  SignalSim signal_;
+  cSignalSim signal_;
   // ---- Timing Handshake state (null authority = legacy path) ----
   litholattice::TimingHandshakeAuthority* hsAuthority_ = nullptr;
   ChunkMap* hsWorld_ = nullptr;   // valid only inside tickHandshake
@@ -79,7 +79,7 @@ class cSignalWorldSim final : public IWorldSimulation {
   std::vector<std::string> hsNames_;                    // component names (desc.name points here)
   struct HsDirtyPos { int x, y, z; };
   std::vector<std::vector<HsDirtyPos>> hsLampDirty_;   // per-shard collected dirties
-  std::vector<std::vector<SignalSim::LampHoldUpdate>> hsLampHolds_;  // per-shard deferred hold merges
+  std::vector<std::vector<cSignalSim::LampHoldUpdate>> hsLampHolds_;  // per-shard deferred hold merges
   std::vector<SoundEvent> sounds_;  // edit cues, in order; tick sounds are appended at takeEvents()
   std::vector<PatternRomScreen> romScreens_;  // playtest 2026-10-16: sim-tick screen animations
   std::vector<SimEvent> dropEvents_;  // item drops from popped blocks (drained at takeEvents())

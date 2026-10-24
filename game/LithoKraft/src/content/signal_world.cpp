@@ -230,8 +230,8 @@ void cSignalWorldSim::registerHandshake(litholattice::TimingHandshakeAuthority& 
           collected.clear();
           const DirtyFn collector = [&collected](int x, int y, int z) { collected.push_back(HsDirtyPos{x, y, z}); };
           signal_.hsLampsBatch(batch, *hsWorld_, collector);
-          hsLampHolds_[size_t(i)] = SignalSim::hsTlsLampHolds();  // drain this thread's hold updates
-          SignalSim::hsTlsLampHolds().clear();
+          hsLampHolds_[size_t(i)] = cSignalSim::hsTlsLampHolds();  // drain this thread's hold updates
+          cSignalSim::hsTlsLampHolds().clear();
         });
   }
 }
