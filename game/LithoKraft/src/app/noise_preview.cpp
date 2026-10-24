@@ -29,7 +29,7 @@ int runNoisePreview(const NoisePreviewOptions& o) {
     logError("noise preview: %s", err.c_str());
     return 1;
   }
-  const auto graph = procgen::NoiseGraph::compile(desc, procgen::dimensionSeed(o.seed, "preview"), err);
+  const auto graph = procgen::cNoiseGraph::compile(desc, procgen::dimensionSeed(o.seed, "preview"), err);
   if (!graph) {
     logError("noise preview: %s", err.c_str());
     return 1;

@@ -33,8 +33,8 @@ int posMod(int v, int m) {
 }
 
 /// Per-biome ground palettes, placed by BlockId (the new biome surface blocks 46/49-51).
-/// Runs after the JSON LayeredSurface and dithers the top block by the column's blend
-/// weights (own salt, independent of the LayeredSurface dither): the boundary is a noisy
+/// Runs after the JSON cLayeredSurface and dithers the top block by the column's blend
+/// weights (own salt, independent of the cLayeredSurface dither): the boundary is a noisy
 /// gradient, not a line. Palette:
 ///  - TraceForest     -> kWaferSilicon (1, default silicon)
 ///  - DicingPlains    -> kScribeSilicon (49, die-grid texture)
