@@ -223,7 +223,7 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
        CVarType::Bool},
       {"render.tex_res",  // Cortana 2026-10-16: software texture tile cap 0 auto / 16 / 32 / 64
        [](const GameSettings& s) { return std::to_string(s.texRes); },
-       [](GameSettings& s, const std::string& v) { const int t = toInt(v); s.texRes = (t == 16 || t == 32 || t == 64) ? t : 0; },
+       [](GameSettings& s, const std::string& v) { const int t = toInt(v); s.texRes = (t == 16 || t == 32 || t == 64 || t == 128) ? t : 0;  /* 128: GPU pack_128 (2026-10-24) */ },
        CVarType::Int},
       {"render.bloom",  // Cortana 2026-10-16: -1 auto (on if > 4 cores), 0 off, 1 on (software, live)
        [](const GameSettings& s) { return std::to_string(s.bloom); },

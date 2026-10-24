@@ -675,7 +675,8 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
   renderer_.setBloom(resolvedBloom(settings_));          // Cortana 2026-10-16: render.bloom
   renderer_.setAo(settings_.ao);                         // Cortana 2026-10-16: render.ao
   renderer_.setShimmer(settings_.shimmer);               // Cortana 2026-10-16: render.shimmer
-  renderer_.setTexRes(settings_.texRes);                 // Cortana 2026-10-16: render.tex_res
+  renderer_.setTexRes(std::min(settings_.texRes, 64));  // 2026-10-24: 128 = GPU pack; software caps at 64
+ //                 // Cortana 2026-10-16: render.tex_res
   renderer_.setMipmaps(settings_.mipmaps);               // Cortana 2026-10-16: render.mipmaps
   renderer_.setEmissiveLight(settings_.emissiveLight);   // Cortana 2026-10-16: render.emissive_light
   renderer_.setAsciiMode(settings_.asciiMode, settings_.asciiCols);  // ASCII pipeline
@@ -1911,7 +1912,7 @@ void Game::onSettingsChanged(const GameSettings& s) {
   if (s.mipmaps != old.mipmaps) { renderer_.setMipmaps(s.mipmaps); logInfo("settings: render.mipmaps -> %s", s.mipmaps ? "on" : "off"); }
   if (s.ao != old.ao) { renderer_.setAo(s.ao); logInfo("settings: render.ao -> %s", s.ao ? "on" : "off"); }
   if (s.shimmer != old.shimmer) { renderer_.setShimmer(s.shimmer); logInfo("settings: render.shimmer -> %s", s.shimmer ? "on" : "off"); }
-  if (s.texRes != old.texRes) { renderer_.setTexRes(s.texRes); logInfo("settings: render.tex_res -> %d (applies on the next texture load / F9)", s.texRes); }
+  if (s.texRes != old.texRes) { renderer_.setTexRes(std::min(s.texRes, 64)); logInfo("settings: render.tex_res -> %d (applies on the next texture load / F9)", s.texRes); }
   if (s.bloom != old.bloom) {  // Cortana 2026-10-16
     renderer_.setBloom(resolvedBloom(s));
     logInfo("settings: render.bloom -> %s", resolvedBloom(s) ? "on" : "off");

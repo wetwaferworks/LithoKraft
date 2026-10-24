@@ -366,9 +366,11 @@ void cGameUi::openSettings(const GameSettings& cur) {
     const int rSel = cur.renderer == "gl33" ? 1 : cur.renderer == "vulkan" ? 2 : 0;
     drop("Renderer (saves the world and restarts)", "set-renderer", {"Software", "OpenGL 3.3", "Vulkan"}, rSel,
          [](GameSettings& s, int i) { s.renderer = i == 1 ? "gl33" : i == 2 ? "vulkan" : "software"; });
-    const int texSel = cur.texRes == 16 ? 1 : cur.texRes == 32 ? 2 : cur.texRes == 64 ? 3 : 0;
-    drop("Texture resolution (F9)", "set-texres", {"Auto", "16", "32", "64"}, texSel,
-         [](GameSettings& s, int i) { s.texRes = i == 1 ? 16 : i == 2 ? 32 : i == 3 ? 64 : 0; });
+    const int texSel = cur.texRes == 16 ? 1 : cur.texRes == 32 ? 2 : cur.texRes == 64 ? 3 : cur.texRes == 128 ? 4 : 0;
+    // 2026-10-24 (JD): 128 = the HD pack on OpenGL 3.3 / Vulkan (Auto picks it too); applies on restart.
+    // The software renderer stays capped at 64.
+    drop("Texture resolution (F9; 128 = GPU, on restart)", "set-texres", {"Auto", "16", "32", "64", "128"}, texSel,
+         [](GameSettings& s, int i) { s.texRes = i == 1 ? 16 : i == 2 ? 32 : i == 3 ? 64 : i == 4 ? 128 : 0; });
     box("Distance mipmaps (no far sparkle)", "set-mipmaps", cur.mipmaps, [](GameSettings& s, bool v) { s.mipmaps = v; });
     const int aaSel = cur.aaMode == "fxaa" ? 1 : cur.aaMode == "cmaa" ? 2 : cur.aaMode == "ssaa2x" ? 3 : 0;
     drop("Anti-aliasing", "set-aa", {"Off", "FXAA", "CMAA", "SSAA 2x"}, aaSel,

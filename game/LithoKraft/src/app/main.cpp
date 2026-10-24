@@ -822,6 +822,7 @@ int main(int argc, char** argv) {
   bool glArena = true;
   std::string saveDir, presentMode, benchPath = "orbit", benchJson;
   std::string pack = "pack_64";
+  bool packGiven = false;  // 2026-10-24: --pack wins over the 128 px GPU default
   std::vector<std::string> extraPacks;
   bool mute = false;
   std::string backend = "software";  // JD's standard: the CPU path is the baseline default;
@@ -1011,7 +1012,7 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--dim") && i + 1 < argc) cfg.dimension = argv[++i];
     else if (!std::strcmp(argv[i], "--log") && i + 1 < argc) logPath = argv[++i];
     else if (!std::strcmp(argv[i], "--scripts") && i + 1 < argc) scriptsMode = argv[++i];
-    else if (!std::strcmp(argv[i], "--pack") && i + 1 < argc) pack = argv[++i];
+    else if (!std::strcmp(argv[i], "--pack") && i + 1 < argc) { pack = argv[++i]; packGiven = true; }
     else if (!std::strcmp(argv[i], "--resource-pack") && i + 1 < argc) extraPacks.emplace_back(argv[++i]);
     else if (!std::strcmp(argv[i], "--mute")) mute = true;
     else if (!std::strcmp(argv[i], "--renderer") && i + 1 < argc) { backend = argv[++i]; rendererGiven = true; }
@@ -1056,6 +1057,15 @@ int main(int argc, char** argv) {
   const std::string settingsPath = (dataRoot(argv[0]) / "config" / "settings.json").lexically_normal().string();
   GameSettings settings = GameSettings::load(settingsPath);
   if (!rendererGiven && benchSeconds <= 0) backend = settings.renderer;  // JD 2026-10-24: saved renderer is the startup default
+  // 2026-10-24 (JD): GPU renderers default to the 128 px pack (CloudAtlas HD tops + nearest 2x of
+  // pack_64) when Texture resolution is Auto or 128. The software renderer stays on pack_64 (its
+  // CPU array caps at 64 anyway). Render only; --pack still wins.
+  if (!packGiven && backend != "software" && (settings.texRes == 0 || settings.texRes == 128)) {
+    const AssetDirs ad = findAssetDirs(argv[0]);
+    std::error_code pec;
+    if (!ad.game.empty() && std::filesystem::is_regular_file(std::filesystem::path(ad.game) / "packs" / "pack_128" / "resources.json", pec))
+      pack = "pack_128";
+  }
   if (!hsGiven) { cfg.timingHandshake = settings.timingHandshake; cfg.handshakePhases = settings.handshakePhases; }
   if (!tpsGiven) cfg.tps = settings.tps;  // load() only yields valid modes
   if (!radiusGiven) cfg.tickRadius = settings.tickRadius;
