@@ -53,11 +53,19 @@ class cSignalWorldSim final : public IWorldSim {
     const int64_t tpR = tpS ? ::litholattice::tickprof::nowNs() : 0;
     // Playtest 2026-10-16: Pattern ROM screens advance once per world tick (empty in every
     // hash / selftest world, so those ticks are unchanged).
-    for (PatternRomScreen& s : romScreens_) tickPatternRom(world, s, dirty);
+    if (gateSet_) applyTortureGate(world, dirty);  // 2026-10-24 (JD): playtest torture lever
+    if (!gateSet_ || gateLit_) for (PatternRomScreen& s : romScreens_) tickPatternRom(world, s, dirty);
     if (tpS) { auto& w = ::litholattice::tickprof::worldSub(); w.signalNs = tpR - tpS; w.romNs = ::litholattice::tickprof::nowNs() - tpR; }
   }
   /// Add a Pattern ROM screen (before the cSimThread starts; the sim thread owns it afterwards).
   void addPatternRom(PatternRomScreen s) { romScreens_.push_back(std::move(s)); }
+  /// 2026-10-24 (JD): playtest torture lever. While the Switch at (x, y, z) is off, the listed
+  /// LED sources are removed (air) and the Pattern ROM screens stop; switching it on puts the
+  /// LEDs back (and off removes them again). Unset in every bench / hash / selftest world.
+  struct GatedSource { int x, y, z; BlockId id; CellState st; };
+  void setTortureGate(int x, int y, int z, std::vector<GatedSource> src) {
+    gateSet_ = true; gateX_ = x; gateY_ = y; gateZ_ = z; gated_ = std::move(src);
+  }
   /// True when the last handshake tick was frozen by the watchdog mid-cycle.
   bool handshakeFrozenCycle() const { return hsFrozenCycle_; }
   size_t activeCount() const override { return signal_.componentCount(); }
@@ -67,6 +75,10 @@ class cSignalWorldSim final : public IWorldSim {
 
  private:
   void tickHandshake(ChunkMap& world, const TickArea& area, const DirtyFn& dirty);
+  void applyTortureGate(ChunkMap& world, const DirtyFn& dirty);
+  bool gateSet_ = false, gateLit_ = false;
+  int gateX_ = 0, gateY_ = 0, gateZ_ = 0;
+  std::vector<GatedSource> gated_;
   void onHsCommit(uint64_t phase, uint64_t cycleTick, uint32_t group);
   cSignalSim signal_;
   // ---- Timing Handshake state (null authority = legacy path) ----

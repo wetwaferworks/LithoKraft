@@ -986,6 +986,9 @@ void Game::loadActive() {
   }
   Spawn sp = active_->load(pool_, cfg_.worldChunks);
   std::vector<PatternRomScreen> roms;  // playtest 2026-10-16: handed to the new sim below
+  std::vector<cSignalWorldSim::GatedSource> torture;  // 2026-10-24 (JD): LEDs held off by the torture lever
+  int tortureLever[3] = {0, -1, 0};                    // y < 0 = no lever
+  int s16Box[4] = {0, -1, 0, -1};                      // wired screen 16 footprint (x0, x1, z0, z1)
   if (cfg_.benchScene == "testworld") {
     // Playtest 2026-10-16 (JD): flat pad, every registry block in labeled rows, Pattern ROM screen.
     const int sx = int(std::floor(sp.x)), sz = int(std::floor(sp.z));
@@ -1065,10 +1068,52 @@ void Game::loadActive() {
       const FramebufferLayout fb16 = buildFramebufferScene(cw, fx, floorY + 1, fz, 32, 16);
       logInfo("test world wired screen 16: lamps x %d..%d z %d..%d y %d (frame cache z %d, viewing stand y %d); %d blocks", fx + 8, fx + 24,
               fb16.screenZ0, fb16.screenZ1, floorY + 2, fb16.cacheZ, floorY + 15, fb16.blocks);
+      s16Box[0] = fx - 4; s16Box[1] = fx + 40; s16Box[2] = fz - 4; s16Box[3] = fz + 48;
     }    if (cfg_.testWorldExamples) {  // 2026-10-24 (JD): playtest builds only
-      for (const TestWorldExample& e : buildTestWorldExamples(active_->chunks, tw, sx, sz, cfg_.worldChunks * 16))
-        logInfo("test world examples: %-12s x %d..%d z %d..%d  %s %d blocks%s%s", e.label.c_str(), e.x0, e.x1, e.z0, e.z1,
-                e.placed ? "placed" : "SKIPPED", e.blocks, e.note.empty() ? "" : " | ", e.note.c_str());
+      ChunkMap& cw = active_->chunks;
+      // 2026-10-24 5:11 PM (JD): every torture / stress circuit stays off until the torture lever is
+      // switched on. Their LED sources are lifted out here (air) and handed to the sim, which puts them
+      // back while the lever is on; the Pattern ROM screen stops with them. Shared builders unchanged.
+      auto gateBox = [&](int x0, int x1, int z0, int z1) {
+        int n = 0;
+        for (int z = z0; z <= z1; ++z)
+          for (int x = x0; x <= x1; ++x)
+            for (int y = floorY + 1; y <= floorY + 72; ++y) {
+              const BlockId b = cw.get(x, y, z);
+              // LEDs kick the clocks; Repeators / Pulsors are lifted too so self-running rings really stop.
+              if (b != kRedTorch && b != kBlueTorch && b != kRepeator && b != kPulsor) continue;
+              torture.push_back({x, y, z, b, cw.getState(x, y, z)});
+              cw.set(x, y, z, kAir); cw.setState(x, y, z, 0);
+              ++n;
+            }
+        return n;
+      };
+      int fbX = 0, fbZ = 0; bool fbOk = false;
+      for (const TestWorldExample& e : buildTestWorldExamples(cw, tw, sx, sz, cfg_.worldChunks * 16)) {
+        const int held = e.placed ? gateBox(e.x0, e.x1, e.z0, e.z1) : 0;
+        logInfo("test world examples: %-12s x %d..%d z %d..%d  %s %d blocks%s%s | %d sources on the torture lever", e.label.c_str(), e.x0, e.x1, e.z0, e.z1,
+                e.placed ? "placed" : "SKIPPED", e.blocks, e.note.empty() ? "" : " | ", e.note.c_str(), held);
+        // FRAMEBUFFER viewing stand (buildFramebufferScene, size 64 at bx = x0 + 8, bz = z0 + 14): 9 x 9 at y + 14.
+        if (e.placed && e.label == "FRAMEBUFFER") { fbX = e.x0 + 8 + 32; fbZ = e.z0 + 14 + 71; fbOk = true; }
+      }
+      if (s16Box[1] >= s16Box[0]) logInfo("test world wired screen 16: %d sources on the torture lever", gateBox(s16Box[0], s16Box[1], s16Box[2], s16Box[3]));
+      if (fbOk) {
+        // 2026-10-24 5:15 PM (JD): spawn on the centre of the FRAMEBUFFER viewing stand (top y = floorY + 15).
+        const int standY = floorY + 15;
+        sp.x = float(fbX) + 0.5f; sp.z = float(fbZ) + 0.5f; sp.y = float(standY + 1);
+        // The torture lever on the stand, 2 west / 2 south of spawn, with a lamp beside it that lights while it is on.
+        tortureLever[0] = fbX - 2; tortureLever[1] = standY + 1; tortureLever[2] = fbZ - 2;
+        cw.set(tortureLever[0], tortureLever[1], tortureLever[2], kSwitch);
+        cw.setState(tortureLever[0], tortureLever[1], tortureLever[2], withAttach(0, 1));
+        cw.set(tortureLever[0] - 1, tortureLever[1], tortureLever[2], kRedTrace);
+        cw.set(tortureLever[0] - 2, tortureLever[1], tortureLever[2], kLamp);
+        logInfo("test world: spawn on the FRAMEBUFFER stand (%.1f, %.1f, %.1f), chunk (%d, %d); torture lever (%d,%d,%d) OFF, %zu LEDs held",
+                double(sp.x), double(sp.y), double(sp.z), fbX >> 4, fbZ >> 4, tortureLever[0], tortureLever[1], tortureLever[2], torture.size());
+      } else {
+        for (const auto& g : torture) { cw.set(g.x, g.y, g.z, g.id); cw.setState(g.x, g.y, g.z, g.st); }  // no stand: put the LEDs back
+        torture.clear();
+        logInfo("test world: FRAMEBUFFER slot not placed; no torture lever, spawn unchanged");
+      }
     }
     roms.push_back(tw.screen);
   } else if (cfg_.benchScene == "framebuffer" && !cfg_.screenVertical) {
@@ -1158,6 +1203,7 @@ void Game::loadActive() {
   clockSynced_ = false;   // 2026-10-16: a new sim's worldTick must not be diffed against the old one's
   auto worldSim = std::make_unique<cSignalWorldSim>();
   for (PatternRomScreen& r : roms) worldSim->addPatternRom(std::move(r));  // before the sim thread owns it
+  if (tortureLever[1] >= 0) worldSim->setTortureGate(tortureLever[0], tortureLever[1], tortureLever[2], std::move(torture));
   sim_ = std::make_unique<cSimThread>(active_->chunks, blockRegistry(), std::move(worldSim), std::move(sc),
                                      submitMesh_);
   // Measure-only windowed determinism probe (LL_HASH_AT_TICK=<world tick>; Proposed by JD; co-implemented by JD and Cortana).
@@ -1750,7 +1796,7 @@ std::string Game::toggleFly(const std::string& arg) {
 }
 
 void Game::handleHotbar() {
-  for (int i = 0; i < kHotbarSize; ++i)
+  for (int i = 0; i < kHotbarSize && i < kHotbarKeySlots; ++i)
     if (input_.pressed(hotbarAction(i))) hot_ = i;
   // In third/follow the wheel zooms the camera instead of cycling slots.
   const int steps = camera_.consumesWheel()
