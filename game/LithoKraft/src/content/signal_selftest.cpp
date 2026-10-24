@@ -875,7 +875,7 @@ int runSignalSelfTest() {
         ps.tick(pw, 0, 0, 100, [](int, int, int) {});
         for (int r = 0; r < sz; ++r)
           for (int i = 0; i < sz; ++i) {
-            const int v = stValue(pw.getState(px0 + i, yb + 1 + 2 * r, zw));
+            const int v = stValue(pw.getState(px0 + i, yb + 1 + 2 * r, zw - 1));  // 2026-10-24: lamps sit behind the latch Memor
             if (!v) continue;
             ++count[size_t(r * sz + i)];
             if (v != patternColor(pat, sz, i, r)) ++wrong;

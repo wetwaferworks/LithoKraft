@@ -1078,7 +1078,7 @@ void Game::loadActive() {
         int n = 0;
         for (int z = z0; z <= z1; ++z)
           for (int x = x0; x <= x1; ++x)
-            for (int y = floorY + 1; y <= floorY + 72; ++y) {
+            for (int y = floorY - 8; y <= floorY + 72; ++y) {  // 2026-10-24: PATTERN / WALL PIXEL drivers sit under the floor (were ungated)
               const BlockId b = cw.get(x, y, z);
               // LEDs kick the clocks; Repeators / Pulsors are lifted too so self-running rings really stop.
               if (b != kRedTorch && b != kBlueTorch && b != kRepeator && b != kPulsor) continue;

@@ -315,8 +315,8 @@ FramebufferLayout buildWallPixelScene(ChunkMap& w, int x0, int yf, int zw, int w
     }
   }
   FramebufferLayout L;
-  L.x0 = x0; L.y = yf; L.z0 = zw; L.size = Wd; L.width = Wd; L.vertical = true; L.wallZ = zw; L.topY = yTop;
-  L.columns = 1; L.blocks = placed; L.screenZ0 = zw; L.screenZ1 = zw; L.cacheZ = B;
+  L.x0 = x0; L.y = yf; L.z0 = zw; L.size = Wd; L.width = Wd; L.vertical = true; L.wallZ = zw - 1; L.topY = yTop;
+  L.columns = 1; L.blocks = placed; L.screenZ0 = zw - 1; L.screenZ1 = zw - 1; L.cacheZ = B;
   return L;
 }
 int patternColor(std::string_view pattern, int size, int i, int r) {
@@ -382,9 +382,12 @@ FramebufferLayout buildPatternWall(ChunkMap& w, int x0, int yf, int zw, int size
     const int Y = yf + 1 + 2 * r;
     const bool blue = r & 1;
     for (int x = x0; x < x0 + size; ++x)
-      for (int z = zw; z <= zw + 2; ++z) { put(x, Y - 1, z, kGlass); put(x, Y + 1, z, kGlass); }
+      for (int z = zw - 1; z <= zw + 2; ++z) { put(x, Y - 1, z, kGlass); put(x, Y + 1, z, kGlass); }
     for (int i = 0; i < size; ++i) {
-      put(x0 + i, Y, zw, kColorLamp64);
+      // 2026-10-24 7:00 PM (JD): latch each pixel through a Memor (SAWTOOTH pattern) so the image
+      // holds steady instead of a one-tick flash per sweep: Catchor -> Memor (back write) -> lamp.
+      put(x0 + i, Y, zw - 1, kColorLamp64);
+      put(x0 + i, Y, zw, kMemor, N);
       put(x0 + i, Y, zw + 1, kCatchor, N, patternColor(pattern, size, i, r), blue ? 4 : 0);
       put(x0 + i, Y, zw + 2, blue ? kBlueTrace : kRedTrace);
     }
@@ -397,8 +400,8 @@ FramebufferLayout buildPatternWall(ChunkMap& w, int x0, int yf, int zw, int size
   for (int yy = Hb + 1; yy <= yf + 1 + 2 * (rows - 1 - ((rows - 1) & 1 ? 0 : 1)); ++yy)
     put(xbl, yy, zs, (yy - yf - 3) >= 0 && (yy - yf - 3) % 4 == 0 ? kBlueTrace : kBlueVia);
   FramebufferLayout L;
-  L.x0 = x0; L.y = yf; L.z0 = zw; L.size = size; L.width = size; L.vertical = true; L.wallZ = zw; L.topY = yTop;
-  L.columns = 1; L.blocks = placed; L.screenZ0 = zw; L.screenZ1 = zw; L.cacheZ = B;
+  L.x0 = x0; L.y = yf; L.z0 = zw; L.size = size; L.width = size; L.vertical = true; L.wallZ = zw - 1; L.topY = yTop;
+  L.columns = 1; L.blocks = placed; L.screenZ0 = zw - 1; L.screenZ1 = zw - 1; L.cacheZ = B;
   return L;
 }
 
