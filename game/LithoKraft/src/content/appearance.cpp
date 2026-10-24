@@ -601,9 +601,27 @@ void cLithoKraftAppearance::bindMaterials(const BlockDef& def, const BlockModel&
 // Authored standing on the support; the mesher turns them toward the attach face.
 const char* const kTorchModel = R"({"asset": {"version": "ll-box-1"},
   "materials": [{"name": "torch", "slot": "top"}],
-  "meshes": [{"name": "led", "boxes": [{"min": [5, 0, 5], "max": [11, 1, 11], "material": 0},
-                                       {"min": [7, 1, 7], "max": [9, 8, 9], "material": 0},
-                                       {"min": [6, 8, 6], "max": [10, 12, 10], "material": 0}]}],
+  "meshes": [{"name": "led", "boxes": [{"min": [5, 0, 5], "max": [11, 2, 11], "material": 0},
+                                       {"min": [6, 2, 6], "max": [10, 4, 10], "material": 0},
+                                       {"min": [5, 4, 5], "max": [11, 5, 11], "material": 0},
+                                       {"min": [6, 5, 6], "max": [10, 6, 10], "material": 0},
+                                       {"min": [4, 6, 4], "max": [12, 8, 12], "material": 0},
+                                       {"min": [5, 8, 5], "max": [11, 9, 11], "material": 0}]}],
+  "nodes": [{"mesh": 0}]})";
+// 2026-10-24 (CloudAtlas LED v2b, integer approximation): wall LED authored with the support at
+// z=0 (north); the stack above the socket ledge steps +Z one per one up (~45 deg, away from the
+// wall). No element rotation; the mesher turns it by yaw only.
+const char* const kTorchWallModel = R"({"asset": {"version": "ll-box-1"},
+  "materials": [{"name": "torch", "slot": "top"}],
+  "meshes": [{"name": "led", "boxes": [{"min": [5, 4, 0], "max": [11, 11, 1], "material": 0},
+                                       {"min": [5, 4, 1], "max": [11, 6, 7], "material": 0},
+                                       {"min": [6, 6, 2], "max": [10, 7, 6], "material": 0},
+                                       {"min": [6, 7, 3], "max": [10, 8, 7], "material": 0},
+                                       {"min": [5, 8, 3], "max": [11, 9, 9], "material": 0},
+                                       {"min": [6, 9, 5], "max": [10, 10, 9], "material": 0},
+                                       {"min": [4, 10, 4], "max": [12, 11, 12], "material": 0},
+                                       {"min": [4, 11, 5], "max": [12, 12, 13], "material": 0},
+                                       {"min": [5, 12, 7], "max": [11, 13, 13], "material": 0}]}],
   "nodes": [{"mesh": 0}]})";
 // 2026-10-24 (CloudAtlas lever, facing north): base [4,0,5]-[12,2,11]; 2x2 handle pivoting at
 // y=1 on the centre line, tilted 45 degrees, drawn as a 3-step staircase (box models have no
@@ -653,11 +671,18 @@ const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def, CellState s
     static const std::optional<BoxModel> on = BoxModel::parse(kSwitchOnModel, nullptr);
     return on ? &*on : nullptr;
   }
+  if (roleOf(def) == SimRole::Torch && stAttach(st) >= 3 && stAttach(st) <= 6) {
+    static const std::optional<BoxModel> wall = BoxModel::parse(kTorchWallModel, nullptr);
+    return wall ? &*wall : nullptr;
+  }
   return boxModel(def);
 }
 
 int cLithoKraftAppearance::boxModelTurns(const BlockDef& def, CellState st) const {
   const SimRole r = roleOf(def);
+  if (r == SimRole::Torch) {  // 2026-10-24 LED v2 wall: support -Z/+X/+Z/-X -> yaw 0/1/2/3
+    switch (stAttach(st)) { case 3: return 0; case 6: return 1; case 4: return 2; case 5: return 3; default: return 0; }
+  }
   return (r == SimRole::Switch || r == SimRole::cButton) ? stFacing(st) : 0;  // 2026-10-24: floor / ceiling facing
 }
 
