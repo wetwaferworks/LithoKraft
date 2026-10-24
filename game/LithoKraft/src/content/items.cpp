@@ -10,9 +10,9 @@
 //   Slicor sword, Firewall shield, Ping bow, Callback returning thrown
 //   weapon, Debuggor debug stick, Sniffor handheld receiver (IN DISCUSSION),
 //   Atlas map (name LOCKED, crafting TBD), Fragment starting book (LOCKED).
-// The Etchor family (Etchor / Selector / Connector / Laysor / Portor /
+// The Etchor family (Etchor / Selector / Connector / Laysor / cPortor /
 // Fabor) are machine BLOCKS/components in lore, not hand tools -- they are
-// deliberately NOT items here (Portor/Fusor already exist as blocks).
+// deliberately NOT items here (cPortor/cFusor already exist as blocks).
 #include "lithokraft/content/items.h"
 
 namespace lithokraft {

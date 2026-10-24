@@ -48,7 +48,7 @@ extern const BlockId kSignalReceivor;     ///< wireless signal sink (signal -> t
 extern const BlockId kDish;               ///< long-range receivor; hears channel 0 (the Daemon)
 extern const BlockId kOverclockor;
 extern const BlockId kPortor;
-extern const BlockId kFusor;  ///< Fusor block (G-L2: this line previously carried garbled
+extern const BlockId kFusor;  ///< cFusor block (G-L2: this line previously carried garbled
                               ///< copy-paste fragments of five other blocks' doc comments)
 // Wafer biome blocks (2026-10-11, procgen pass). Texture keys reuse existing art
 // until CloudAtlas does the biome art pass; geometry and placement come first.
@@ -149,7 +149,7 @@ constexpr uint32_t kGameFluid = uint32_t(kFirstGameFlag) << 3;      // swimmable
 enum class SimRole : uint16_t {
   None, Wire, Torch, Lamp, ColorLamp,
   Repeator, Thresholdor, Redirector, Pulsor, Memor, FastLatch, Switch, Button, Keyboard, Tone, Catchor,
-  cSignalTransmittor, cSignalReceivor, Dish, Overclockor, Lithographor, Chipor, Portor, Fusor,
+  cSignalTransmittor, cSignalReceivor, cDish, cOverclockor, Lithographor, Chipor, cPortor, cFusor,
   Etchor,  // appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
 };
 constexpr SimRole roleOf(const BlockDef& d) { return SimRole(d.role); }
@@ -170,13 +170,13 @@ inline void setRadioChannelsUnlocked(uint8_t n) {
 }
 /// Transmittor broadcast power in blocks (link budget: range = power + receivor sensitivity).
 constexpr int kTransmittorPower = 256;
-/// Dish receivor sensitivity in blocks (link budget: range = power + sensitivity).
+/// cDish receivor sensitivity in blocks (link budget: range = power + sensitivity).
 constexpr int kDishSensitivity = 1024;
-/// Jammer radius in blocks (Overclockor + jammer item).
-constexpr int kJammerRadius = 64;      ///< base (Overclockor)
-constexpr int kJammerRadiusCopper = 32;  ///< Copper Overclockor
-constexpr int kJammerRadiusSilver = 64;  ///< Silver Overclockor
-constexpr int kJammerRadiusViolet = 128; ///< Violet Overclockor
+/// Jammer radius in blocks (cOverclockor + jammer item).
+constexpr int kJammerRadius = 64;      ///< base (cOverclockor)
+constexpr int kJammerRadiusCopper = 32;  ///< Copper cOverclockor
+constexpr int kJammerRadiusSilver = 64;  ///< Silver cOverclockor
+constexpr int kJammerRadiusViolet = 128; ///< Violet cOverclockor
 
 /// The LithoKraft block registry (built once, thread-safe to read).
 const BlockRegistry& blockRegistry();

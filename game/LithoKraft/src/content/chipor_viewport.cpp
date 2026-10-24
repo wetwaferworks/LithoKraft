@@ -13,7 +13,7 @@ namespace lithokraft::chipor {
 namespace {
 
 using litholattice::subdiv::MicroCell;
-using litholattice::subdiv::SparseOctree;
+using litholattice::subdiv::cSparseOctree;
 
 // Interior grid dims, derived from the box in the header.
 constexpr int kGX = kInteriorHi[0] - kInteriorLo[0];  // 14
@@ -35,10 +35,10 @@ void quantizeSpan(int c0, int c1, int lo, int dim, int& q0, int& q1) {
 }  // namespace
 
 std::vector<MicroCell> demoModelCells() {
-  // A tiny circuit, authored with the real SparseOctree (workstream 1) in its
+  // A tiny circuit, authored with the real cSparseOctree (workstream 1) in its
   // 64^3 model space (level, x, y, z).
   // Materials: 1 = red trace, 2 = blue trace, 3 = silicon die, 4 = torch post.
-  SparseOctree tree;
+  cSparseOctree tree;
   auto set = [&](int level, int x, int y, int z, uint8_t material) {
     tree.set(level, x, y, z, material);
   };

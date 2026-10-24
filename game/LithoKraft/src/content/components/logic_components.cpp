@@ -37,7 +37,7 @@ std::string describeOutput(const BlockDef& d, CellState s) {
 
 /// Back = input, left = LOW reference, right = HIGH reference; output = input when it passes.
 /// One reference: threshold (in >= ref). Both: window comparator (refs sorted). None: pass-through.
-class Thresholdor final : public cCompBehavior {
+class cThresholdor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory&) const override {
     // SW-H2: pass-through outputs copy the input value — clamp it here (and at
@@ -293,10 +293,10 @@ class cSignalReceivor final : public cCompBehavior {
 };
 
 
-/// The Dish: a long-range receivor. The sim queries with kDishSensitivity, so it hears
+/// The cDish: a long-range receivor. The sim queries with kDishSensitivity, so it hears
 /// far beyond a plain receivor. Listens on its set channel; channel 0 (the Daemon) is
 /// monitored when the lore pipeline exists. Single block for v1; multiblock later.
-class Dish final : public cCompBehavior {
+class cDish final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int v = std::min(in.radioIn, kMaxSignal);  // SW-H2: received strength is passed through to the wire
@@ -317,11 +317,11 @@ class Dish final : public cCompBehavior {
 };
 
 
-/// The Overclockor: the beacon equivalent. Tick accelerator (tiers later) + ward mode.
+/// The cOverclockor: the beacon equivalent. Tick accelerator (tiers later) + ward mode.
 /// Accepts items through its interface; the jammer item enables jamming mode: all radio
 /// channels except its own are blocked within kJammerRadius. use toggles the jammer item
 /// (v1 placeholder for the item UI); sneak+use cycles the jam channel.
-class Overclockor final : public cCompBehavior {
+class cOverclockor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& /*in*/, CellState st, ComponentMemory& /*m*/) const override {
     return {0, 0, st};
@@ -342,16 +342,16 @@ class Overclockor final : public cCompBehavior {
 };
 
 
-/// Portor (lithography port). Defines input or output for a chip face.
+/// cPortor (lithography port). Defines input or output for a chip face.
 /// Simple by design: use toggles input/output. Wire color auto-detected from
 /// adjacent Trace (like Catchor). When the Lithographer prints a chip, each
-/// Portor maps to one face. 6 faces = 6 bits = 64 configurations.
+/// cPortor maps to one face. 6 faces = 6 bits = 64 configurations.
 /// State: aux bit 0 = output (1) or input (0), aux bit 2 = blue (like Catchor).
-class Portor final : public cCompBehavior {
+class cPortor final : public cCompBehavior {
  public:
   bool quiescent(CellState, const ComponentMemory&) const override { return true; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
-    // Portor is a passive doorway: input mode reads, output mode passes through.
+    // cPortor is a passive doorway: input mode reads, output mode passes through.
     // The actual I/O happens at lithography time; in the build area it's just a marker.
     const bool isOutput = (stAux(st) & 1) != 0;
     if (!isOutput) {
@@ -378,12 +378,12 @@ class Portor final : public cCompBehavior {
 };
 
 
-/// Fusor (circuit breaker). Trips when input signal exceeds its threshold (1-64).
+/// cFusor (circuit breaker). Trips when input signal exceeds its threshold (1-64).
 /// When tripped, output drops to 0 until reset. Protects chips from overload.
 /// State: value = trip threshold (1-64), aux bit 0 = tripped.
 /// Use cycles threshold? No — sneak+use sets threshold (like Catchor match).
 /// Use toggles reset (untrip).
-class Fusor final : public cCompBehavior {
+class cFusor final : public cCompBehavior {
  public:
   bool quiescent(CellState s, const ComponentMemory& m) const override {
     return (stAux(s) & 1) != 0;  // tripped = quiescent (no output)
@@ -421,18 +421,18 @@ class Fusor final : public cCompBehavior {
 
 void registerLogic(const Registrar& add) {
   add("repeator", std::make_unique<Repeator>());
-  add("thresholdor", std::make_unique<Thresholdor>());
+  add("thresholdor", std::make_unique<cThresholdor>());
   add("redirector", std::make_unique<Redirector>());
   add("pulsor", std::make_unique<Pulsor>());
   add("memor", std::make_unique<Memor>());
   add("catchor", std::make_unique<Catchor>());
   add("signal_transmittor", std::make_unique<cSignalTransmittor>());
   add("signal_receivor", std::make_unique<cSignalReceivor>());
-  add("dish", std::make_unique<Dish>());
-  add("overclockor", std::make_unique<Overclockor>());
+  add("dish", std::make_unique<cDish>());
+  add("overclockor", std::make_unique<cOverclockor>());
   add("fast_latch", std::make_unique<cFastLatch>());
-  add("portor", std::make_unique<Portor>());
-  add("fusor", std::make_unique<Fusor>());
+  add("portor", std::make_unique<cPortor>());
+  add("fusor", std::make_unique<cFusor>());
 }
 
 }  // namespace lithokraft::components

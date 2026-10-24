@@ -16,7 +16,7 @@ namespace {
 
 using litholattice::subdiv::kMaxLevel;
 using litholattice::subdiv::MicroCell;
-using litholattice::subdiv::SparseOctree;
+using litholattice::subdiv::cSparseOctree;
 
 // ---- little-endian integer helpers ---------------------------------------
 
@@ -273,7 +273,7 @@ LoadResult loadModel(const std::string& path) {
     return r;
   }
 
-  SparseOctree tree;
+  cSparseOctree tree;
   for (const MicroCell& c : parsed) tree.set(c.level, c.x, c.y, c.z, c.material);
   m.geometry = tree;
   r.model = std::move(m);
@@ -297,11 +297,11 @@ bool modelEquals(const Model& a, const Model& b) {
   return true;
 }
 
-void placeModel(litholattice::subdiv::SubdivStore& store, int bx, int by,
+void placeModel(litholattice::subdiv::cSubdivStore& store, int bx, int by,
                 int bz, const Model& m) {
   if (m.geometry.empty()) return;  // no-op: never creates or clears entries
-  SparseOctree target;
-  if (const SparseOctree* cur = store.getBlockOctree(bx, by, bz)) {
+  cSparseOctree target;
+  if (const cSparseOctree* cur = store.getBlockOctree(bx, by, bz)) {
     target = *cur;
   }
   for (const MicroCell& c : m.geometry.leaves()) {

@@ -914,8 +914,8 @@ int runSignalSelfTest() {
     run(6);
     check(val(42, y, 30) > 0, "wireless: beacon mode transmits without wire input");
   }
-  {  // Jammer: Overclockor + jammer item blocks all channels except its own.
-    // TX at (10, y, 50) torch-fed; RX at (40, y, 50) + lamp; Overclockor at (25, y, 50).
+  {  // Jammer: cOverclockor + jammer item blocks all channels except its own.
+    // TX at (10, y, 50) torch-fed; RX at (40, y, 50) + lamp; cOverclockor at (25, y, 50).
     putF(10, y, 50, kSignalTransmittor, 1);
     put(9, y, 50, kRedTorch);
     putF(40, y, 50, kSignalReceivor, 1);

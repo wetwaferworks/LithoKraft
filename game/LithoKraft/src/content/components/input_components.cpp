@@ -8,7 +8,7 @@ namespace lithokraft::components {
 namespace {
 
 /// Right-click toggles a steady 64 on every side.
-class Switch final : public cCompBehavior {
+class cSwitch final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory&) const override {
     const int out = stOn(st) ? kMaxSignal : 0;
@@ -72,7 +72,7 @@ class Keyboard final : public cCompBehavior {
 }  // namespace
 
 void registerInputs(const Registrar& add) {
-  add("switch", std::make_unique<Switch>());
+  add("switch", std::make_unique<cSwitch>());
   add("button", std::make_unique<cInputButton>());
   add("keyboard", std::make_unique<Keyboard>());
 }

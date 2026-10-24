@@ -695,13 +695,13 @@ void SignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
     ++lastTicked_;
     ComponentInputs in;
     const SimRole role = roleOf(blockRegistry().def(w.get(x, y, z)));
-    if (role == SimRole::cSignalReceivor || role == SimRole::Dish) {
+    if (role == SimRole::cSignalReceivor || role == SimRole::cDish) {
       int rs = 0, rc = 0;
-      const int sens = role == SimRole::Dish ? kDishSensitivity : 0;
+      const int sens = role == SimRole::cDish ? kDishSensitivity : 0;
       if (!jammers_.jammed(x, y, z, c.mem.channel) &&
           radio_.query(c.mem.channel, x, y, z, dim_, sens, rs, rc)) { in.radioIn = rs; in.radioCol = uint8_t(rc); }
     }
-    if (role == SimRole::Overclockor && c.mem.jammer)
+    if (role == SimRole::cOverclockor && c.mem.jammer)
       jammers_.publish(JammerZone{x, y, z, kJammerRadius, c.mem.channel});
     if (fastInputs && c.fast) {
       for (int d = 0; d < 4; ++d) {

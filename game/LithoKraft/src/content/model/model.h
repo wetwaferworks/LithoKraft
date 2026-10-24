@@ -18,7 +18,7 @@
 #include <litholattice/subdiv/octree.h>
 
 namespace litholattice::subdiv {
-class SubdivStore;  // engine/src/subdiv/include/litholattice/subdiv/subdiv_store.h
+class cSubdivStore;  // engine/src/subdiv/include/litholattice/subdiv/subdiv_store.h
 }
 
 namespace lithokraft::model {
@@ -33,7 +33,7 @@ inline constexpr uint16_t kFormatFlags = 0;
 // Re-exported for authoring convenience: consumers work with these types
 // through lithokraft::model without reaching into the engine namespace.
 using litholattice::subdiv::MicroCell;
-using litholattice::subdiv::SparseOctree;
+using litholattice::subdiv::cSparseOctree;
 
 /// A named, authored subdivision model: one block's worth of micro-cell
 /// detail, ready to stamp into the world.
@@ -43,7 +43,7 @@ struct Model {
   /// LOD hint: highest subdivision level carrying useful detail, in
   /// [0, litholattice::subdiv::kMaxLevel].
   int maxLevel = 0;
-  litholattice::subdiv::SparseOctree geometry;
+  litholattice::subdiv::cSparseOctree geometry;
 };
 
 /// Why a load failed. Every failure path returns a message, never throws.
@@ -81,11 +81,11 @@ bool modelEquals(const Model& a, const Model& b);
 /// coordinates are a no-op.
 ///
 /// Merge semantics: every non-empty leaf of the model overwrites the target
-/// cell (via SparseOctree::set, which also clears finer cells beneath the
+/// cell (via cSparseOctree::set, which also clears finer cells beneath the
 /// stamped cell). Target cells the model does not touch are left exactly as
 /// they were. An empty model is a no-op: it neither creates nor clears an
 /// entry.
-void placeModel(litholattice::subdiv::SubdivStore& store, int bx, int by,
+void placeModel(litholattice::subdiv::cSubdivStore& store, int bx, int by,
                 int bz, const Model& m);
 
 /// Authoring helper for building Models in code (workstream 5 authors the
@@ -114,7 +114,7 @@ class cModelBuilder {
  private:
   std::string name_;
   std::string author_;
-  litholattice::subdiv::SparseOctree tree_;
+  litholattice::subdiv::cSparseOctree tree_;
 };
 
 }  // namespace lithokraft::model

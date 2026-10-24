@@ -78,18 +78,18 @@ BlockRegistry& mutableRegistry() {
     r.add(def("lithokraft:ceramic", "Ceramic", kSolid | kOpaque | kCutsWire, S::Cube, "ceramic", "", R::None, 0, 0, 80));  // insulator: never powered
     r.add(def("lithokraft:signal_transmittor", "Signal Transmittor", kDir, S::Cube, "signal_transmittor", "signal_transmittor", R::cSignalTransmittor, 0, 0, 45));
     r.add(def("lithokraft:signal_receivor", "Signal Receivor", kDir, S::Cube, "signal_receivor", "signal_receivor", R::cSignalReceivor, 0, 0, 45));
-    r.add(def("lithokraft:dish", "Dish", kDir, S::Cube, "dish", "dish", R::Dish, 0, 0, 45));
-    r.add(def("lithokraft:overclockor", "Overclockor", kDir, S::Cube, "overclockor", "overclockor", R::Overclockor, 0, 0, 45));
+    r.add(def("lithokraft:dish", "Dish", kDir, S::Cube, "dish", "dish", R::cDish, 0, 0, 45));
+    r.add(def("lithokraft:overclockor", "Overclockor", kDir, S::Cube, "overclockor", "overclockor", R::cOverclockor, 0, 0, 45));
     // r.add(def("lithokraft:lithographor", "Lithographor", kDir | kInteractive, S::Cube, "lithographor", "lithographor", R::Lithographor, 0, 0, 45));  // DISABLED
     // G-L1 APPEND WARNING: do NOT re-enable the row HERE when Lithographor
     // lands. Registration order assigns the numeric BlockIds and the registry
     // is append-only (see blocks.h): un-commenting in place would renumber
-    // Portor and every block after it, breaking existing saves. Append the
+    // cPortor and every block after it, breaking existing saves. Append the
     // row at the END of this registration list instead (after the last row),
     // add the kLithographor extern at the end of blocks.h, and resolve it
     // there like the other constants.
-    r.add(def("lithokraft:portor", "Portor", kDir | kInteractive, S::Cube, "portor", "portor", R::Portor, 0, 0, 45));
-    r.add(def("lithokraft:fusor", "Fusor", kDir | kInteractive, S::Cube, "fusor", "fusor", R::Fusor, 0, 0, 45));
+    r.add(def("lithokraft:portor", "Portor", kDir | kInteractive, S::Cube, "portor", "portor", R::cPortor, 0, 0, 45));
+    r.add(def("lithokraft:fusor", "Fusor", kDir | kInteractive, S::Cube, "fusor", "fusor", R::cFusor, 0, 0, 45));
     // Wafer biome blocks (2026-10-11, procgen pass). Texture keys are the biome stub
     // textures (pack_64/32/16); CloudAtlas replaces with final art later.
     const auto kTipFlags = (kTerrain & ~kOpaque) | kShell;  // 1551 (JD): Ghostly by default; render.bulb_shell Solid re-opaques at mesh time

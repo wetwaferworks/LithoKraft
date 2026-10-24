@@ -38,7 +38,7 @@ inline constexpr uint8_t kTuftStemSlot = 1;
 inline constexpr uint8_t kTuftLeafSlot = 2;
 
 /// Highest subdivision level carrying any leaf (0 for an empty octree).
-int maxLeafLevel(const litholattice::subdiv::SparseOctree& tree) {
+int maxLeafLevel(const litholattice::subdiv::cSparseOctree& tree) {
   int level = 0;
   for (const litholattice::subdiv::MicroCell& c : tree.leaves())
     if (c.level > level) level = c.level;
@@ -51,9 +51,9 @@ int maxLeafLevel(const litholattice::subdiv::SparseOctree& tree) {
 /// (blocks -> level-6 cells, 1 block = 64 cells). Deterministic: pure
 /// function of (params, plant). A zero footprint yields an empty octree
 /// (mirrors the engine's fail-closed contract for invalid params).
-litholattice::subdiv::SparseOctree buildCrossStandIn(
+litholattice::subdiv::cSparseOctree buildCrossStandIn(
     const procgen::ShrubParams& p, const procgen::CrossQuadPlant& plant) {
-  litholattice::subdiv::SparseOctree tree;
+  litholattice::subdiv::cSparseOctree tree;
   if (!(plant.widthBlocks > 0.f) || !(plant.heightBlocks > 0.f)) return tree;
   const int w = std::max(
       2, std::min(64, static_cast<int>(std::lround(plant.widthBlocks * 64.f))));
@@ -126,7 +126,7 @@ model::Model generateTreeModel(const procgen::TreeParams& p, std::string name,
                                std::string author) {
   procgen::TreeParams q = p;
   bindTreePalette(q);
-  litholattice::subdiv::SparseOctree oct = procgen::generateTree(q);
+  litholattice::subdiv::cSparseOctree oct = procgen::generateTree(q);
   model::Model m;
   m.name = std::move(name);
   m.author = std::move(author);

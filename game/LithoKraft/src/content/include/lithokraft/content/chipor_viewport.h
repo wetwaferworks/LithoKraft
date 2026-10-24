@@ -19,7 +19,7 @@
 //     engine/src/subdiv/include/litholattice/subdiv/octree.h (workstream 1,
 //     implemented in engine/src/subdiv/octree.cpp, linked via
 //     litholattice_subdiv). The demo model is built with the real
-//     SparseOctree::set and read back with the real leaves().
+//     cSparseOctree::set and read back with the real leaves().
 //   - loadModelCells is the workstream 3 seam: it reads real .lthm files with
 //     lithokraft::model::loadModel (see src/content/model/FORMAT.md). The
 //     fixed default model (kDefaultModel) falls back to the built-in demo
@@ -71,7 +71,7 @@ inline constexpr std::string_view kDefaultModel = "chipor-demo";
 std::vector<litholattice::subdiv::MicroCell> loadModelCells(std::string_view name);
 
 /// Built-in demo model: a tiny circuit (silicon die plate, red + blue trace
-/// runs, a torch post, a via pillar) authored with the real SparseOctree.
+/// runs, a torch post, a via pillar) authored with the real cSparseOctree.
 /// Micro-materials: 1 = red trace, 2 = blue trace, 3 = silicon, 4 = post.
 /// This is also what generates assets/models/chipor-demo.lthm.
 std::vector<litholattice::subdiv::MicroCell> demoModelCells();

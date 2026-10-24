@@ -31,7 +31,7 @@ struct ComponentMemory {
   uint8_t timer = 0;           ///< button press / pulsor animation countdown
   std::deque<std::pair<uint8_t, uint8_t>> keys;  ///< keyboard: queued (front, control) pulses
   uint8_t channel = 1;         ///< radio channel for the transmittor / receivor (1..64; 0 = the Daemon, reserved)
-  bool jammer = false;         ///< Overclockor: jammer item installed (v1: toggled by use; item UI later)
+  bool jammer = false;         ///< cOverclockor: jammer item installed (v1: toggled by use; item UI later)
   bool beacon = false;         ///< transmittor: generate its own signal instead of reading the wire
 };
 

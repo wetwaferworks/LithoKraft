@@ -49,8 +49,8 @@ void writeBytes(const std::string& path, const std::vector<uint8_t>& data) {
           static_cast<std::streamsize>(data.size()));
 }
 
-// The real workstream-1 SubdivStore stands in for itself here.
-using Store = subdiv::SubdivStore;
+// The real workstream-1 cSubdivStore stands in for itself here.
+using Store = subdiv::cSubdivStore;
 
 mdl::Model makeTestModel() {
   mdl::cModelBuilder b("Test Cube", "Elfie");
@@ -210,12 +210,12 @@ void testPlaceModelMerge() {
   // one finer cell UNDER a model leaf (correctly cleared by the stamp),
   // plus a cell at a neighbor block.
   {
-    subdiv::SparseOctree t;
+    subdiv::cSparseOctree t;
     t.set(2, 0, 0, 0, 11);
     t.set(3, 0, 0, 7, 12);
     t.set(3, 7, 7, 7, 14);
     store.setBlockOctree(4, 5, 6, t);
-    subdiv::SparseOctree n;
+    subdiv::cSparseOctree n;
     n.set(1, 0, 0, 0, 13);
     store.setBlockOctree(7, 5, 6, n);
   }
@@ -227,14 +227,14 @@ void testPlaceModelMerge() {
 
   mdl::placeModel(store, 4, 5, 6, m);
 
-  const subdiv::SparseOctree* t = store.getBlockOctree(4, 5, 6);
+  const subdiv::cSparseOctree* t = store.getBlockOctree(4, 5, 6);
   check(t != nullptr, "target block has an entry after place");
   check(t->get(2, 0, 0, 0) == 21, "model cell overwrites target cell");
   check(t->get(1, 1, 1, 1) == 22, "new model cell stamped");
   check(t->get(3, 0, 0, 7) == 12, "untouched target cell preserved");
   check(t->get(3, 7, 7, 7) == 22,
         "finer target cells under a stamped cell are cleared");
-  const subdiv::SparseOctree* n = store.getBlockOctree(7, 5, 6);
+  const subdiv::cSparseOctree* n = store.getBlockOctree(7, 5, 6);
   check(n != nullptr && n->get(1, 0, 0, 0) == 13, "neighbor block untouched");
 
   // Empty model is a no-op.
@@ -247,7 +247,7 @@ void testPlaceModelMerge() {
 
   // Placing into a fresh block creates its octree.
   mdl::placeModel(store, 0, 0, 0, m);
-  const subdiv::SparseOctree* fresh = store.getBlockOctree(0, 0, 0);
+  const subdiv::cSparseOctree* fresh = store.getBlockOctree(0, 0, 0);
   check(fresh != nullptr && fresh->get(2, 0, 0, 0) == 21,
         "place creates missing block octree");
 

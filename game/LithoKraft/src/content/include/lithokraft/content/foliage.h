@@ -1,7 +1,7 @@
 // Cortana 2026-10-15 2010 [GAME]: 3D voxel foliage, placed as INSTANCES of shared models.
 //
 // MODELS: each foliage kind is authored once, deterministically, as level-4 (16^3 per block)
-// SparseOctree micro-cells in lithokraft::model::Model blocks stacked in y (a cattail is two
+// cSparseOctree micro-cells in lithokraft::model::Model blocks stacked in y (a cattail is two
 // blocks tall). The same models ship as .lthm assets in assets/models/foliage/<name>_<i>.lthm
 // (biome_capture --foliage regenerates them); at first use the library loads those assets
 // and falls back to the generator when they are missing or invalid.
@@ -50,7 +50,7 @@ struct Quad {
 };
 struct Mesh {
   std::vector<Quad> quads;
-  size_t octreeBytes = 0;  ///< shared model memory (SparseOctree::memoryBytes)
+  size_t octreeBytes = 0;  ///< shared model memory (cSparseOctree::memoryBytes)
   size_t leafCells = 0;
   bool fromAsset = false;  ///< loaded from the shipped .lthm (else generated)
   size_t rawQuads = 0;     ///< Cortana 2026-10-15 2310: quad count before the coplanar merge
