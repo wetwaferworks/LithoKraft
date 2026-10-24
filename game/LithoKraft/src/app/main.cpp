@@ -59,15 +59,15 @@
 #include "lithokraft/game/build_version.h"  // 2026-10-16 (JD): Alpha build counter
 #include "build_counter.h"  // 2026-10-18 (JD): rolling build counter (8 wheels, base 64; generated per build)
 #include "lithokraft/game/modWarnings.h"  // 2026-10-18 (JD): boot-log warnings for unofficial mods (default-ON)
-#include "lithokraft/game/world_save.h"  // SV-H2: WorldSave::readWorldSeed (level.json) before Game construction
+#include "lithokraft/game/world_save.h"  // SV-H2: cWorldSave::readWorldSeed (level.json) before Game construction
 #include "lithokraft/game/resource_manager.h"
 #include "lithokraft/game/settings.h"
 #include "litholattice/input/input_system.h"
 #include "litholattice/platform/window.h"
 #include "litholattice/render/pbr_materials.h"
 #include "litholattice/render/renderer.h"
-#include "litholattice/mcp/server.h"  // McpServer + IStdioTransport (--mcp-stdio, P2c F-M9)
-#include "litholattice/render/frame_pacer.h"  // FramePacer (render.fps_cap drive, D-M3)
+#include "litholattice/mcp/server.h"  // cMcpServer + IStdioTransport (--mcp-stdio, P2c F-M9)
+#include "litholattice/render/frame_pacer.h"  // cFramePacer (render.fps_cap drive, D-M3)
 #include "litholattice/render/software_presenter.h"
 #include "litholattice/render/software_renderer.h"
 #include "litholattice/render_vk/vulkan_renderer.h"

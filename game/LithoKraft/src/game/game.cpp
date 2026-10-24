@@ -27,7 +27,7 @@
 #include "lithokraft/game/lithography.h"      // Cortana 2026-10-15 1900: mask-and-expose machine
 #include "lithokraft/game/signing.h"          // B7: certificate signing flow
 #include "litholattice/mcp/mcp_senses.h"  // encodePngRgb (clean-room PNG writer)
-#include "litholattice/procgen/stages.h"  // StructureFeature (map markers)
+#include "litholattice/procgen/stages.h"  // cStructureFeature (map markers)
 #include "litholattice/render/ground_pulse.h"
 #include "lithokraft/content/item_use.h"
 #include "lithokraft/content/signal_world.h"

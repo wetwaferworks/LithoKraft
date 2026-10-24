@@ -14,7 +14,7 @@
 
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/content/certificates.h"
-#include "lithokraft/content/component.h"  // BehaviorCatalog
+#include "lithokraft/content/component.h"  // cBehaviorCatalog
 #include "lithokraft/content/items.h"
 #include "lithokraft/game/dimensions.h"
 #include "lithokraft/game/etching.h"

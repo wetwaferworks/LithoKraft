@@ -32,8 +32,8 @@
 #include "lithokraft/game/actions.h"
 #include "lithokraft/game/world_save.h"
 #include "lithokraft/game/lithography.h"  // Cortana 2026-10-15 1900
-#include "lithokraft/game/camera_controller.h"  // GameCameraController (engine camera system)
-#include "lithokraft/game/sprite_host.h"        // SpriteHost (engine sprite system)
+#include "lithokraft/game/camera_controller.h"  // cGameCameraController (engine camera system)
+#include "lithokraft/game/sprite_host.h"        // cSpriteHost (engine sprite system)
 #include "lithokraft/game/ai_host.h"            // AiHost (engine AiWorld production owner, B6)
 #include "lithokraft/game/deceitor.h"           // Deceitor mob director (brains live in the AiWorld)
 #include "lithokraft/game/mcp_player_control.h"
@@ -51,13 +51,13 @@
 #include "litholattice/render/renderer.h"
 #include "litholattice/render/binary_greedy_mesher.h"   // BinaryQuad path (mesher option)
 #include "litholattice/render/pbr_quad_mesh.h"          // PbrChunkMesh + expansion
-#include "litholattice/render/pbr_emissive_provider.h"  // ChunkEmissiveProvider (PBR lights)
+#include "litholattice/render/pbr_emissive_provider.h"  // cChunkEmissiveProvider (PBR lights)
 #include "litholattice/script/script_engine.h"
 #include "litholattice/console/concmd.h"
 #include "litholattice/console/debug_console.h"
 #include "litholattice/console/script_console.h"
-#include "litholattice/mcp/server.h"  // McpServer / McpBackends (P2c MCP wiring)
-#include "litholattice/projectile/projectile.h"  // ProjectileManager (P2c, ENT-1)
+#include "litholattice/mcp/server.h"  // cMcpServer / McpBackends (P2c MCP wiring)
+#include "litholattice/projectile/projectile.h"  // cProjectileMgr (P2c, ENT-1)
 #include "litholattice/sim/sim_thread.h"
 #include "litholattice/world/dimension.h"
 #include "lithokraft/game/game_ui.h"

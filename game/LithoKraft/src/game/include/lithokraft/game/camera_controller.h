@@ -2,7 +2,7 @@
 // (litholattice::camera). Owns the game's cCameraMgr and its cameras:
 //
 //   - the player camera, attached to the local player through a
-//     PlayerCameraTarget adapter. The target's ANCHOR is the player's
+//     cPlayerCameraTarget adapter. The target's ANCHOR is the player's
 //     FEET (player_.pos is the locomotion body's feet position); the eye
 //     rides in the target's eyeOffset at the locomotion controller's
 //     current eye height (Stand 1.62 / Sneak 1.27 / Crawl 0.4, via the
@@ -16,7 +16,7 @@
 //     its own engine camera in the manager).
 //   - a third-person orbit camera: mouse Look orbits, the wheel zooms,
 //     pitch is clamped by the engine, and the spring arm collides against
-//     the world through a GameCameraWorld adapter fed by Game's race-free
+//     the world through a cGameCameraWorld adapter fed by Game's race-free
 //     raycast hook (cSimThread::runBetweenTicks + the engine voxel raycast,
 //     one ray per frame, third person only). A follow camera (velocity-
 //     driven chase, wheel sets its distance) binds the same target.
@@ -59,7 +59,7 @@
 
 #include "litholattice/core/math.h"  // Vec3
 #include "litholattice/mcp/mcp_senses.h"  // mcp::CameraPose (pilot boundary type)
-#include "lithokraft/game/mcp_player_control.h"  // McpPlayerView::GameState
+#include "lithokraft/game/mcp_player_control.h"  // cMcpPlayerView::GameState
 
 namespace litholattice {
 class cInputSystem;
@@ -113,7 +113,7 @@ struct GameCameraHooks {
       raycastSolid;
   /// The local player's current locomotion eye height (feet-relative):
   /// Stand 1.62 / Sneak 1.27 / Crawl 0.4 from the locomotion controller.
-  /// PlayerCameraTarget reads it on every pose resolution, so the
+  /// cPlayerCameraTarget reads it on every pose resolution, so the
   /// first-person view dips when sneaking and drops inside a crawl
   /// tunnel. May be empty (the target falls back to the standing height).
   std::function<float()> playerEyeHeight;

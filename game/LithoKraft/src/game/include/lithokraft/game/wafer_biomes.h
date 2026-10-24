@@ -79,7 +79,7 @@ inline float blendLerp(const litholattice::procgen::ColumnMaps& maps, size_t col
 }
 
 /// The Wafer's code surface rules, appended after the JSON cLayeredSurface in the pipeline:
-///  - WaferPaletteSurface: per-biome ground tops by BlockId (TraceForest -> silicon,
+///  - cWaferPaletteSurface: per-biome ground tops by BlockId (TraceForest -> silicon,
 ///    DicingPlains -> kScribeSilicon/49, CapacitorGroves -> kDenseSilicon/50,
 ///    ResonatorSpires -> kFleckedSilicon/51, DeadZones -> kDeadSilicon/46 + stone-run
 ///    remap). Weight-dithered, so borders fade.

@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "litholattice/player/iplayer.h"         // IPlayer
-#include "litholattice/player/player_state.h"    // PlayerManager, PlayerState
+#include "litholattice/player/player_state.h"    // cPlayerMgr, PlayerState
 #include "litholattice/player/standard_stats.h"  // StandardStats
 #include "litholattice/player/vitals.h"          // StandardVitals
 #include "litholattice/world/block.h"          // BlockId

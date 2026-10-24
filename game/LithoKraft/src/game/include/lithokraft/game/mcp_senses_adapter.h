@@ -81,8 +81,8 @@
 #include "litholattice/mcp/mcp_senses.h"
 #include "litholattice/render/renderer.h"  // ChunkMesh
 #include "litholattice/render/software_renderer.h"
-#include "lithokraft/game/camera_controller.h"  // PilotCameraRig (engine pilot cameras)
-#include "lithokraft/game/mcp_player_control.h"  // McpPlayerView::GameState
+#include "lithokraft/game/camera_controller.h"  // cPilotCameraRig (engine pilot cameras)
+#include "lithokraft/game/mcp_player_control.h"  // cMcpPlayerView::GameState
 
 namespace lithokraft {
 

@@ -12,7 +12,7 @@
 // through cSimThread::edit, exactly like block Use.
 #pragma once
 #include <cstdint>
-#include "litholattice/sim/world_simulation.h"  // IWorldSimulation::DirtyFn
+#include "litholattice/sim/world_simulation.h"  // IWorldSim::DirtyFn
 #include "litholattice/world/chunk_map.h"
 
 namespace lithokraft {

@@ -25,7 +25,7 @@
 #include "lithokraft/content/blocks.h"  // blockRegistry()
 #include "lithokraft/content/foliage.h"  // Cortana 2026-10-15 2010 [TOOLS]: --foliage
 #include "lithokraft/game/dimensions.h"  // createDimensions
-#include "lithokraft/game/resource_manager.h"  // ResourceManager (real pack textures/materials)
+#include "lithokraft/game/resource_manager.h"  // cResourceMgr (real pack textures/materials)
 #include "lithokraft/game/scout.h"  // locateBiome
 #include "lithokraft/game/wafer_biomes.h"  // WaferBiome, kWaferBiomeNames
 #include "lithokraft/game/map_render.h"  // renderOverviewMap, waferMapPalette

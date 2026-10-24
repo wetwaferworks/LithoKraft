@@ -69,7 +69,7 @@
 #include "litholattice/ai/ai_world.h"
 #include "litholattice/ai/nav.h"
 #include "litholattice/core/threading.h"  // JobPool
-#include "litholattice/world/block.h"    // BlockRegistry
+#include "litholattice/world/block.h"    // cBlockReg
 #include "litholattice/world/chunk_map.h"
 
 namespace lithokraft {

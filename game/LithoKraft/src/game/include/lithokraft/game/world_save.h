@@ -16,7 +16,7 @@
 #include "lithokraft/content/signal.h"
 #include "lithokraft/game/engine.h"
 #include "lithokraft/game/inventory.h"  // PlayerMeta's v4 inventory block (P2b-1)
-#include "litholattice/render/pbr_materials.h"  // MaterialRegistry* (MATS payload registration)
+#include "litholattice/render/pbr_materials.h"  // cMaterialReg* (MATS payload registration)
 #include "litholattice/core/math.h"
 #include "litholattice/storage/block_names.h"
 #include "litholattice/storage/storage.h"

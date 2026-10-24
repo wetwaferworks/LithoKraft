@@ -58,8 +58,8 @@
 #include "lithokraft/game/sprite_host.h"
 #include "lithokraft/game/settings.h"        // A4: render.fps_cap Settings field
 #include "lithokraft/game/settings_cvars.h"  // A4: render.fps_cap cvar row
-#include "litholattice/console/concmd.h"     // A4: ConsoleRegistry for the cvar flow check
-#include "litholattice/render/frame_pacer.h"  // A4: FramePacer drive semantics
+#include "litholattice/console/concmd.h"     // A4: cConsoleReg for the cvar flow check
+#include "litholattice/render/frame_pacer.h"  // A4: cFramePacer drive semantics
 #include "lithokraft/game/ai_host.h"         // A6: AiWorld production host smoke test
 #include "lithokraft/game/deceitor.h"        // Deceitor mob behaviour test (2026-10-14)
 #include "lithokraft/game/interchange.h"    // Interchange settlements test (2026-10-14)
