@@ -74,7 +74,7 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
 
   SpriteHost host;
   host.registerStarterSprites(rm);
-  spr::ISpriteRegistry& reg = host.registry();
+  spr::ISpriteReg& reg = host.registry();
 
   // -- starter defs: every source kind represented -------------------------
   const char* kStarters[] = {"fx:star5",      "fx:star5_orange", "fx:star5_pale",

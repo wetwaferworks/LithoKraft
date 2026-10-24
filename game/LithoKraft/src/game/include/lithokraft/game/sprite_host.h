@@ -94,8 +94,8 @@ class SpriteHost {
   const std::vector<litholattice::PackedVertex>& softwareVerts() const { return softwareVerts_; }
   litholattice::Vec3 softwareOrigin() const { return softwareOrigin_; }
 
-  litholattice::sprite::ISpriteRegistry& registry() { return registry_; }
-  const litholattice::sprite::ISpriteRegistry& registry() const { return registry_; }
+  litholattice::sprite::ISpriteReg& registry() { return registry_; }
+  const litholattice::sprite::ISpriteReg& registry() const { return registry_; }
   litholattice::sprite::SpriteSystem& system() { return system_; }
   size_t instanceCount() const { return system_.instanceCount(); }
 
