@@ -1112,6 +1112,15 @@ int main(int argc, char** argv) {
   const ScriptsDirChoice scripts = findScriptsDir(argv[0], scriptsMode);
   cfg.scriptsDir = scripts.dir;
   // Saves: <data root>/saves/world by default; --bench never loads or saves (repeatable runs).
+#ifdef LK_PLAYTEST_SPAWN
+  // 2026-10-24 (JD): playtest builds (-DLK_PLAYTEST_SPAWN=ON) start in the test area when no
+  // scene / bench / test mode was asked for, with their own save dir (saves/playtest) so the
+  // normal world (saves/world) and the scenario hashes are never touched.
+  if (cfg.benchScene == "default" && benchSeconds <= 0 && !runHandshakeTest) {
+    cfg.benchScene = "testworld";
+    if (saveDir.empty() && !noSave) saveDir = (dataRoot(argv[0]) / "saves" / "playtest").lexically_normal().string();
+  }
+#endif
   if (cfg.benchScene == "testworld") {
     cfg.sceneSize = romScreen >= 64 ? 64 : 32;
     // The test world is rebuilt every launch; a save would restore its columns over the fresh

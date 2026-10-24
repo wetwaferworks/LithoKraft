@@ -33,6 +33,11 @@ if(LITHOKRAFT_DEV_BUILD)
   target_compile_definitions(lithokraft PRIVATE LITHOKRAFT_DEV_SCRIPTS_DIR="${LithoKraft_SOURCE_DIR}/scripts")
 endif()
 litholattice_module_options(lithokraft)
+# 2026-10-24 (JD): playtest builds spawn in the test area on a no-flag launch (own save dir).
+option(LK_PLAYTEST_SPAWN "No-flag launch opens the --test-world area (saves/playtest)" OFF)
+if(LK_PLAYTEST_SPAWN)
+  target_compile_definitions(lithokraft PRIVATE LK_PLAYTEST_SPAWN=1)
+endif()
 # Ship scripts/ next to the exe (used by shipping builds and --scripts exe).
 # Third-party license texts ship next to the exe.
 add_custom_command(TARGET lithokraft POST_BUILD
