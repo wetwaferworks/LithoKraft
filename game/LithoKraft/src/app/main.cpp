@@ -105,9 +105,9 @@ using namespace lithokraft;
 //  - readLine() polls with a timeout and honours requestStop(), so the
 //    game can shut the server thread down deterministically on exit
 //    (join, never detach) instead of stranding it in a blocking read.
-class McpStdioTransport final : public litholattice::mcp::IStdioTransport {
+class cMcpStdioTransport final : public litholattice::mcp::IStdioTransport {
  public:
-  explicit McpStdioTransport(int outFd) : outFd_(outFd) {}
+  explicit cMcpStdioTransport(int outFd) : outFd_(outFd) {}
   void requestStop() { stop_.store(true, std::memory_order_relaxed); }
 
   bool readLine(std::string& out) override {
@@ -740,7 +740,7 @@ struct FrameCtx {
   std::thread mcpThread;
   std::shared_ptr<std::atomic<bool>> mcpDone;  // set by the MCP thread as it exits (R-RACE-1)
 #if !defined(_WIN32)
-  std::unique_ptr<McpStdioTransport> mcpTransport;
+  std::unique_ptr<cMcpStdioTransport> mcpTransport;
   int mcpSavedStdoutFd = -1;
 #endif
   RenderWorker rw;
@@ -1254,9 +1254,9 @@ int main(int argc, char** argv) {
       mcpSavedStdoutFd = ::dup(STDOUT_FILENO);
       if (mcpSavedStdoutFd >= 0) ::dup2(STDERR_FILENO, STDOUT_FILENO);
       const int outFd = mcpSavedStdoutFd >= 0 ? mcpSavedStdoutFd : STDOUT_FILENO;
-      mcpTransport = std::make_unique<McpStdioTransport>(outFd);
+      mcpTransport = std::make_unique<cMcpStdioTransport>(outFd);
       litholattice::mcp::McpServer* srv = mcpServer.get();
-      McpStdioTransport* tr = mcpTransport.get();
+      cMcpStdioTransport* tr = mcpTransport.get();
       mcpThread = std::thread([srv, tr] { srv->runStdio(*tr); });
 #else
       // Windows: the engine's own stdio transport (blocking std::cin);

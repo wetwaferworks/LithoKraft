@@ -1,5 +1,5 @@
 // SpriteHost: LithoKraft's host for the engine sprite system
-// (litholattice::sprite). Owns the game's SpriteRegistry + SpriteSystem,
+// (litholattice::sprite). Owns the game's cSpriteReg + SpriteSystem,
 // registers the starter sprite defs (proving every image source the core
 // offers), ticks instances from the game's sim-tick stream, and converts
 // each frame's emitted quads into the two draw forms the game feeds:
@@ -105,7 +105,7 @@ class SpriteHost {
   /// (uniform across source kinds — Image, SVG and PNG defs alike).
   std::array<float, 3> avgColorFor(uint32_t defId);
 
-  litholattice::sprite::SpriteRegistry registry_;
+  litholattice::sprite::cSpriteReg registry_;
   litholattice::sprite::SpriteSystem system_;
   std::vector<litholattice::SpriteDrawQuad> drawQuads_;
   std::vector<litholattice::PackedVertex> softwareVerts_;

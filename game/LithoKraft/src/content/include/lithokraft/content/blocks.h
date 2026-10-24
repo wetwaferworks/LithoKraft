@@ -149,7 +149,7 @@ constexpr uint32_t kGameFluid = uint32_t(kFirstGameFlag) << 3;      // swimmable
 enum class SimRole : uint16_t {
   None, Wire, Torch, Lamp, ColorLamp,
   Repeator, Thresholdor, Redirector, Pulsor, Memor, FastLatch, Switch, Button, Keyboard, Tone, Catchor,
-  SignalTransmittor, SignalReceivor, Dish, Overclockor, Lithographor, Chipor, Portor, Fusor,
+  cSignalTransmittor, cSignalReceivor, Dish, Overclockor, Lithographor, Chipor, Portor, Fusor,
   Etchor,  // appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
 };
 constexpr SimRole roleOf(const BlockDef& d) { return SimRole(d.role); }

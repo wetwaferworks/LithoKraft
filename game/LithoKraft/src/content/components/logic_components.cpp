@@ -233,7 +233,7 @@ class cFastLatch final : public cCompBehavior {
 /// sneak+use cycles the radio channel. First trace touching a side binds the input colour.
 /// Broadcasts (mem.out = strength, mem.out2 = colour); the sim publishes after the tick.
 /// Never drives wire (emitToward = 0).
-class SignalTransmittor final : public cCompBehavior {
+class cSignalTransmittor final : public cCompBehavior {
  public:
   static bool wired(CellState s) { return (stAux(s) & 3) != 3; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
@@ -272,7 +272,7 @@ class SignalTransmittor final : public cCompBehavior {
 /// Wireless signal sink: radio in, trace out. The sim fills in.radioIn / in.radioCol from the
 /// radio registry (1-tick latency). sneak+use cycles the listen channel. Outputs on the front,
 /// on the received colour.
-class SignalReceivor final : public cCompBehavior {
+class cSignalReceivor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int v = std::min(in.radioIn, kMaxSignal);  // SW-H2: received strength is passed through to the wire
@@ -426,8 +426,8 @@ void registerLogic(const Registrar& add) {
   add("pulsor", std::make_unique<Pulsor>());
   add("memor", std::make_unique<Memor>());
   add("catchor", std::make_unique<Catchor>());
-  add("signal_transmittor", std::make_unique<SignalTransmittor>());
-  add("signal_receivor", std::make_unique<SignalReceivor>());
+  add("signal_transmittor", std::make_unique<cSignalTransmittor>());
+  add("signal_receivor", std::make_unique<cSignalReceivor>());
   add("dish", std::make_unique<Dish>());
   add("overclockor", std::make_unique<Overclockor>());
   add("fast_latch", std::make_unique<cFastLatch>());

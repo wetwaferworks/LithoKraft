@@ -76,8 +76,8 @@ BlockRegistry& mutableRegistry() {
     r.add(def("lithokraft:catchor", "Catchor", kDir | kInteractive, S::Cube, "catchor", "catchor", R::Catchor, 0, 0, 45));
     r.add(def("lithokraft:frosted_glass", "Frosted Glass", kSolid | kTransparent | kCutsWire, S::Cube, "frosted_glass", "", R::None, 0, 0, 10));
     r.add(def("lithokraft:ceramic", "Ceramic", kSolid | kOpaque | kCutsWire, S::Cube, "ceramic", "", R::None, 0, 0, 80));  // insulator: never powered
-    r.add(def("lithokraft:signal_transmittor", "Signal Transmittor", kDir, S::Cube, "signal_transmittor", "signal_transmittor", R::SignalTransmittor, 0, 0, 45));
-    r.add(def("lithokraft:signal_receivor", "Signal Receivor", kDir, S::Cube, "signal_receivor", "signal_receivor", R::SignalReceivor, 0, 0, 45));
+    r.add(def("lithokraft:signal_transmittor", "Signal Transmittor", kDir, S::Cube, "signal_transmittor", "signal_transmittor", R::cSignalTransmittor, 0, 0, 45));
+    r.add(def("lithokraft:signal_receivor", "Signal Receivor", kDir, S::Cube, "signal_receivor", "signal_receivor", R::cSignalReceivor, 0, 0, 45));
     r.add(def("lithokraft:dish", "Dish", kDir, S::Cube, "dish", "dish", R::Dish, 0, 0, 45));
     r.add(def("lithokraft:overclockor", "Overclockor", kDir, S::Cube, "overclockor", "overclockor", R::Overclockor, 0, 0, 45));
     // r.add(def("lithokraft:lithographor", "Lithographor", kDir | kInteractive, S::Cube, "lithographor", "lithographor", R::Lithographor, 0, 0, 45));  // DISABLED

@@ -695,7 +695,7 @@ void SignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
     ++lastTicked_;
     ComponentInputs in;
     const SimRole role = roleOf(blockRegistry().def(w.get(x, y, z)));
-    if (role == SimRole::SignalReceivor || role == SimRole::Dish) {
+    if (role == SimRole::cSignalReceivor || role == SimRole::Dish) {
       int rs = 0, rc = 0;
       const int sens = role == SimRole::Dish ? kDishSensitivity : 0;
       if (!jammers_.jammed(x, y, z, c.mem.channel) &&
@@ -753,7 +753,7 @@ void SignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
     if (w.getState(x, y, z) != step.state) { w.setState(x, y, z, step.state); dirty(x, y, z); }
     if (step.sound) sounds_.push_back({*step.sound, stValue(step.state), x, y, z});
     // Wireless: transmittors broadcast (strength = mem.out, colour = mem.out2), unless jammed.
-    if (blockRegistry().def(w.get(x, y, z)).role == SimRole::SignalTransmittor && m.out > 0 &&
+    if (blockRegistry().def(w.get(x, y, z)).role == SimRole::cSignalTransmittor && m.out > 0 &&
         m.channel >= 1 && m.channel <= radioChannelsUnlocked() &&
         !jammers_.jammed(x, y, z, m.channel))
       radio_.publish(RadioBroadcast{x, y, z, dim_, m.channel, m.out, m.out2, kTransmittorPower});
