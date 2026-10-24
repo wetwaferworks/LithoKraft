@@ -116,7 +116,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
      // by construction: the pacer's returned sleep is computed from
      // explicit time points; the single measured check is bounded wide.
     using litholattice::cFramePacer;
-    check(GameSettings{}.fpsCap == 30 && GameSettings{}.vsync && GameSettings{}.swapImages == 3 && GameSettings{}.streamRadius == 16, "pacing: defaults 30 FPS cap, V-sync on, triple buffering, render distance 16 (JD 2026-10-24)");
+    check(GameSettings{}.fpsCap == 30 && GameSettings{}.vsync && GameSettings{}.swapImages == 3 && GameSettings{}.streamRadius == 8 && GameSettings{}.tickRadius == 6, "pacing: defaults 30 FPS cap, V-sync on, triple buffering, render distance 8, sim distance 6 (JD 2026-10-24)");
     {  // JSON round-trip + load-side clamp (0..1000).
       const auto dir = uniqueTempDir("lithokraft-fpscap");
       const std::string path = (dir / "settings.json").string();

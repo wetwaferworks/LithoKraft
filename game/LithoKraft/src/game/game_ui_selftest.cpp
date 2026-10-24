@@ -279,7 +279,7 @@ void testSettingsFile(Checker& check) {
 
   writeFile(p, "{ not json");
   const GameSettings corrupt = GameSettings::load(p.string());
-  check(corrupt.tps == 32 && corrupt.tickRadius == 8 /* F56-10 (JD 2026-10-17) */ && !corrupt.muted && corrupt.euv &&
+  check(corrupt.tps == 32 && corrupt.tickRadius == 6 /* JD 2026-10-24 */ && !corrupt.muted && corrupt.euv &&
         corrupt.pbrTier == 1,
         "settings: a corrupt file falls back to defaults");
 

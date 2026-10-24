@@ -46,7 +46,7 @@ struct GameSettings {
   std::string renderer = "software";
   bool vsync = true;      ///< 2026-10-24 (JD): default ON. boot-only: the window is created with it
   int tps = 32;           ///< one of kSettingsTpsModes (kDefaultTps)
-  int tickRadius = 8;     ///< simulation distance, 0..512 chunks; boot-only. F56-10 (JD 2026-10-17): default 8; 16/32 are stress-test options; env LL_SIM_TICK_RADIUS (was 16 since F55-5)
+  int tickRadius = 6;     ///< 2026-10-24 (JD): default 6. simulation distance, 0..512 chunks; boot-only. F56-10 (JD 2026-10-17): default 8; 16/32 are stress-test options; env LL_SIM_TICK_RADIUS (was 16 since F55-5)
   bool euv = true;        ///< the lithographed EUV-tier sim domain
   int mesher = 0;         ///< index into kSettingsMesherNames; boot-only (world (re)load):
                           ///< 0 = PackedVertex (classic chunk programs), 1 = BinaryQuad
@@ -110,7 +110,7 @@ struct GameSettings {
   float vkBloomStrength = 1.f;
   float vkHeartbeatGlow = 1.75f;
   bool vkFarLod = true;  ///< 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): far LOD for the 33-64 ring (render-only, live)  ///< 0.0.1.53 [C53-3] (Proposed by JD, Built by Cortana): wafer heartbeat bloom gain (0..4)
-  int streamRadius = 16;  ///< 2026-10-24 (JD): default 16. render / stream distance in chunks, 0 = auto (Vulkan 64, others 32), max 64; boot-only
+  int streamRadius = 8;   ///< 2026-10-24 (JD, 4:31 PM): default 8. render / stream distance in chunks, 0 = auto (Vulkan 64, others 32), max 64; boot-only
   bool bulbShellSolid = false;  ///< 2026-10-16 1551 (JD): render.bulb_shell - Trace Bulb shell Ghostly (false, default) / Solid (true); render-only, saved
   bool emissiveLight = false;  ///< Cortana 2026-10-16: render.emissive_light - software local light from emitters (live). Default OFF: ~2x frame cost on the Trace-dense test world.
   int texRes = 0;       ///< Cortana 2026-10-16: render.tex_res 0 auto / 16 / 32 / 64 (software; next texture load or F9)
