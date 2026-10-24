@@ -3116,9 +3116,10 @@ HudModel Game::hudModel() const {
                   meshesReceived_, totalSubs_, modeName, poseName,
                   locomotion_.onGround() ? "" : " (air)");
     std::snprintf(l[4], sizeof l[4], "look: %s", targetText().c_str());
-    std::snprintf(l[5], sizeof l[5], "health %d  oxygen %d  stamina %d  kharge %d",
+    std::snprintf(l[5], sizeof l[5], "health %d  oxygen %d  stamina %d  kharge %d  |  XYZ %.2f %.2f %.2f  block %d %d %d",
                   playerAdapter_.health(), playerAdapter_.oxygen(), playerAdapter_.stamina(),
-                  playerAdapter_.kharge());
+                  playerAdapter_.kharge(), double(player_.pos.x), double(player_.pos.y), double(player_.pos.z),
+                  int(std::floor(double(player_.pos.x))), int(std::floor(double(player_.pos.y))), int(std::floor(double(player_.pos.z))));  // 2026-10-24 (JD): feet / origin
     std::snprintf(l[6], sizeof l[6], "renderer: %s", rendererInfo().c_str());  // 2026-10-16 (JD)
     std::snprintf(l[7], sizeof l[7], "%s", releaseInfo().c_str());
     m.debugLines.assign(std::begin(l), std::end(l));
