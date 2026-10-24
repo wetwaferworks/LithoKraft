@@ -309,6 +309,17 @@ int runSignalSelfTest() {
     check(stValue(w.getState(85, y, 60)) == 0 && stAttach(w.getState(85, y, 60)) == 6 && stAttach(w.getState(82, y + 3, 60)) == 1,
           "wall torch turns off when its support is powered; attach faces survive ticks and toggles");
   }
+  {  // 2026-10-24 (JD): a floor-mounted switch also drives the Trace beside it, red and blue alike.
+    for (int x = 40; x <= 42; ++x) put(x, y - 1, 62, kWaferSilicon);
+    w.set(41, y, 62, kSwitch); w.setState(41, y, 62, withAttach(0, 1)); sim.onBlockChanged(41, y, 62, kSwitch);
+    put(42, y, 62, kRedTrace);
+    put(40, y, 62, kBlueTrace);
+    run(3);
+    const bool off = w.get(41, y, 62) == kSwitch && val(42, y, 62) == 0 && val(40, y, 62) == 0;
+    sim.use(w, 41, y, 62, none);
+    run(4);
+    check(off && val(42, y, 62) == 64 && val(40, y, 62) == 64, "attached switch powers red and blue Trace on its own sides (64)");
+  }
   {  // 2026-10-24 lever: on each of the 6 faces (floor / ceiling in all 4 facings) the switch keeps
      // its attach face and facing through ticks and toggles and powers its support (lamp beside it).
     const int sup[3] = {4, y + 4, 48};
