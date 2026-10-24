@@ -330,6 +330,16 @@ void cGameUi::openSettings(const GameSettings& cur) {
         changed();
       });
     }
+    {  // 2026-10-24 (JD): floor pulse Off / Slow / Normal (render only, live)
+      ui::cStackPanel& fp = row(pg, "Floor pulse");
+      const std::vector<std::string> fpItems{"Off", "Slow", "Normal"};
+      ui::cDropdown& fpd = fp.add<ui::cDropdown>(fpItems, std::clamp(cur.floorPulse, 0, 2));
+      fpd.setId("set-floorpulse");
+      fpd.on("change", [changed, state](ui::cWidget& w) {
+        state->floorPulse = std::clamp(static_cast<ui::cDropdown&>(w).selected(), 0, 2);
+        changed();
+      });
+    }
     ui::cStackPanel& hr = row(pg, "HUD scale");
     const std::vector<std::string> hudItems{"Auto", "1x", "2x", "3x", "4x"};  // Cortana 2026-10-16: GUI scale 1-4
     ui::cDropdown& hud = hr.add<ui::cDropdown>(hudItems, cur.hudScale);

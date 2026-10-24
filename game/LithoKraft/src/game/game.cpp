@@ -2981,7 +2981,7 @@ FrameParams Game::frameParams(int width, int height) const {
   // Wafer ground pulse (JD 2026-10-11): sim-time seconds drive the shader's
   // pulse phase. Pausing the sim freezes worldTick, so the pulse freezes too -
   // never wall-clock. render.ground_pulse toggles it live (no remesh).
-  p.groundPulseOn = settings_.groundPulse;
+  p.groundPulseOn = settings_.groundPulse && settings_.floorPulse > 0;  // 2026-10-24 (JD): Floor pulse Off/Slow/Normal
   p.leafTwinkle = resolvedTwinkle(settings_);  // 2026-10-16 crystal twinkle: render clock (p.timeSec)
   p.vkFx = cfg_.vkFxOverride >= 0 ? cfg_.vkFxOverride : settings_.vkFx;  // JD Vulkan push: Vulkan-only effects (render-only)
   p.vkBloomStrength = settings_.vkBloomStrength;
@@ -2993,6 +2993,7 @@ FrameParams Game::frameParams(int width, int height) const {
   // packets), independent live toggle (render.ground_traces, default on).
   p.groundTraceOn = settings_.groundTraces;
   p.groundTraceTimeSec = p.groundPulseTimeSec;
+  if (settings_.floorPulse == 1) p.groundPulseTimeSec *= 0.35f;  // Slow: about a third of Normal speed (traces keep their clock)
   ui_.paint(p.hud, *resources_.materials(), [this](BlockId b) { return resources_.icon(b); },
             [this](uint32_t itemId) { return resources_.itemIcon(itemId); });
   // PBR analytic lights for the chunk_pbr uniforms (phase 2, Worker 3): K-nearest

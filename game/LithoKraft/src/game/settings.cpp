@@ -37,6 +37,7 @@ GameSettings GameSettings::load(const std::string& path) {
   s.displayMode = clampInt(int(json.getNum("displayMode", s.displayMode)), 0, kSettingsDisplayModeCount - 1);
   s.vsync = json.getBool("vsync", s.vsync);
   s.swapImages = clampInt(int(json.getNum("swapImages", s.swapImages)), 2, 3);
+  s.floorPulse = clampInt(int(json.getNum("floorPulse", s.floorPulse)), 0, 2);
   s.tps = nearestTps(int(json.getNum("tps", s.tps)));
   s.tickRadius = clampInt(int(json.getNum("tickRadius", s.tickRadius)), 0, 512);
   // JD 2026-10-16: the old default 8 moves to the new simulation distance 32 once (files saved
@@ -82,6 +83,7 @@ bool GameSettings::save(const std::string& path) const {
   json.add("displayMode", litholattice::Json::number(displayMode));
   json.add("vsync", litholattice::Json::boolean(vsync));
   json.add("swapImages", litholattice::Json::number(swapImages));
+  json.add("floorPulse", litholattice::Json::number(floorPulse));
   json.add("tps", litholattice::Json::number(tps));
   json.add("tickRadius", litholattice::Json::number(tickRadius));
   json.add("simDistanceV2", litholattice::Json::boolean(true));

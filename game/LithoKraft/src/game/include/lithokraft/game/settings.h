@@ -81,6 +81,7 @@ struct GameSettings {
   int renderThreads = 0;        ///< Cortana 2026-10-15 1156: software raster threads (0 = auto: pow2 <= logical cores - 2, clamped 2..16 [JD 14:41, Cortana 1450]; N = override, powers of two 1..64)
   int handshakePhases = 4;       ///< sim.handshake_phases: phases per cycle, 1..16
                           ///< (the Signal cycle uses the first four slots).
+  int floorPulse = 0;  ///< 2026-10-24 (JD): Graphics 'Floor pulse' 0 Off / 1 Slow / 2 Normal (render only, live; missing key = Off).
   bool groundPulse = true;  ///< render.ground_pulse: the Wafer's energized
                           ///< ground pulse (JD 2026-10-11). Live toggle, no
                           ///< remesh; default on.
