@@ -603,8 +603,10 @@ int runSignalSelfTest() {
             rows == 1 ? "wall-pixel 1 row: every pixel fires repeatedly, alone, left to right, showing its caught value"
                       : "wall-pixel 16 rows: per-row drivers + vias, every pixel of every row fires alone in order with its value");
       if (rows == 1) {
+        const int m0 = stValue(ww.getState(px0 + 3, yb + 1, zw + 1));
         ws.use(ww, px0 + 3, yb + 1, zw + 1, [](int, int, int) {}, true);
-        check((stAux(ww.getState(px0 + 3, yb + 1, zw + 1)) & 3) == 3, "catchor: sneak + use (alt-use command) clears the binding for rebind");
+        const CellState s1 = ww.getState(px0 + 3, yb + 1, zw + 1);
+        check((stAux(s1) & 3) != 3 && stValue(s1) == m0 % kMaxSignal + 1, "catchor: sneak / Alt + use steps the match and keeps the binding (JD 2026-10-24)");
       }
     }
   }
@@ -925,10 +927,9 @@ int runSignalSelfTest() {
     const bool right = seen[2] && !seen[0] && !seen[1];
     cs.use(cw, 2, y, 3, [](int, int, int) {});
     const bool back = (stAux(cw.getState(2, y, 3)) & 3) == 0;
-    cs.use(cw, 2, y, 3, [](int, int, int) {}, true);  // bound -> sneak+use clears the binding
-    const bool unbound = (stAux(cw.getState(2, y, 3)) & 3) == 3 && stValue(cw.getState(2, y, 3)) == 64;
-    cs.use(cw, 2, y, 3, [](int, int, int) {}, true);  // unbound -> sneak+use steps the match (64 -> 1)
-    const bool alt = stValue(cw.getState(2, y, 3)) == 1 && (stAux(cw.getState(2, y, 3)) & 3) == 3;
+    const bool unbound = true;  // 2026-10-24 (JD): sneak / Alt + use no longer clears the binding
+    cs.use(cw, 2, y, 3, [](int, int, int) {}, true);  // bound -> sneak+use steps the match (64 -> 1)
+    const bool alt = stValue(cw.getState(2, y, 3)) == 1 && (stAux(cw.getState(2, y, 3)) & 3) == 0;
     cw.setState(2, y, 3, makeState(64, 1, 0));  // rebind directly for the redirector test below
     check(autoWired && kept && left && right && back && unbound && alt,
           "catchor: auto-wires to the first touching wire (west, red), keeps it; output centre -> left -> right; sneak+use clears binding, then steps match");

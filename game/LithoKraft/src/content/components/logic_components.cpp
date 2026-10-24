@@ -194,13 +194,13 @@ class cCatchor final : public cCompBehavior {
     return wired(st) && dir == outDir(st) ? m.out : 0;
   }
   std::optional<CellState> use(CellState st, ComponentMemory& /*m*/) const override {
-    if (!wired(st)) return std::nullopt;
-    const int mode = ((stAux(st) & 3) + 1) % 3;
+    // 2026-10-24 (JD 6:40 PM): RMB always cycles the output left -> right -> centre; an unwired
+    // Catchor takes the centre output (bound to the colour bit it has).
+    const int mode = wired(st) ? ((stAux(st) & 3) + 1) % 3 : 0;
     return makeState(stValue(st), stFacing(st), (stAux(st) & 4) | mode, false);
   }
   std::optional<CellState> useAlt(CellState st, ComponentMemory& /*m*/) const override {
-    if (wired(st))
-      return makeState(stValue(st), stFacing(st), (stAux(st) & ~3) | 3, false);  // clear binding; touch to rebind
+    // 2026-10-24 (JD 6:40 PM): sneak / Alt + RMB steps the match number (1..64, wraps), wired or not.
     return makeState(stValue(st) % kMaxSignal + 1, stFacing(st), stAux(st), false);
   }
   std::string describe(const BlockDef& d, CellState s) const override {

@@ -2213,7 +2213,9 @@ void Game::handleWorldActions() {
   const bool sneaking = input_.held(Action::Sneak);
   const bool wireUse = inReach && isFlatWire(st.hitBlock) && selBlock == kAir;
   const bool usable = inReach && (reg.has(st.hitBlock, kInteractive) || wireUse) && !sneaking;
-  const bool altUse = inReach && input_.held(Action::Secondary) && roleOf(st.hitBlock) != SimRole::None;
+  // 2026-10-24 (JD): sneak + RMB is the secondary setting too on a Catchor (match number).
+  const bool altUse = inReach && (input_.held(Action::Secondary) || (sneaking && roleOf(st.hitBlock) == SimRole::Catchor)) &&
+                      roleOf(st.hitBlock) != SimRole::None;
   const int curTarget[3] = {st.hx, st.hy, st.hz};
   const bool newTarget = curTarget[0] != lastPlaceHit_[0] || curTarget[1] != lastPlaceHit_[1] ||
                          curTarget[2] != lastPlaceHit_[2];

@@ -17,7 +17,7 @@ const Row kRows[] = {
     {"jump (2x: flight)", {Action::Jump}},
     {"sneak / down (fly)", {Action::Sneak}},
     {"crawl", {Action::Crawl}},
-    {"secondary setting (hold + right click)", {Action::Secondary}},  // Cortana 2026-10-15 2215
+    {"secondary setting (hold + RMB; Catchor: match, also sneak+RMB)", {Action::Secondary}},  // Cortana 2026-10-15 2215
     {"sprint", {Action::Sprint}},
     {"break", {Action::Break}},
     {"place / use", {Action::Place, Action::Use}},
