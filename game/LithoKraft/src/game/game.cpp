@@ -1007,7 +1007,53 @@ void Game::loadActive() {
     logInfo("test world: crystal leaf grove (8 trees, red/blue-dominant) x %d..%d, y %d..%d, z %d..%d", tw.leafDemoX - 28, tw.leafDemoX,
             tw.floorY + 1, tw.floorY + 7, tw.leafDemoZ - 1, tw.leafDemoZ + 10);  // 2026-10-16 JD leaf pass
     for (BlockId b : tw.missing) logError("test world: could not place '%s'", blockRegistry().def(b).name.data());
-    if (cfg_.testWorldExamples) {  // 2026-10-24 (JD): playtest builds only
+    if (cfg_.testWorldExamples) {  // 2026-10-24 (JD playtest note 4): 6x6-chunk flat test area, one floor block per chunk
+      ChunkMap& cw = active_->chunks;
+      const auto& reg = blockRegistry();
+      std::vector<BlockId> floors{kWaferSilicon};
+      for (int id = 1; id < int(reg.size()) && floors.size() < 6; ++id) {
+        const BlockDef& d = reg.def(BlockId(id));
+        const uint32_t bad = kTransparent | kCutsWire | kInteractive | kRandomTicks | kAttachable | kDirectional;
+        if (BlockId(id) == kWaferSilicon || d.shape != Shape::Cube || roleOf(d) != SimRole::None) continue;
+        if ((d.flags & (kSolid | kOpaque)) != (kSolid | kOpaque) || (d.flags & bad)) continue;
+        floors.push_back(BlockId(id));
+      }
+      const int ccx = (sx >> 4) - 3, ccz = (sz >> 4) - 3;  // chunks -3..+2 around spawn: Manhattan <= 6 (inside the 8 diamond)
+      auto busy = [&](int x, int z) {  // keep existing pads: anything standing within one block
+        for (int dz = -1; dz <= 1; ++dz)
+          for (int dx = -1; dx <= 1; ++dx)
+            for (int y = floorY + 1; y <= floorY + 2; ++y)
+              if (cw.get(x + dx, y, z + dz) != kAir) return true;
+        return false;
+      };
+      int refloored = 0;
+      for (int j = 0; j < 6; ++j)
+        for (int i = 0; i < 6; ++i) {
+          const BlockId fb = floors[size_t((i % 3) + 3 * (j % 2)) % floors.size()];  // no two edge-neighbours match
+          for (int z = (ccz + j) * 16; z < (ccz + j + 1) * 16; ++z)
+            for (int x = (ccx + i) * 16; x < (ccx + i + 1) * 16; ++x) {
+              const BlockId top = cw.get(x, floorY, z);
+              const bool pad = (top == kWaferSilicon || reg.has(top, kCutsWire)) && cw.get(x, floorY - 3, z) == kWaferSilicon;
+              if (pad && busy(x, z)) continue;
+              if (!pad) for (int y = floorY + 1; y <= floorY + 24; ++y) cw.set(x, y, z, kAir);
+              for (int y = floorY - 3; y < floorY; ++y) cw.set(x, y, z, kWaferSilicon);
+              if (!reg.has(top, kCutsWire) || !pad) { cw.set(x, floorY, z, fb); cw.setState(x, floorY, z, 0); ++refloored; }
+            }
+        }
+      // Cross-chunk run: Switch -> 62 Red Trace -> Lamp along the south chunk row (clear of the pads), crossing 3+ chunk borders.
+      const int rz = ccz * 16 + 8, rx = (ccx + 1) * 16 + 4;
+      bool runOk = true;
+      for (int k = 0; k <= 63 && runOk; ++k) runOk = !busy(rx + k, rz);
+      if (runOk) runOk = cw.set(rx, floorY + 1, rz, kSwitch);
+      for (int k = 1; k <= 62 && runOk; ++k) runOk = cw.set(rx + k, floorY + 1, rz, kRedTrace);
+      if (runOk) runOk = cw.set(rx + 63, floorY + 1, rz, kLamp);
+      std::string names;
+      for (BlockId b : floors) { names += names.empty() ? "" : ", "; names += reg.def(b).name; }
+      logInfo("test world chunk grid: chunks x %d..%d z %d..%d (blocks x %d..%d z %d..%d), %d floor cells, floors: %s", ccx, ccx + 5, ccz,
+              ccz + 5, ccx * 16, (ccx + 6) * 16 - 1, ccz * 16, (ccz + 6) * 16 - 1, refloored, names.c_str());
+      logInfo("test world chunk grid: cross-chunk run %s: switch (%d,%d,%d) -> 62 red trace -> lamp (%d,%d,%d), crosses chunk borders at x %d, %d, %d, %d",
+              runOk ? "placed" : "SKIPPED", rx, floorY + 1, rz, rx + 63, floorY + 1, rz, (ccx + 2) * 16, (ccx + 3) * 16, (ccx + 4) * 16, (ccx + 5) * 16);
+    }    if (cfg_.testWorldExamples) {  // 2026-10-24 (JD): playtest builds only
       for (const TestWorldExample& e : buildTestWorldExamples(active_->chunks, tw, sx, sz, cfg_.worldChunks * 16))
         logInfo("test world examples: %-12s x %d..%d z %d..%d  %s %d blocks%s%s", e.label.c_str(), e.x0, e.x1, e.z0, e.z1,
                 e.placed ? "placed" : "SKIPPED", e.blocks, e.note.empty() ? "" : " | ", e.note.c_str());
