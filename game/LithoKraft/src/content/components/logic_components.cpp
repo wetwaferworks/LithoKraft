@@ -68,7 +68,10 @@ class cThresholdor final : public cCompBehavior {
     const int v = std::min(back, kMaxSignal), lo = in.left(f), hi = in.right(f);
     const bool pass = (lo > 0 && hi > 0) ? (v >= std::min(lo, hi) && v <= std::max(lo, hi)) : v >= std::max(lo, hi);
     const int out = (pass && v > 0) ? v : 0;
-    return {out, 0, makeState(out, f, keep, out > 0)};
+    // 2026-10-25 (JD, CloudAtlas readout top): in compare mode the state value carries the BACK
+    // input (what the 2-digit readout shows: e.g. the container level in read mode); the output
+    // is mem.out (emitToward) and "on" = out > 0, so the signal behaviour is unchanged.
+    return {out, 0, makeState(v, f, keep, out > 0)};
   }
   std::optional<CellState> use(CellState st, ComponentMemory&) const override {
     return CellState(makeState(stValue(st), stFacing(st), uint8_t(stAux(st) ^ kSubtract), stOn(st)));
@@ -77,8 +80,11 @@ class cThresholdor final : public cCompBehavior {
     return CellState(makeState(stValue(st), stFacing(st), uint8_t(stAux(st) ^ kRead), stOn(st)));
   }
   std::string describe(const BlockDef& d, CellState s) const override {
-    return std::format("{} | mode {}{} | out {} | facing {}", d.name, subtract(s) ? "subtract" : "compare",
-                       readMode(s) ? " + read behind" : "", stValue(s), facingName(stFacing(s)));
+    if (subtract(s))
+      return std::format("{} | mode subtract{} | out {} | facing {}", d.name, readMode(s) ? " + read behind" : "",
+                         stValue(s), facingName(stFacing(s)));
+    return std::format("{} | mode compare{} | in {} | {} | facing {}", d.name, readMode(s) ? " + read behind" : "",
+                       stValue(s), stOn(s) ? "passing" : "blocked", facingName(stFacing(s)));
   }
 };
 

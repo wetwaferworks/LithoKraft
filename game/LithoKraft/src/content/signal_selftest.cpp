@@ -173,12 +173,18 @@ int runSignalSelfTest() {
   // H) Thresholdor: back = input, left = LOW, right = HIGH; output = input strength.
   putF(10, y, 46, kThresholdor, E); put(9, y, 46, kRedTrace); put(10, y, 45, kRedTrace); put(10, y, 47, kRedTrace);
   put(11, y, 46, kRedTrace);
-  auto thr = [&](int in, int lo, int hi) { setW(9, y, 46, in); setW(10, y, 45, lo); setW(10, y, 47, hi); run(1); return val(10, y, 46); };
+  auto thr = [&](int in, int lo, int hi) { setW(9, y, 46, in); setW(10, y, 45, lo); setW(10, y, 47, hi); run(1); return val(11, y, 46); };  // output = front wire (compare-mode state value = back input, readout)
   check(thr(30, 0, 0) == 30, "thresholder: no reference -> passes the input");
   check(thr(30, 20, 0) == 30 && thr(10, 20, 0) == 0, "thresholder: LOW ref only = threshold (in >= ref)");
   check(thr(30, 0, 40) == 0 && thr(50, 0, 40) == 50, "thresholder: HIGH ref only = threshold too");
   check(thr(30, 20, 40) == 30 && thr(45, 20, 40) == 0 && thr(10, 20, 40) == 0, "thresholder: both refs = window comparator");
   check(thr(30, 40, 20) == 30, "thresholder: swapped refs are sorted (min/max)");
+  // 2026-10-25 (JD, CloudAtlas readout): compare mode shows the BACK input on the 2-digit readout
+  // (state value), passing or not; the output stays the comparison result.
+  check(thr(10, 20, 0) == 0 && val(10, y, 46) == 10 && !stOn(w.getState(10, y, 46)),
+        "thresholder readout: compare mode, blocked -> readout shows the back input (10), output 0");
+  check(thr(30, 20, 40) == 30 && val(10, y, 46) == 30 && stOn(w.getState(10, y, 46)),
+        "thresholder readout: compare mode, passing -> readout 30, output 30, lit");
   thr(33, 0, 0);
   check(val(11, y, 46) == 33, "thresholder output drives its front wire at the input strength");
   // H2) 2026-10-25 (JD): subtract mode, toggled by use (aux bit 0); out = max(0, back - max(sides)).
@@ -193,6 +199,7 @@ int runSignalSelfTest() {
     check(down, "thresholder subtract: countdown 50 -> 0 as the side steps 0, 10 .. 50");
   }
   check(thr(64, 0, 0) == 64 && val(11, y, 46) == 64, "thresholder subtract: 0..64 range, drives its front wire");
+  check(thr(40, 10, 0) == 30 && val(10, y, 46) == 30, "thresholder readout: subtract mode shows the forward output (40 - 10 = 30)");
   sim.use(w, 10, y, 46, none);
   check(stAux(w.getState(10, y, 46)) == 0 && thr(30, 20, 40) == 30 && thr(45, 20, 40) == 0, "thresholder: use again = compare mode, window unchanged");
   {

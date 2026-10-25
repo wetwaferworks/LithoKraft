@@ -227,6 +227,11 @@
   "thresholdor_top_subtract": "textures/blocks/thresholdor_top_subtract.png",
   "thresholdor_top_subtract_on": "textures/blocks/thresholdor_top_subtract_on.png",
   "thresholdor_top_on": "textures/blocks/thresholdor_top_on_v2.png",
+  "thresholdor_readout_mask": "textures/masks/thresholdor_readout_mask.png",
+  "thresholdor_top_readout": "textures/blocks/thresholdor_top_readout.png",
+  "thresholdor_top_readout_on": "textures/blocks/thresholdor_top_readout_on.png",
+  "thresholdor_top_readout_subtract": "textures/blocks/thresholdor_top_readout_subtract.png",
+  "thresholdor_top_readout_subtract_on": "textures/blocks/thresholdor_top_readout_subtract_on.png",
   "tone_block_back": "textures/blocks/tone_block_back.png",
   "tone_block_front": "textures/blocks/tone_block_front.png",
   "tone_block_side": "textures/blocks/tone_block_side.png",
@@ -984,10 +989,13 @@
     "left": "thresholdor_low",
     "right": "thresholdor_high",
     "side": "thresholdor_side",
-    "top": "thresholdor_top"
+    "top": "thresholdor_top_readout"
    },
    "active": {
-    "top": "thresholdor_top_on"
+    "top": "thresholdor_top_readout_on"
+   },
+   "masks": {
+    "readout": "thresholdor_readout_mask"
    }
   },
   "tone_block": {

@@ -259,7 +259,10 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
   const bool thrSub = r == SimRole::Thresholdor && (stAux(cell.state) & 1);
   const FaceMaterial* subTop = nullptr;
   if (thrSub) {
-    subTop = on ? cell.materials.named("thresholdor_top_subtract_on") : nullptr;
+    // 2026-10-25 (JD, CloudAtlas readout package): prefer the readout-window subtract tops.
+    subTop = on ? cell.materials.named("thresholdor_top_readout_subtract_on") : nullptr;
+    if (!subTop) subTop = cell.materials.named("thresholdor_top_readout_subtract");
+    if (!subTop && on) subTop = cell.materials.named("thresholdor_top_subtract_on");
     if (!subTop) subTop = cell.materials.named("thresholdor_top_subtract");
   }
   machineBox(cell, out, slo, shi, on, subTop);
@@ -314,9 +317,11 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
     };
     overlay("red", 0);
     overlay("blue", split ? ((stAux(cell.state) & 3) - f) & 3 : 0);
-  } else if (r == SimRole::Catchor) {
+  } else if (r == SimRole::Catchor || r == SimRole::Thresholdor) {
     // 2026-10-25 (JD 8:26): the readout mask is authored for the opposite quarter turn, so with
     // rotation f the digits read upside down from the input side; +2 turns them upright for every facing.
+    // 2026-10-25 (JD, CloudAtlas): the Thresholdor shares the Catchor mask format; its state value is
+    // the back input in compare mode (container level in read mode) and the output in subtract mode.
     if (const FaceMaterial* m = cell.materials.named(tex + "_readout_mask"))
       out.face(cell, 2, tlo, thi, *m, {kShadeReadout, uint8_t((stValue(cell.state) & 127) | (stOn(cell.state) ? 128 : 0))}, (f + 2) & 3);
   }

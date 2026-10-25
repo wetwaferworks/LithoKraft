@@ -1356,6 +1356,11 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
               face(kSwitch, FaceSlot::Bottom, false) == "switch_side" && face(kSiliconSlab, FaceSlot::Bottom, false) == "silicon_slab_top" &&
               face(kMemor, FaceSlot::Top, false) == "memor_top_empty" && face(kMemor, FaceSlot::Top, true) == "memor_top",
           "block models: front/back/left/right files, active top, side and slab fallbacks (as before the refactor)");
+    // 2026-10-25 (JD, CloudAtlas Thresholdor readout): readout tops + Catchor-format mask in pack_64.
+    check(ok && face(kThresholdor, FaceSlot::Top, false) == "thresholdor_top_readout" &&
+              face(kThresholdor, FaceSlot::Top, true) == "thresholdor_top_readout_on" && mats->named("thresholdor_readout_mask") &&
+              mats->named("thresholdor_top_readout_subtract") && mats->named("thresholdor_top_readout_subtract_on"),
+          "thresholdor readout: readout tops (compare / on / subtract / subtract on) and the readout mask load");
     const auto anim = tex.findAnimation("pulsor_top_firing");
     check(ok && anim && tex.animation(*anim).frameCount == 7 && tex.animation(*anim).timing.frameMs == 31 /* 2026-10-24: Pulsor v2 strip */ &&
               mats->face(kPulsor, FaceSlot::Top, true).animated() && !mats->face(kPulsor, FaceSlot::Top, false).animated(),
