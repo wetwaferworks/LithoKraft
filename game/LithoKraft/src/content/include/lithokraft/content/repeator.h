@@ -15,7 +15,7 @@
 namespace lithokraft::repeator {
 
 inline constexpr litholattice::CellState kNewEncoding = 0x2000;
-inline constexpr int kDelays[4] = {2, 4, 8, 16};
+inline constexpr int kDelays[4] = {4, 8, 16, 32};  // 2026-10-24 9:33 PM JD: was {2, 4, 8, 16}; same button index
 
 inline int legacyIndex(int legacyDelay) { return legacyDelay <= 3 ? 0 : legacyDelay <= 6 ? 1 : 2; }
 /// Delay index 0..3 of a Repeator state in either encoding.

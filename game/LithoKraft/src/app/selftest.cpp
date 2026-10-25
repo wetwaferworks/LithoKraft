@@ -1390,7 +1390,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   }
   {  // HUD readout comes from each block's behaviour class, through the registry
     const auto& cat = cBehaviorCatalog::get();
-    check(cat.describe(kRepeator, makeState(64, 1, 3, true)) == "Repeator | delay 4 ticks (button 2/4) | out 64 | facing E" &&
+    check(cat.describe(kRepeator, makeState(64, 1, 3, true)) == "Repeator | delay 8 ticks (button 2/4) | out 64 | facing E" &&
               cat.describe(kRedTrace, 40) == "Red Trace | strength 40" &&
               cat.describe(kColorLamp16, makeState(17, 0)) == "Color Lamp 16 | tier 16 (wrap) | strength 17 -> colour 0" &&
               cat.describe(kToneBlock, makeState(34, 2)).find("A4 (440.0 Hz)") != std::string::npos &&

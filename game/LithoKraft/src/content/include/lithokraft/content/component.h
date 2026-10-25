@@ -29,6 +29,7 @@ struct ComponentMemory {
   uint8_t prevIn = 0, prevSide = 0, prevClk = 0;  ///< edge detectors
   uint8_t history = 0;         ///< repeator delay line (bit i = input i ticks ago)
   uint8_t timer = 0;           ///< button press / pulsor animation countdown
+  uint16_t historyHi = 0;      ///< repeator delay line bits 16..31 (2026-10-24 JD: delays 4/8/16/32; SGNL v3)
   std::deque<std::pair<uint8_t, uint8_t>> keys;  ///< keyboard: queued (front, control) pulses
   uint8_t channel = 1;         ///< radio channel for the transmittor / receivor (1..64; 0 = the Daemon, reserved)
   bool jammer = false;         ///< cOverclockor: jammer item installed (v1: toggled by use; item UI later)

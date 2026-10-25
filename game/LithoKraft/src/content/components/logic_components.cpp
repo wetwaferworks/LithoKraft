@@ -8,17 +8,18 @@
 namespace lithokraft::components {
 namespace {
 
-/// Back in -> front out, one-way. Re-boosts any input to a full 64 after a 2 / 4 / 8 / 16 tick delay.
+/// Back in -> front out, one-way. Re-boosts any input to a full 64 after a 4 / 8 / 16 / 32 tick delay (2026-10-24 JD; was 2 / 4 / 8 / 16).
 /// Cortana 2026-10-15 2215 (JD D4): was 1..8; encoding + lazy legacy migration in content/repeator.h.
 class cRepeator final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), idx = repeator::delayIndex(st), delay = repeator::kDelays[idx];
-    // 16-bit delay line: history = low byte, timer = high byte (bit i = input i ticks ago).
-    uint16_t line = uint16_t(m.history | (uint16_t(m.timer) << 8));
-    line = uint16_t((line << 1) | (in.back(f) > 0 ? 1 : 0));
+    // 32-bit delay line: history = bits 0-7, timer = bits 8-15, historyHi = bits 16-31 (bit i = input i ticks ago).
+    uint32_t line = uint32_t(m.history) | (uint32_t(m.timer) << 8) | (uint32_t(m.historyHi) << 16);
+    line = (line << 1) | (in.back(f) > 0 ? 1u : 0u);
     m.history = uint8_t(line & 0xFF);
-    m.timer = uint8_t(line >> 8);
+    m.timer = uint8_t((line >> 8) & 0xFF);
+    m.historyHi = uint16_t(line >> 16);
     const int out = ((line >> (delay - 1)) & 1) ? kMaxSignal : 0;
     return {out, 0, repeator::encode(out, f, idx, out > 0)};
   }

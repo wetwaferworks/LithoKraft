@@ -32,6 +32,22 @@ std::optional<storage::Bytes> cWorldSave::migrateSignalV1ToV2(const storage::Byt
   return w.out;
 }
 
+std::optional<storage::Bytes> cWorldSave::migrateSignalV2ToV3(const storage::Bytes& v2) {
+  storage::ByteReader r(v2.data(), v2.size());
+  storage::ByteWriter w;
+  while (r.ok() && !r.done()) {
+    w.u64(r.u64());
+    for (int i = 0; i < 10; ++i) w.u8(r.u8());
+    w.u16(0);  // historyHi
+    const uint16_t n = r.u16();
+    w.u16(n);
+    for (uint16_t i = 0; i < n; ++i) { w.u8(r.u8()); w.u8(r.u8()); }
+    if (!r.ok()) return std::nullopt;
+  }
+  if (!r.ok()) return std::nullopt;
+  return w.out;
+}
+
 cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::cMaterialReg* materials)
     : root_(std::move(root)) {
   // Infinite Registry: the BLKS payload translates between the StableId voxel
@@ -42,6 +58,9 @@ cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::cMaterial
   sig.version = cSignalSim::kStateVersion;
   sig.migrate[1] = [](const storage::Bytes& v1) -> std::optional<storage::Bytes> {
     return migrateSignalV1ToV2(v1);
+  };
+  sig.migrate[2] = [](const storage::Bytes& v2) -> std::optional<storage::Bytes> {
+    return migrateSignalV2ToV3(v2);
   };
   sig.save = [this](const ChunkColumn& c) {
     std::lock_guard l(m_);

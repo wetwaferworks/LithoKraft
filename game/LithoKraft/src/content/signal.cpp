@@ -33,7 +33,7 @@ std::map<uint64_t, std::vector<uint8_t>> cSignalSim::exportState() const {
     const ComponentMemory& m = c->mem;
     w.u64(uint64_t(k));
     w.u8(m.out); w.u8(m.out2); w.u8(m.pulse ? 1 : 0); w.u8(m.prevIn); w.u8(m.prevSide); w.u8(m.prevClk);
-    w.u8(m.history); w.u8(m.timer); w.u8(m.channel); w.u8(m.beacon ? 1 : 0);
+    w.u8(m.history); w.u8(m.timer); w.u8(m.channel); w.u8(m.beacon ? 1 : 0); w.u16(m.historyHi);
     w.u16(uint16_t(std::min<size_t>(m.keys.size(), 65535)));
     for (size_t i = 0; i < m.keys.size() && i < 65535; ++i) { w.u8(m.keys[i].first); w.u8(m.keys[i].second); }
   }
@@ -56,7 +56,7 @@ bool cSignalSim::importState(const std::vector<uint8_t>& b) {
     // (never zero) so an imported output can never index a bucket out of bounds.
     m.out = uint8_t(std::min<int>(r.u8(), kMaxSignal)); m.out2 = uint8_t(std::min<int>(r.u8(), kMaxSignal));
     m.pulse = r.u8() != 0; m.prevIn = r.u8(); m.prevSide = r.u8(); m.prevClk = r.u8();
-    m.history = r.u8(); m.timer = r.u8(); m.channel = r.u8(); m.beacon = r.u8() != 0;
+    m.history = r.u8(); m.timer = r.u8(); m.channel = r.u8(); m.beacon = r.u8() != 0; m.historyHi = r.u16();
     const uint16_t n = r.u16();
     for (uint16_t i = 0; i < n && r.ok(); ++i) { const uint8_t f = r.u8(); m.keys.emplace_back(f, r.u8()); }
     entries.push_back(std::move(e));
@@ -318,8 +318,8 @@ std::string cSignalSim::inspect(const ChunkMap& w, int x, int y, int z) const {
   }
   if (const auto it = comps_.find(k); it != comps_.end()) {
     const ComponentMemory& m = it->second.mem;
-    r += std::format(" | out {}{} out2 {} | edges in {} side {} clk {} | hist 0x{:02x} timer {}", m.out, m.pulse ? " (pulse)" : "", m.out2,
-                     m.prevIn, m.prevSide, m.prevClk, m.history, m.timer);
+    r += std::format(" | out {}{} out2 {} | edges in {} side {} clk {} | hist 0x{:02x} timer {} histHi 0x{:04x}", m.out, m.pulse ? " (pulse)" : "", m.out2,
+                     m.prevIn, m.prevSide, m.prevClk, m.history, m.timer, m.historyHi);
   }
   return r;
 }

@@ -200,6 +200,9 @@ class cWorldSave {
 
   /// v1 -> v2 signal state migration (adds channel=1, beacon=0). Exposed for tests.
   static std::optional<storage::Bytes> migrateSignalV1ToV2(const storage::Bytes& v1);
+  /// v2 -> v3 (2026-10-24): appends u16 historyHi = 0 after beacon. Delay index (cell state) is kept,
+  /// so an old save keeps its button; the button now means 4 / 8 / 16 / 32 ticks.
+  static std::optional<storage::Bytes> migrateSignalV2ToV3(const storage::Bytes& v2);
   /// Every queued write on disk; returns false when any store's flush failed
   /// (SV-H1 — the failed regions keep their pending records for a retry).
   bool flush();

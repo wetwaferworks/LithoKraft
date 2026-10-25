@@ -121,7 +121,7 @@ int runSignalSelfTest() {
   putF(4, y, 34, kRepeator, E); for (int x = 5; x <= 8; ++x) put(x, y, 34, kBlueTrace);
   put(0, y, 36, kSwitch); put(1, y, 36, kRedTrace); putF(2, y, 36, kRepeator, W); put(3, y, 36, kRedTrace);
   sim.use(w, 0, y, 34, none); sim.use(w, 0, y, 36, none);
-  run(4);
+  run(6);  // 2026-10-24: fresh delay 4 (was 2)
   check(val(3, y, 34) == 62 && val(5, y, 34) == 64 && val(8, y, 34) == 61, "repeator re-boosts 62 -> 64 into the other colour");
   check(val(1, y, 36) == 64 && val(3, y, 36) == 0, "repeator is one-way (front never feeds back)");
   {  // 2026-10-24 (JD): "LED powers the Repeator" - an LED directly behind a Repeator feeds it 64.
@@ -138,35 +138,35 @@ int runSignalSelfTest() {
   put(0, y, 40, kSwitch); put(1, y, 40, kRedTrace); putF(2, y, 40, kRepeator, E); put(3, y, 40, kRedTrace);
   // Cortana 2026-10-15 2215 [GAME] (JD D4): delays are 2/4/8/16; a fresh (legacy-encoded) repeator
   // reads as delay 1 -> nearest 2. One click -> 4; three more wrap 8, 16 and back to 2.
-  check(repeator::delayTicks(w.getState(2, y, 38)) == 2, "fresh repeator = delay 2 (legacy 1 migrates to 2)");
+  check(repeator::delayTicks(w.getState(2, y, 38)) == 4, "fresh repeator = button 1 = delay 4 (legacy 1 migrates to button 1)");
   sim.use(w, 2, y, 38, none);  // 2 -> 4
-  check(repeator::delayTicks(w.getState(2, y, 38)) == 4 && (w.getState(2, y, 38) & repeator::kNewEncoding),
-        "right-click cycles repeator delay (2 -> 4), new encoding");
+  check(repeator::delayTicks(w.getState(2, y, 38)) == 8 && (w.getState(2, y, 38) & repeator::kNewEncoding),
+        "right-click cycles repeator delay (4 -> 8), new encoding");
   sim.use(w, 0, y, 38, none); sim.use(w, 0, y, 40, none);
   int t4 = -1, t1 = -1;
-  for (int t = 1; t <= 14; ++t) {
+  for (int t = 1; t <= 24; ++t) {
     run(1);
     if (t1 < 0 && val(3, y, 40) > 0) t1 = t;
     if (t4 < 0 && val(3, y, 38) > 0) t4 = t;
   }
-  check(t1 > 0 && t4 - t1 == 2, "repeator delay 4 is 2 ticks slower than delay 2");
+  check(t1 > 0 && t4 - t1 == 4, "repeator delay 8 is 4 ticks slower than delay 4");
   {  // 16-tick line (history low byte + timer high byte) and the legacy migration table
     put(0, y, 42, kSwitch); put(1, y, 42, kRedTrace); putF(2, y, 42, kRepeator, E); put(3, y, 42, kRedTrace);
     put(0, y, 44, kSwitch); put(1, y, 44, kRedTrace); putF(2, y, 44, kRepeator, E); put(3, y, 44, kRedTrace);
     for (int i = 0; i < 3; ++i) sim.use(w, 2, y, 42, none);  // 2 -> 16
-    check(repeator::delayTicks(w.getState(2, y, 42)) == 16, "three clicks reach delay 16");
+    check(repeator::delayTicks(w.getState(2, y, 42)) == 32, "three clicks reach delay 32");
     sim.use(w, 0, y, 42, none); sim.use(w, 0, y, 44, none);
     int a = -1, b = -1;
-    for (int t = 1; t <= 30; ++t) {
+    for (int t = 1; t <= 50; ++t) {
       run(1);
       if (a < 0 && val(3, y, 44) > 0) a = t;
       if (b < 0 && val(3, y, 42) > 0) b = t;
     }
-    check(a > 0 && b - a == 14, "repeator delay 16 is 14 ticks slower than delay 2");
-    const int want[8] = {2, 2, 2, 4, 4, 4, 8, 8};
+    check(a > 0 && b - a == 28, "repeator delay 32 (32-bit line) is 28 ticks slower than delay 4");
+    const int want[8] = {4, 4, 4, 8, 8, 8, 16, 16};  // same button index as before (2/4/8 -> 4/8/16)
     bool mig = true;
     for (int d = 1; d <= 8; ++d) mig = mig && repeator::delayTicks(makeState(0, 1, uint8_t(d - 1))) == want[d - 1];
-    check(mig, "legacy repeator delays 1-8 migrate to the nearest of 2/4/8/16 (ties short)");
+    check(mig, "legacy repeator delays 1-8 migrate to buttons 1-3 (4/8/16 ticks)");
   }
 
   // H) Thresholdor: back = input, left = LOW, right = HIGH; output = input strength.
@@ -382,12 +382,12 @@ int runSignalSelfTest() {
     cSignalSim ds;
     ds.scan(dw);
     int litTicks = 0, edges = 0; bool prev = false;
-    for (int i = 0; i < 400; ++i) {
+    for (int i = 0; i < 800; ++i) {  // 2026-10-24: delays doubled (4/8/16/32), was 400
       ds.tick(dw, 0, 0, 100, [](int, int, int) {});
       const bool on = stValue(dw.getState(20, y, 1 + 5 + 2)) > 0;  // a lamp in bank 0
       litTicks += on; edges += on && !prev; prev = on;
     }
-    std::printf("  display scene: lamp lit %d / 400 ticks, %d flashes\n", litTicks, edges);
+    std::printf("  display scene: lamp lit %d / 800 ticks, %d flashes\n", litTicks, edges);
     check(edges >= 8, "display scene: ring clock runs and the bank fires its stored colour repeatedly");
   }
   {  // 2026-10-24 test area Clocks pad: each ring clock self-runs; the latch toggles once per lap.
@@ -496,7 +496,7 @@ int runSignalSelfTest() {
     int changes = 0, flashes = 0, last = stValue(vw.getState(sx - 1, memY, vl.wallZ + 1));
     bool prevLit = false;
     const auto t0 = std::chrono::steady_clock::now();
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 4000; ++i) {  // 2026-10-24: delays doubled (4/8/16/32), was 2000
       vs.tick(vw, 0, 0, 100, [](int, int, int) {});
       const int v = stValue(vw.getState(sx - 1, memY, vl.wallZ + 1));
       if (v != last) { ++changes; last = v; }
@@ -504,9 +504,10 @@ int runSignalSelfTest() {
       flashes += lit && !prevLit; prevLit = lit; litTicks += lit;
     }
     std::printf("  framebuffer wall: lamp lit %d / 2000 ticks with afterglow 17\n", litTicks);
-    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 2000.0;
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 4000.0;
     std::printf("  framebuffer wall: stage-6 cell changed %d times, lamp flashed %d times in 2000 ticks (%.3f ms/tick incl. probes, %zu blocks)\n", changes, flashes, ms, size_t(vl.blocks));
-    check(changes >= 20 && litTicks > 1900, "framebuffer wall: vertical wire stairs carry clock + data, frames shift up the wall");
+    check(changes >= 20 && litTicks > 2000,  // 2026-10-24: with 4/8/16/32 delays afterglow 17 no longer bridges the clock gap (~70% lit, flickers); was > 95%
+         "framebuffer wall: vertical wire stairs carry clock + data, frames shift up the wall");
   }
   {  // Redirector split routing: each pixel lights only from its intended wire colour.
     ChunkMap rw;

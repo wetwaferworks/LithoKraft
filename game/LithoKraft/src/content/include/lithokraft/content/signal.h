@@ -255,7 +255,7 @@ class cSignalSim {
   /// key pulses) of every component, grouped by chunk column key (ChunkKey::make), in a versioned
   /// byte layout (kStateVersion). Everything else the sim needs is in the blocks and cell states,
   /// so scan() + importState() after a load restores the sim exactly.
-  static constexpr uint16_t kStateVersion = 2;
+  static constexpr uint16_t kStateVersion = 3;  // v3 (2026-10-24): + u16 historyHi after beacon
   std::map<uint64_t, std::vector<uint8_t>> exportState() const;
   bool importState(const std::vector<uint8_t>& bytes);  ///< false on a malformed blob (nothing applied)
 
