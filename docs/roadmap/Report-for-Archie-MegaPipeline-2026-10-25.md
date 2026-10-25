@@ -1,6 +1,6 @@
 # Report for Archie: Mega-Pipeline Phases 2 and 3 (2026-10-25, ~6:05 AM ET)
 
-Direction and final verify JD. Design Archie (mega-draw and Mega-Pipeline briefs). Implementation Cortana.
+Direction and final verify JD. LithoPipeline (halves LithoVoxel and LithoTexture; formerly "mega-draw" / "Mega-Pipeline") designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
 
 Commits (local, main, not pushed):
 - `03af049` Phase 2, vertex pulling, `LL_VK_PULL=1` (default off). Rollback: `git reset --hard b706863`
@@ -83,4 +83,4 @@ Fresh borderless baseline (1920x1080, JD's request; FPS / p99.9 / max ms):
 3. Given the shading-bound result, should the next effort go to fragment cost (overdraw, depth prepass, LOD) rather than to further draw or vertex work? This overlaps Elfie's streaming/culling research for Phase 4.
 4. Blocks >= 64 fall back to Packed12. Should we raise the binding to 1024 (descriptor indexing) or use buffer device address?
 
-Direction and final verify JD. Design Archie (mega-draw and Mega-Pipeline briefs). Implementation Cortana.
+Direction and final verify JD. LithoPipeline (halves LithoVoxel and LithoTexture; formerly "mega-draw" / "Mega-Pipeline") designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.

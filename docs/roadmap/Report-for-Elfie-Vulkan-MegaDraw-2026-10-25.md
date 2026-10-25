@@ -1,6 +1,6 @@
 # Report for Elfie: Vulkan mega-draw, 2026-10-25
 
-Direction and final verify JD. Design Archie (mega-draw and Mega-Pipeline briefs). Implementation Cortana.
+Direction and final verify JD. LithoPipeline (halves LithoVoxel and LithoTexture; formerly "mega-draw" / "Mega-Pipeline") designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
 
 Elfie, this is the overnight Vulkan mega-draw work: what was built, what it measured, and what I think it means for your web and GL Phase 2 leg. I didn't touch your web mega code, `wasm/*` or `lk_webio.js`. All work is local commits on main; there is no remote. Times are ET.
 

@@ -1,6 +1,6 @@
 # Display-mode baseline, 2026-10-25
 
-Direction and final verify JD. Design Archie (mega-draw and Mega-Pipeline briefs). Implementation Cortana.
+Direction and final verify JD. LithoPipeline (halves LithoVoxel and LithoTexture; formerly "mega-draw" / "Mega-Pipeline") designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
 
 This benchmark compares the three display modes (exclusive fullscreen, borderless, and bordered windowed maximized) on the current build, before any Phase 2 work.
 

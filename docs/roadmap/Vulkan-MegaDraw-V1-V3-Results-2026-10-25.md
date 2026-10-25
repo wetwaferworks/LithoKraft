@@ -1,6 +1,6 @@
 # Vulkan mega-draw V1-V3: results (2026-10-25, ~3:10 AM ET)
 
-For Archie and Elfie. Direction and final verify JD. Design Archie (mega-draw briefs). Implementation Cortana.
+For Archie and Elfie. Direction and final verify JD. LithoPipeline (halves LithoVoxel and LithoTexture; formerly "mega-draw" / "Mega-Pipeline") designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
 
 ## What landed (local, main)
 - `0046ff2` V1: `vkCmdDrawIndexedIndirect` loader entry, `multiDrawIndirect` + `drawIndirectFirstInstance` enabled when offered, `LL_VK_MEGA` flag (0 default).
