@@ -507,6 +507,14 @@ void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out)
     static constexpr int lo[3] = {0, 0, 0}, hi[3] = {16, 3, 16};
     machineBox(cell, out, lo, hi, stOn(cell.state), cell.materials.named(kTops[repeator::delayIndex(cell.state) & 3]),
                foliage::kRepeatorTopTurns);  // 2026-10-24: art's arrow points +v
+    // 2026-10-24 9:30 PM (JD clock clip): four 1/16 raised delay buttons over the art's pips (local
+    // x is mirrored by the 2 top turns); the first delayIndex+1 are pressed (flush, sunk art shows).
+    const int di = repeator::delayIndex(cell.state) & 3;
+    for (int i = 0; i < 4; ++i) {
+      if (i <= di) continue;
+      const int bl[3] = {12 - 3 * i, 3, 7}, bh[3] = {14 - 3 * i, 4, 9};
+      machineBox(cell, out, bl, bh, stOn(cell.state), cell.materials.named(kTops[di]), foliage::kRepeatorTopTurns);
+    }
     return;
   }
   // 2026-10-16 WaferBeta: Lithographor cuboids (CloudAtlas lithographor.cuboids.json, hand-ported:
