@@ -48,6 +48,41 @@ std::optional<storage::Bytes> cWorldSave::migrateSignalV2ToV3(const storage::Byt
   return w.out;
 }
 
+storage::PayloadType cWorldSave::postTextPayload() {
+  storage::PayloadType t;
+  t.tag = kPostTextTag;
+  t.version = 1;
+  t.omitEmpty = true;
+  t.save = [](const ChunkColumn& c) {
+    storage::ByteWriter w;
+    if (c.cellText.empty()) return w.out;
+    w.u16(uint16_t(std::min<size_t>(c.cellText.size(), 0xffff)));
+    size_t n = 0;
+    for (const auto& [k, s] : c.cellText) {
+      if (n++ == 0xffff) break;
+      const size_t len = std::min<size_t>(s.size(), 0xffff);
+      w.u32(k); w.u16(uint16_t(len));
+      for (size_t i = 0; i < len; ++i) w.u8(uint8_t(s[i]));
+    }
+    return w.out;
+  };
+  t.load = [](const storage::Bytes& b, ChunkColumn& c) {
+    if (b.empty()) return true;
+    storage::ByteReader r(b.data(), b.size());
+    const uint16_t n = r.u16();
+    for (uint16_t i = 0; i < n && r.ok(); ++i) {
+      const uint32_t k = r.u32();
+      const uint16_t len = r.u16();
+      std::string s;
+      s.reserve(len);
+      for (uint16_t j = 0; j < len && r.ok(); ++j) s.push_back(char(r.u8()));
+      if (r.ok() && !s.empty()) c.cellText[k] = std::move(s);
+    }
+    return r.ok();
+  };
+  return t;
+}
+
 cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::cMaterialReg* materials)
     : root_(std::move(root)) {
   // Infinite Registry: the BLKS payload translates between the StableId voxel
@@ -78,6 +113,10 @@ cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::cMaterial
     return true;
   };
   payloads_.add(std::move(sig));
+  // 2026-10-25 (JD, Posts): "PTXT" per-cell text. v1 = u16 count, then per cell u32 key
+  // (ChunkColumn::cellTextKey), u16 length, bytes. omitEmpty: columns without text encode exactly as
+  // before, and a build that predates Posts skips the unknown tag (the text is simply not shown).
+  payloads_.add(postTextPayload());
   // PBR chunk materials (phase 2): the engine's MATS payload persists the per-voxel material
   // bytes as string IDs (see render/material_payload.h). The registry must outlive the stores.
   if (materials) payloads_.add(litholattice::makeMaterialPayload(*materials));
@@ -367,6 +406,7 @@ size_t cWorldSave::saveDimension(const std::string& dim, const ChunkMap& world, 
     for (size_t s = 0; s < col.subs.size(); ++s)
       if (col.subs[s] && col.subs[s]->nonAir) c->subs[s] = std::make_unique<SubChunk>(*col.subs[s]);
     c->materialPalette = col.materialPalette;  // PBR chunk materials ride along (interned handle: shared, not copied)
+    c->cellText = col.cellText;  // 2026-10-25 Posts: panel text (PTXT payload)
     copies.push_back(std::move(c));
   };
   if (dirty) {
@@ -450,6 +490,7 @@ size_t cWorldSave::saveColumns(const std::string& dim, const std::vector<const C
     for (size_t s = 0; s < col->subs.size(); ++s)
       if (col->subs[s] && col->subs[s]->nonAir) c->subs[s] = std::make_unique<SubChunk>(*col->subs[s]);
     c->materialPalette = col->materialPalette;  // interned handle: shared, not copied
+    c->cellText = col->cellText;  // 2026-10-25 Posts: panel text (PTXT payload)
     copies.push_back(std::move(c));
   }
   const size_t n = copies.size();

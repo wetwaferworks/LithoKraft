@@ -26,6 +26,7 @@
 namespace lithokraft {
 
 constexpr uint32_t kSignalTag = storage::fourcc("SGNL");
+constexpr uint32_t kPostTextTag = storage::fourcc("PTXT");  ///< 2026-10-25 Posts: per-cell panel text
 
 struct PlayerMeta {
   // v2 adds the stat block; v3 adds the vitals block (health/oxygen/stamina
@@ -203,6 +204,8 @@ class cWorldSave {
   /// v2 -> v3 (2026-10-24): appends u16 historyHi = 0 after beacon. Delay index (cell state) is kept,
   /// so an old save keeps its button; the button now means 4 / 8 / 16 / 32 ticks.
   static std::optional<storage::Bytes> migrateSignalV2ToV3(const storage::Bytes& v2);
+  /// 2026-10-25 (JD, Posts): the "PTXT" payload codec (public for the selftests).
+  static storage::PayloadType postTextPayload();
   /// Every queued write on disk; returns false when any store's flush failed
   /// (SV-H1 — the failed regions keep their pending records for a retry).
   bool flush();

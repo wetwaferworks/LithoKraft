@@ -388,6 +388,7 @@ class Game {
   std::string targetText() const;
   void beginTyping(int x, int y, int z);
   void endTyping();
+  void beginPostEdit(int x, int y, int z);  ///< 2026-10-25 Posts: typing goes to the post's text
   void handleTyping();
 
   enum class MenuState { cMenu, Playing };
@@ -613,6 +614,7 @@ class Game {
   bool typing_ = false;        // keyboard block typing capture
   int typeX_ = 0, typeY_ = 0, typeZ_ = 0;
   std::string typed_;
+  bool postTyping_ = false;    // 2026-10-25 Posts: the typing capture edits a post (not a Keyboard)
   double lastJumpTap_ = -1.0;  // double-tap Jump detection
   float fps_ = 0, frameAvgMs_ = 0, frameMaxMs_ = 0;
   float p99Ms_ = 0, updateMs_ = 0, gpuMs_ = -1.f;  ///< F56-4 perf readout

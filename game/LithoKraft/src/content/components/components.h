@@ -14,6 +14,7 @@ void registerLogic(const Registrar& add);    // repeator, thresholder, redirecto
 void registerInputs(const Registrar& add);   // switch, button, keyboard
 void registerSound(const Registrar& add);    // tone block
 void registerCertificateTable(const Registrar& add);  // certificate table (describe-only seam; signing mechanic game-side, B7)
+void registerPosts(const Registrar& add);             // 2026-10-25 Posts (standing / wall readouts)
 void registerEtchor(const Registrar& add);            // Etchor (describe-only seam; etch flow game-side, B6)
 
 }  // namespace lithokraft::components

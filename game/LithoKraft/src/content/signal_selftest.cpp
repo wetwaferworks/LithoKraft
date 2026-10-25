@@ -7,6 +7,7 @@
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/content/circuit_scene.h"
 #include "lithokraft/content/signal_world.h"
+#include "lithokraft/content/post.h"  // 2026-10-25 Posts
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215
 
 namespace lithokraft {
@@ -1305,6 +1306,81 @@ int runSignalSelfTest() {
       check(every32 && offs.size() % 2 == 0 && offs[1] - offs[0] == 1,
             "ROADMAP-7 comparator clock: timer buffer (loop, step 2, reload 15) + read thresholdor = 1 Hz at 32 TPS, endless");
     }
+  }
+  {  // POSTS (2026-10-25, JD; art by Cloud): Standing / Wall Posts -- placement, facings, pair, text.
+    ChunkMap pw;
+    pw.setRegistry(&blockRegistry());
+    { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; pw.insert(std::move(col)); }
+    cSignalWorldSim sim;
+    const int py = 20;
+    for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) pw.set(x, py - 1, z, kWaferSilicon);
+    const auto& reg = blockRegistry();
+    check(reg.idOf(kVirtualPost) == "lithokraft:virtual_post" && reg.idOf(kOrganicPost) == "lithokraft:organic_post" &&
+              reg.idOf(kVirtualWallPost) == "lithokraft:virtual_wall_post" && reg.idOf(kOrganicWallPost) == "lithokraft:organic_wall_post" &&
+              kVirtualPost == BlockId(kTimerBuffer + 1) && kOrganicWallPost == BlockId(kTimerBuffer + 4),
+          "POSTS: 4 namespaced ids appended at the END after the Timer Buffer");
+    check(reg.has(kVirtualPost, kFacing8) && !reg.has(kVirtualPost, kDirectional) && reg.has(kVirtualWallPost, kDirectional) &&
+              !reg.has(kVirtualWallPost, kFacing8) && reg.has(kOrganicPost, kInteractive) && reg.has(kOrganicWallPost, kInteractive) &&
+              !reg.has(kVirtualPost, kOpaque) && reg.def(kVirtualPost).shape == Shape::Custom &&
+              cBehaviorCatalog::get().byName("post") && cBehaviorCatalog::get().byName("wall_post"),
+          "POSTS: standing = 8 facings, wall = 4 facings, both use-able custom see-through blocks with behaviours");
+    // Facings: yaw snapped to the nearest 45 degrees; the octant round-trips through the cell state.
+    bool snap = true;
+    constexpr float kPi = 3.14159265f;
+    for (int o = 0; o < 8; ++o)
+      for (float d : {-20.f, 0.f, 20.f}) {
+        const float a = (float(o) * 45.f + d) * kPi / 180.f;
+        snap = snap && facing8FromLook(std::sin(a), -std::cos(a)) == o;
+      }
+    bool trip = true;
+    for (int o = 0; o < 8; ++o) {
+      const CellState st = withFacing8(CellState(post::kUpperBit | 0x1000), o);
+      trip = trip && stFacing8(st) == o && stFacing(st) == (o >> 1) && post::isUpper(st) && stOn(st);
+    }
+    check(snap && trip, "POSTS: 8 facings -- yaw snaps to the nearest 45 degrees; octant round-trips (other bits kept)");
+    // Placement: needs the cell above; places the panel half above with the same facing.
+    pw.set(3, py + 1, 3, kGlass);
+    const bool blocked = !sim.canPlace(pw, 3, py, 3, kVirtualPost), free = sim.canPlace(pw, 5, py, 5, kVirtualPost);
+    pw.set(5, py, 5, kVirtualPost); pw.setState(5, py, 5, withFacing8(0, 3));
+    sim.onBlockChanged(pw, 5, py, 5, kVirtualPost);
+    const CellState lo = pw.getState(5, py, 5), hi = pw.getState(5, py + 1, 5);
+    check(blocked && free && pw.get(5, py + 1, 5) == kVirtualPost && !post::isUpper(lo) && post::isUpper(hi) &&
+              stFacing8(lo) == 3 && stFacing8(hi) == 3,
+          "POSTS: a Standing Post needs room above and places stand + panel as a pair, same facing (SE)");
+    // Text: either half edits the panel's text; printable ASCII only; capped at 256.
+    auto edit = [&](int x, int y, int z, int ch, int ctl) { sim.command(pw, SimCommand{kCmdPostEdit, x, y, z, ch, ctl}, [](int, int, int) {}); };
+    for (char c : std::string("HELLO")) edit(5, py, 5, c, post::kTypeChar);
+    edit(5, py + 1, 5, 0, post::kNewline);
+    edit(5, py + 1, 5, 'w', post::kTypeChar);
+    edit(5, py, 5, 7, post::kTypeChar);  // control char: ignored
+    const std::string* txt = pw.cellText(5, py + 1, 5);
+    check(txt && *txt == "HELLO\nw" && !pw.cellText(5, py, 5), "POSTS: use on either half writes the panel cell's text (Enter = new line)");
+    edit(5, py, 5, 0, post::kBackspace);
+    for (int i = 0; i < 300; ++i) edit(5, py, 5, 'a' + i % 26, post::kTypeChar);
+    txt = pw.cellText(5, py + 1, 5);
+    check(txt && txt->size() == post::kMaxChars && txt->compare(0, 6, "HELLO\n") == 0, "POSTS: text is capped at 256 characters");
+    const auto lines = post::layout(*txt, 16);
+    const auto diag = post::layout(*txt, post::columnsFor(kVirtualPost, hi));
+    check(lines.size() == 16 && lines[0] == "HELLO" && lines[1].size() == 16 && post::columnsFor(kVirtualPost, withFacing8(0, 2)) == 16 &&
+              post::columnsFor(kVirtualPost, hi) == 10 && diag.size() == 16 && diag[1].size() == 10,
+          "POSTS: panel layout wraps 16 columns straight on (16 x 16 = 256 cells), 10 on a diagonal, 16 rows");
+    // Pair break: breaking either half removes the other, and the text goes with it.
+    pw.set(5, py + 1, 5, kAir); sim.onBlockChanged(pw, 5, py + 1, 5, kAir);
+    const bool upperBreak = pw.get(5, py, 5) == kAir && !pw.cellText(5, py + 1, 5);
+    pw.set(7, py, 7, kOrganicPost); pw.setState(7, py, 7, withFacing8(0, 6)); sim.onBlockChanged(pw, 7, py, 7, kOrganicPost);
+    pw.set(7, py + 2, 7, kOrganicPost); pw.setState(7, py + 2, 7, withFacing8(0, 1)); sim.onBlockChanged(pw, 7, py + 2, 7, kOrganicPost);
+    pw.set(7, py, 7, kAir); sim.onBlockChanged(pw, 7, py, 7, kAir);
+    check(upperBreak && pw.get(7, py + 1, 7) == kAir && pw.get(7, py + 2, 7) == kOrganicPost && pw.get(7, py + 3, 7) == kOrganicPost,
+          "POSTS: breaking either half breaks the pair (text removed); a stacked post above is untouched");
+    // Wall Post: needs a solid side block; turns to face it.
+    const bool noWall = !sim.canPlace(pw, 12, py, 12, kVirtualWallPost);
+    pw.set(13, py, 12, kGlass);
+    const bool wall = sim.canPlace(pw, 12, py, 12, kVirtualWallPost);
+    pw.set(12, py, 12, kVirtualWallPost); pw.setState(12, py, 12, makeState(0, 0)); sim.onBlockChanged(pw, 12, py, 12, kVirtualWallPost);
+    edit(12, py, 12, 'X', post::kTypeChar);
+    check(noWall && wall && stFacing(pw.getState(12, py, 12)) == 1 && pw.get(12, py + 1, 12) == kAir &&
+              pw.cellText(12, py, 12) && *pw.cellText(12, py, 12) == "X",
+          "POSTS: a Wall Post needs a solid block beside it, faces it (E), is one cell, and holds its own text");
   }
   return fails;
 }

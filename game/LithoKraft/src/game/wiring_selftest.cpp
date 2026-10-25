@@ -24,6 +24,7 @@
 #include "lithokraft/game/inventory.h"
 #include "lithokraft/game/signing.h"
 #include "lithokraft/game/world_save.h"
+#include "lithokraft/content/post.h"  // 2026-10-25 Posts
 #include "litholattice/procgen/shrubs.h"
 #include "litholattice/storage/storage.h"
 
@@ -517,6 +518,70 @@ int runWiringSelfTest() {
     check(stValue(bs) == kLithoBufferMax && stFacing(bs) == 2 && stAux(bs) == 3 && stOn(bs) &&
               stValue(lithoBufferWithCount(bs, -4)) == 0,
           "litho: back-buffer wafer count clamps 0..64 and keeps facing/aux/on");
+  }
+
+  // ---- POSTS (2026-10-25, JD): panel text in saves (PTXT payload) + save compatibility ----
+  {
+    namespace fs = std::filesystem;
+    ChunkMap w;
+    w.setRegistry(&blockRegistry());
+    { auto col = std::make_unique<ChunkColumn>(); col->cx = 2; col->cz = 3; w.insert(std::move(col)); }
+    const int x = 2 * 16 + 4, y = 40, z = 3 * 16 + 9;
+    w.set(x, y, z, kVirtualPost); w.setState(x, y, z, withFacing8(0, 5));
+    w.set(x, y + 1, z, kVirtualPost); w.setState(x, y + 1, z, withFacing8(post::kUpperBit, 5));
+    std::string text = "Line one\n";
+    for (int i = 0; i < 400; ++i) post::applyEdit(text, 'A' + i % 26, post::kTypeChar);
+    w.setCellText(x, y + 1, z, text);
+    // Codec: v1 round-trip, and an untouched column records no PTXT at all.
+    storage::cPayloadReg with, without;
+    with.setRegistry(&blockRegistry()); without.setRegistry(&blockRegistry());
+    with.add(cWorldSave::postTextPayload());
+    const ChunkColumn* src = w.column(2, 3);
+    const storage::Bytes rec = with.encode(*src);
+    std::string err;
+    auto back = with.decode(rec, &err);
+    const auto it = back ? back->cellText.find(ChunkColumn::cellTextKey(x, y + 1, z)) : decltype(back->cellText)::iterator{};
+    check(back && back->cellText.size() == 1 && it != back->cellText.end() && it->second == text && text.size() == post::kMaxChars,
+          "POSTS save: PTXT v1 round-trips the panel text (256 chars, new line kept)");
+    ChunkColumn plain; plain.cx = 1; plain.cz = 1;
+    check(with.encode(plain) == without.encode(plain),
+          "POSTS save compat: a column without text encodes byte-identical to a pre-Posts build (PTXT omitted)");
+    auto old = without.decode(rec, &err);
+    storage::StableRemap ident;  // the save's name table == the live registry (no LLBN file here)
+    for (size_t i = 0; i < blockRegistry().size(); ++i) ident.map.push_back(blockRegistry().stableIdOf(BlockId(i)));
+    bool oldOk = old && old->cellText.empty() && storage::remapColumn(*old, ident, &err);
+    if (oldOk) {
+      ChunkMap om;
+      om.setRegistry(&blockRegistry());
+      om.insert(std::move(old));
+        oldOk = om.get(x, y, z) == kVirtualPost && om.get(x, y + 1, z) == kVirtualPost && !om.cellText(x, y + 1, z);
+    }
+    check(oldOk,
+          "POSTS save compat: a build without PTXT skips the unknown payload and still loads the blocks");
+    // Full store path: saveColumns -> loadColumn keeps blocks, facing and text.
+    const fs::path dir = fs::temp_directory_path() / ("lithokraft_posts_selftest_" + std::to_string(std::time(nullptr)));
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    {
+      cWorldSave save(dir);
+      cSignalSim sig;
+      check(save.saveColumns("wafer", {src}, sig, true) == 1 && save.lastSaveOk(), "POSTS save: the post column saves");
+    }
+    {
+      cWorldSave load(dir);
+      auto lc = load.loadColumn("wafer", 2, 3);
+      bool ok = lc.status == cWorldSave::ColumnLoad::Loaded && lc.column;
+      if (ok) {
+        ChunkMap r;
+        r.setRegistry(&blockRegistry());
+        r.insert(std::move(lc.column));
+        const std::string* t = r.cellText(x, y + 1, z);
+        ok = r.get(x, y, z) == kVirtualPost && r.get(x, y + 1, z) == kVirtualPost && stFacing8(r.getState(x, y + 1, z)) == 5 &&
+             post::isUpper(r.getState(x, y + 1, z)) && t && *t == text && !r.cellText(x, y, z);
+      }
+      check(ok, "POSTS save: save -> load keeps the pair, its 8-way facing and the panel text");
+    }
+    fs::remove_all(dir);
   }
 
   return g_fails;

@@ -1,4 +1,5 @@
 #include "lithokraft/content/signal_world.h"
+#include "lithokraft/content/post.h"
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/content/item_use.h"
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215
@@ -37,6 +38,14 @@ bool cSignalWorldSim::canPlace(const ChunkMap& w, int x, int y, int z, BlockId b
   if (isFlatWire(block)) return wireSupported(w, x, y, z);
   if (needsFloorSupport(block)) return floorSupported(w, x, y, z);  // 2026-10-24: Memor floor-only
   // Proposed by JD, Built by Cortana: the Highway Ramp needs room for its second half (any side).
+  // 2026-10-25 (JD, Posts): a Standing Post needs the cell above for its panel; a Wall Post needs a
+  // solid block beside it to hang on (onBlockChanged turns it to face one).
+  if (post::isStanding(block)) return y + 1 < kWorldHeight && w.get(x, y + 1, z) == kAir;
+  if (post::isWall(block)) {
+    const auto& reg = blockRegistry();
+    return reg.has(w.get(x, y, z - 1), kSolid) || reg.has(w.get(x + 1, y, z), kSolid) ||
+           reg.has(w.get(x, y, z + 1), kSolid) || reg.has(w.get(x - 1, y, z), kSolid);
+  }
   if (block == kHighwayRamp)
     return w.get(x + 1, y, z) == kAir || w.get(x - 1, y, z) == kAir || w.get(x, y, z + 1) == kAir || w.get(x, y, z - 1) == kAir;
   return true;  // torches and switches: canAttach decides (they mount on the clicked face)
@@ -163,6 +172,28 @@ void cSignalWorldSim::onBlockChanged(ChunkMap& w, int x, int y, int z, BlockId n
       }
     }
   }
+  // 2026-10-25 (JD, Posts): pairs like the Highway Ramp. Placing a Standing Post (its lower half, in
+  // the clicked cell) puts the panel half above with the same facing; breaking either half removes
+  // the other (the panel's text goes with it). A Wall Post turns to the nearest solid wall.
+  if (post::isStanding(now)) {
+    const CellState s = w.getState(x, y, z);
+    if (!post::isUpper(s) && w.get(x, y + 1, z) == kAir && w.set(x, y + 1, z, now))
+      w.setState(x, y + 1, z, CellState(s | post::kUpperBit));
+  } else if (post::isWall(now)) {
+    static constexpr int f4[4][2] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+    const CellState s = w.getState(x, y, z);
+    const int f0 = stFacing(s);
+    for (int k = 0; k < 4; ++k) {
+      const int f = (f0 + (k == 0 ? 0 : k == 1 ? 1 : k == 2 ? 3 : 2)) & 3;
+      if (blockRegistry().has(w.get(x + f4[f][0], y, z + f4[f][1]), kSolid)) {
+        if (f != f0) w.setState(x, y, z, makeState(0, f));
+        break;
+      }
+    }
+  } else if (now == kAir) {
+    if (post::isStanding(w.get(x, y + 1, z)) && post::isUpper(w.getState(x, y + 1, z))) w.set(x, y + 1, z, kAir);
+    if (post::isStanding(w.get(x, y - 1, z)) && !post::isUpper(w.getState(x, y - 1, z))) w.set(x, y - 1, z, kAir);
+  }
   signal_.onBlockChanged(x, y, z, now);
   sounds_.push_back({now == kAir ? SoundCue::Break : SoundCue::Place, 0, x, y, z});
 }
@@ -196,6 +227,18 @@ void cSignalWorldSim::command(ChunkMap& w, const SimCommand& c, const DirtyFn& d
       onBlockChanged(w, c.x, c.y, c.z, b);
       dirty(c.x, c.y, c.z);
       sounds_.push_back({SoundCue::Place, 0, c.x, c.y, c.z});
+    }
+  }
+  // 2026-10-25 (JD, Posts): one text edit on a post (either half; the panel cell holds the text).
+  else if (c.code == kCmdPostEdit) {
+    const BlockId b = w.get(c.x, c.y, c.z);
+    if (post::isPost(b)) {
+      const int py = post::panelY(b, w.getState(c.x, c.y, c.z), c.y);
+      if (post::isPost(w.get(c.x, py, c.z))) {
+        const std::string* cur = w.cellText(c.x, py, c.z);
+        std::string t = cur ? *cur : std::string{};
+        if (post::applyEdit(t, c.a, c.b)) { w.setCellText(c.x, py, c.z, std::move(t)); dirty(c.x, py, c.z); }
+      }
     }
   }
   // B1a/A3: the general per-item use seam. Dispatch fails closed (logged)

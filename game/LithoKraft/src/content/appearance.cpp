@@ -5,6 +5,7 @@
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/content/chipor_viewport.h"
 #include "lithokraft/content/foliage.h"  // Cortana 2026-10-15 2010 [GAME]
+#include "lithokraft/content/post.h"  // 2026-10-25 Posts
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215 [GAME]
 #include <utility>
 #include "litholattice/procgen/ramp_shape.h"  // Cortana 2026-10-16: Aluminum Ramp
@@ -464,12 +465,131 @@ void meshHighwayRamp(const CustomBlock& cell, MeshWriter& out) {
 
 }  // namespace
 
+
+// 2026-10-25 (JD, Posts; art by Cloud): Standing and Wall Posts. Every piece is an oriented box in an
+// integer (R, F) frame: F = the facing direction, R = the viewer's right when looking along F (the
+// text reads left-to-right along R on the -F face, the side the placer stood on). Straight facings
+// use unit vectors; the 45-degree facings use (+-1, +-1) lattice steps, so every corner stays on the
+// 1/16 vertex grid (PackedVertex precision) with no rounding. Text: one 1/16 glyph cell per char
+// from the generated "post_font" atlas (16 x 16 ASCII grid, panel colours baked in).
+namespace {
+struct PostFrame { int c[2]; int R[2]; int F[2]; };
+
+PostFrame postFrame(int octant) {
+  PostFrame f{{8, 8}, {0, 0}, {0, 0}};
+  facing8Dir(octant, f.F[0], f.F[1]);
+  f.R[0] = -f.F[1]; f.R[1] = f.F[0];  // clockwise quarter turn from above
+  return f;
+}
+
+int postLightFace(int nx, int ny, int nz) {
+  if (ny) return ny > 0 ? 2 : 3;
+  if (std::abs(nx) >= std::abs(nz)) return nx > 0 ? 0 : 1;
+  return nz > 0 ? 4 : 5;
+}
+
+// p wound so its normal points along nrm (same fix-up as the ramps), then emitted.
+void postQuad(const CustomBlock& cell, MeshWriter& out, int p[4][3], int uv[4][2], const int nrm[3],
+              const FaceMaterial& fm, FaceLook look = {}) {
+  int e1[3], e2[3];
+  for (int a = 0; a < 3; ++a) { e1[a] = p[1][a] - p[0][a]; e2[a] = p[2][a] - p[0][a]; }
+  const int n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};
+  if (n[0] * nrm[0] + n[1] * nrm[1] + n[2] * nrm[2] < 0) {
+    for (int a = 0; a < 3; ++a) std::swap(p[1][a], p[3][a]);
+    std::swap(uv[1][0], uv[3][0]); std::swap(uv[1][1], uv[3][1]);
+  }
+  for (int i = 0; i < 4; ++i) { p[i][0] = std::clamp(p[i][0], 0, 16); p[i][2] = std::clamp(p[i][2], 0, 16); }
+  out.quad(cell, p, uv, postLightFace(nrm[0], nrm[1], nrm[2]), fm, look);
+}
+
+// One face of the box a in [a0,a1] (R steps) x b in [b0,b1] (F steps) x y in [y0,y1]: the quad
+// spanning (s0..s1) along the face's horizontal axis and (t0..t1) in y, at the fixed coordinate.
+void postSide(const CustomBlock& cell, MeshWriter& out, const PostFrame& f, bool alongR, int fixed, int s0, int s1,
+              int y0, int y1, const int nrm[3], const FaceMaterial& fm, const int uvr[4], FaceLook look = {}) {
+  auto P = [&](int s, int y, int (&q)[3]) {
+    const int a = alongR ? s : fixed, b = alongR ? fixed : s;
+    q[0] = f.c[0] + a * f.R[0] + b * f.F[0]; q[1] = y; q[2] = f.c[1] + a * f.R[1] + b * f.F[1];
+  };
+  int p[4][3], uv[4][2] = {{uvr[0], uvr[3]}, {uvr[2], uvr[3]}, {uvr[2], uvr[1]}, {uvr[0], uvr[1]}};
+  P(s0, y0, p[0]); P(s1, y0, p[1]); P(s1, y1, p[2]); P(s0, y1, p[3]);
+  postQuad(cell, out, p, uv, nrm, fm, look);
+}
+
+// A whole oriented box. `textFace` true: the -F face is left to the caller (the glyph pass).
+void postBox(const CustomBlock& cell, MeshWriter& out, const PostFrame& f, int a0, int a1, int b0, int b1, int y0,
+             int y1, const FaceMaterial& side, const FaceMaterial& face, bool textFace) {
+  const int full[4] = {0, 0, 16, 16};
+  const int nF[3] = {f.F[0], 0, f.F[1]}, nB[3] = {-f.F[0], 0, -f.F[1]};
+  const int nR[3] = {f.R[0], 0, f.R[1]}, nL[3] = {-f.R[0], 0, -f.R[1]};
+  postSide(cell, out, f, true, b1, a1, a0, y0, y1, nF, face, full);  // back (away from the viewer)
+  if (!textFace) postSide(cell, out, f, true, b0, a0, a1, y0, y1, nB, face, full);
+  postSide(cell, out, f, false, a1, b0, b1, y0, y1, nR, side, full);
+  postSide(cell, out, f, false, a0, b1, b0, y0, y1, nL, side, full);
+  for (int top = 0; top < 2; ++top) {  // caps
+    const int y = top ? y1 : y0;
+    auto P = [&](int a, int b, int (&q)[3]) {
+      q[0] = f.c[0] + a * f.R[0] + b * f.F[0]; q[1] = y; q[2] = f.c[1] + a * f.R[1] + b * f.F[1];
+    };
+    int p[4][3], uv[4][2] = {{0, 0}, {16, 0}, {16, 16}, {0, 16}};
+    P(a0, b0, p[0]); P(a1, b0, p[1]); P(a1, b1, p[2]); P(a0, b1, p[3]);
+    const int n[3] = {0, top ? 1 : -1, 0};
+    postQuad(cell, out, p, uv, n, side);
+  }
+}
+
+// The text face of a panel box: kRows rows of glyph cells across [a0, a1] on b = b0 (facing -F).
+void postText(const CustomBlock& cell, MeshWriter& out, const PostFrame& f, int a0, int a1, int b0,
+              const FaceMaterial& font, const std::string* text) {
+  const int cols = a1 - a0;
+  const std::vector<std::string> lines = post::layout(text ? *text : std::string{}, cols);
+  const int nB[3] = {-f.F[0], 0, -f.F[1]};
+  for (int r = 0; r < post::kRows; ++r) {
+    const std::string& line = r < int(lines.size()) ? lines[size_t(r)] : std::string{};
+    const int y1 = 16 - r, y0 = y1 - 1;
+    const int n = std::min<int>(int(line.size()), cols);
+    for (int i = 0; i < n; ++i) {
+      const int ch = uint8_t(line[size_t(i)]) & 127;
+      const int uvr[4] = {ch & 15, ch >> 4, (ch & 15) + 1, (ch >> 4) + 1};
+      postSide(cell, out, f, true, b0, a0 + i, a0 + i + 1, y0, y1, nB, font, uvr);
+    }
+    if (n < cols) {  // the rest of the row: one stretched blank (space) cell
+      const int uvr[4] = {0, 2, 1, 3};
+      postSide(cell, out, f, true, b0, a0 + n, a1, y0, y1, nB, font, uvr);
+    }
+  }
+}
+
+void meshPost(const CustomBlock& cell, MeshWriter& out) {
+  const FaceMaterial wood = cell.materials.face(cell.id, FaceSlot::Left, false);
+  const FaceMaterial* panelM = cell.materials.named("post_panel");
+  const FaceMaterial panel = panelM ? *panelM : wood;
+  const FaceMaterial* font = cell.materials.named("post_font");
+  const std::string* text = cell.in.textAt(cell.x, cell.y, cell.z);
+  if (post::isWall(cell.id)) {
+    const PostFrame f = postFrame((stFacing(cell.state) & 3) * 2);
+    postBox(cell, out, f, -8, 8, 7, 8, 0, 16, wood, panel, font != nullptr);
+    if (font) postText(cell, out, f, -8, 8, 7, *font, text);
+    return;
+  }
+  const int oct = stFacing8(cell.state) & 7;
+  const PostFrame f = postFrame(oct);
+  if (!post::isUpper(cell.state)) {  // the stand: a foot and a stick
+    postBox(cell, out, f, -3, 3, -3, 3, 0, 1, wood, wood, false);
+    postBox(cell, out, f, -1, 1, -1, 1, 1, 16, wood, wood, false);
+    return;
+  }
+  const int hw = (oct & 1) ? 5 : 8;  // diagonal: 10 lattice steps (14.1/16 wide); straight: 16
+  postBox(cell, out, f, -hw, hw, -1, 1, 0, 16, wood, panel, font != nullptr);
+  if (font) postText(cell, out, f, -hw, hw, -1, *font, text);
+}
+}  // namespace
 // Wire: one flat piece on the cell floor, chosen from its connections and tinted by strength.
 void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out) const {
   const cBlockReg& reg = cell.blocks;
   const BlockDef def = cell.def();
   if (cell.id == kAluminumRamp) { meshRamp(cell, out); return; }  // Cortana 2026-10-16
   if (cell.id == kHighwayRamp) { meshHighwayRamp(cell, out); return; }  // Proposed by JD, Built by Cortana
+  if (post::isPost(cell.id)) { meshPost(cell, out); return; }  // 2026-10-25 Posts
   // Cortana 2026-10-15 2010 [GAME]: 3D foliage instance. Expands the kind's shared quad list
   // (built once, read-only) rotated by the position-hash variant; nothing per instance.
   if (cell.id >= kFoliageCattail && cell.id <= kFoliageMoss) {  // ids 82-87, consecutive

@@ -18,6 +18,7 @@
 #include "controls_panel.h"
 #include "lithokraft/content/appearance.h"
 #include "lithokraft/content/blocks.h"
+#include "lithokraft/content/post.h"  // 2026-10-25 Posts
 #include "lithokraft/content/foliage.h"  // Cortana 2026-10-15 2215: repeator button picking
 #include "lithokraft/game/map_render.h"
 #include "lithokraft/game/scout.h"
@@ -2390,6 +2391,8 @@ void Game::handleWorldActions() {
     const Vec3 fw = player_.forward();
     if (reg.def(st.hitBlock).role == SimRole::Keyboard) {
       beginTyping(st.hx, st.hy, st.hz);
+    } else if (post::isPost(st.hitBlock)) {  // 2026-10-25 Posts: right-click writes on the panel
+      beginPostEdit(st.hx, st.hy, st.hz);
     } else if (roleOf(st.hitBlock) == SimRole::Repeator && eye.y > float(st.hy + 1) && fw.y < -1e-4f) {
       // Top-face click: intersect the look ray with the cell's top plane -> the button quadrant.
       const float t = (float(st.hy + 1) - eye.y) / fw.y;
@@ -2421,7 +2424,9 @@ void Game::handleWorldActions() {
     const int facing = foliage::facingFromLook(fw.x, fw.z);
     const bool repeat = !input_.pressed(Action::Place);
     if (inReach && (!repeat || newTarget)) {
-      EditCmd pc{EditCmd::Kind::Place, selBlock, uint8_t(facing)};
+      // 2026-10-25 Posts: kFacing8 blocks take the yaw snapped to 45 degrees (octant 0..7).
+      const int placeFacing = reg.has(selBlock, kFacing8) ? facing8FromLook(fw.x, fw.z) : facing;
+      EditCmd pc{EditCmd::Kind::Place, selBlock, uint8_t(placeFacing)};
       pc.x = kPlaceReceipt;  // 2026-10-16: the sim reports the outcome; a rejection is refunded
       sim_->edit(pc);
       // Placement CONSUMES one from the selected stack (P2b-1), gated on reach (a click into the
@@ -3272,10 +3277,23 @@ void Game::beginTyping(int x, int y, int z) {
   logInfo("keyboard at %d %d %d: typing capture ON (Esc ends)", x, y, z);
 }
 
+void Game::beginPostEdit(int x, int y, int z) {
+  typing_ = true; postTyping_ = true; typeX_ = x; typeY_ = y; typeZ_ = z;
+  typed_.clear();
+  input_.push(InputContext::KeyboardTyping);
+  logInfo("post at %d %d %d: writing (Enter = new line, Backspace deletes, Esc ends)", x, y, z);
+}
+
 void Game::endTyping() {
   if (!typing_) return;
   typing_ = false;
   input_.pop(InputContext::KeyboardTyping);
+  if (postTyping_) {  // a post has no capture state to toggle back
+    postTyping_ = false;
+    typed_.clear();
+    logInfo("post writing OFF");
+    return;
+  }
   EditCmd c{EditCmd::Kind::Use}; c.x = typeX_; c.y = typeY_; c.z = typeZ_;
   sim_->edit(c);
   logInfo("keyboard typing capture OFF");
@@ -3285,6 +3303,19 @@ void Game::endTyping() {
 // Enter / Backspace (including auto-repeat) -> right port.
 void Game::handleTyping() {
   const TextInput& in = input_.text();
+  if (postTyping_) {  // 2026-10-25 Posts: printable ASCII, Enter = new line, Backspace deletes
+    auto edit = [&](int ch, int control) {
+      EditCmd c{EditCmd::Kind::Command}; c.x = typeX_; c.y = typeY_; c.z = typeZ_;
+      c.command = SimCommand{kCmdPostEdit, typeX_, typeY_, typeZ_, ch, control};
+      sim_->edit(c);
+    };
+    for (char32_t ch : in.chars)
+      if (ch >= 32 && ch <= 126) { edit(int(ch), post::kTypeChar); typed_ += char(ch); }
+    for (int i = 0; i < in.enter; ++i) { edit(0, post::kNewline); typed_ += '/'; }
+    for (int i = 0; i < in.backspace; ++i) { edit(0, post::kBackspace); if (!typed_.empty()) typed_.pop_back(); }
+    if (typed_.size() > 60) typed_.erase(0, typed_.size() - 60);
+    return;
+  }
   auto pulse = [&](int front, int control) {
     EditCmd c{EditCmd::Kind::Command}; c.x = typeX_; c.y = typeY_; c.z = typeZ_;
     c.command = SimCommand{kCmdKeyPulse, typeX_, typeY_, typeZ_, uint8_t(front), uint8_t(control)};
@@ -3372,7 +3403,9 @@ HudModel Game::hudModel() const {
     std::snprintf(l, sizeof l, "FPS %.0f  avg %.2f ms  p99 %.2f ms  update %.2f ms  GPU %s", fps_, frameAvgMs_, p99Ms_, updateMs_, gpu);
     m.debugLines = {std::string(l)};
   }
-  if (typing_)
+  if (typing_ && postTyping_)
+    m.bannerLines = {"POST - type up to 256 characters, Enter = new line, Backspace deletes, Esc ends", "> " + typed_ + "_"};
+  else if (typing_)
     m.bannerLines = {"KEYBOARD CAPTURE - type A-Z 0-9 symbols (SIXBIT), Enter = 1, Backspace = 2, Esc ends", "> " + typed_ + "_"};
   m.controlLines = showControls_ ? controlsPanelLines(input_.map())
                                  : std::vector<std::string>{controlsToggleLabel(input_.map()) + "  show controls"};

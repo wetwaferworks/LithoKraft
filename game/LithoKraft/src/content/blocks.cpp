@@ -255,6 +255,15 @@ cBlockReg& mutableRegistry() {
   // model in the packs' resources.json borrows the Input Buffer faces, and the block is hidden from
   // the palette / kit / grid (isPaletteHidden) until Cloud's art lands.
   r.add(def("lithokraft:timer_buffer", "Timer Buffer", kDir | kInteractive, S::Cube, "timer_buffer", "timer_buffer", R::None, 0, 0, 45));
+  // 2026-10-25 (JD, Posts; art by Cloud): Posts, appended at the END (stable ids). A Standing Post is
+  // two blocks tall (a stand under a holographic panel) placed and broken as a pair, with 8 facings
+  // (kFacing8: the placer's yaw snapped to 45 degrees). A Wall Post is one panel against the block in
+  // front, 4 facings. Use (right-click) edits up to 256 characters of text, kept in the column's cell
+  // text (PTXT save payload) on the panel cell. Behaviours "post" / "wall_post" (components/post.cpp).
+  r.add(def("lithokraft:virtual_post", "Virtual Post", kSolid | kTransparent | kInteractive | kFacing8, S::Custom, "virtual_post", "post", R::None, 0, 0, 45));
+  r.add(def("lithokraft:organic_post", "Organic Post", kSolid | kTransparent | kInteractive | kFacing8, S::Custom, "organic_post", "post", R::None, 0, 0, 45));
+  r.add(def("lithokraft:virtual_wall_post", "Virtual Wall Post", kSolid | kTransparent | kInteractive | kDirectional, S::Custom, "virtual_wall_post", "wall_post", R::None, 0, 0, 45));
+  r.add(def("lithokraft:organic_wall_post", "Organic Wall Post", kSolid | kTransparent | kInteractive | kDirectional, S::Custom, "organic_wall_post", "wall_post", R::None, 0, 0, 45));
     // Save migration: pre-rename ids remap to the -OR names (2026-10-10).
     r.addAlias("lithokraft:pulsar", "lithokraft:pulsor");
     // 2026-10-16 (JD): the Repeater is now the Repeator; old saves name the old id.
@@ -399,6 +408,10 @@ const BlockId kLaysor               = resolveId(blockRegistry(), "lithokraft:lay
 const BlockId kEmitor               = resolveId(blockRegistry(), "lithokraft:emitor");
 const BlockId kInputBuffer          = resolveId(blockRegistry(), "lithokraft:input_buffer");
 const BlockId kTimerBuffer          = resolveId(blockRegistry(), "lithokraft:timer_buffer");  // 2026-10-25 roadmap 7
+const BlockId kVirtualPost          = resolveId(blockRegistry(), "lithokraft:virtual_post");       // 2026-10-25 Posts
+const BlockId kOrganicPost          = resolveId(blockRegistry(), "lithokraft:organic_post");
+const BlockId kVirtualWallPost      = resolveId(blockRegistry(), "lithokraft:virtual_wall_post");
+const BlockId kOrganicWallPost      = resolveId(blockRegistry(), "lithokraft:organic_wall_post");
 const BlockId kFabor                = resolveId(blockRegistry(), "lithokraft:fabor");
 const BlockId kAutoFabor            = resolveId(blockRegistry(), "lithokraft:autofabor");
 const BlockId kVior                 = resolveId(blockRegistry(), "lithokraft:vior");

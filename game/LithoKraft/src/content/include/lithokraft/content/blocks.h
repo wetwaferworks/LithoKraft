@@ -126,6 +126,10 @@ extern const BlockId kConnector;      ///< Connector (9-pad wiring block)
 extern const BlockId kLaysor;         ///< Laysor: transparent purple laser crystal (blended translucency)
 extern const BlockId kEmitor;         ///< Emitor: light source; beam through the Laysor into the Etchor
 extern const BlockId kTimerBuffer;    ///< 2026-10-25 roadmap 7: comparator-clock input buffer (hidden, no art yet)
+extern const BlockId kVirtualPost;       ///< 2026-10-25 Posts: Standing Post (2 tall, 8 facings), virtual wood
+extern const BlockId kOrganicPost;       ///< Standing Post, organic wood
+extern const BlockId kVirtualWallPost;   ///< Wall Post (one panel on the block in front, 4 facings), virtual wood
+extern const BlockId kOrganicWallPost;   ///< Wall Post, organic wood
 extern const BlockId kInputBuffer;    ///< Input buffer (wafers in on top, out the front)
 extern const BlockId kFabor;          ///< Fabor (wafer fab)
 extern const BlockId kAutoFabor;      ///< AutoFabor (Trace-controlled Fabor)

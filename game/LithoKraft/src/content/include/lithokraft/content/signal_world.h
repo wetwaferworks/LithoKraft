@@ -23,6 +23,8 @@ enum SimCommandCode : uint16_t {
   kCmdRepeatorSet = 4,   ///< Repeator at (x, y, z): set delay index a (0..3 = 2/4/8/16), top-button click
   kCmdBridgePlace = 5,   ///< bridge placement: put block a (facing b) into the AIR cell (x, y, z) when a
                          ///< face neighbour is solid and canPlace allows it (Bedrock walk-bridging)
+  // 2026-10-25 (JD, Posts):
+  kCmdPostEdit = 6,      ///< post at (x, y, z) (either half): a = ASCII char, b = post::Control
 };
 
 /// SimEvent kinds above the SoundCue range (SoundCue is uint8_t).

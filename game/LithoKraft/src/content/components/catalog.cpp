@@ -22,6 +22,7 @@ cBehaviorCatalog::cBehaviorCatalog() {
   components::registerSound(add);
   components::registerCertificateTable(add);
   components::registerEtchor(add);
+  components::registerPosts(add);  // 2026-10-25 Posts
 
   // Bind every block that names a behaviour in the block registry.
   const auto& reg = blockRegistry();

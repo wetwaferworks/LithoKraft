@@ -255,6 +255,11 @@
   "buffer_front_out": "textures/blocks/buffer_front_out.png",
   "buffer_side": "textures/blocks/buffer_side.png",
   "buffer_top_in": "textures/blocks/buffer_top_in.png",
+  "post_panel": "textures/blocks/post_panel.png",
+  "post_panel_translucent": "textures/blocks/post_panel_translucent.png",
+  "post_wood_virtual": "textures/blocks/post_wood_virtual.png",
+  "post_wood_organic": "textures/blocks/post_wood_organic.png",
+  "post_font": "textures/blocks/post_font.png",
   "connector_bottom": "textures/blocks/connector_bottom.png",
   "connector_side": "textures/blocks/connector_side.png",
   "connector_top": "textures/blocks/connector_top.png",
@@ -1125,6 +1130,34 @@
     "top": "buffer_top_in",
     "front": "buffer_front_out",
     "side": "buffer_side"
+   }
+  },
+  "virtual_post": {
+   "faces": {
+    "top": "post_wood_virtual",
+    "front": "post_wood_virtual",
+    "side": "post_wood_virtual"
+   }
+  },
+  "organic_post": {
+   "faces": {
+    "top": "post_wood_organic",
+    "front": "post_wood_organic",
+    "side": "post_wood_organic"
+   }
+  },
+  "virtual_wall_post": {
+   "faces": {
+    "top": "post_wood_virtual",
+    "front": "post_wood_virtual",
+    "side": "post_wood_virtual"
+   }
+  },
+  "organic_wall_post": {
+   "faces": {
+    "top": "post_wood_organic",
+    "front": "post_wood_organic",
+    "side": "post_wood_organic"
    }
   },
   "timer_buffer": {
