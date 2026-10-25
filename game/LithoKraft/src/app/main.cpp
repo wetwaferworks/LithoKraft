@@ -1802,6 +1802,14 @@ static void lkShutdownTail(FrameCtx& F) {
     }
     if (benchSeconds > 0) {
       br.memEnd = processWorkingSetBytes();
+      // Mega-draw smoothness bench (Direction JD, implementation Cortana 2026-10-25): LL_BENCH_FRAMES=<file> dumps
+      // every measured frame time (ms, one per line) for p99.9 / stddev / hitch analysis. Tooling only.
+      if (const char* ff = std::getenv("LL_BENCH_FRAMES"); ff && *ff) {
+        if (FILE* fp = std::fopen(ff, "w")) {
+          for (const double ms : benchMs) std::fprintf(fp, "%.4f\n", ms);
+          std::fclose(fp);
+        }
+      }
       const double avg = avgOf(benchMs), p50 = percentile(benchMs, 0.5), p99 = percentile(benchMs, 0.99), mx = percentile(benchMs, 1.0);
       cBenchStreamer* bs = game.benchStreamer();
       const double genAvg = bs ? MsSamples::avg(bs->genMs.run) : 0, genP99 = bs ? MsSamples::pct(bs->genMs.run, 0.99) : 0;
