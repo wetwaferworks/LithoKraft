@@ -62,7 +62,7 @@ void cGameUi::rebuildHud() {
   controlsPanel_ = &hud_->add<ui::cPanel>("hud");
   // Cortana 2026-10-16 (standards review): sits ABOVE the hotbar + slot-name rows (it used to
   // overlap the hotbar at 2x GUI scale) and uses the compact hud_small text.
-  controlsPanel_->setLayout(ui::Layout::at({0, 1}, {0, 1}, {8 * k, -(6 + 40 * kInventoryScale + 24 + 12) * k}));
+  controlsPanel_->setLayout(ui::Layout::at({0, 1}, {0, 1}, {8 * k, -(6 + 40 * hotbarScale_ + 24 + 12) * k}));
   controlsText_ = &controlsPanel_->add<ui::cLabel>("", "hud_small");
   controlsText_->setColor({0.9f, 0.95f, 1.f, 1.f});
 
@@ -91,11 +91,12 @@ void cGameUi::rebuildHud() {
   splash_->setColor({0.75f, 0.85f, 1.f, 1.f});
   splash_->setLayout(ui::Layout::at({1, 1}, {1, 1}, {-8 * k, -8 * k}));
 
-  auto& bar = hud_->add<ui::cStackPanel>(ui::Orientation::Horizontal, 4 * k * kInventoryScale, "hud");
+  auto& bar = hud_->add<ui::cStackPanel>(ui::Orientation::Horizontal, 4 * k * hotbarScale_, "hud");
   bar.setId("hotbar");
   bar.setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -6 * k}));
   for (int i = 0; i < kHotbarSlots; ++i) {
-    ui::cSlot& slot = bar.add<ui::cSlot>(ui::Vec2{40 * k * kInventoryScale, 40 * k * kInventoryScale});  // +25% (JD 2026-10-16)
+    ui::cSlot& slot = bar.add<ui::cSlot>(ui::Vec2{40 * k * hotbarScale_, 40 * k * hotbarScale_});  // kHotbarScale (JD 2026-10-25)
+    slot.setScale(hotbarScale_ / kInventoryScale);  // frame + caption grow with the slot
     // 2026-10-24 (JD): one row of 16; captions are the direct-select keys (1..9, 0), slots 11..16 are wheel-only.
     slot.setCaption(i < 9 ? std::to_string(i + 1) : i == 9 ? std::string("0") : std::string()).setData(i);
     slot.on("click", [this](ui::cWidget& w) {
@@ -104,9 +105,9 @@ void cGameUi::rebuildHud() {
     slots_[size_t(i)] = &slot;
   }
   slotName_ = &hud_->add<ui::cLabel>();
-  slotName_->setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -(40 * kInventoryScale + 6 + 24) * k}));
+  slotName_->setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -(40 * hotbarScale_ + 6 + 24) * k}));
   lookName_ = &hud_->add<ui::cLabel>();  // 2026-10-16 (JD): one line above the held-item name
-  lookName_->setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -(40 * kInventoryScale + 6 + 24 + 24) * k}));
+  lookName_->setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -(40 * hotbarScale_ + 6 + 24 + 24) * k}));
   lookName_->setColor({1.f, 1.f, 1.f, 1.f});
 }
 
@@ -534,11 +535,15 @@ void cGameUi::closeInventory() {
 
 void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
   const float k = float(effectiveGuiScale(hudScalePref_, viewport.x, viewport.y));
-  if (k != scale_) {
+  const float hs = hotbarScaleFor(viewport.x, k);  // 2026-10-25: re-lay the hotbar when the cap changes
+  if (k != scale_ || hs != hotbarScale_) {
+    if (k != scale_) {
+      ui::Theme t = ui_.theme();
+      t.setScale(k);
+      ui_.setTheme(std::move(t));
+    }
     scale_ = k;
-    ui::Theme t = ui_.theme();
-    t.setScale(k);
-    ui_.setTheme(std::move(t));
+    hotbarScale_ = hs;
     rebuildHud();
   }
   if (menu_ && k != menuScale_) rebuildMenu();

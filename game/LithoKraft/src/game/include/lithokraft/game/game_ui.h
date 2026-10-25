@@ -90,6 +90,15 @@ class cGameUi {
   /// this multiple of the GUI scale (1.25 = +25% for readability). Renderer-agnostic: every backend
   /// paints the same UI rects.
   static constexpr float kInventoryScale = 1.25f;
+  /// 2026-10-25 (JD: "scale up the UI of the hotbar by twenty-five percent"): the ONE constant for
+  /// the HUD hotbar (slots, icons, selection frame, key captions, gaps and the labels above it).
+  /// update() caps it so the 16-slot row always fits the window width (see hotbarScaleFor).
+  static constexpr float kHotbarScale = kInventoryScale * 1.25f;
+  static float hotbarScaleFor(float viewportW, float k) {
+    const float rowUnits = kHotbarSlots * 40.f + (kHotbarSlots - 1) * 4.f;  // slot + gap units at scale 1
+    const float fit = (viewportW - 16.f) / (k * rowUnits);
+    return fit < kHotbarScale ? fit : kHotbarScale;
+  }
   static int effectiveGuiScale(int pref, float w, float h) {
     auto fit = [w, h](float rw, float rh) { const int a = int(w / rw), b = int(h / rh); return a < b ? a : b; };
     const int autoK = std::clamp(fit(960.f, 540.f), 1, kMaxGuiScale);
@@ -113,6 +122,7 @@ class cGameUi {
   ui::cUiRoot ui_;
   float scale_ = 0;  // HUD scale the widgets were built for (0 = not built)
   ui::cWidget* hud_ = nullptr;
+  float hotbarScale_ = kHotbarScale;  ///< kHotbarScale capped to the window (hotbarScaleFor)
   ui::cPanel* debugPanel_ = nullptr;
   ui::cLabel* debugText_ = nullptr;
   ui::cLabel* debugLook_ = nullptr;      ///< 2026-10-16 (JD): the look-at line, red
