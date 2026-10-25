@@ -40,7 +40,7 @@ struct GameSettings {
   float masterVolume = 0.6f;  ///< 0..1; matches the cAudioEngine default gain
   bool muted = false;
   int hudScale = 0;       ///< 0 = auto, else a fixed GUI scale (1-4)
-  int displayMode = 2;    ///< index into kSettingsDisplayModes (Cortana 2026-10-15 1153: default Borderless per JD, was 0 Windowed)
+  int displayMode = 1;    ///< index into kSettingsDisplayModes (Cortana 2026-10-25: default Maximized windowed per JD; was 2 Borderless, 0 Windowed before that)
   /// Renderer backend at startup: "software" (shipped default), "gl33" or "vulkan" (JD 2026-10-24).
   /// Settings > Graphics > Renderer saves the world and relaunches with it; --renderer still wins.
   std::string renderer = "software";
