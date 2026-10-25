@@ -859,7 +859,7 @@ int main(int argc, char** argv) {
   // Cortana 2026-10-15 1345: verify-mode summary at exit (when on).
   std::atexit([] { if (litholattice::meshVerifyEnabled()) { const auto s = litholattice::meshVerifyStats(); std::fprintf(stderr, "mesh-verify: checked %llu mismatches %llu skipped %llu\n", (unsigned long long)s.checked, (unsigned long long)s.mismatches, (unsigned long long)s.skipped); } });
   int renderThreadsArg = 0;  // Cortana 2026-10-15 1156: --render-threads N
-  double swScaleArg = 1.0;  // Cortana 2026-10-25 (pass sw3): --sw-scale 0.5|0.75|1.0
+  double swScaleArg = 0.5;  // Cortana 2026-10-25 (pass sw3): --sw-scale 0.5|0.75|1.0; default 0.5 (540p at 1080p, exact 2x nearest upscale; Archie 2026-10-25), 1.0 opt-in
   int fpsCapArg = -2; bool noVsync = false; bool noOverlay = false;  // Cortana 2026-10-15 1440: --no-overlay (A/B)  // Cortana 2026-10-15 1610: --fps-cap 30|60|off|auto (-2 = not given), --no-vsync
   bool tpsGiven = false, radiusGiven = false, displayGiven = false, streamGiven = false; int streamingArg = -1;  // CLI wins over settings.json
   bool simAreaGiven = false, streamAreaGiven = false;  // diamond (JD 2026-10-23)
