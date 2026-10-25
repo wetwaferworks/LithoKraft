@@ -262,8 +262,8 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
   if (r == SimRole::Memor) {
     // CloudAtlas memor_stored.json: slab [0,0,0]-[16,2,16], pads N out / S in / W+E clear, cell_display
     // bezel [2,2,2]-[14,3,14] whose top is the readout (the stored value, kShadeCells, as before).
-    pad(6, 14, 10, 16); pad(0, 6, 2, 10); pad(14, 6, 16, 10);
-    const int blo[3] = {2, 2, 2}, bhi[3] = {14, 3, 14};
+    // 2026-10-24 7:52 PM CloudAtlas engine-fit memor.json: no pads; readout [4,2,4]-[12,3,12].
+    const int blo[3] = {4, 2, 4}, bhi[3] = {12, 3, 12};
     const FaceMaterial& topM = cell.materials.face(cell.id, FaceSlot::Top, on);
     const BlockDef d = cell.def();
     const FaceLook rl = faceLookAt(d, cell.state, FaceSlot::Top, on, cell.in.cx * 16 + cell.x, cell.in.sy * 16 + cell.y,
@@ -600,28 +600,27 @@ void cLithoKraftAppearance::bindMaterials(const BlockDef& def, const BlockModel&
 // Attached torches and switches: box models (JSON, the glTF-subset format of box_model.h).
 // Authored standing on the support; the mesher turns them toward the attach face.
 const char* const kTorchModel = R"({"asset": {"version": "ll-box-1"},
-  "materials": [{"name": "torch", "slot": "top"}],
-  "meshes": [{"name": "led", "boxes": [{"min": [5, 0, 5], "max": [11, 2, 11], "material": 0},
-                                       {"min": [6, 2, 6], "max": [10, 4, 10], "material": 0},
-                                       {"min": [5, 4, 5], "max": [11, 5, 11], "material": 0},
-                                       {"min": [6, 5, 6], "max": [10, 6, 10], "material": 0},
-                                       {"min": [4, 6, 4], "max": [12, 8, 12], "material": 0},
-                                       {"min": [5, 8, 5], "max": [11, 9, 11], "material": 0}]}],
+  "materials": [{"name": "gem", "slot": "top"}, {"name": "shaft", "slot": "front"}, {"name": "chip", "slot": "bottom"}],
+  "meshes": [{"name": "led", "boxes": [{"min": [5, 0, 5], "max": [11, 1, 11], "material": 2},
+    {"min": [7, 1, 7], "max": [9, 3, 9], "material": 1},
+    {"min": [6, 3, 6], "max": [10, 4, 10], "material": 0},
+    {"min": [5, 4, 5], "max": [11, 6, 11], "material": 0},
+    {"min": [4, 4, 6], "max": [12, 6, 10], "material": 0},
+    {"min": [6, 4, 4], "max": [10, 6, 12], "material": 0},
+    {"min": [6, 6, 6], "max": [10, 7, 10], "material": 0}]}],
   "nodes": [{"mesh": 0}]})";
-// 2026-10-24 (CloudAtlas LED v2b, integer approximation): wall LED authored with the support at
+// 2026-10-24 7:52 PM CloudAtlas engine-fit LED (floor + wall, gem=top chip=bottom shaft=side textures); was LED v2b: wall LED authored with the support at
 // z=0 (north); the stack above the socket ledge steps +Z one per one up (~45 deg, away from the
 // wall). No element rotation; the mesher turns it by yaw only.
 const char* const kTorchWallModel = R"({"asset": {"version": "ll-box-1"},
-  "materials": [{"name": "torch", "slot": "top"}],
-  "meshes": [{"name": "led", "boxes": [{"min": [5, 4, 0], "max": [11, 11, 1], "material": 0},
-                                       {"min": [5, 4, 1], "max": [11, 6, 7], "material": 0},
-                                       {"min": [6, 6, 2], "max": [10, 7, 6], "material": 0},
-                                       {"min": [6, 7, 3], "max": [10, 8, 7], "material": 0},
-                                       {"min": [5, 8, 3], "max": [11, 9, 9], "material": 0},
-                                       {"min": [6, 9, 5], "max": [10, 10, 9], "material": 0},
-                                       {"min": [4, 10, 4], "max": [12, 11, 12], "material": 0},
-                                       {"min": [4, 11, 5], "max": [12, 12, 13], "material": 0},
-                                       {"min": [5, 12, 7], "max": [11, 13, 13], "material": 0}]}],
+  "materials": [{"name": "gem", "slot": "top"}, {"name": "shaft", "slot": "front"}, {"name": "chip", "slot": "bottom"}],
+  "meshes": [{"name": "led", "boxes": [{"min": [5, 2, 0], "max": [11, 8, 1], "material": 2},
+    {"min": [7, 5, 1], "max": [9, 7, 3], "material": 1},
+    {"min": [6, 6, 3], "max": [10, 10, 4], "material": 0},
+    {"min": [5, 6, 4], "max": [11, 12, 6], "material": 0},
+    {"min": [4, 7, 4], "max": [12, 11, 6], "material": 0},
+    {"min": [6, 5, 4], "max": [10, 13, 6], "material": 0},
+    {"min": [6, 9, 6], "max": [10, 13, 7], "material": 0}]}],
   "nodes": [{"mesh": 0}]})";
 // 2026-10-24 (CloudAtlas lever, facing north): base [4,0,5]-[12,2,11]; 2x2 handle pivoting at
 // y=1 on the centre line, tilted 45 degrees, drawn as a 3-step staircase (box models have no

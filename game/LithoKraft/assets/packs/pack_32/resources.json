@@ -148,6 +148,12 @@
   "pulsor_side": "textures/blocks/pulsor_side.png",
   "pulsor_top": "textures/blocks/pulsor_top.png",
   "quartz_spire": "textures/blocks/quartz_spire.png",
+  "led_chip": "textures/blocks/led_chip.png",
+  "led_gem_blue_off": "textures/blocks/led_gem_blue_off.png",
+  "led_gem_blue_on": "textures/blocks/led_gem_blue_on.png",
+  "led_gem_red_off": "textures/blocks/led_gem_red_off.png",
+  "led_gem_red_on": "textures/blocks/led_gem_red_on.png",
+  "led_shaft": "textures/blocks/led_shaft.png",
   "red_torch": "textures/blocks/red_torch.png",
   "red_torch_off": "textures/blocks/red_torch_off.png",
   "red_trace": "textures/blocks/red_trace.png",
@@ -395,10 +401,14 @@
  "models": {
   "blue_torch": {
    "faces": {
-    "all": "blue_torch_off"
+    "bottom": "led_chip",
+    "side": "led_shaft",
+    "top": "led_gem_blue_off"
    },
    "active": {
-    "all": "blue_torch"
+    "bottom": "led_chip",
+    "side": "led_shaft",
+    "top": "led_gem_blue_on"
    }
   },
   "blue_trace": {
@@ -778,10 +788,14 @@
   },
   "red_torch": {
    "faces": {
-    "all": "red_torch_off"
+    "bottom": "led_chip",
+    "side": "led_shaft",
+    "top": "led_gem_red_off"
    },
    "active": {
-    "all": "red_torch"
+    "bottom": "led_chip",
+    "side": "led_shaft",
+    "top": "led_gem_red_on"
    }
   },
   "red_trace": {
