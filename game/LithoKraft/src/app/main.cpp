@@ -1058,7 +1058,15 @@ int main(int argc, char** argv) {
   if (badArg) return 2;
   // cPlayer settings (config/settings.json next to config/input.json): CLI flags win.
   const std::string settingsPath = (dataRoot(argv[0]) / "config" / "settings.json").lexically_normal().string();
+#ifdef LK_PLAYTEST_SPAWN
+  // 2026-10-25 fix pass (JD J2): playtest builds default to Borderless (index 2); a saved displayMode
+  // and --display still win. Shipping builds keep the Maximized default from settings.h.
+  GameSettings settingsDefaults;
+  settingsDefaults.displayMode = 2;
+  GameSettings settings = GameSettings::load(settingsPath, settingsDefaults);
+#else
   GameSettings settings = GameSettings::load(settingsPath);
+#endif
   if (!rendererGiven && benchSeconds <= 0) backend = settings.renderer;  // JD 2026-10-24: saved renderer is the startup default
   // 2026-10-24 (JD): GPU renderers default to the 128 px pack (CloudAtlas HD tops + nearest 2x of
   // pack_64) when Texture resolution is Auto or 128. The software renderer stays on pack_64 (its

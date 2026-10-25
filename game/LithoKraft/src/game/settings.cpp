@@ -21,8 +21,8 @@ int clampInt(int v, int lo, int hi) { return std::max(lo, std::min(hi, v)); }
 
 }  // namespace
 
-GameSettings GameSettings::load(const std::string& path) {
-  GameSettings s;
+GameSettings GameSettings::load(const std::string& path, const GameSettings& defaults) {
+  GameSettings s = defaults;
   if (path.empty()) return s;
   std::ifstream in(path, std::ios::binary);
   if (!in) return s;  // first run: no file yet
