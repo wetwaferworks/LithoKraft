@@ -939,6 +939,21 @@ void Game::setBenchCamera(float t) {
     }
     return;
   }
+  // Phase 4 torture paths (Direction JD, research Elfie, implementation Cortana). Camera only; sim untouched.
+  if (benchPath_ == "whip") {  // T1: hold 20 up over the spawn; every 1.5 s a 180-degree pan in 0.12 s (max speed)
+    const float u = std::fmod(t, 1.5f), k = std::min(1.f, u / 0.12f), s = k * k * (3.f - 2.f * k);
+    const float base = float(int(t / 1.5f) & 1) * 3.14159265f;
+    player_.pos = {benchCenter_.x, benchCenter_.y + 20.f, benchCenter_.z};
+    player_.yaw = base + 3.14159265f * s; player_.pitch = -0.2f;
+    locomotion_.place(player_.pos);  // pin the body too, or locomotion pulls the camera back each update
+    return;
+  }
+  if (benchPath_ == "sprint") {  // T2/T3: from the spawn along +x at 60 blocks/s, 30 up (~4 chunk borders/s); the play streamer follows
+    player_.pos = {benchCenter_.x + 60.f * t, benchCenter_.y + 30.f, benchCenter_.z};
+    player_.yaw = 0.f; player_.pitch = -0.25f;
+    locomotion_.place(player_.pos);
+    return;
+  }
   const bool streaming = benchPath_ == "stream" || (benchPath_ == "soak" && (int(t / 60.f) & 1));
   if (benchPath_ == "soak") t = std::fmod(t, 60.f);
   if (streaming) {  // start 2 chunks inside the fixed world's +x edge, fly out along +x

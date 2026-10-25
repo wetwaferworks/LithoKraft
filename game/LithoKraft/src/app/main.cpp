@@ -473,6 +473,7 @@ inline std::FILE* openForWrite(const char* path) {
 /// per second (log lines) and for the whole run (BENCH line + optional JSON).
 struct BenchRun {
   std::vector<double> frame, input, update, upload, render, present, tick, uploadBytes;
+  std::vector<double> meshQueue;  ///< Phase 4.0: game mesh-upload queue depth per measured frame
   std::vector<double> secFrame;
   uint64_t memStart = 0, memPeak = 0, memEnd = 0;
   std::vector<double> minuteFrame, minuteRam;  // soak drift
@@ -942,7 +943,8 @@ int main(int argc, char** argv) {
     }
     else if (!std::strcmp(argv[i], "--bench-path") && i + 1 < argc) {
       benchPath = argv[++i];
-      if (benchPath != "orbit" && benchPath != "stream" && benchPath != "flyover" && benchPath != "walk" && benchPath != "still") { std::fprintf(stderr, "--bench-path: orbit|stream|flyover|walk|still\n"); badArg = true; }
+      if (benchPath != "orbit" && benchPath != "stream" && benchPath != "flyover" && benchPath != "walk" && benchPath != "still" &&
+          benchPath != "whip" && benchPath != "sprint") { std::fprintf(stderr, "--bench-path: orbit|stream|flyover|walk|still|whip|sprint\n"); badArg = true; }
     }
     else if (!std::strcmp(argv[i], "--soak")) {
       benchSeconds = 60.0 * num(1, 1440);
@@ -1555,6 +1557,7 @@ static bool lkStepFrame(FrameCtx& F) {
           br.minSum += frameMs; ++br.minFrames;
           br.input.push_back(msInput); br.update.push_back(msUpdate - game.lastUploadMs()); br.upload.push_back(game.lastUploadMs());
           br.render.push_back(msRender); br.present.push_back(msPresent); br.uploadBytes.push_back(double(game.lastUploadBytes()));
+          br.meshQueue.push_back(double(game.meshQueueDepth()));  // Phase 4.0
           br.secInput += msInput; br.secUpdate += msUpdate - game.lastUploadMs(); br.secUpload += game.lastUploadMs();
           br.secRender += msRender; br.secPresent += msPresent; br.secBytes += double(game.lastUploadBytes()); ++br.secFrames;
         }
@@ -1810,7 +1813,33 @@ static void lkShutdownTail(FrameCtx& F) {
           std::fclose(fp);
         }
       }
+      const std::vector<double> rawMs = benchMs;  // Phase 4.0: frame order (percentile() sorts benchMs in place)
       const double avg = avgOf(benchMs), p50 = percentile(benchMs, 0.5), p99 = percentile(benchMs, 0.99), mx = percentile(benchMs, 1.0);
+      {  // Phase 4.0 (Direction JD, research Elfie, implementation Cortana): lows + worst frames. Method: "1% low" =
+         // 1000 / mean of the slowest 1% of measured frames (0.1% likewise); times are seconds after the warmup.
+        std::vector<size_t> idx(rawMs.size());
+        for (size_t i = 0; i < idx.size(); ++i) idx[i] = i;
+        std::sort(idx.begin(), idx.end(), [&](size_t a, size_t b) { return rawMs[a] > rawMs[b]; });
+        auto low = [&](double frac) {
+          const size_t n = std::max<size_t>(1, size_t(double(idx.size()) * frac));
+          double s = 0;
+          for (size_t i = 0; i < n && i < idx.size(); ++i) s += rawMs[idx[i]];
+          return idx.empty() ? 0.0 : 1000.0 / (s / double(std::min(n, idx.size())));
+        };
+        std::vector<double> at(rawMs.size());
+        double acc = 0;
+        for (size_t i = 0; i < rawMs.size(); ++i) { at[i] = acc / 1000.0; acc += rawMs[i]; }
+        std::string worst;
+        char wb[64];
+        for (size_t i = 0; i < idx.size() && i < 10; ++i) {
+          std::snprintf(wb, sizeof wb, "%s%.2fms@%.2fs", i ? " " : "", rawMs[idx[i]], at[idx[i]]);
+          worst += wb;
+        }
+        double qMax = 0;
+        for (const double q : br.meshQueue) qMax = std::max(qMax, q);
+        logInfo("bench lows: avg_fps=%.1f low1=%.1f low01=%.1f fps, mesh-queue avg %.1f p99 %.0f max %.0f, worst10: %s",
+                avg > 0 ? 1000.0 / avg : 0.0, low(0.01), low(0.001), avgOf(br.meshQueue), percentile(br.meshQueue, 0.99), qMax, worst.c_str());
+      }
       cBenchStreamer* bs = game.benchStreamer();
       const double genAvg = bs ? MsSamples::avg(bs->genMs.run) : 0, genP99 = bs ? MsSamples::pct(bs->genMs.run, 0.99) : 0;
       const double meshAvg = bs ? MsSamples::avg(bs->meshMs.run) : 0, meshP99 = bs ? MsSamples::pct(bs->meshMs.run, 0.99) : 0;
