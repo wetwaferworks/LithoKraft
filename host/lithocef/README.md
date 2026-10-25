@@ -56,6 +56,38 @@ DLL border unchanged. A backend exports one symbol,
 Determinism note: the shell is outside the sim by construction. It can
 starve or flood presentation; it cannot move a scenario hash.
 
+## The Thread Handshake (`thread_handshake.h`)
+
+JD's thread architecture for this layer, designed by him on
+2026-10-22 (in his words: "a whole new architecture I just designed";
+he has not seen it in engine systems or the diagram books):
+
+- **Top: the thread pool.** At hardware init the hardware layer takes
+  its thread census and the pool is sized from the machine present —
+  no hard-coded counts (modest hardware, modest pool).
+- **Bottom: the thread dispatch pool**, facing the engine and other
+  systems. As soon as the pool is available it gives the dispatch
+  pool **one thread** — the listener/dispatcher — "to assign other
+  threads where needed." All assignment flows through that one
+  thread, in submission order, so grants can never race.
+- **"Thread needed" calls.** Consumers (the engine, a renderer, any
+  system) call into the dispatch layer and request as many threads
+  as they need for their kind of work and the hardware's scale. The
+  dispatch pool can call the top pool for more. Grants are
+  all-or-nothing (a partial grant would starve two big consumers
+  half-armed). JD considered and rejected an automatic one-thread
+  grant to whatever renderer is running — demand decides.
+- **Not the Timing Handshake.** The Timing Handshake governs *when*
+  the sim steps; the Thread Handshake governs *who does the work*.
+  Two handshakes, two layers.
+
+`lithocef_thread_handshake` implements it (pure `std::thread`, no
+engine dependency); `thread_handshake_smoke` gates it by counts:
+census sizing, the dispatcher's seat (capacity = census − 1),
+per-worker job invocation, all-or-nothing in-order grants, door
+refusals for impossible requests, cancel-on-destroy, and the
+one-thread machine (dispatcher doubles as the only worker).
+
 ## Backends
 
 - **Stub (`lithocef_stub`) — this run.** Reference implementation with
@@ -63,7 +95,10 @@ starve or flood presentation; it cannot move a scenario hash.
   null handles), recorded boot payload, counted frames, sink-forwarded
   input via the test hooks in `lithocef_stub.h`. `lithocef_smoke`
   exercises the whole contract and is registered with ctest when the
-  option is on.
+  option is on; `lithocef_boot_smoke` covers the lifecycle beyond it —
+  re-boot after shutdown, a finite input ring whose capacity drops are
+  counted, the Thread Handshake serving the engine while booted, and
+  `frames_presented` pinned as a shell-lifetime counter.
 - **CEF (next).** A backend linking the Chromium Embedded Framework's
   `libcef_dll_wrapper`, creating a real browser/window surface plugged
   into the host OS, booting the shipped web build's page as its first
