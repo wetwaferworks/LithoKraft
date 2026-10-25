@@ -772,23 +772,12 @@ const char* const kTorchWallModel = R"({"asset": {"version": "ll-box-1"},
     {"min": [6, 5, 4], "max": [10, 13, 6], "material": 0},
     {"min": [6, 9, 6], "max": [10, 13, 7], "material": 0}]}],
   "nodes": [{"mesh": 0}]})";
-// 2026-10-24 (CloudAtlas lever, facing north): base [4,0,5]-[12,2,11]; 2x2 handle pivoting at
+// 2026-10-25 Switch v2 (CloudAtlas, JD approved): lever throws along X, off leans east, on west, pivot (8,8).
+// (superseded) 2026-10-24 (CloudAtlas lever, facing north): base [4,0,5]-[12,2,11]; 2x2 handle pivoting at
 // y=1 on the centre line, tilted 45 degrees, drawn as a 3-step staircase (box models have no
 // element rotation). Off leans back (+Z, toward the player who placed it), on leans forward (-Z).
-const char* const kSwitchModel = R"({"asset": {"version": "ll-box-1"},
-  "materials": [{"name": "base", "slot": "bottom"}, {"name": "lever", "slot": "top"}],
-  "meshes": [{"name": "base", "boxes": [{"min": [4, 0, 5], "max": [12, 2, 11], "material": 0}]},
-             {"name": "lever", "boxes": [{"min": [7, 2, 8], "max": [9, 4, 10], "material": 1},
-                                         {"min": [7, 4, 10], "max": [9, 6, 12], "material": 1},
-                                         {"min": [7, 6, 12], "max": [9, 8, 14], "material": 1}]}],
-  "nodes": [{"mesh": 0}, {"mesh": 1}]})";
-const char* const kSwitchOnModel = R"({"asset": {"version": "ll-box-1"},
-  "materials": [{"name": "base", "slot": "bottom"}, {"name": "lever", "slot": "top"}],
-  "meshes": [{"name": "base", "boxes": [{"min": [4, 0, 5], "max": [12, 2, 11], "material": 0}]},
-             {"name": "lever", "boxes": [{"min": [7, 2, 6], "max": [9, 4, 8], "material": 1},
-                                         {"min": [7, 4, 4], "max": [9, 6, 6], "material": 1},
-                                         {"min": [7, 6, 2], "max": [9, 8, 4], "material": 1}]}],
-  "nodes": [{"mesh": 0}, {"mesh": 1}]})";
+const char* const kSwitchModel = R"({"asset":{"version":"ll-box-1"},"materials":[{"name":"base","slot":"bottom"},{"name":"shaft","slot":"front"},{"name":"tip_red","slot":"left"},{"name":"tip_blue","slot":"right"}],"meshes":[{"name":"switch","boxes":[{"min":[4,0,5],"max":[12,2,11],"material":0},{"min":[7,2,7],"max":[9,3,9],"material":1},{"min":[8,3,7],"max":[10,4,9],"material":1},{"min":[9,4,7],"max":[11,5,9],"material":1},{"min":[10,5,7],"max":[12,6,9],"material":1},{"min":[11,6,7],"max":[13,7,9],"material":1},{"min":[11,7,6],"max":[15,9,8],"material":2},{"min":[11,7,8],"max":[15,9,10],"material":3}]}],"nodes":[{"mesh":0}]})";
+const char* const kSwitchOnModel = R"({"asset":{"version":"ll-box-1"},"materials":[{"name":"base","slot":"bottom"},{"name":"shaft","slot":"front"},{"name":"tip_red","slot":"left"},{"name":"tip_blue","slot":"right"}],"meshes":[{"name":"switch","boxes":[{"min":[4,0,5],"max":[12,2,11],"material":0},{"min":[7,2,7],"max":[9,3,9],"material":1},{"min":[6,3,7],"max":[8,4,9],"material":1},{"min":[5,4,7],"max":[7,5,9],"material":1},{"min":[4,5,7],"max":[6,6,9],"material":1},{"min":[3,6,7],"max":[5,7,9],"material":1},{"min":[1,7,6],"max":[5,9,8],"material":2},{"min":[1,7,8],"max":[5,9,10],"material":3}]}],"nodes":[{"mesh":0}]})";
 
 const char* const kButtonModel = R"({"asset": {"version": "ll-box-1"},
   "materials": [{"name": "cap", "slot": "top"}],

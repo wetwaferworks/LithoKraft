@@ -1353,7 +1353,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     check(ok && face(kRepeator, FaceSlot::Front, false) == "repeator_front_base" && face(kRepeator, FaceSlot::Top, true) == "repeator_top_d2_base" &&
               face(kThresholdor, FaceSlot::Left, false) == "thresholdor_low" && face(kThresholdor, FaceSlot::Right, false) == "thresholdor_high" &&
-              face(kSwitch, FaceSlot::Bottom, false) == "switch_side" && face(kSiliconSlab, FaceSlot::Bottom, false) == "silicon_slab_top" &&
+              face(kSwitch, FaceSlot::Bottom, false) == "switch_base" && face(kSiliconSlab, FaceSlot::Bottom, false) == "silicon_slab_top" &&
               face(kMemor, FaceSlot::Top, false) == "memor_top_empty" && face(kMemor, FaceSlot::Top, true) == "memor_top",
           "block models: front/back/left/right files, active top, side and slab fallbacks (as before the refactor)");
     // 2026-10-25 (JD, CloudAtlas Thresholdor readout): readout tops + Catchor-format mask in pack_64.

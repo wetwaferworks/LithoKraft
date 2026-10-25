@@ -393,7 +393,15 @@
   "blue_trace_bulb_glass_core_normal": "textures/masks/trace_bulb/blue_trace_bulb_glass_core_normal.png",
   "glass_etched_normal": "textures/masks/etched/glass_etched_normal.png",
   "red_trace_cross_etched_normal": "textures/masks/etched/red_trace_cross_etched_normal.png",
-  "wafer_ground_trace_etched_normal": "textures/masks/etched/wafer_ground_trace_etched_normal.png"
+  "wafer_ground_trace_etched_normal": "textures/masks/etched/wafer_ground_trace_etched_normal.png",
+  "switch_base_on": "textures/blocks/switch_base_on.png",
+  "switch_tip_blue": "textures/blocks/switch_tip_blue.png",
+  "switch_base": "textures/blocks/switch_base.png",
+  "switch_shaft_on": "textures/blocks/switch_shaft_on.png",
+  "switch_shaft": "textures/blocks/switch_shaft.png",
+  "switch_tip_blue_on": "textures/blocks/switch_tip_blue_on.png",
+  "switch_tip_red_on": "textures/blocks/switch_tip_red_on.png",
+  "switch_tip_red": "textures/blocks/switch_tip_red.png"
  },
  "animations": {
   "pulsor_top_firing": {
@@ -975,10 +983,18 @@
   },
   "switch": {
    "faces": {
+    "bottom": "switch_base",
+    "front": "switch_shaft",
+    "left": "switch_tip_red",
+    "right": "switch_tip_blue",
     "side": "switch_side",
     "top": "switch_top_off"
    },
    "active": {
+    "bottom": "switch_base_on",
+    "front": "switch_shaft_on",
+    "left": "switch_tip_red_on",
+    "right": "switch_tip_blue_on",
     "top": "switch_top_on"
    }
   },
