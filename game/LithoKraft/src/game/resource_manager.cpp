@@ -14,7 +14,29 @@ namespace lithokraft {
 cResourceMgr::cResourceMgr(std::vector<std::filesystem::path> packDirs)
     : dirs_(std::move(packDirs)), materials_(std::make_shared<const BlockMaterials>()) {}
 
+// Largest <name>_item.png across the active packs and their sibling packs (pack_16..pack_128).
+std::optional<Image> cResourceMgr::bestItemIcon(const std::string& name) const {
+  std::vector<std::filesystem::path> roots;
+  for (const auto& d : dirs_) {
+    roots.push_back(d);
+    std::error_code ec;
+    if (d.has_parent_path())
+      for (const auto& e : std::filesystem::directory_iterator(d.parent_path(), ec))
+        if (e.is_directory(ec) && e.path().filename().string().rfind("pack_", 0) == 0) roots.push_back(e.path());
+  }
+  std::optional<Image> best;
+  for (const auto& root : roots) {
+    const auto f = root / "textures" / "ui" / "icons" / (name + "_item.png");
+    std::error_code ec;
+    if (!std::filesystem::exists(f, ec)) continue;
+    std::string err;
+    if (auto img = loadTextureFileCached(f, &err); img && (!best || img->width() > best->width())) best = std::move(img);
+  }
+  return best;
+}
+
 void cResourceMgr::reload() {
+  invalidateHudIconCache();
   cPackStack stack;
   // 2026-10-16 (JD rename): Repeator art is named repeator_*; packs that still ship only the
   // old repeater_* files keep working through this fallback.
@@ -36,8 +58,10 @@ void cResourceMgr::reload() {
     std::string err;
     // 2026-10-25 (JD, CloudAtlas item icons): <name>_item.png (rendered model) wins over <name>.png;
     // blocks without one (e.g. the Trace Bulb) keep their old icon / swatch fallback.
-    auto file = stack.find("textures/ui/icons/" + iconName(BlockId(b)) + "_item.png");
-    if (!file) file = stack.find("textures/ui/icons/" + iconName(BlockId(b)) + ".png");
+    // 2026-10-25 (JD, crisp icons): the highest-resolution _item.png shipped in ANY pack
+    // (pack_128 normally) is kept at full size; the HUD fits it to the slot's pixel size.
+    if (auto best = bestItemIcon(iconName(BlockId(b)))) { icons[b] = std::move(*best); continue; }
+    auto file = stack.find("textures/ui/icons/" + iconName(BlockId(b)) + ".png");
     if (auto img = file ? loadTextureFileCached(*file, &err) : std::nullopt) icons[b] = downsampleIcon(*img, kHudIconPx);  // decode cache (CREW TILE)
     else ++missingIcons;
   }

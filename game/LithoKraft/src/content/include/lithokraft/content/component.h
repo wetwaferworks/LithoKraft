@@ -140,6 +140,14 @@ class cBehaviorCatalog {
   std::vector<const cCompBehavior*> components_;
 };
 
+/// 2026-10-25 (JD): does block `b` have a secondary (sneak / Alt + right click) setting in
+/// state `s`? Probes useAlt on a scratch memory copy (pure; safe on the main thread).
+inline bool hasSneakUse(BlockId b, CellState s) {
+  const cCompBehavior* c = cBehaviorCatalog::get().component(b);
+  ComponentMemory scratch{};
+  return c && c->useAlt(s, scratch).has_value();
+}
+
 /// Compass name of a facing (N, E, S, W).
 const char* facingName(int facing);
 

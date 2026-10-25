@@ -229,7 +229,7 @@ void testGameUi(Checker& check) {
   gui.update(m, {1920, 1080}, 0.016f);  // auto GUI scale (2026-10-16): 2 from 1920x1080 up
   const bool scaled = bar != gui.root().root().find("hotbar") && gui.root().theme().scale() == 2.f;
   check(scaled, "HUD: rebuilt at scale 2 for 1080p windows (auto)");
-  {  // 2026-10-25 (JD): hotbar = kHotbarScale (x1.25), capped to fit; centred, on screen at 1080p
+  {  // 2026-10-25 (JD): hotbar = kHotbarScale (x1.125), capped to fit; centred, on screen at 1080p
     gui.update(m, {1920, 1080}, 0.016f);
     const ui::cWidget* hb = gui.root().root().find("hotbar");
     const bool fits = hb && hb->rect().x >= 0 && hb->rect().x + hb->rect().w <= 1920 && hb->rect().bottom() <= 1080 &&
@@ -237,8 +237,8 @@ void testGameUi(Checker& check) {
     gui.update(m, {2560, 1080}, 0.016f);
     const ui::cWidget* wide = gui.root().root().find("hotbar");
     const bool full = wide && std::abs(wide->children()[0]->rect().w - 40 * 2 * cGameUi::kHotbarScale) < 0.5f;
-    check(fits && full && cGameUi::kHotbarScale == cGameUi::kInventoryScale * 1.25f,
-          "HUD: hotbar x1.25 from one constant; capped to fit and centred at 1920x1080, full size on wider windows");
+    check(fits && full && cGameUi::kHotbarScale == cGameUi::kInventoryScale * 1.125f,
+          "HUD: hotbar x1.125 from one constant; capped to fit and centred at 1920x1080, full size on wider windows");
     gui.update(m, {1920, 1080}, 0.016f);
   }
 

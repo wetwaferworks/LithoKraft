@@ -2370,7 +2370,8 @@ void Game::handleWorldActions() {
   const bool wireUse = inReach && isFlatWire(st.hitBlock) && selBlock == kAir;
   const bool usable = inReach && (reg.has(st.hitBlock, kInteractive) || wireUse) && !sneaking;
   // 2026-10-24 (JD): sneak + RMB is the secondary setting too on a Catchor (match number).
-  const bool altUse = inReach && (input_.held(Action::Secondary) || (sneaking && roleOf(st.hitBlock) == SimRole::Catchor)) &&
+  // 2026-10-25 (JD): ... and on EVERY block with a secondary setting (Thresholdor read mode, ...): never a place.
+  const bool altUse = inReach && (input_.held(Action::Secondary) || (sneaking && hasSneakUse(st.hitBlock, st.hitState))) &&
                       roleOf(st.hitBlock) != SimRole::None;
   const int curTarget[3] = {st.hx, st.hy, st.hz};
   const bool newTarget = curTarget[0] != lastPlaceHit_[0] || curTarget[1] != lastPlaceHit_[1] ||
@@ -2405,7 +2406,7 @@ void Game::handleWorldActions() {
     } else if (post::isPost(st.hitBlock)) {  // 2026-10-25 (JD): right click views the full text (toggle)
       const bool again = postViewOpen_ && samePost(postViewX_, postViewY_, postViewZ_);
       postViewOpen_ = !again; postViewX_ = st.hx; postViewY_ = st.hy; postViewZ_ = st.hz;
-    } else if (roleOf(st.hitBlock) == SimRole::Repeator && eye.y > float(st.hy + 1) && fw.y < -1e-4f) {
+    } else if (false && roleOf(st.hitBlock) == SimRole::Repeator && eye.y > float(st.hy + 1) && fw.y < -1e-4f) {  // 2026-10-25 (JD): off; every right click cycles one step (Use)
       // Top-face click: intersect the look ray with the cell's top plane -> the button quadrant.
       const float t = (float(st.hy + 1) - eye.y) / fw.y;
       const double lx = double(eye.x + fw.x * t) - st.hx, lz = double(eye.z + fw.z * t) - st.hz;

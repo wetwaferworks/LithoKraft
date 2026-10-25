@@ -1271,9 +1271,9 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
           "game pack: worldgen/wafer.json and worldgen/organic.json resolve through the pack stack");
     size_t icons = 0;
     for (size_t b = 1; b < blockRegistry().size(); ++b)
-      if (const Image* i = rm.icon(BlockId(b)); i && i->width() == 16) ++icons;
+      if (const Image* i = rm.icon(BlockId(b)); i && i->width() >= 16) ++icons;
       else std::printf("  (no icon for %s: textures/ui/icons/%s.png)\n", blockRegistry().idOf(BlockId(b)).c_str(), cResourceMgr::iconName(BlockId(b)).c_str());
-    check(ok && icons == blockRegistry().size() - 1, "hotbar: every block has a textures/ui/icons icon in the pack stack (16 x 16 for the HUD)");
+    check(ok && icons == blockRegistry().size() - 1, "hotbar: every block has a textures/ui/icons icon in the pack stack (>= 16 px; _item icons at full res, fitted by the HUD)");
     {  // Cortana 2026-10-16 (BUG-0003): the software texture array keeps the pack's full
        // resolution (it used to box-filter every layer to 16x16 = the software blur).
       cCpuTextureArray cta;

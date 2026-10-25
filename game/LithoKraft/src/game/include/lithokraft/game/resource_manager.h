@@ -3,6 +3,7 @@
 // the renderer, and rebuilds all of it on a debug hot reload (F9). Worldgen sources are re-read
 // on reload but only take effect for worlds created afterwards (a new game).
 #pragma once
+#include <optional>
 #include "litholattice/assets/image.h"
 #include "lithokraft/game/engine.h"
 #include <filesystem>
@@ -54,6 +55,7 @@ class cResourceMgr {
   /// item registry, textures/ui/icons/<name>.png, box-filtered to 16 x 16),
   /// or nullptr when no pack has one / the id is not a registered item.
   /// Block-backed items (e.g. Chipor) resolve through icon(BlockId) instead.
+  std::optional<Image> bestItemIcon(const std::string& name) const;  ///< 2026-10-25: highest-res _item.png in any pack
   const Image* itemIcon(uint32_t itemId) const;
   /// World seed + generator JSON from the packs (worldgen/<dimension>.json, highest pack wins)
   /// for createDimensions() (dimensions.h).

@@ -93,7 +93,7 @@ class cGameUi {
   /// 2026-10-25 (JD: "scale up the UI of the hotbar by twenty-five percent"): the ONE constant for
   /// the HUD hotbar (slots, icons, selection frame, key captions, gaps and the labels above it).
   /// update() caps it so the 16-slot row always fits the window width (see hotbarScaleFor).
-  static constexpr float kHotbarScale = kInventoryScale * 1.25f;
+  static constexpr float kHotbarScale = kInventoryScale * 1.125f;
   static float hotbarScaleFor(float viewportW, float k) {
     const float rowUnits = kHotbarSlots * 40.f + (kHotbarSlots - 1) * 4.f;  // slot + gap units at scale 1
     const float fit = (viewportW - 16.f) / (k * rowUnits);

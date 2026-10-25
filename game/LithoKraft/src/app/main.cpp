@@ -422,6 +422,30 @@ Display createDisplay(const std::string& backend, bool vsync, bool validation, c
                       const std::string& vkArena, bool glArena, int swapImages = 0) {
   Display d;
   if (backend == "software") {
+#ifdef _WIN32
+    // 2026-10-25 (JD, capture fix): on Windows the software frame is presented with GDI
+    // (StretchDIBits into a no-client-API, DWM-redirected window) instead of a GL blit, so
+    // Print Screen and OBS Display / Window / Game capture all see it. LK_SW_PRESENT=gl
+    // restores the GL blit.
+    const char* swp = std::getenv("LK_SW_PRESENT");
+    if (!(swp && std::string(swp) == "gl")) {
+      d.window = Window::create({1280, 720, "LithoKraft", vsync, GraphicsApi::None, disp});
+      if (d.window) {
+        auto sw = std::make_unique<cSoftwareRenderer>();
+        sw->setPerPixelShading(true);
+        d.software = sw.get();
+        d.renderer = std::move(sw);
+        struct GdiPresenter : ISoftwarePresenter {
+          Window* w;
+          explicit GdiPresenter(Window* win) : w(win) {}
+          void present(const uint32_t* px, int pw, int ph, int, int) override { w->presentPixels(px, pw, ph); }
+        };
+        d.presenter = std::make_unique<GdiPresenter>(d.window.get());
+        logInfo("renderer: software present via GDI (capturable)");
+        return d;
+      }
+    }
+#endif
     d.window = Window::create({1280, 720, "LithoKraft", vsync, GraphicsApi::OpenGL33, disp});
     if (d.window) {
       auto sw = std::make_unique<cSoftwareRenderer>();

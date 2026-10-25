@@ -653,7 +653,7 @@ void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out)
     // x is mirrored by the 2 top turns); the first delayIndex+1 are pressed (flush, sunk art shows).
     const int di = repeator::delayIndex(cell.state) & 3;
     for (int i = 0; i < 4; ++i) {
-      if (i <= di) continue;
+      if (i == di) continue;  // 2026-10-25 (JD): exactly ONE button pressed (the current setting), not 1..di
       const int bl[3] = {12 - 3 * i, 3, 7}, bh[3] = {14 - 3 * i, 4, 9};
       machineBox(cell, out, bl, bh, stOn(cell.state), cell.materials.named(kTops[di]), foliage::kRepeatorTopTurns);
     }
@@ -873,7 +873,7 @@ int pickShapeBoxes(const litholattice::ChunkMap& w, const litholattice::cBlockRe
   if (r == SimRole::Repeator) {
     add(0, 0, 0, 16, 3, 16, f);
     const int di = repeator::delayIndex(st) & 3;
-    for (int i = di + 1; i < 4; ++i) add(12 - 3 * i, 3, 7, 14 - 3 * i, 4, 9, f);
+    for (int i = 0; i < 4; ++i) if (i != di) add(12 - 3 * i, 3, 7, 14 - 3 * i, 4, 9, f);  // 2026-10-25: one pressed
     return n;
   }
   if (b == kLithographor) { add(0, 0, 0, 16, 11, 16, 0); add(4, 11, 4, 12, 15, 12, 0); add(5, 15, 5, 11, 16, 11, 0); return n; }

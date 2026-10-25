@@ -8,6 +8,7 @@
 #include "lithokraft/content/circuit_scene.h"
 #include "lithokraft/content/signal_world.h"
 #include "lithokraft/content/post.h"  // 2026-10-25 Posts
+#include "litholattice/sim/sim_thread.h"  // placeOverlapsPlayer
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215
 
 namespace lithokraft {
@@ -143,6 +144,21 @@ int runSignalSelfTest() {
   sim.use(w, 2, y, 38, none);  // 2 -> 4
   check(repeator::delayTicks(w.getState(2, y, 38)) == 8 && (w.getState(2, y, 38) & repeator::kNewEncoding),
         "right-click cycles repeator delay (4 -> 8), new encoding");
+    {  // 2026-10-25 (JD): Repeator starts at button 1 / 4 ticks; each use steps 1->2->3->4->1;
+       // exactly one button is pressed (3 raised + the slab = 4 pick boxes) and the sim delay matches.
+      const int rx = 90, rz = 62;
+      putF(rx, y, rz, kRepeator, 1); run(1);  // the sim registers the component on its next tick
+      bool ok = repeator::delayIndex(w.getState(rx, y, rz)) == 0 && repeator::delayTicks(w.getState(rx, y, rz)) == 4;
+      static constexpr int kWant[5] = {1, 2, 3, 0, 1};
+      for (int k = 0; k < 5; ++k) {
+        sim.use(w, rx, y, rz, none);
+        const CellState s = w.getState(rx, y, rz);
+        litholattice::PickBox pb[8];
+        const int n = pickShapeBoxes(w, blockRegistry(), rx, y, rz, kRepeator, pb, 8);
+        ok = ok && repeator::delayIndex(s) == kWant[k] && repeator::delayTicks(s) == repeator::kDelays[kWant[k]] && n == 4;
+      }
+      check(ok, "REPEATOR: new = button 1 (4 ticks); right click cycles 1->2->3->4->1 (4/8/16/32); one button pressed; sim delay matches");
+    }
   sim.use(w, 0, y, 38, none); sim.use(w, 0, y, 40, none);
   int t4 = -1, t1 = -1;
   for (int t = 1; t <= 24; ++t) {
@@ -1388,6 +1404,16 @@ int runSignalSelfTest() {
     check(noWall && wall && stFacing(pw.getState(12, py, 12)) == 1 && pw.get(12, py + 1, 12) == kAir &&
               pw.cellText(12, py, 12) && *pw.cellText(12, py, 12) == "X",
           "POSTS: a Wall Post needs a solid block beside it, faces it (E), is one cell, and holds its own text");
+    {  // 2026-10-25 (JD): sneak + right click reaches a component's secondary setting; overlap places refused
+      check(hasSneakUse(kThresholdor, makeState(0, 0)) && hasSneakUse(kCatchor, makeState(0, 0)) &&
+                !hasSneakUse(kRedTrace, 0) && !hasSneakUse(kWaferSilicon, 0),
+            "SNEAK USE: Thresholdor / Catchor have a sneak + right click setting (no place); plain blocks do not");
+      const float ex = 5.5f, ey = 11.62f, ez = 5.5f;  // eye of a player standing at (5.5, 10, 5.5)
+      check(litholattice::placeOverlapsPlayer(5, 10, 5, ex, ey, ez) && litholattice::placeOverlapsPlayer(5, 11, 5, ex, ey, ez) &&
+                litholattice::placeOverlapsPlayer(5, 10, 6, ex, ey, 5.75f) && !litholattice::placeOverlapsPlayer(6, 10, 5, ex, ey, ez) &&
+                !litholattice::placeOverlapsPlayer(5, 9, 5, ex, ey, ez) && !litholattice::placeOverlapsPlayer(5, 12, 5, ex, ey, ez),
+            "PLACE: a block overlapping the player's body is refused (feet, head, a side the box reaches); clear cells allowed");
+    }
     {  // 2026-10-25 (JD, Post viewer): the HUD overlay shows all 256 characters, diagonal posts included
       std::string full;
       for (int i = 0; i < 256; ++i) full.push_back(char(33 + i % 94));
