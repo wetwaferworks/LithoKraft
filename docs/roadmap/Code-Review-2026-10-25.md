@@ -25,6 +25,7 @@ Executive direction, vision and verification: JD. Systems architecture and optim
 | Correctness risk | 6 |
 | Perf | 7 |
 | Cleanup | 8 |
+| JD requests 08:02/08:05 (separate section) | 3 items + borderless diagnosis |
 
 No confirmed defects were found. The blend split was checked against `chunk_shading.glsl:166`: in pass 1 everything except alpha-blend faces is discarded, so leaving the pulled opaque quads out of the blend pass changes nothing on screen.
 
@@ -128,3 +129,77 @@ Source: `Archie-Phase4-ABCD-Reply-2026-10-25-0758-EDT.md`. Not started.
 5. P3 through P7.
 6. Cleanup C1 through C8.
 7. Q4 last.
+
+## JD requests 08:02/08:05 (fix in the post-review pass, not now)
+
+All findings below are static. I read code only; nothing was built or run, and JD's process was not touched. The only live check was a read-only look at the running process's command line.
+
+### J1. Test bed default: testworld with `LK_PLAYTEST_SPAWN` ON, borderless
+
+Target: a no-flag launch of the test bed opens `testworld` with every playtest pad:
+- Examples pads (`61e1ba5`);
+- Clocks and Pixel Display pads (`fe613d8`);
+- the 6x6-chunk spawn platform;
+- in Borderless mode.
+
+**Verified statically: `LK_PLAYTEST_SPAWN` is the only gate for those pads.**
+- `LK_PLAYTEST_SPAWN` is a CMake option, not an environment variable. It is OFF by default (`src/app/CMakeLists.txt:37-39`).
+- It does two things:
+  - the no-flag default spawn into testworld with `saves/playtest` (`main.cpp:1128-1135`);
+  - `cfg.testWorldExamples = true` (`main.cpp:1138-1139`).
+- `testWorldExamples` (`game.h:94`, default false) is set **nowhere else**. There is no CLI flag and no setting for it (`git grep` over `game/`).
+- Everything playtest-only hangs off that one bool in `game.cpp`:
+  - `:1007` widens the world to at least 36 chunks;
+  - `:1037` builds the 6x6-chunk flat spawn/test platform;
+  - `:1096-1116` calls `buildTestWorldExamples`, which places every Examples pad, including CLOCKS and PIXEL DISPLAY (`test_world.cpp:371-373`, `413-430`).
+- **Why JD lost the pads:** `rename-build/CMakeCache.txt` has no `LK_PLAYTEST_SPAWN` entry (it is OFF there).
+  - JD's running Playtest exe (PID 12216) was launched with `--renderer vulkan --test-world --display borderless`.
+  - So he gets the plain test pad (registry rows only) with no Examples, Clocks, Pixel or spawn platform.
+
+**Circuits switch:**
+- `--bench-scene circuits` loads the standalone circuits scene (`game.cpp:1200`). It is playable and does not need `--bench` (`main.cpp:1046`).
+- `--test-world` is `--bench-scene testworld` (`main.cpp:958`), the flat registry pad.
+- With `LK_PLAYTEST_SPAWN`, testworld also gets a CIRCUITS tile in Examples (`test_world.cpp:372/411`).
+
+**Proposed fix:**
+- Configure the Playtest build with `-DLK_PLAYTEST_SPAWN=ON`, recorded in the build script so it can't be dropped again.
+- Optionally decouple Examples from the spawn default, e.g. `--examples` or `testWorldExamples` whenever `benchScene == testworld` in dev builds, so `--test-world` alone never loses the pads.
+- Optionally add a `/tp circuits` shortcut (J3).
+
+### J2. Borderless as the code default for the test bed
+
+- **Current default:** `settings.h:43` has `displayMode = 1` (Maximized, from `b4597aa`).
+- **Proposed fix:** under `LK_PLAYTEST_SPAWN`, default to 2 (Borderless). The shipping default stays Maximized unless JD says otherwise.
+- JD's `settings.json` is not edited.
+
+### J2a. JD reports he is not getting borderless (static diagnosis)
+
+**The setting reaches the window, so the cause is in the window code, not the settings.**
+- The settings path is baked to the source tree. `dataRoot()` (`main.cpp:370-375`) uses `LITHOKRAFT_SOURCE_DIR`, so the Playtest exe reads `game/LithoKraft/config/settings.json`.
+- That file has `"displayMode": 2`, which `main.cpp:1114` maps to Borderless.
+- The running process was also launched with `--display borderless`, which wins over settings (`main.cpp:925`).
+
+**Most likely cause: how Borderless is applied** (`window.cpp:103-105`).
+- The window is created decorated and visible (`window.cpp:33`, default hints).
+- Borderless then turns `GLFW_DECORATED` off and calls `glfwSetWindowMonitor(win, nullptr, mx, my, deskW, deskH, 0)`.
+- That makes a frameless window sized to the desktop, not true borderless fullscreen. On Win32 a windowed-to-windowed style change can keep a frame or caption, and the taskbar can stay on top.
+
+**Fix options:**
+- (a) Set `glfwWindowHint(GLFW_DECORATED, GLFW_FALSE)` before `glfwCreateWindow` when the starting mode is Borderless.
+- (b) Use `glfwSetWindowMonitor(win, mon, 0, 0, deskW, deskH, desk->refreshRate)`, the GLFW windowed-fullscreen idiom.
+- (c) Create the window hidden, apply the mode, then show it.
+
+**Other things to rule out:**
+- An Alt+Enter press switches back to Windowed (`window.cpp:136-143`).
+- A settings-dropdown change re-applies the mode (`game.cpp:2005`).
+- **Verify after JD quits:** the `display:` lines in his log (read-only).
+
+### J3. Teleport command
+
+- There is no teleport command today.
+- **Name clash:** `tp` is already an alias for third-person camera (`camera_controller.cpp:527`). Use `/teleport`, with `/tp` as an alias only when coordinates or a known target follow.
+- **Proposed:**
+  - `/tp x y z` with absolute or `~`-relative coordinates;
+  - `/tp testarea` and `/tp circuits`, `/tp clocks`, `/tp pixel` shortcuts from the `TestWorldExample` x0/z0 coordinates;
+  - route through the existing teleport/respawn snap (`game.cpp:2578`), so interpolation and streaming re-centre correctly.
+- Gate it to dev/playtest builds.
