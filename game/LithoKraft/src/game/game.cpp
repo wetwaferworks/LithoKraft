@@ -3104,16 +3104,24 @@ void Game::uploadMeshes() {
   constexpr int kUploadBudget = 32;                 // sub-chunks per frame
   constexpr double kUploadMsBudget = 1.5;           // main-thread commit time per frame
   constexpr size_t kUploadBytesBudget = 3u << 20;   // bytes per frame
-  const auto tUploads = Clock::now();
+  constexpr int kUploadFloor = 16;                  // always commit this many (time cap applies past it)
   size_t bytes = 0;
   int uploads = 0;
-  if (pendingOrder_.size() > size_t(kUploadBudget)) {
+  {  // nearest-first: re-sort only when the player changes chunk or the queue grew past the last sort
+    static int64_t sortedAt = INT64_MIN;
+    static size_t sortedSize = 0;
     const int pcx = int(std::floor(player_.pos.x / 16)), pcy = int(std::floor(player_.pos.y / 16)), pcz = int(std::floor(player_.pos.z / 16));
-    auto dist = [&](int64_t k) { int x, y, z; unpackPos(k, x, y, z); return (x - pcx) * (x - pcx) + (y - pcy) * (y - pcy) + (z - pcz) * (z - pcz); };
-    std::stable_sort(pendingOrder_.begin(), pendingOrder_.end(), [&](int64_t a, int64_t b) { return dist(a) < dist(b); });
+    const int64_t here = packPos(pcx, std::clamp(pcy, 0, kSubChunks - 1), pcz);
+    if (pendingOrder_.size() > size_t(kUploadBudget) && (here != sortedAt || pendingOrder_.size() > sortedSize + size_t(kUploadBudget))) {
+      auto dist = [&](int64_t k) { int x, y, z; unpackPos(k, x, y, z); return (x - pcx) * (x - pcx) + (y - pcy) * (y - pcy) + (z - pcz) * (z - pcz); };
+      std::stable_sort(pendingOrder_.begin(), pendingOrder_.end(), [&](int64_t a, int64_t b) { return dist(a) < dist(b); });
+      sortedAt = here;
+    }
+    sortedSize = pendingOrder_.size();
   }
+  const auto tUploads = Clock::now();  // the cap measures commits, not the sort
   for (; !pendingOrder_.empty() && uploads < kUploadBudget;) {
-    if (uploads > 0 && msBetween(tUploads, Clock::now()) > kUploadMsBudget) { g_uploadsCapped += pendingOrder_.size(); break; }
+    if (uploads >= kUploadFloor && msBetween(tUploads, Clock::now()) > kUploadMsBudget) { g_uploadsCapped += pendingOrder_.size(); break; }
     const int64_t k = pendingOrder_.front();
     auto node = pendingMesh_.find(k);
     if (node == pendingMesh_.end()) { pendingOrder_.pop_front(); continue; }
@@ -3137,7 +3145,7 @@ void Game::uploadMeshes() {
       else if (m.epoch != it->second.epoch || m.seq > it->second.seq) it->second = std::move(m);
     } }
   for (; !pbrPendingOrder_.empty() && uploads < kUploadBudget;) {
-    if (uploads > 0 && msBetween(tUploads, Clock::now()) > kUploadMsBudget) break;
+    if (uploads >= kUploadFloor && msBetween(tUploads, Clock::now()) > kUploadMsBudget) break;
     const int64_t k = pbrPendingOrder_.front();
     auto node = pbrPendingMesh_.find(k);
     if (node == pbrPendingMesh_.end()) { pbrPendingOrder_.pop_front(); continue; }
