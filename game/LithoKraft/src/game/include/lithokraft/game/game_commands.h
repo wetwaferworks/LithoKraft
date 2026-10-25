@@ -4,6 +4,11 @@
 // split, locked). Names are plain verbs; cheat-gating follows Decision 8.
 //
 //   give <itemId> [count]  — add items to the player inventory (cheat)
+//   teleport <x y z>|<name> — move the player (cheat; alias tp). Coordinates take ~ for
+//                            relative; names: spawn, testarea, circuits and every
+//                            test-world Examples pad (clocks, pixel...). No argument
+//                            lists the names. 2026-10-25: `tp` as a COMMAND is
+//                            teleport; `camera tp` (third person) is unchanged.
 //   kill                   — respawn the player at spawn (cheat; provisional
 //                            until the health/damage system lands)
 //   fly [on|off]           — toggle the player's locomotion Fly mode
@@ -65,6 +70,8 @@ struct GameCommandBindings {
   std::function<std::string(uint32_t itemId, uint16_t count)> give;
   /// Respawn the player at spawn. Returns a message.
   std::function<std::string()> kill;
+  /// 2026-10-25 (JD J3): teleport; `args` are the words after the verb. Returns a message.
+  std::function<std::string(const std::vector<std::string>& args)> teleport;
   /// Toggle the player's locomotion mode (Walk <-> Fly), or set it when
   /// `arg` is "on"/"off". Returns a message naming the new mode.
   std::function<std::string(const std::string& arg)> flyToggle;

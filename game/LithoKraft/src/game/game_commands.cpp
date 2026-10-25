@@ -83,6 +83,19 @@ void registerGameCommands(cConsoleReg& r, GameCommandBindings b) {
       [b](cConsoleReg& r, const ConsoleArgs&) { r.print(b.kill()); }, cheat,
       &err);
 
+  // teleport / tp (2026-10-25, JD J3): cheat. `tp` is only a camera-mode WORD inside `camera`
+  // (camera tp = third person); as a command it is this teleport, so the two never collide.
+  for (const char* verb : {"teleport", "tp"}) {
+    r.registerCommand(
+        verb, std::string(verb) + " <x y z>|<name> - teleport the player (~ = relative; no arg lists names: spawn, testarea, circuits, ...) (cheat)",
+        [b](cConsoleReg& r, const ConsoleArgs& a) {
+          std::vector<std::string> args;
+          for (size_t i = 1; i < a.size(); ++i) args.push_back(a[i]);
+          r.print(b.teleport ? b.teleport(args) : std::string("teleport: unavailable"));
+        },
+        cheat, &err);
+  }
+
   // fly [on|off] — cheat; toggles the player's locomotion Fly mode. The
   // free camera (`camera free`) is a camera, not the player, and is not
   // touched by this.

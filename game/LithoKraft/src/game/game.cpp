@@ -9,6 +9,7 @@
 #include "litholattice/mods/mod_permissions.h"  // permissionBitForName (mcp grant/revoke)
 #include <algorithm>
 #include <chrono>  // Cortana 2026-10-15 2215: hold-to-repeat timers
+#include <cctype>  // 2026-10-25: teleport name matching
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -237,6 +238,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
       if (leftover) msg += " (" + std::to_string(leftover) + " did not fit)";
       return msg;
     };
+    b.teleport = [this](const std::vector<std::string>& args) { return teleportCmd(args); };
     b.kill = [this] {
       // Provisional until the health/damage system lands: kill = respawn.
       player_.pos = spawnPoint_;
@@ -1000,6 +1002,52 @@ Game::~Game() {
   pool_.waitIdle();  // mesh jobs reference meshOut_
 }
 
+// 2026-10-25 (JD J3): teleport <x y z> (absolute or ~relative) | <name>. Names: spawn, then the marks of
+// this load (testarea, circuits, Examples pads); exact match first, then a unique prefix ("pixel").
+// Writes player_.pos like kill does; the locomotion body re-seats on the external write (see update()).
+std::string Game::teleportCmd(const std::vector<std::string>& args) {
+  auto names = [this] {
+    std::string s = "spawn";
+    for (const auto& [k, p] : tpMarks_) s += ", " + k;
+    return s;
+  };
+  auto go = [this](const Vec3& p, const std::string& what) {
+    player_.pos = p;
+    char buf[160];
+    std::snprintf(buf, sizeof buf, "teleport: %s (%.1f, %.1f, %.1f)", what.c_str(), p.x, p.y, p.z);
+    return std::string(buf);
+  };
+  if (args.empty()) return "usage: tp <x y z> | <name>   (~ = relative)   names: " + names();
+  if (args.size() == 3) {
+    const float cur[3] = {player_.pos.x, player_.pos.y, player_.pos.z};
+    float v[3];
+    for (int i = 0; i < 3; ++i) {
+      const std::string& s = args[size_t(i)];
+      const bool rel = !s.empty() && s[0] == '~';
+      const std::string num = rel ? s.substr(1) : s;
+      char* end = nullptr;
+      const float f = num.empty() ? 0.f : std::strtof(num.c_str(), &end);
+      if (!num.empty() && (end == num.c_str() || *end != '\0' || !std::isfinite(f))) return "teleport: bad coordinate '" + s + "' (number or ~[number])";
+      v[i] = rel ? cur[i] + f : f;
+    }
+    return go(Vec3{v[0], v[1], v[2]}, "to");
+  }
+  if (args.size() != 1) return "usage: tp <x y z> | <name>";
+  std::string want;
+  for (char ch : args[0]) want += char(std::tolower(static_cast<unsigned char>(ch)));
+  if (want == "spawn") return go(spawnPoint_, "spawn");
+  for (const auto& [k, p] : tpMarks_)
+    if (k == want) return go(p, k);
+  const std::pair<std::string, Vec3>* hit = nullptr;
+  for (const auto& m : tpMarks_)
+    if (m.first.rfind(want, 0) == 0) {
+      if (hit) return "teleport: '" + args[0] + "' is ambiguous; names: " + names();
+      hit = &m;
+    }
+  if (hit) return go(hit->second, hit->first);
+  return "teleport: no target '" + args[0] + "' here; names: " + names();
+}
+
 void Game::loadActive() {
   const auto t0 = Clock::now();
   if (cfg_.benchScene != "default") {  // bench scenes: load and tick the whole scene
@@ -1008,6 +1056,7 @@ void Game::loadActive() {
     cfg_.tickRadius = std::max(cfg_.tickRadius, cfg_.sceneSize / 32 + 4);
   }
   Spawn sp = active_->load(pool_, cfg_.worldChunks);
+  tpMarks_.clear();  // 2026-10-25 (JD J3): rebuilt below for this load
   std::vector<PatternRomScreen> roms;  // playtest 2026-10-16: handed to the new sim below
   std::vector<cSignalWorldSim::GatedSource> torture;  // 2026-10-24 (JD): LEDs held off by the torture lever
   int tortureLever[3] = {0, -1, 0};                    // y < 0 = no lever
@@ -1019,6 +1068,7 @@ void Game::loadActive() {
     const int floorY = std::max(int(std::floor(sp.y)) - 1, active_->chunks.surfaceY(sx, sz));
     const TestWorldLayout tw = buildTestWorld(active_->chunks, sx, floorY, sz, cfg_.sceneSize >= 64 ? 64 : 32);
     sp.x = tw.spawnX; sp.z = tw.spawnZ; sp.y = float(tw.floorY + 1); sp.yaw = tw.spawnYaw; sp.pitch = -0.32f;
+    tpMarks_.push_back({"testarea", Vec3{sp.x, sp.y, sp.z}});  // J3; the Examples grid centre replaces it below
     logInfo("testworld: origin sx=%d sz=%d floorY=%d (screenshot poses: LL_BENCH_POSE)", sx, sz, tw.floorY);
     size_t n = 0;
     for (const TestWorldRow& r : tw.rows) {
@@ -1043,7 +1093,8 @@ void Game::loadActive() {
         for (int id = 1; id < int(reg.size()) && floors.size() < 6; ++id)
           if (reg.def(BlockId(id)).name == std::string_view(want) && BlockId(id) != kWaferSilicon) { floors.push_back(BlockId(id)); break; }
       }
-      const int ccx = std::max(0, (sx >> 4) - 3), ccz = std::max(0, (sz >> 4) - 3);  // chunks -3..+2 around spawn (Manhattan <= 6, inside the 8 diamond); clamped to generated columns (smoke 15:46: z<0 is not generated)
+      const int ccx = std::max(0, (sx >> 4) - 3), ccz = std::max(0, (sz >> 4) - 3);
+      if (!tpMarks_.empty()) tpMarks_[0].second = Vec3{float((ccx + 3) * 16) + 0.5f, float(floorY + 1), float((ccz + 3) * 16) + 0.5f};  // J3: grid centre  // chunks -3..+2 around spawn (Manhattan <= 6, inside the 8 diamond); clamped to generated columns (smoke 15:46: z<0 is not generated)
       auto busy = [&](int x, int z) {  // keep existing pads: anything standing within one block
         for (int dz = -1; dz <= 1; ++dz)
           for (int dx = -1; dx <= 1; ++dx)
@@ -1125,6 +1176,11 @@ void Game::loadActive() {
           sceneLevers.push_back({lx, ly, lz});
           logInfo("test world examples: %s lever (%d,%d,%d) OFF, group %d", e.label.c_str(), lx, ly, lz, group);
         }
+        if (e.placed) {  // J3: /tp <label>, standing just north of the pad, mid-width
+          std::string key;
+          for (char ch : e.label) key += std::isalnum(static_cast<unsigned char>(ch)) ? char(std::tolower(static_cast<unsigned char>(ch))) : '-';
+          tpMarks_.push_back({key, Vec3{float(e.x0 + e.x1) * 0.5f + 0.5f, float(floorY + 1), float(e.z0 - 2) + 0.5f}});
+        }
         logInfo("test world examples: %-12s x %d..%d z %d..%d  %s %d blocks%s%s | %d sources on the torture lever", e.label.c_str(), e.x0, e.x1, e.z0, e.z1,
                 e.placed ? "placed" : "SKIPPED", e.blocks, e.note.empty() ? "" : " | ", e.note.c_str(), held);
         // FRAMEBUFFER viewing stand (buildFramebufferScene, size 64 at bx = x0 + 8, bz = z0 + 14): 9 x 9 at y + 14.
@@ -1203,6 +1259,7 @@ void Game::loadActive() {
     const int placed = cfg_.benchScene == "display" ? buildDisplayScene(active_->chunks, cx - n / 2, sy, cz, n)
                                                      : buildCircuitScene(active_->chunks, cx - n / 2, sy, cz, n);
     logInfo("bench scene: %s, size %d, %d blocks", cfg_.benchScene.c_str(), n, placed);
+    tpMarks_.push_back({cfg_.benchScene, Vec3{float(cx) + 0.5f, float(sy), float(cz - 2) + 0.5f}});  // J3: /tp circuits
   }
   std::vector<uint8_t> signalState;
   const int restored = save_ ? save_->loadDimension(active_->id, active_->chunks, signalState) : 0;

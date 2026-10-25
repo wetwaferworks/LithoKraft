@@ -489,6 +489,9 @@ class Game {
   cAiHost aiHost_;
   uint64_t lastAiTick_ = 0;          ///< sim worldTick the cAiWorld last advanced to
   Vec3 spawnPoint_{20.f, 92.f, 20.f};  ///< dimension spawn; `kill` respawns here
+  /// 2026-10-25 (JD J3): named teleport targets for this dimension load (testarea, circuits, Examples pads).
+  std::vector<std::pair<std::string, Vec3>> tpMarks_;
+  std::string teleportCmd(const std::vector<std::string>& args);
   litholattice::cEntityMgr entities_{[this](uint32_t type) {
     return makeEntityBehavior(
         type,
