@@ -164,7 +164,9 @@ struct GameSettings {
   /// Reads `path` (missing or broken -> defaults, never throws). Unknown keys are ignored;
   /// out-of-range values clamp to the nearest valid one.
   /// `defaults` (2026-10-25 fix pass): values for keys the file lacks (playtest builds default to Borderless).
-  static GameSettings load(const std::string& path, const GameSettings& defaults = GameSettings{});
+  static GameSettings load(const std::string& path, const GameSettings& defaults);
+  /// Same, with built-in defaults (an overload: GCC rejects a GameSettings{} default argument inside the class).
+  static GameSettings load(const std::string& path);
   /// Writes the settings as JSON, creating parent directories. False when unwritable.
   bool save(const std::string& path) const;
 };
