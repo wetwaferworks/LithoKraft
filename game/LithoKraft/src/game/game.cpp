@@ -940,7 +940,14 @@ void Game::setBenchCamera(float t) {
     benchCam_ = player_.pos;
     return;
   }
-  if (benchPath_ == "still") {
+  if (benchPath_ == "still" || benchPath_ == "live") {
+    // 2026-10-25 (Archie perf plan): "live" = a held, JD-like play view (testworld looking down
+    // the rows to the horizon, ~350-600k tris) with the in-play HUD up, so bench numbers match
+    // what JD sees. LL_BENCH_POSE still overrides the pose.
+    if (benchPath_ == "live") {
+      player_.pos = {58.5f, 270.f, 42.5f}; player_.yaw = 4.712f; player_.pitch = -0.1f;
+      menuState_ = MenuState::Playing; showHud_ = true;
+    }
     static bool loggedPose = false;  // JD Vulkan push: log the held pose once (screenshot framing)
     if (!loggedPose) { loggedPose = true; logInfo("bench still pose: %.1f,%.1f,%.1f,%.3f,%.3f", player_.pos.x, player_.pos.y, player_.pos.z, player_.yaw, player_.pitch); }
     // Playtest 2026-10-16: hold the spawn pose (screenshots); LL_BENCH_POSE="x,y,z,yaw,pitch"
