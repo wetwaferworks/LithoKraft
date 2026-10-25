@@ -286,6 +286,13 @@ TestWorldLayout buildTestWorld(ChunkMap& w, int sx, int floorY, int sz, int scre
       put(x, y, screenZ, frame ? kCeramic : kColorLamp64);
       put(x, y, screenZ + 1, kCeramic);
     }
+  // 2026-10-24 10:50 PM (approved): Color Lamp 16 and 32 columns beside the ROM screen (east of its
+  // frame, 16 tall, ceramic backing) so the two smaller tiers are easy to find. Unpowered (off art).
+  for (int i = 0; i < 16; ++i) {
+    const int y = L.screen.y0 + i, xa = L.screen.x0 + px + 3, xb = xa + 2;
+    put(xa, y, screenZ, kColorLamp16); put(xa, y, screenZ + 1, kCeramic);
+    put(xb, y, screenZ, kColorLamp32); put(xb, y, screenZ + 1, kCeramic);
+  }
   paintPatternRom(w, L.screen, 0);
   L.screen.frame = 0;  // frame 0 is up; the player starts its count from tick 0
   {
