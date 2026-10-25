@@ -125,3 +125,18 @@ For radius 32 and 48 at 1280x720, see the average-FPS table earlier in this repo
 - V2b runs 1-3% behind the old path on average.
 - V2b's tail is as good or better. Its worst frames stay within about 1.5x the median. The old path had one run at radius 48 with an 11-hitch, 34 ms spike, and V2b never went above 18.6 ms.
 - On these paths the test world bench comes out at about the same weight as the plain flyover.
+## Display-mode baseline (2026-10-25, 5:20 AM ET)
+
+The full table is in `docs/roadmap/Display-Mode-Baseline-2026-10-25.md`.
+
+**Setup.** 30-second runs, 2 per case, flyover and test world, stream radius 8/32/48, draw modes 0 and 3, three display modes. Every run used immediate present with vsync off, so nothing was capped by vsync.
+
+**Results.**
+- Exclusive fullscreen runs at 1920x1080 and switches the monitor to 144 Hz.
+- Borderless runs at 1920x1080 on the desktop's 60 Hz mode.
+- Maximized runs at 1920x998, also at 60 Hz.
+- All three are within about 3% of each other on FPS.
+- Borderless has the steadiest worst-case frames: radius-48 p99.9 is about 16.1 ms, against 17.1-17.4 ms for maximized and 17.3-19.3 ms for fullscreen.
+- Maximized is 2-3% slower at radius 32-48, likely because the desktop compositor copies the windowed image.
+
+**Recommendation.** Borderless. One step for JD: set the Windows desktop to 144 Hz so that borderless also gets 144 Hz when vsync is on.
