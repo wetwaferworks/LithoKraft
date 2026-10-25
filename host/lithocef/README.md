@@ -145,3 +145,18 @@ That builds `lithocef_stub` and `lithocef_smoke` alongside (never
 inside) the engine and game targets. With the option OFF (the default)
 the build is behaviorally identical to before this layer existed: no
 new targets, no sim changes, no hash movement.
+
+## Phase 2 (2026-10-25): the four interfaces
+
+- `IHwLayer.h` ABI 2 appends `query_census` (`LithoHwCensus`: threads,
+  memory, refresh, GPU reachable; 0 = unknown, never a guess). The census
+  describes the machine, never the tenant.
+- `IHwCef.h`: CEF tenant settings (`LithoHwCefSettings`).
+- `IHwWebkit.h` + `hw_webkit_stub.cpp` (`lithohw_webkit_stub`): honest
+  unsupported tenant; `create` returns NULL, every verb returns
+  `LITHOHW_ERR_UNSUPPORTED`, refusals counted and printed.
+- `IHwGpu.h`: GPU capability declaration (`LithoHwGpuCaps`), not implemented.
+- `hw_log.h`: `LITHOHW_TRACE(...)`, ON without NDEBUG (debug), OFF in release
+  (expands to `((void)0)`; arguments not evaluated). Errors never go
+  through it.
+- `hwlayer_tenants_smoke` gates the above (ctest).

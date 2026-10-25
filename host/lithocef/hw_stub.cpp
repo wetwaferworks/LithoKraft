@@ -10,9 +10,11 @@
 // a known-good shape.
 #include "IHwLayer.h"
 #include "hw_stub.h"
+#include "hw_log.h"
 
 #include <cstring>
 #include <string>
+#include <thread>
 
 struct LithoHwShell {
   std::string app_name;
@@ -45,10 +47,11 @@ LithoHwShell* create(const LithoHwConfig* cfg) {
   s->width = cfg->surface_width > 0 ? cfg->surface_width : 1280;
   s->height = cfg->surface_height > 0 ? cfg->surface_height : 720;
   s->headless_ok = cfg->headless_ok;
+  LITHOHW_TRACE("stub create %dx%d preferred_surface=%d", int(s->width), int(s->height), int(s->preferred));
   return s;
 }
 
-void destroy(LithoHwShell* s) { delete s; }
+void destroy(LithoHwShell* s) { LITHOHW_TRACE("stub destroy (frames=%llu dropped=%llu)", s ? (unsigned long long)s->frames : 0ull, s ? (unsigned long long)s->dropped : 0ull); delete s; }
 
 int boot_engine(LithoHwShell* s, const LithoHwEngineBoot* boot) {
   if (!s) return LITHOHW_ERR_INVALID;
@@ -56,6 +59,7 @@ int boot_engine(LithoHwShell* s, const LithoHwEngineBoot* boot) {
   s->boot_payload = (boot && boot->payload_uri) ? boot->payload_uri : "";
   s->booted = true;
   s->error.clear();
+  LITHOHW_TRACE("stub boot_engine payload='%s'", s->boot_payload.c_str());
   return LITHOHW_OK;
 }
 
@@ -63,6 +67,7 @@ int shutdown(LithoHwShell* s) {
   if (!s) return LITHOHW_ERR_INVALID;
   if (!s->booted) return fail(s, LITHOHW_ERR_NOT_BOOTED, "engine not booted");
   s->booted = false;
+  LITHOHW_TRACE("stub shutdown");
   return LITHOHW_OK;
 }
 
@@ -84,6 +89,7 @@ int acquire_surface(LithoHwShell* s, LithoHwSurfaceDesc* out) {
   out->width = s->width;
   out->height = s->height;
   s->surface_held = true;
+  LITHOHW_TRACE("stub acquire_surface kind=NONE %dx%d", int(out->width), int(out->height));
   return LITHOHW_OK;
 }
 
@@ -96,11 +102,13 @@ int set_input_sink(LithoHwShell* s, const LithoHwInputSink* sink) {
   if (!sink) {
     s->sink = LithoHwInputSink{nullptr, nullptr};
     s->sink_set = false;
+    LITHOHW_TRACE("stub input sink detached");
     return LITHOHW_OK;
   }
   if (!sink->push_event) return fail(s, LITHOHW_ERR_INVALID, "sink has no push_event");
   s->sink = *sink;
   s->sink_set = true;
+  LITHOHW_TRACE("stub input sink registered");
   return LITHOHW_OK;
 }
 
@@ -108,6 +116,7 @@ int present(LithoHwShell* s) {
   if (!s) return LITHOHW_ERR_INVALID;
   if (!s->booted) return fail(s, LITHOHW_ERR_NOT_BOOTED, "present before boot");
   ++s->frames;
+  LITHOHW_TRACE("stub present frame=%llu", (unsigned long long)s->frames);
   return LITHOHW_OK;
 }
 
@@ -118,6 +127,19 @@ uint64_t dropped_inputs(LithoHwShell* s) { return s ? s->dropped : 0; }
 
 const char* last_error(LithoHwShell* s) { return s ? s->error.c_str() : "null shell"; }
 
+// ABI 2: the stub has no hardware under it, so it reports only what the
+// C++ runtime can honestly see (thread count); everything else is 0
+// (unknown). No GPU seat answers for a stub shell.
+int query_census(LithoHwShell* s, LithoHwCensus* out) {
+  if (!s || !out) return LITHOHW_ERR_INVALID;
+  *out = LithoHwCensus{};
+  out->logical_threads = std::thread::hardware_concurrency();
+  out->refresh_millihertz = 0;
+  out->gpu_reachable = 0;
+  LITHOHW_TRACE("stub query_census threads=%u", out->logical_threads);
+  return LITHOHW_OK;
+}
+
 const LithoHwApi kApi = {
     LITHOHW_ABI_VERSION,
     create, destroy, boot_engine, shutdown,
@@ -126,6 +148,7 @@ const LithoHwApi kApi = {
     present, refresh_millihertz,
     frames_presented, dropped_inputs,
     last_error,
+    query_census,
 };
 
 } // namespace
@@ -139,6 +162,7 @@ extern "C" int lithohw_stub_inject_event(LithoHwShell* s, const LithoHwInputEven
     return 0;
   }
   int consumed = s->sink.push_event(s->sink.user, ev);
+  LITHOHW_TRACE("stub input kind=%u t=%llu -> %s", ev->kind, (unsigned long long)ev->time_ns, consumed ? "consumed" : "dropped");
   if (!consumed) ++s->dropped;
   return consumed;
 }

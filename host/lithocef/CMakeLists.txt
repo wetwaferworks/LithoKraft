@@ -40,3 +40,12 @@ target_link_libraries(hwlayer_boot_smoke PRIVATE lithohw_stub lithohw_thread_han
 add_test(NAME hwlayer_stub_smoke COMMAND hwlayer_smoke)
 add_test(NAME hwlayer_boot_smoke COMMAND hwlayer_boot_smoke)
 add_test(NAME hwlayer_thread_handshake_smoke COMMAND thread_handshake_smoke)
+
+# IHwLayer phase 2 (2026-10-25): the IHwWebkit honest stub and the tenant
+# seats smoke (webkit refusals, census, IHwCef/IHwGpu headers).
+add_library(lithohw_webkit_stub STATIC hw_webkit_stub.cpp)
+target_include_directories(lithohw_webkit_stub PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(lithohw_webkit_stub PUBLIC cxx_std_17)
+add_executable(hwlayer_tenants_smoke hwlayer_tenants_smoke.cpp)
+target_link_libraries(hwlayer_tenants_smoke PRIVATE lithohw_stub lithohw_webkit_stub)
+add_test(NAME hwlayer_tenants_smoke COMMAND hwlayer_tenants_smoke)

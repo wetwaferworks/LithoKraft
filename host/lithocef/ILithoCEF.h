@@ -20,6 +20,7 @@ typedef LithoHwInputEventKind LithoCefInputEventKind;
 typedef LithoHwInputEvent LithoCefInputEvent;
 typedef LithoHwInputSink LithoCefInputSink;
 typedef LithoHwApi LithoCefApi;
+typedef LithoHwCensus LithoCefCensus;
 #define LITHOCEF_OK LITHOHW_OK
 #define LITHOCEF_ERR_INVALID LITHOHW_ERR_INVALID
 #define LITHOCEF_ERR_UNSUPPORTED LITHOHW_ERR_UNSUPPORTED

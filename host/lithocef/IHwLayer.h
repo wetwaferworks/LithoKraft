@@ -39,7 +39,22 @@
 extern "C" {
 #endif
 
-#define LITHOHW_ABI_VERSION 1u
+/* ABI 2 (2026-10-25, IHwLayer phase 2): query_census appended. */
+#define LITHOHW_ABI_VERSION 2u
+
+/* Hardware census (JD: "the layer spends what the hardware census says
+ * the machine can pay"). Every field is honest: 0 means unknown, never a
+ * guess. The census describes the machine, never the tenant: IHwCef,
+ * IHwWebkit and the stub all answer through the same struct, so the
+ * engine cannot tell which tenant is present. GPU detail lives behind
+ * IHwGpu (IHwGpu.h); here only whether one is reachable. */
+typedef struct LithoHwCensus {
+  uint32_t logical_threads;     /* hardware threads; feeds the Thread Handshake census */
+  uint32_t physical_memory_mb;  /* 0 = unknown */
+  int32_t refresh_millihertz;   /* display cadence; 0 = unknown / headless */
+  uint32_t gpu_reachable;       /* 1 = an IHwGpu seat can answer for this shell */
+  uint32_t reserved[4];         /* zero; appended fields take these first */
+} LithoHwCensus;
 
 /* Opaque shell instance. Created, owned, and destroyed by the backend;
  * the engine side only ever holds the pointer. */
@@ -180,6 +195,11 @@ typedef struct LithoHwApi {
   /* Human-readable detail for the most recent error on this shell.
    * Owned by the shell; valid until the next API call on it. */
   const char* (*last_error)(LithoHwShell* shell);
+
+  /* ABI 2. Hardware census / capability query. Fills *out (zeroing what
+   * the backend cannot know); LITHOHW_OK, or LITHOHW_ERR_INVALID on a
+   * null argument. Callable at any point between create and destroy. */
+  int (*query_census)(LithoHwShell* shell, LithoHwCensus* out);
 } LithoHwApi;
 
 /* The one symbol every LithoHw backend exports. */
