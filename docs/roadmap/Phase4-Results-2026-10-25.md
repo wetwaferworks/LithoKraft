@@ -74,3 +74,10 @@ The baselines convict neither, so neither was implemented.
 1. Fix the bench streaming harness (a game-side change that needs JD's approval), then rerun T2/T3. That is the only test that could convict 4.1.
 2. Biggest renderer lever: blend-quad split for LithoVoxel pulling (67% of quads), then sub-cell support. Coverage would rise from 8% to potentially ~90%. It is worth asking Archie whether that is the next phase.
 3. Shading cost, not draw submission, sets the frame rate on this GPU.
+## Update ~6:50 AM ET: T2/T3 run after JD's 6:30 approval
+
+- e2a84e1: the bench streamer follows the bench camera. The cause was that update() reset player_.pos from the locomotion body before the streamer read it. Rollback: git reset --hard b352684.
+- T2/T3 sprint: r32 mode 3 at 115 FPS (1% low 69), r64 mode 3 at 92 FPS (1% low 25; warm 74 FPS), r64 3p at 68 FPS. Peak RAM 3.4 GB at r64. r128 was not run because the CLI caps --stream-radius at 64. Full table: Report-for-Archie-Phase4-Questions-2026-10-25.md.
+- This run convicted the CPU frustum loop, which takes 5.6-7.3 ms per frame at r64 (about 25k hash-map nodes). That is the 4.2 family, so I implemented 585db08, the Phase 4.2a compact cull list (LL_VK_FASTCULL=1, default off). Same decisions; r64 FPS went from 84.5 to 104.6 and cull from 3.0 to 1.7 ms. Rollback: git reset --hard e2a84e1.
+- The 1% lows did not move (40-55 ms streaming spikes). 4.1, the governor, is next but unproven; it needs per-spike attribution first.
+- Direction and final verify JD. LithoPipeline designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
