@@ -470,15 +470,35 @@ void cSignalSim::wakeAround(int64_t k) {
       }
 }
 
+// 2026-10-25 (JD): via link rules. Vertical: same colour, at least one vertical via, no side via.
+// Horizontal (same y, step dx/dz): needs a side via whose axis matches the step; the other end is a
+// same-axis side via, a vertical via (pipe elbow) or a flat Trace. Symmetric; colour checked by caller.
+static bool viaVertOk(BlockId self, BlockId nb) {
+  return (viaAxis(self) == 0 || viaAxis(nb) == 0) && !isSideVia(self) && !isSideVia(nb);
+}
+static bool viaSideOk(BlockId self, BlockId nb, int dx) {
+  const int ax = dx ? 1 : 2, sa = viaAxis(self), na = viaAxis(nb);
+  if (sa > 0 && sa != ax) return false;
+  if (na > 0 && na != ax) return false;
+  return sa > 0 || na > 0;
+}
+
 void cSignalSim::wireLinks(const ChunkMap& w, int x, int y, int z, std::vector<int64_t>& out) const {
   const auto& reg = blockRegistry();
   const uint8_t channel = reg.def(w.get(x, y, z)).channel;
-  const bool selfVia = isVia(w.get(x, y, z));
+  const BlockId self = w.get(x, y, z);
+  const bool selfVia = isVia(self);
   for (int dy = -1; dy <= 1; dy += 2) {  // via links: straight up/down, same colour, lossless
     const BlockId nb = w.get(x, y + dy, z);
-    if (isWire(nb) && reg.def(nb).channel == channel && (selfVia || isVia(nb))) out.push_back(packPos(x, y + dy, z));
+    if (isWire(nb) && reg.def(nb).channel == channel && (selfVia || isVia(nb)) && viaVertOk(self, nb)) out.push_back(packPos(x, y + dy, z));
   }
-  if (selfVia) return;  // a via never links sideways (red and blue tubes can touch)
+  if (selfVia) {  // vertical vias only reach sideways into a side via pointing at them
+    for (auto& d : kH) {
+      const BlockId nb = w.get(x + d[0], y, z + d[1]);
+      if (isWire(nb) && reg.def(nb).channel == channel && viaSideOk(self, nb, d[0])) out.push_back(packPos(x + d[0], y, z + d[1]));
+    }
+    return;
+  }
   const bool upBlocked = reg.has(w.get(x, y + 1, z), kCutsWire);
   for (auto& d : kH) {
     const int nx = x + d[0], nz = z + d[1];
@@ -486,7 +506,8 @@ void cSignalSim::wireLinks(const ChunkMap& w, int x, int y, int z, std::vector<i
       if (dy == 1 && upBlocked) continue;
       if (dy == -1 && reg.has(w.get(nx, y, nz), kCutsWire)) continue;
       const BlockDef nd = reg.def(w.get(nx, y + dy, nz));
-      if (nd.role != SimRole::Wire || nd.channel != channel || isVia(w.get(nx, y + dy, nz))) continue;
+      if (nd.role != SimRole::Wire || nd.channel != channel) continue;
+      if (isVia(w.get(nx, y + dy, nz)) && !(dy == 0 && viaSideOk(self, w.get(nx, y, nz), d[0]))) continue;  // Trace feeds a via only through a side via's open end
       out.push_back(packPos(nx, y + dy, nz));
     }
   }
@@ -796,12 +817,12 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
   for (int64_t k : wires_) resetWire(k);
   for (auto& b : buckets_) b.clear();
   for (auto& b : nbuckets_) b.clear();
-  auto seed = [&](int x, int y, int z, int s, uint8_t channel) {  // channel 0 = either colour
+  auto seed = [&](int x, int y, int z, int s, uint8_t channel, int viaAx = 0) {  // channel 0 = either colour; viaAx: Repeator emit axis
     const BlockDef d = reg.def(w.get(x, y, z));
     // SW-H2: guard the high end too — buckets_ has kMaxSignal + 1 entries, so
     // s in 65..255 (reachable via a disk-loaded value before the input clamps)
     // was an out-of-bounds array access.
-    if (d.role != SimRole::Wire || isVia(w.get(x, y, z)) || (channel && d.channel != channel) || s <= 0 || s > kMaxSignal) return;
+    if (d.role != SimRole::Wire || (isVia(w.get(x, y, z)) && !(viaAx > 0 && viaAxis(w.get(x, y, z)) == viaAx)) || (channel && d.channel != channel) || s <= 0 || s > kMaxSignal) return;
     if (stValue(w.getState(x, y, z)) >= s || !area_.contains(x, z)) return;
     w.setState(x, y, z, CellState(s));
     buckets_[s].push_back(packPos(x, y, z));
@@ -846,7 +867,8 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
       const int s = c.behavior->emitToward(d, st, c.mem);
       if (s <= 0) continue;
       if (c.mem.pulse) pulses.push_back({packPos(x + kDirX[d], y, z + kDirZ[d]), s});
-      else seed(x + kDirX[d], y, z + kDirZ[d], s, uint8_t(c.behavior->emitChannel(d, st, c.mem)));
+      else seed(x + kDirX[d], y, z + kDirZ[d], s, uint8_t(c.behavior->emitChannel(d, st, c.mem)),
+           reg.def(w.get(x, y, z)).role == SimRole::Repeator ? (kDirX[d] ? 1 : 2) : 0);  // Repeator feeds a side via end-on
       // Hard-powered block in front of a Repeator: colourless power to its other five faces.
       if (!c.mem.pulse && mountPowered_.contains(packPos(x + kDirX[d], y, z + kDirZ[d])) && reg.def(w.get(x, y, z)).role == SimRole::Repeator)
         for (auto& e : k6) seed(x + kDirX[d] + e[0], y + e[1], z + kDirZ[d] + e[2], s, 0);
@@ -855,12 +877,19 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
   // Neighbours of a wire cell along the run (same channel; one-block stairs).
   auto forEachLink = [&](int x, int y, int z, auto&& fn) {
     const uint8_t channel = reg.def(w.get(x, y, z)).channel;
-    const bool selfVia = isVia(w.get(x, y, z));
+    const BlockId self = w.get(x, y, z);
+    const bool selfVia = isVia(self);
     for (int dy = -1; dy <= 1; dy += 2) {  // via links (vertical, lossless)
       const BlockId nb = w.get(x, y + dy, z);
-      if (isWire(nb) && reg.def(nb).channel == channel && (selfVia || isVia(nb))) fn(x, y + dy, z);
+      if (isWire(nb) && reg.def(nb).channel == channel && (selfVia || isVia(nb)) && viaVertOk(self, nb)) fn(x, y + dy, z);
     }
-    if (selfVia) return;
+    if (selfVia) {
+      for (auto& d : kH) {
+        const BlockId nb = w.get(x + d[0], y, z + d[1]);
+        if (isWire(nb) && reg.def(nb).channel == channel && viaSideOk(self, nb, d[0]) && area_.contains(x + d[0], z + d[1])) fn(x + d[0], y, z + d[1]);
+      }
+      return;
+    }
     const bool upBlocked = reg.has(w.get(x, y + 1, z), kCutsWire);
     for (auto& d : kH) {
       const int nx = x + d[0], nz = z + d[1];
@@ -868,7 +897,8 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
         if (dy == 1 && upBlocked) continue;        // climbing needs headroom above this wire
         if (dy == -1 && reg.has(w.get(nx, y, nz), kCutsWire)) continue;  // descending past a block edge
         const BlockDef nd = reg.def(w.get(nx, y + dy, nz));
-        if (nd.role != SimRole::Wire || nd.channel != channel || isVia(w.get(nx, y + dy, nz))) continue;  // red never meets blue
+        if (nd.role != SimRole::Wire || nd.channel != channel) continue;  // red never meets blue
+        if (isVia(w.get(nx, y + dy, nz)) && !(dy == 0 && viaSideOk(self, w.get(nx, y, nz), d[0]))) continue;  // only a side via's open end
         if (!area_.contains(nx, nz)) continue;
         fn(nx, y + dy, nz);
       }
@@ -953,11 +983,11 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
     for (size_t i = 0; i < a.st.size(); ++i) { a.old[i] = *a.st[i]; *a.st[i] = 0; }
   }
   for (auto& b : nbuckets_) b.clear();  // legacy hygiene (the global buckets are unused by the per-net flood)
-  auto seed = [&](int x, int y, int z, int s, uint8_t channel) {  // channel 0 = either colour
+  auto seed = [&](int x, int y, int z, int s, uint8_t channel, int viaAx = 0) {  // channel 0 = either colour; viaAx: Repeator emit axis
     const BlockDef d = reg.def(w.get(x, y, z));
     // SW-H2: same high-end guard as the full-pass seed (the recorded strength
     // is later applied via lb[size_t(s)] in hsPropagateNet, sized kMaxSignal + 1).
-    if (d.role != SimRole::Wire || isVia(w.get(x, y, z)) || (channel && d.channel != channel) || s <= 0 || s > kMaxSignal) return;
+    if (d.role != SimRole::Wire || (isVia(w.get(x, y, z)) && !(viaAx > 0 && viaAxis(w.get(x, y, z)) == viaAx)) || (channel && d.channel != channel) || s <= 0 || s > kMaxSignal) return;
     const auto it = wireLoc_.find(packPos(x, y, z));
     if (it == wireLoc_.end() || !isNetMarked(it->second.first)) return;
     hsNetWork_[size_t(it->second.first)].seeds.push_back({it->second.second, s});
@@ -1003,7 +1033,8 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
         if (it != wireLoc_.end() && isNetMarked(it->second.first) &&
             !netArr_[size_t(it->second.first)].via[size_t(it->second.second)])
           hsNetWork_[size_t(it->second.first)].pulses.push_back({it->second.second, s});
-      } else seed(x + kDirX[d], y, z + kDirZ[d], s, uint8_t(c.behavior->emitChannel(d, st, c.mem)));
+      } else seed(x + kDirX[d], y, z + kDirZ[d], s, uint8_t(c.behavior->emitChannel(d, st, c.mem)),
+           reg.def(w.get(x, y, z)).role == SimRole::Repeator ? (kDirX[d] ? 1 : 2) : 0);  // Repeator feeds a side via end-on
       // Hard-powered block in front of a Repeator: colourless power to its other five faces.
       if (!c.mem.pulse && mountPowered_.contains(packPos(x + kDirX[d], y, z + kDirZ[d])) && reg.def(w.get(x, y, z)).role == SimRole::Repeator)
         for (auto& e : k6) seed(x + kDirX[d] + e[0], y + e[1], z + kDirZ[d] + e[2], s, 0);

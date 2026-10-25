@@ -24,6 +24,15 @@ bool needsFloorSupport(BlockId b) {
 bool floorSupported(const ChunkMap& w, int x, int y, int z) { return blockRegistry().has(w.get(x, y - 1, z), kSolid); }
 }  // namespace
 
+// 2026-10-25 (JD): a Via placed against a SIDE face lies on its side, open ends pointing at the
+// clicked block (X or Z); against a top/bottom face it stands vertical as before.
+BlockId cSignalWorldSim::placeVariant(const ChunkMap&, BlockId block, int hdx, int hdy, int hdz) const {
+  if (viaAxis(block) != 0 || hdy != 0) return block;
+  if (hdx) return viaSide(block, 1);
+  if (hdz) return viaSide(block, 2);
+  return block;
+}
+
 bool cSignalWorldSim::canPlace(const ChunkMap& w, int x, int y, int z, BlockId block) const {
   if (isFlatWire(block)) return wireSupported(w, x, y, z);
   if (needsFloorSupport(block)) return floorSupported(w, x, y, z);  // 2026-10-24: Memor floor-only
@@ -204,7 +213,7 @@ void cSignalWorldSim::onBlockPopped(ChunkMap& /*w*/, int x, int y, int z, BlockI
       dropEvents_.push_back(SimEvent{kEvItemDrop, int(kItemSilicaSeed), x, y, z});
     return;
   }
-  dropEvents_.push_back(SimEvent{kEvItemDrop, int(was), x, y, z});
+  dropEvents_.push_back(SimEvent{kEvItemDrop, int(viaBase(was)), x, y, z});  // side vias drop the base via
 }
 
 void cSignalWorldSim::onRandomTick(ChunkMap& w, int x, int y, int z, BlockId block, uint32_t rnd,

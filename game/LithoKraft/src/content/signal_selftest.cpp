@@ -597,6 +597,45 @@ int runSignalSelfTest() {
     check(stValue(vw.getState(6, y + 1, 3)) == 0 && stValue(vw.getState(6, y + 1, 5)) == 63,
           "glass: glass over a wire blocks the stair climb (control stair without glass is lit)");
   }
+  {  // 2026-10-25 (JD): side-lying Vias: horizontal runs, pipe elbows, end-only Trace / Repeator feed.
+    ChunkMap vw;
+    vw.setRegistry(&blockRegistry());
+    { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; vw.insert(std::move(col)); }
+    for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) vw.set(x, y - 1, z, kWaferSilicon);
+    auto putF = [&](int x, int yy, int z, BlockId b, int f) { vw.set(x, yy, z, b); vw.setState(x, yy, z, makeState(0, f)); };
+    // A: torch -> trace -> 4 side vias (X) -> trace.
+    vw.set(0, y, 1, kRedTorch); vw.set(1, y, 1, kRedTrace);
+    for (int x = 2; x <= 5; ++x) vw.set(x, y, 1, kRedViaX);
+    vw.set(6, y, 1, kRedTrace);
+    // B: elbow: side via (X) -> vertical stack up 2 -> side via (X) -> trace at the top.
+    vw.set(0, y, 3, kRedTorch); vw.set(1, y, 3, kRedTrace); vw.set(2, y, 3, kRedViaX);
+    for (int yy = y; yy <= y + 2; ++yy) vw.set(3, yy, 3, kRedVia);
+    vw.set(4, y + 2, 3, kRedViaX); vw.set(5, y + 2, 3, kRedTrace); vw.set(5, y + 1, 3, kWaferSilicon);
+    // C: a trace against a side via's closed side (Z via fed along X) and against a vertical via.
+    vw.set(0, y, 5, kRedTorch); vw.set(1, y, 5, kRedTrace); vw.set(2, y, 5, kRedViaZ);
+    vw.set(0, y, 7, kRedTorch); vw.set(1, y, 7, kRedTrace); vw.set(2, y, 7, kRedVia);
+    // D: colour: lit red side via end-on to a blue side via.
+    vw.set(0, y, 9, kRedTorch); vw.set(1, y, 9, kRedTrace); vw.set(2, y, 9, kRedViaX); vw.set(3, y, 9, kBlueViaX); vw.set(4, y, 9, kBlueTrace);
+    // E: Repeator (facing E) into a side via end (X) vs into a side via's closed side (Z).
+    vw.set(0, y, 11, kRedTorch); vw.set(1, y, 11, kRedTrace); putF(2, y, 11, kRepeator, 1); vw.set(3, y, 11, kRedViaX); vw.set(4, y, 11, kRedTrace);
+    vw.set(0, y, 13, kRedTorch); vw.set(1, y, 13, kRedTrace); putF(2, y, 13, kRepeator, 1); vw.set(3, y, 13, kRedViaZ); vw.set(4, y, 13, kRedTrace);
+    cSignalSim vs;
+    vs.scan(vw);
+    for (int i = 0; i < 40; ++i) vs.tick(vw, 0, 0, 100, [](int, int, int) {});
+    auto v = [&](int x, int yy, int z) { return stValue(vw.getState(x, yy, z)); };
+    check(v(1, y, 1) == 64 && v(3, y, 1) == 64 && v(5, y, 1) == 64 && v(6, y, 1) == 64,
+          "side via: a Trace feeds a side via run through its open end; it carries horizontally, losslessly (64 -> 64)");
+    check(v(2, y, 3) == 64 && v(3, y + 1, 3) == 64 && v(3, y + 2, 3) == 64 && v(4, y + 2, 3) == 64 && v(5, y + 2, 3) == 64,
+          "side via: elbows: side -> vertical stack turns up, vertical -> side turns back out (pipe elbow)");
+    check(v(1, y, 5) == 64 && v(2, y, 5) == 0 && v(1, y, 7) == 64 && v(2, y, 7) == 0,
+          "side via: a Trace never feeds a side via's closed side, nor a vertical via sideways");
+    check(v(2, y, 9) == 64 && v(3, y, 9) == 0 && v(4, y, 9) == 0,
+          "side via: red and blue side vias never connect end to end");
+    check(v(3, y, 11) > 0 && v(4, y, 11) > 0 && v(3, y, 13) == 0 && v(4, y, 13) == 0,
+          "side via: a Repeator feeds a side via only through its open end");
+    check(viaAxis(kRedVia) == 0 && viaAxis(kBlueViaZ) == 2 && viaSide(kRedVia, 1) == kRedViaX && viaBase(kBlueViaX) == kBlueVia && viaAxis(kRedTrace) == -1,
+          "side via: axis / variant / drop-base helpers (existing vias stay vertical)");
+  }
   {  // Wall-pixel: Catchor decoders off per-row Pulsor lines; each pixel shows its caught value,
      // lights alone within its row, left to right; rows are isolated; no wire floats.
     for (const int rows : {1, 16}) {

@@ -244,6 +244,12 @@ cBlockReg& mutableRegistry() {
   // run, 4 facings, no corners, no hanging (never a stair/roof block). State: facing bits 0-1 (high
   // side), bit 2 half (0 low, 1 high); see procgen/ramp_shape.h `highway`. Reuses the Aluminum Ramp art.
   r.add(def("lithokraft:highway_ramp", "Highway Ramp", kSolid | kTransparent | kDirectional, S::Custom, "aluminum_block", "", R::None, 0, 0, 45));
+  // 2026-10-25 (JD): side-lying Vias, appended at the END. Same art and colour channel as the
+  // vertical via; open ends along X or Z. Placed by clicking a side face while holding a via.
+  r.add(def("lithokraft:red_via_x", "Red Via (side, X)", kSolid | kTransparent, S::Cube, "red_via", "wire", R::Wire, 1, 0, 45));
+  r.add(def("lithokraft:red_via_z", "Red Via (side, Z)", kSolid | kTransparent, S::Cube, "red_via", "wire", R::Wire, 1, 0, 45));
+  r.add(def("lithokraft:blue_via_x", "Blue Via (side, X)", kSolid | kTransparent, S::Cube, "blue_via", "wire", R::Wire, 2, 0, 45));
+  r.add(def("lithokraft:blue_via_z", "Blue Via (side, Z)", kSolid | kTransparent, S::Cube, "blue_via", "wire", R::Wire, 2, 0, 45));
     // Save migration: pre-rename ids remap to the -OR names (2026-10-10).
     r.addAlias("lithokraft:pulsar", "lithokraft:pulsor");
     // 2026-10-16 (JD): the Repeater is now the Repeator; old saves name the old id.
@@ -330,6 +336,10 @@ const BlockId kDirtSlab         = resolveId(blockRegistry(), "lithokraft:dirt_sl
 const BlockId kToneBlock        = resolveId(blockRegistry(), "lithokraft:tone_block");
 const BlockId kRedVia           = resolveId(blockRegistry(), "lithokraft:red_via");
 const BlockId kBlueVia          = resolveId(blockRegistry(), "lithokraft:blue_via");
+const BlockId kRedViaX          = resolveId(blockRegistry(), "lithokraft:red_via_x");
+const BlockId kRedViaZ          = resolveId(blockRegistry(), "lithokraft:red_via_z");
+const BlockId kBlueViaX         = resolveId(blockRegistry(), "lithokraft:blue_via_x");
+const BlockId kBlueViaZ         = resolveId(blockRegistry(), "lithokraft:blue_via_z");
 const BlockId kGlass            = resolveId(blockRegistry(), "lithokraft:glass");
 const BlockId kCatchor          = resolveId(blockRegistry(), "lithokraft:catchor");
 const BlockId kFrostedGlass     = resolveId(blockRegistry(), "lithokraft:frosted_glass");

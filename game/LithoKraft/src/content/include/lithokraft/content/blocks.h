@@ -39,6 +39,11 @@ extern const BlockId kDirtSlab;
 extern const BlockId kToneBlock;
 extern const BlockId kRedVia;   // hollow vertical wire tube: links only straight up/down, lossless
 extern const BlockId kBlueVia;
+// 2026-10-25 (JD): side-lying Vias, open ends along X or Z (appended ids; old saves keep vertical vias).
+extern const BlockId kRedViaX;
+extern const BlockId kRedViaZ;
+extern const BlockId kBlueViaX;
+extern const BlockId kBlueViaZ;
 extern const BlockId kGlass;    // non-conductive, see-through; cuts wire stairs past it
 extern const BlockId kCatchor;
 extern const BlockId kFrostedGlass;  // like glass, diffused look
@@ -194,7 +199,23 @@ cBlockReg& mutableBlockRegistry();
 BlockId registerBlock(BlockDef def);
 inline BlockDef blockDef(BlockId b) { return blockRegistry().def(b); }
 inline SimRole roleOf(BlockId b) { return roleOf(blockDef(b)); }
-inline bool isVia(BlockId b) { return b == kRedVia || b == kBlueVia; }
+inline bool isVia(BlockId b) { return b == kRedVia || b == kBlueVia || b == kRedViaX || b == kRedViaZ || b == kBlueViaX || b == kBlueViaZ; }
+/// Via axis: -1 not a via, 0 vertical (Y), 1 side-lying along X, 2 side-lying along Z.
+inline int viaAxis(BlockId b) {
+  if (b == kRedVia || b == kBlueVia) return 0;
+  if (b == kRedViaX || b == kBlueViaX) return 1;
+  if (b == kRedViaZ || b == kBlueViaZ) return 2;
+  return -1;
+}
+inline bool isSideVia(BlockId b) { return viaAxis(b) > 0; }
+/// The vertical (item) form of any via: side vias drop as their base colour.
+inline BlockId viaBase(BlockId b) { return (b == kRedViaX || b == kRedViaZ) ? kRedVia : (b == kBlueViaX || b == kBlueViaZ) ? kBlueVia : b; }
+/// The side-lying variant of a vertical via for axis 1 (X) or 2 (Z); other blocks unchanged.
+inline BlockId viaSide(BlockId b, int axis) {
+  if (b == kRedVia) return axis == 1 ? kRedViaX : kRedViaZ;
+  if (b == kBlueVia) return axis == 1 ? kBlueViaX : kBlueViaZ;
+  return b;
+}
 /// Any wire-network cell (wire or via). Vias only talk vertically to their own colour, so code that
 /// reads "power from an adjacent wire" uses isFlatWire.
 inline bool isWire(BlockId b) { return roleOf(b) == SimRole::Wire; }

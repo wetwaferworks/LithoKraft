@@ -96,9 +96,9 @@ int runContentSelfTest() {
       {  // 2026-10-16 WaferBeta: Lithographor re-enabled at the END of the registry (id 92), Custom cuboids.
         const auto id = reg.findById("lithokraft:lithographor");
         const BlockDef d = id ? reg.def(*id) : BlockDef{};
-        check(id && *id == BlockId(kFoliageMoss + 5) && reg.size() == size_t(kFoliageMoss) + 8 && d.shape == Shape::Custom &&
+        check(id && *id == BlockId(kFoliageMoss + 5) && reg.size() == size_t(kFoliageMoss) + 12 && kRedViaX == BlockId(kFoliageMoss + 8) && kBlueViaZ == BlockId(kFoliageMoss + 11) &&  /* 2026-10-25: + 4 side vias */ d.shape == Shape::Custom &&
                   (d.flags & litholattice::kDirectional) && !(d.flags & kOpaque) && d.tex == "lithographor",
-              "lithographor: id 92 (appended; Aluminum Ramp 93 follows), Custom directional cuboid model, tex lithographor");
+              "lithographor: id 92 (appended; Aluminum Ramp 93, Highway Ramp, 4 side Vias follow), Custom directional cuboid model, tex lithographor");
         // Cortana 2026-10-16: Aluminum Ramp appended after the Lithographor (id 93), Custom slope, not opaque.
         const auto rid = reg.findById("lithokraft:aluminum_ramp");
         const BlockDef rd = rid ? reg.def(*rid) : BlockDef{};

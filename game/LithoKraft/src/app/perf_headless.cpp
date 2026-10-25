@@ -60,6 +60,7 @@ class cTimedSim final : public IWorldSim {
   explicit cTimedSim(std::unique_ptr<IWorldSim> s) : s_(std::move(s)) {}
   void scan(const ChunkMap& w) override { s_->scan(w); }
   bool canPlace(const ChunkMap& w, int x, int y, int z, BlockId b) const override { return s_->canPlace(w, x, y, z, b); }
+  BlockId placeVariant(const ChunkMap& w, BlockId b, int dx, int dy, int dz) const override { return s_->placeVariant(w, b, dx, dy, dz); }
   bool stillSupported(const ChunkMap& w, int x, int y, int z) const override { return s_->stillSupported(w, x, y, z); }
   void onBlockChanged(ChunkMap& w, int x, int y, int z, BlockId b) override { s_->onBlockChanged(w, x, y, z, b); }
   bool use(ChunkMap& w, int x, int y, int z, const DirtyFn& d) override { return s_->use(w, x, y, z, d); }

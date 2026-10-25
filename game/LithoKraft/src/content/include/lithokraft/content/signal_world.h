@@ -32,6 +32,7 @@ class cSignalWorldSim final : public IWorldSim {
  public:
   void scan(const ChunkMap& world) override { signal_.scan(world); }
   bool canPlace(const ChunkMap& world, int x, int y, int z, BlockId block) const override;
+  BlockId placeVariant(const ChunkMap& world, BlockId block, int hdx, int hdy, int hdz) const override;
   bool canAttach(const ChunkMap& world, int x, int y, int z, BlockId block, int face) const override;
   bool stillSupported(const ChunkMap& world, int x, int y, int z) const override;
   std::string inspect(const ChunkMap& w, int x, int y, int z) const override { return signal_.inspect(w, x, y, z); }
