@@ -24,6 +24,15 @@ std::optional<Image> cResourceMgr::bestItemIcon(const std::string& name) const {
       for (const auto& e : std::filesystem::directory_iterator(d.parent_path(), ec))
         if (e.is_directory(ec) && e.path().filename().string().rfind("pack_", 0) == 0) roots.push_back(e.path());
   }
+  // 2026-10-25 (JD): CloudAtlas 256x256 item icons (assets/item_icons/256) are the source for every pack.
+  for (const auto& d : dirs_) {
+    if (!d.has_parent_path()) continue;
+    const auto f = d.parent_path().parent_path() / "item_icons" / "256" / (name + "_item.png");
+    std::error_code ec;
+    if (!std::filesystem::exists(f, ec)) continue;
+    std::string err;
+    if (auto img = loadTextureFileCached(f, &err)) return img;
+  }
   std::optional<Image> best;
   for (const auto& root : roots) {
     const auto f = root / "textures" / "ui" / "icons" / (name + "_item.png");
