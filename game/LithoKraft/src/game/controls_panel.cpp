@@ -35,6 +35,7 @@ const Row kRows[] = {
     {"Save world", {Action::SaveWorld}},
     {"reload textures + shaders", {Action::ReloadResources}},
     {"script editor (debug)", {Action::ScriptEditor}},
+    {"screenshot", {Action::Screenshot}},
     {"pause / release", {Action::Pause}},
 };
 

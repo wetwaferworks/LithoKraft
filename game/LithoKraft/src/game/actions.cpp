@@ -22,7 +22,7 @@ constexpr A kUiText[] = {A::Look};
 constexpr A kTyping[] = {A::Pause, A::Look};
 // Debug keys (function keys / pad Back, which never produce text) work in every mode.
 constexpr A kDebug[] = {A::ToggleHUD, A::ToggleDebug, A::CycleTPS, A::SwitchDim, A::ToggleEUV, A::ReloadResources, A::SaveWorld,
-                         A::ScriptEditor};
+                         A::ScriptEditor, A::Screenshot};
 
 ContextRules rules(const char* name, bool opaque, bool wantsText, bool atStart, std::span<const Action> actions) {
   ContextRules r{name, opaque, wantsText, atStart, {}};
@@ -75,6 +75,7 @@ ActionMap defaultActionMap() {
   bind(A::SaveWorld, {B::key(Key::F5)});
   bind(A::ReloadResources, {B::key(Key::F9)});
   bind(A::ScriptEditor, {B::key(Key::F10)});
+  bind(A::Screenshot, {B::key(Key::F2)});  // 2026-10-25 (JD): screenshot key, every renderer
   bind(A::Pause, {B::key(Key::Escape), B::pad(GB::Start)});
   bind(A::Look, {B::mouseMotion(), B::stick(Stick::Right)});
   return m;

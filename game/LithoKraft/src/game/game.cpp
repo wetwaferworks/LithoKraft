@@ -1815,6 +1815,7 @@ void Game::handleToggles() {
   if (input_.pressed(Action::SwitchDim)) switchDimension(active_->id == "wafer" ? "organic" : "wafer");
   if (input_.pressed(Action::ToggleControls)) showControls_ = !showControls_;
   if (input_.pressed(Action::ToggleHUD)) showHud_ = !showHud_;
+  if (input_.pressed(Action::Screenshot)) logInfo("%s", requestScreenshot(ScreenshotRequest{}).c_str());  // 2026-10-25 (JD): F2
   if (input_.pressed(Action::ToggleDebug)) showDebug_ = !showDebug_ && !cfg_.capture;  // capture: F3 stays off
   if (input_.pressed(Action::Inventory)) setInventoryOpen(!inventoryOpen_);
   if (input_.pressed(Action::ReloadResources)) reloadResources();
@@ -2583,6 +2584,7 @@ void Game::capturePendingScreenshot() {
   std::string err;
   if (!captureScreenshot(renderer_, ps.req.lowres, vw, vh, shot, &err)) {
     consoleRegistry_.print("screenshot: " + err);
+    logError("screenshot: %s", err.c_str());
     return;
   }
   const std::string dims =
@@ -2608,6 +2610,7 @@ void Game::capturePendingScreenshot() {
     return;
   }
   consoleRegistry_.print("screenshot: saved '" + ps.path + "' (" + dims + ")");
+  logInfo("screenshot: saved '%s' (%s)", ps.path.c_str(), dims.c_str());
 }
 
 // 0.0.1.53 [C53-1] (Proposed by JD; co-implemented by JD and Cortana): per-section main-thread timing of update(),
