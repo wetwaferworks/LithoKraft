@@ -1,3 +1,30 @@
+# IHwLayer — the hardware layer (formerly LithoCEF)
+
+**Renamed and split 2026-10-25 (JD).** The layer is no longer just the CEF
+host: it is *the* hardware layer — it sits outside the engine, boots the
+engine, plugs into the hardware, and provides hardware resources while the
+engine never learns what it runs on. Interface set (JD, 2026-10-25 01:54 EDT):
+
+- **IHwLayer** (`IHwLayer.h`) — the base contract every tenant sits behind.
+- **IHwCef** (`IHwCef.h`) — the CEF host tenant; the current working path.
+- **IHwWebkit** — WebKit / Safari view tenant, stub only (phase 2).
+- **IHwGpu** — GPU capability interface, the seat for hardware draw paths (phases 2–3).
+
+`ILithoCEF.h` remains as a compatibility header mapping the old names onto
+IHwLayer. The directory stays `host/lithocef` and the engine option stays
+`LL_WITH_LITHOCEF` (renaming them would touch engine/CMakeLists.txt, outside
+this layer). Targets: `lithohw_stub`, `lithohw_thread_handshake`,
+`hwlayer_smoke`, `hwlayer_boot_smoke`, `thread_handshake_smoke`.
+
+Doctrine (JD's, locked): proprietary and closed — `host/` stays out of the
+public MIT drop; the Thread Handshake lives here, semantics frozen; the
+Timing Handshake is *not* part of this layer; no Emscripten here (no linking,
+no includes); loud boot errors stay loud; the scenario hash does not move.
+
+The constitution below is carried verbatim from LithoCEF; read "LithoCEF
+shell" as the IHwLayer base and `lithocef_*` as `lithohw_*` / `hwlayer_*`.
+
+---
 # LithoCEF — the Litho CEF layer
 
 JD's law of the shape (verbatim, 2026-10-20 08:21 EDT):

@@ -1,4 +1,4 @@
-// lithocef_boot_smoke.cpp — the ILithoCEF lifecycle the first smoke does
+// hwlayer_boot_smoke.cpp — the IHwLayer lifecycle the first smoke does
 // not reach, plus the two JD designs composing: a shell that boots,
 // serves, shuts down, and boots AGAIN (the contract's re-boot clause),
 // with a finite engine-side ring (drops counted at capacity, not only
@@ -11,8 +11,8 @@
 #include <cstdio>
 #include <cstring>
 
-#include "ILithoCEF.h"
-#include "lithocef_stub.h"
+#include "IHwLayer.h"
+#include "hw_stub.h"
 #include "thread_handshake.h"
 
 namespace {
@@ -22,7 +22,7 @@ struct FiniteRing {
   int consumed = 0;
 };
 
-int push_event(void* user, const LithoCefInputEvent* ev) {
+int push_event(void* user, const LithoHwInputEvent* ev) {
   auto* r = static_cast<FiniteRing*>(user);
   (void)ev;
   if (r->consumed >= r->capacity) return 0; // ring full: honest refusal
@@ -37,49 +37,49 @@ void count_job(void* user, uint32_t worker_index) {
 }
 
 bool check(bool cond, const char* what) {
-  if (!cond) std::printf("LITHOCEF BOOT SMOKE FAIL: %s\n", what);
+  if (!cond) std::printf("LITHOHW BOOT SMOKE FAIL: %s\n", what);
   return cond;
 }
 
 } // namespace
 
 int main() {
-  const LithoCefApi* api = lithocef_get_api();
+  const LithoHwApi* api = lithohw_get_api();
   bool ok = true;
-  ok &= check(api != nullptr, "lithocef_get_api returned null");
+  ok &= check(api != nullptr, "lithohw_get_api returned null");
   if (!ok) return 1;
 
-  LithoCefConfig cfg{};
-  cfg.abi_version = LITHOCEF_ABI_VERSION;
-  cfg.application_name = "LithoCEF boot smoke";
+  LithoHwConfig cfg{};
+  cfg.abi_version = LITHOHW_ABI_VERSION;
+  cfg.application_name = "LithoHw boot smoke";
   cfg.surface_width = 1280;
   cfg.surface_height = 720;
-  cfg.preferred_surface = LITHOCEF_SURFACE_NONE;
+  cfg.preferred_surface = LITHOHW_SURFACE_NONE;
   cfg.headless_ok = true;
 
-  LithoCefShell* shell = api->create(&cfg);
+  LithoHwShell* shell = api->create(&cfg);
   ok &= check(shell != nullptr, "create failed");
   if (!shell) return 1;
 
   FiniteRing ring;
-  LithoCefInputSink sink{&ring, &push_event};
-  ok &= check(api->set_input_sink(shell, &sink) == LITHOCEF_OK, "set_input_sink failed");
+  LithoHwInputSink sink{&ring, &push_event};
+  ok &= check(api->set_input_sink(shell, &sink) == LITHOHW_OK, "set_input_sink failed");
 
   // ---- Boot #1 ----
-  LithoCefEngineBoot boot1{};
-  boot1.payload_uri = "lithocef://boot/first";
-  ok &= check(api->boot_engine(shell, &boot1) == LITHOCEF_OK, "boot #1 failed");
-  ok &= check(std::strcmp(lithocef_stub_boot_payload(shell), "lithocef://boot/first") == 0,
+  LithoHwEngineBoot boot1{};
+  boot1.payload_uri = "lithohw://boot/first";
+  ok &= check(api->boot_engine(shell, &boot1) == LITHOHW_OK, "boot #1 failed");
+  ok &= check(std::strcmp(lithohw_stub_boot_payload(shell), "lithohw://boot/first") == 0,
               "boot #1 payload not recorded");
 
   // Finite ring: 5 events in, 3 consumed, 2 refused and counted as drops.
   for (int i = 0; i < 5; ++i) {
-    LithoCefInputEvent ev{};
-    ev.kind = LITHOCEF_INPUT_KEY;
+    LithoHwInputEvent ev{};
+    ev.kind = LITHOHW_INPUT_KEY;
     ev.code = 0x42;
     ev.value = 1;
     ev.time_ns = 2000 + static_cast<uint64_t>(i);
-    int consumed = lithocef_stub_inject_event(shell, &ev);
+    int consumed = lithohw_stub_inject_event(shell, &ev);
     ok &= check(consumed == (i < 3 ? 1 : 0), "ring capacity result wrong");
   }
   ok &= check(ring.consumed == 3, "ring did not stop at capacity");
@@ -106,29 +106,29 @@ int main() {
   }
 
   for (int i = 0; i < 3; ++i)
-    ok &= check(api->present(shell) == LITHOCEF_OK, "present (boot #1) failed");
+    ok &= check(api->present(shell) == LITHOHW_OK, "present (boot #1) failed");
   ok &= check(api->frames_presented(shell) == 3, "frames after boot #1 wrong");
-  ok &= check(api->shutdown(shell) == LITHOCEF_OK, "shutdown #1 failed");
-  ok &= check(api->present(shell) == LITHOCEF_ERR_NOT_BOOTED,
+  ok &= check(api->shutdown(shell) == LITHOHW_OK, "shutdown #1 failed");
+  ok &= check(api->present(shell) == LITHOHW_ERR_NOT_BOOTED,
               "present after shutdown not refused");
 
   // ---- Boot #2: the contract's re-boot clause ----
-  LithoCefEngineBoot boot2{};
-  boot2.payload_uri = "lithocef://boot/second";
-  ok &= check(api->boot_engine(shell, &boot2) == LITHOCEF_OK, "re-boot failed");
-  ok &= check(std::strcmp(lithocef_stub_boot_payload(shell), "lithocef://boot/second") == 0,
+  LithoHwEngineBoot boot2{};
+  boot2.payload_uri = "lithohw://boot/second";
+  ok &= check(api->boot_engine(shell, &boot2) == LITHOHW_OK, "re-boot failed");
+  ok &= check(std::strcmp(lithohw_stub_boot_payload(shell), "lithohw://boot/second") == 0,
               "boot #2 payload not recorded");
   for (int i = 0; i < 2; ++i)
-    ok &= check(api->present(shell) == LITHOCEF_OK, "present (boot #2) failed");
+    ok &= check(api->present(shell) == LITHOHW_OK, "present (boot #2) failed");
   ok &= check(api->frames_presented(shell) == 5,
               "frames_presented is not the shell-lifetime counter");
-  ok &= check(api->shutdown(shell) == LITHOCEF_OK, "shutdown #2 failed");
+  ok &= check(api->shutdown(shell) == LITHOHW_OK, "shutdown #2 failed");
 
   if (hs) litho_thread_handshake_destroy(hs);
   api->destroy(shell);
 
   if (!ok) return 1;
-  std::printf("LITHOCEF BOOT SMOKE OK: re-boot after shutdown, finite ring "
+  std::printf("LITHOHW BOOT SMOKE OK: re-boot after shutdown, finite ring "
               "(3 consumed + 2 drops counted), thread handshake served the "
               "engine during boot (2 workers, over-capacity refused), "
               "frames cumulative 3+2=5\n");
