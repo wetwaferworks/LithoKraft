@@ -94,6 +94,20 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
             starDef->tint != orangeDef->tint,
         "sprite host: fx:star5 and fx:star5_orange are distinct defs (tint is a def property) over the same generated image");
 
+  // -- 2026-10-25 (JD, CloudAtlas item icons): <name>_item.png in the 32 / 64 / 128 packs ------
+  {
+    int found = 0, packs = 0;
+    for (const auto& dir : packDirs) {
+      const std::string n = dir.filename().string();
+      if (n != "pack_32" && n != "pack_64" && n != "pack_128") continue;
+      ++packs;
+      for (BlockId b : {kCatchor, kThresholdor, kCertificateTable, kVirtualPost, kRepeator, kMemor})
+        if (std::filesystem::exists(dir / ("textures/ui/icons/" + cResourceMgr::iconName(b) + "_item.png"))) ++found;
+    }
+    check(packs == 0 || found == packs * 6, "item icons: CloudAtlas <name>_item.png present for every pack (32/64/128)");
+    check(kHudIconPx == 16, "item icons: HUD icon size is one constant (kHudIconPx, still 16 until JD confirms)");
+  }
+
   // -- PNG entry points against the real pack file --------------------------
   {
     const std::string iconFile =

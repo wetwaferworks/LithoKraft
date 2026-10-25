@@ -24,6 +24,10 @@ class IRenderer;
 
 namespace lithokraft {
 
+/// 2026-10-25 (JD): pixel size every hotbar / inventory icon is box-filtered to. The one place to
+/// change it (CloudAtlas item icons ship at 32 / 64 / 128; raising this awaits JD's go-ahead).
+inline constexpr int kHudIconPx = 16;
+
 class cResourceMgr {
  public:
   /// `packDirs`: lowest priority first (engine base, game pack, art pack, mods, player pack).

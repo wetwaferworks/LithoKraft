@@ -34,8 +34,11 @@ void cResourceMgr::reload() {
   size_t missingIcons = 0;
   for (size_t b = 1; b < icons.size(); ++b) {
     std::string err;
-    const auto file = stack.find("textures/ui/icons/" + iconName(BlockId(b)) + ".png");
-    if (auto img = file ? loadTextureFileCached(*file, &err) : std::nullopt) icons[b] = downsampleIcon(*img, 16);  // decode cache (CREW TILE)
+    // 2026-10-25 (JD, CloudAtlas item icons): <name>_item.png (rendered model) wins over <name>.png;
+    // blocks without one (e.g. the Trace Bulb) keep their old icon / swatch fallback.
+    auto file = stack.find("textures/ui/icons/" + iconName(BlockId(b)) + "_item.png");
+    if (!file) file = stack.find("textures/ui/icons/" + iconName(BlockId(b)) + ".png");
+    if (auto img = file ? loadTextureFileCached(*file, &err) : std::nullopt) icons[b] = downsampleIcon(*img, kHudIconPx);  // decode cache (CREW TILE)
     else ++missingIcons;
   }
   if (missingIcons) logError("resources: %zu block icon(s) missing under textures/ui/icons (swatches used)", missingIcons);
@@ -49,7 +52,7 @@ void cResourceMgr::reload() {
     if (def.itemId < kFirstItemId) continue;  // block-backed
     std::string err;
     const auto file = stack.find("textures/ui/icons/" + std::string(def.iconName) + ".png");
-    if (auto img = file ? loadTextureFileCached(*file, &err) : std::nullopt) itemIcons[def.itemId] = downsampleIcon(*img, 16);  // decode cache (CREW TILE)
+    if (auto img = file ? loadTextureFileCached(*file, &err) : std::nullopt) itemIcons[def.itemId] = downsampleIcon(*img, kHudIconPx);  // decode cache (CREW TILE)
     else ++missingItemIcons;
   }
   if (missingItemIcons) logError("resources: %zu item icon(s) missing under textures/ui/icons", missingItemIcons);
