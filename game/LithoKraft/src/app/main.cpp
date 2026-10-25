@@ -20,6 +20,13 @@
 #include <io.h>  // _isatty (wheel-ink console check, 2026-10-18 JD)
 #include <process.h>  // _spawnv: renderer-switch relaunch (JD 2026-10-24)
 #include <cerrno>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>  // GetConsoleWindow / SetWindowPos: console always on top (JD 2026-10-25)
 #endif
 #include <algorithm>
 #include <cstdio>
@@ -808,7 +815,20 @@ static void lkShutdownTail(FrameCtx& F);
 static void lkFrameThunk(void* p);
 #endif
 
+// JD 2026-10-25: keep the console window (the Windows console-subsystem window this exe runs
+// in; the game never AllocConsole()s) always on top. On by default; LK_CONSOLE_TOPMOST=0 opts
+// out. It only shows over the game in borderless / windowed: exclusive fullscreen still covers
+// it. No-op on Linux and when there is no console (GetConsoleWindow() == null).
+static void lkConsoleTopmost() {
+#if defined(_WIN32)
+  if (const char* e = std::getenv("LK_CONSOLE_TOPMOST"); e && !std::strcmp(e, "0")) return;
+  if (HWND hwnd = GetConsoleWindow())
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+#endif
+}
+
 int main(int argc, char** argv) {
+  lkConsoleTopmost();
   GameConfig cfg;
   std::string uiShot, uiView = "hud";  // Cortana 2026-10-16: bench UI screenshot (--ui-shot FILE --ui-view hud|menu|settings|pause)
   double runSeconds = 0, benchSeconds = 0; bool vsync = false, noSave = false; int romScreen = 32;
