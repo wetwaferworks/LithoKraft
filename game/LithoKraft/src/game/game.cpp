@@ -744,6 +744,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
       const int lf = lod == 0 ? 1 : lod == 1 ? 1 : lod == 2 ? 2 : 4;
       const std::shared_ptr<MeshInput> src = lf > 1 ? farLodMeshInput(*in, lf) : in;
       ChunkMesh cm = meshSubChunk(*src, ctx);
+      cm.lodScale = uint8_t(lf);  // software renderer: >= 4x flat shade / thin-face cull
       if (lf > 1)
         for (PackedVertex& v : cm.verts) { v.x = uint16_t(v.x * lf); v.y = uint16_t(v.y * lf); v.z = uint16_t(v.z * lf); }
       if (lod >= 1) {
