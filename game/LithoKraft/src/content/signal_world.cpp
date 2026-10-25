@@ -48,15 +48,21 @@ bool cSignalWorldSim::canAttach(const ChunkMap& w, int x, int y, int z, BlockId 
 }
 
 void cSignalWorldSim::applyTortureGate(ChunkMap& w, const DirtyFn& dirty) {
-  const bool on = w.get(gateX_, gateY_, gateZ_) == kSwitch && stOn(w.getState(gateX_, gateY_, gateZ_));
+  auto leverOn = [&](int x, int y, int z) { return w.get(x, y, z) == kSwitch && stOn(w.getState(x, y, z)); };
+  const bool on = leverOn(gateX_, gateY_, gateZ_);
+  // 2026-10-24 9:15 PM (JD): per-scene levers. want[n] = master || scene lever n; want[0] = master.
+  std::vector<uint8_t> want(levers_.size() + 1, uint8_t(on));
+  for (size_t i = 0; i < levers_.size(); ++i) want[i + 1] = uint8_t(on || leverOn(levers_[i].x, levers_[i].y, levers_[i].z));
+  auto groupOf = [&](const GatedSource& g) { return (g.group > 0 && size_t(g.group) < want.size()) ? size_t(g.group) : size_t(0); };
   if (!gateSynced_) {
     // 2026-10-24 (JD 6:06 PM): the save restores its columns AFTER the test world is built, so a
     // playtest save from before the lever brings the old LEDs / Repeators back and they ran with
     // the lever off. First tick: with the lever off, lift every held source the save put back.
     gateSynced_ = true;
-    if (!on) {
+    {
       int lifted = 0;
       for (const GatedSource& g : gated_) {
+        if (want[groupOf(g)]) continue;
         if (w.get(g.x, g.y, g.z) != g.id || !w.set(g.x, g.y, g.z, kAir)) continue;
         w.setState(g.x, g.y, g.z, CellState(0));
         onBlockChanged(w, g.x, g.y, g.z, kAir);
@@ -66,9 +72,15 @@ void cSignalWorldSim::applyTortureGate(ChunkMap& w, const DirtyFn& dirty) {
       if (lifted) litholattice::logInfo("torture lever: off at load, lifted %d sources restored by the save", lifted);
     }
   }
-  if (on == gateLit_) return;
-  gateLit_ = on;
+  if (want == groupLit_) return;
+  const std::vector<uint8_t> was = groupLit_.empty() ? std::vector<uint8_t>(want.size(), 0) : groupLit_;
+  groupLit_ = want;
+  gateLit_ = false;
+  for (uint8_t v : want) gateLit_ = gateLit_ || v;  // Pattern ROM screens run while any lever is on
   for (const GatedSource& g : gated_) {
+    const size_t gi = groupOf(g);
+    const bool on = want[gi] != 0;
+    if (on == (was[gi] != 0)) continue;
     if (w.get(g.x, g.y, g.z) != (on ? kAir : g.id)) continue;  // the player changed the cell: leave it
     const BlockId b = on ? g.id : kAir;
     if (!w.set(g.x, g.y, g.z, b)) continue;

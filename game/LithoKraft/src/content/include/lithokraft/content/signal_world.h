@@ -62,7 +62,11 @@ class cSignalWorldSim final : public IWorldSim {
   /// 2026-10-24 (JD): playtest torture lever. While the Switch at (x, y, z) is off, the listed
   /// LED sources are removed (air) and the Pattern ROM screens stop; switching it on puts the
   /// LEDs back (and off removes them again). Unset in every bench / hash / selftest world.
-  struct GatedSource { int x, y, z; BlockId id; CellState st; };
+  struct GatedSource { int x, y, z; BlockId id; CellState st; int group = 0; };  // group 0 = master only, n = scene lever n
+  /// 2026-10-24 9:15 PM (JD): one lever per scene. A source in group n is on while the master lever OR
+  /// scene lever n (levers[n - 1]) is on.
+  struct LeverPos { int x, y, z; };
+  void setSceneLevers(std::vector<LeverPos> levers) { levers_ = std::move(levers); }
   void setTortureGate(int x, int y, int z, std::vector<GatedSource> src) {
     gateSet_ = true; gateX_ = x; gateY_ = y; gateZ_ = z; gated_ = std::move(src);
   }
@@ -79,6 +83,8 @@ class cSignalWorldSim final : public IWorldSim {
   bool gateSet_ = false, gateLit_ = false, gateSynced_ = false;
   int gateX_ = 0, gateY_ = 0, gateZ_ = 0;
   std::vector<GatedSource> gated_;
+  std::vector<LeverPos> levers_;      // scene levers (group n = levers_[n - 1])
+  std::vector<uint8_t> groupLit_;     // last applied on-state per group (empty = nothing applied yet)
   void onHsCommit(uint64_t phase, uint64_t cycleTick, uint32_t group);
   cSignalSim signal_;
   // ---- Timing Handshake state (null authority = legacy path) ----
