@@ -125,6 +125,7 @@ extern const BlockId kSelector;       ///< Selector (tells the Etchor what to ma
 extern const BlockId kConnector;      ///< Connector (9-pad wiring block)
 extern const BlockId kLaysor;         ///< Laysor: transparent purple laser crystal (blended translucency)
 extern const BlockId kEmitor;         ///< Emitor: light source; beam through the Laysor into the Etchor
+extern const BlockId kTimerBuffer;    ///< 2026-10-25 roadmap 7: comparator-clock input buffer (hidden, no art yet)
 extern const BlockId kInputBuffer;    ///< Input buffer (wafers in on top, out the front)
 extern const BlockId kFabor;          ///< Fabor (wafer fab)
 extern const BlockId kAutoFabor;      ///< AutoFabor (Trace-controlled Fabor)
@@ -208,6 +209,9 @@ inline int viaAxis(BlockId b) {
   return -1;
 }
 inline bool isSideVia(BlockId b) { return viaAxis(b) > 0; }
+/// 2026-10-25: blocks kept out of the creative palette, test-world kit and block grid (placement
+/// variants, or no art yet). Still placeable by id / command and in scenes.
+inline bool isPaletteHidden(BlockId b) { return isSideVia(b) || b == kTimerBuffer; }
 /// The vertical (item) form of any via: side vias drop as their base colour.
 inline BlockId viaBase(BlockId b) { return (b == kRedViaX || b == kRedViaZ) ? kRedVia : (b == kBlueViaX || b == kBlueViaZ) ? kBlueVia : b; }
 /// The side-lying variant of a vertical via for axis 1 (X) or 2 (Z); other blocks unchanged.

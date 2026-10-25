@@ -1211,6 +1211,101 @@ int runSignalSelfTest() {
     check(qval(7, 12) == 0 && qval(7, 14) == 1,
           "TRACE-C3 round trip is live: breaking the red run's last trace turns its lamp off; the blue lamp stays lit");
   }
+  {
+    // ROADMAP-7 (2026-10-25, JD's comparator-clock port): Timer Buffer + Thresholdor read mode.
+    // N = 0, E = 1, S = 2, W = 3. Each sub-test gets a fresh world and sim.
+    struct Rig {
+      ChunkMap m; cSignalSim s; int y = 10;
+      Rig() {
+        m.setRegistry(&blockRegistry());
+        auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; m.insert(std::move(col));
+        for (int x = 0; x < 12; ++x) for (int z = 0; z < 12; ++z) m.set(x, y - 1, z, kWaferSilicon);
+      }
+      void put(int x, int z, BlockId b, CellState st = 0) { m.set(x, y, z, b); m.setState(x, y, z, st); s.onBlockChanged(x, y, z, b); }
+      void run(int n) { for (int i = 0; i < n; ++i) s.tick(m, 0, 0, 100, [](int, int, int) {}); }
+      int v(int x, int z) const { return stValue(m.getState(x, y, z)); }
+      int aux(int x, int z) const { return stAux(m.getState(x, y, z)); }
+      void use(int x, int z, bool alt = false) { s.use(m, x, y, z, [](int, int, int) {}, alt); }
+    };
+    constexpr int RN = 0, RE = 1;
+    {
+      // Timer Buffer alone (loop, step 1, reload 16): 16 -> 0 then reload; period 17 ticks.
+      Rig r; r.put(5, 5, kTimerBuffer, makeState(0, RN));
+      std::vector<int> seq; for (int i = 0; i < 40; ++i) { r.run(1); seq.push_back(r.v(5, 5)); }
+      bool periodic = true; for (int i = 17; i < 40; ++i) periodic = periodic && seq[i] == seq[i - 17];
+      bool down = true; for (int i = 1; i < 17; ++i) down = down && seq[i] == 16 - i;
+      check(seq[0] == 16 && down && periodic, "ROADMAP-7 timer buffer: loop mode counts 16 -> 0 then reloads, period 17 ticks");
+      check(r.aux(5, 5) == 0, "ROADMAP-7 timer buffer: placed in loop mode, step 1 (aux 0)");
+      r.use(5, 5);
+      check(r.aux(5, 5) == 2, "ROADMAP-7 timer buffer: use steps the divider (step 2 ticks)");
+      for (int k = 0; k < 3; ++k) r.use(5, 5);
+      check(r.aux(5, 5) == 1, "ROADMAP-7 timer buffer: 4 uses wrap the step and flip to once mode");
+      r.run(60);
+      check(r.v(5, 5) == 0 && !stOn(r.m.getState(5, 5, r.y)), "ROADMAP-7 timer buffer: once mode stops at 0 (no reload)");
+      r.use(5, 5, true);
+      check(r.v(5, 5) == 17, "ROADMAP-7 timer buffer: sneak+use steps reload 16 -> 17 and reloads");
+      r.run(17);
+      check(r.v(5, 5) == 0, "ROADMAP-7 timer buffer: once mode counts 17 down to 0 in 17 ticks");
+      // Repower: torch + trace behind it (back = south, facing N).
+      r.put(5, 7, kRedTorch); r.put(5, 6, kRedTrace);
+      r.run(5);
+      check(r.v(5, 5) == 17, "ROADMAP-7 timer buffer: powered back holds it at the reload value (repower)");
+      r.put(5, 7, kAir);
+      r.run(3);
+      const int a = r.v(5, 5); r.run(5);
+      check(a < 17 && a > 0 && r.v(5, 5) == a - 5, "ROADMAP-7 timer buffer: released, it counts down again one step a tick");
+      r.run(40);
+      check(r.v(5, 5) == 0, "ROADMAP-7 timer buffer: and stops at 0 again in once mode");
+    }
+    {
+      // Thresholdor read mode: Timer Buffer (facing N, so it does not drive the Thresholdor) sits
+      // behind a Thresholdor facing E. Read off: output 0. Read on: output = the count.
+      Rig r; r.put(4, 5, kTimerBuffer, makeState(0, RN)); r.put(5, 5, kThresholdor, makeState(0, RE)); r.put(6, 5, kRedTrace);
+      r.run(10);
+      check(r.v(5, 5) == 0, "ROADMAP-7 thresholdor: read mode off (default) ignores the timer buffer level");
+      r.use(5, 5, true);
+      check((r.aux(5, 5) & 2) == 2 && (r.aux(5, 5) & 1) == 0, "ROADMAP-7 thresholdor: sneak+use toggles read mode (aux bit 1), subtract untouched");
+      bool follows = true;
+      for (int i = 0; i < 40; ++i) { const int before = r.v(4, 5); r.run(1); follows = follows && r.v(5, 5) == before; }
+      check(follows, "ROADMAP-7 thresholdor: read mode outputs the timer buffer count (read before the tick: one tick behind)");
+      r.use(5, 5);  // subtract mode, still reading
+      check((r.aux(5, 5) & 3) == 3, "ROADMAP-7 thresholdor: subtract mode keeps read mode");
+      r.put(5, 4, kRedTorch);  // left side (north of an E-facing Thresholdor) = 64 -> subtract to 0
+      r.run(5);
+      check(r.v(5, 5) == 0, "ROADMAP-7 thresholdor: subtract mode subtracts the side from the read level");
+      r.use(5, 5, true);
+      check((r.aux(5, 5) & 3) == 1, "ROADMAP-7 thresholdor: sneak+use again = read off, subtract kept");
+    }
+    {
+      // Catchor readable: torch -> trace -> Catchor(match 64). Thresholdor (read, E) east of it.
+      Rig r; r.put(2, 3, kCatchor, makeState(64, 0, 3)); r.put(3, 3, kThresholdor, makeState(0, RE, 2)); r.put(4, 3, kRedTrace);
+      r.put(1, 3, kRedTrace); r.put(0, 3, kRedTorch);
+      r.run(12);
+      const int held = r.v(3, 3);
+      r.run(20);
+      check(held == 64 && r.v(3, 3) == 64, "ROADMAP-7 catchor: a read-mode thresholdor reads the caught value (64), steady while the input holds the match");
+      r.put(0, 3, kAir);
+      r.run(6);
+      check(r.v(3, 3) == 0, "ROADMAP-7 catchor: input gone -> level 0 -> thresholdor off");
+      // Read mode off: the Catchor's one-shot pulse only (never steady).
+      Rig q; q.put(2, 3, kCatchor, makeState(64, 0, 3)); q.put(3, 3, kThresholdor, makeState(0, RE)); q.put(4, 3, kRedTrace);
+      q.put(1, 3, kRedTrace); q.put(0, 3, kRedTorch);
+      q.run(32);
+      check(q.v(3, 3) == 0, "ROADMAP-7 catchor: read mode off -> no steady level (old behaviour)");
+    }
+    {
+      // Comparator clock at 32 TPS: Timer Buffer loop, step 2, reload 15 -> period (15 + 1) * 2 =
+      // 32 ticks = 1 s. A read-mode Thresholdor turns it into a clock: off for 2 ticks per second.
+      Rig r; r.put(4, 5, kTimerBuffer, makeState(0, RN)); r.put(5, 5, kThresholdor, makeState(0, RE, 2)); r.put(6, 5, kRedTrace);
+      r.use(4, 5);  // step 2
+      for (int k = 0; k < 63; ++k) r.use(4, 5, true);  // reload 16 -> 64 -> wraps 1 .. 15
+      r.run(70);
+      std::vector<int> offs; for (int t = 0; t < 130; ++t) { r.run(1); if (r.v(5, 5) == 0) offs.push_back(t); }
+      bool every32 = offs.size() >= 6; for (size_t i = 2; i < offs.size(); ++i) every32 = every32 && offs[i] - offs[i - 2] == 32;
+      check(every32 && offs.size() % 2 == 0 && offs[1] - offs[0] == 1,
+            "ROADMAP-7 comparator clock: timer buffer (loop, step 2, reload 15) + read thresholdor = 1 Hz at 32 TPS, endless");
+    }
+  }
   return fails;
 }
 

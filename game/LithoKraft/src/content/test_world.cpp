@@ -203,7 +203,7 @@ std::vector<BlockId> testWorldKit(int n) {
   const auto& reg = blockRegistry();
   std::vector<BlockId> out;
   auto add = [&](BlockId b) {
-    if (int(out.size()) < n && b != kAir && !isSideVia(b) && std::find(out.begin(), out.end(), b) == out.end()) out.push_back(b);
+    if (int(out.size()) < n && b != kAir && !isPaletteHidden(b) && std::find(out.begin(), out.end(), b) == out.end()) out.push_back(b);
   };
   for (int g = kGWire; g <= kGMachine; ++g)
     for (int id = 1; id < int(reg.size()); ++id)
@@ -229,7 +229,7 @@ TestWorldLayout buildTestWorld(ChunkMap& w, int sx, int floorY, int sz, int scre
   // Group the registry (ids 1 .. size-1: the E palette list), registry order inside a group.
   std::vector<BlockId> groups[kGroups];
   for (int id = 1; id < int(reg.size()); ++id)
-    if (!isSideVia(BlockId(id))) groups[groupOf(reg.def(BlockId(id)))].push_back(BlockId(id));  // 2026-10-25: side Vias are placement variants
+    if (!isPaletteHidden(BlockId(id))) groups[groupOf(reg.def(BlockId(id)))].push_back(BlockId(id));  // 2026-10-25: side Vias are placement variants
   int rowZ = sz + 10;
   for (int g = 0; g < kGroups; ++g)
     for (size_t at = 0, part = 0; at < groups[g].size(); at += kPerRow, ++part) {

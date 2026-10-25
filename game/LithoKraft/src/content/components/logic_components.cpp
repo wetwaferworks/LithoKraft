@@ -41,30 +41,98 @@ std::string describeOutput(const BlockDef& d, CellState s) {
 /// 2026-10-25 (JD): subtract mode (aux bit 0; compare = 0, so existing cells / saves are unchanged):
 /// out = max(0, back - max(left, right)), 0..64. Using the block toggles compare <-> subtract (the
 /// same use-cycles-a-setting convention as the Repeator delay and the Redirector front).
+/// 2026-10-25 (JD roadmap 7, comparator-clock port): read mode (aux bit 1, toggled by sneak + use;
+/// off = 0, so existing cells / saves are unchanged). In read mode the back input is the stronger of
+/// the back signal and the LEVEL of the block directly behind (ComponentInputs::level): a Timer
+/// Buffer's count, a Catchor's caught value while its input holds the match, an Input Buffer's
+/// wafer count. Minecraft's comparator reading a container, in both compare and subtract mode.
 class cThresholdor final : public cCompBehavior {
  public:
   static constexpr int kSubtract = 1;  // aux bit 0
+  static constexpr int kRead = 2;      // aux bit 1
   static bool subtract(CellState s) { return (stAux(s) & kSubtract) != 0; }
+  static bool readMode(CellState s) { return (stAux(s) & kRead) != 0; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory&) const override {
+    const int f = stFacing(st), keep = stAux(st) & kRead;
+    int back = in.back(f);
+    if (readMode(st)) back = std::max(back, in.level[dirBack(f)]);
     if (subtract(st)) {
-      const int f = stFacing(st), v = std::min(in.back(f), kMaxSignal);
+      const int v = std::min(back, kMaxSignal);
       const int side = std::min(std::max(in.left(f), in.right(f)), kMaxSignal);
       const int out = std::max(0, v - side);
-      return {out, 0, makeState(out, f, kSubtract, out > 0)};
+      return {out, 0, makeState(out, f, kSubtract | keep, out > 0)};
     }
     // SW-H2: pass-through outputs copy the input value — clamp it here (and at
     // the sim's sampling point) so a disk-loaded 65..127 wire value can never
     // propagate into an output. In-range values are untouched.
-    const int f = stFacing(st), v = std::min(in.back(f), kMaxSignal), lo = in.left(f), hi = in.right(f);
+    const int v = std::min(back, kMaxSignal), lo = in.left(f), hi = in.right(f);
     const bool pass = (lo > 0 && hi > 0) ? (v >= std::min(lo, hi) && v <= std::max(lo, hi)) : v >= std::max(lo, hi);
     const int out = (pass && v > 0) ? v : 0;
-    return {out, 0, makeState(out, f, 0, out > 0)};
+    return {out, 0, makeState(out, f, keep, out > 0)};
   }
   std::optional<CellState> use(CellState st, ComponentMemory&) const override {
     return CellState(makeState(stValue(st), stFacing(st), uint8_t(stAux(st) ^ kSubtract), stOn(st)));
   }
+  std::optional<CellState> useAlt(CellState st, ComponentMemory&) const override {  // roadmap 7: read mode
+    return CellState(makeState(stValue(st), stFacing(st), uint8_t(stAux(st) ^ kRead), stOn(st)));
+  }
   std::string describe(const BlockDef& d, CellState s) const override {
-    return std::format("{} | mode {} | out {} | facing {}", d.name, subtract(s) ? "subtract" : "compare", stValue(s), facingName(stFacing(s)));
+    return std::format("{} | mode {}{} | out {} | facing {}", d.name, subtract(s) ? "subtract" : "compare",
+                       readMode(s) ? " + read behind" : "", stValue(s), facingName(stFacing(s)));
+  }
+};
+
+/// 2026-10-25 (JD roadmap 7): Timer Buffer, the input buffer for comparator clocks (the hopper of
+/// a Minecraft hopper / comparator clock). Holds a count 0..64 and counts it down at the world
+/// tick rate (32 TPS): one step every 1 / 2 / 4 / 8 ticks. The front drives the count as an
+/// analog signal, and a Thresholdor in read mode behind it reads it as a level (readLevel).
+///   loop mode: at 0 it holds one step, then reloads, so it repeats forever; period = (reload + 1)
+///              steps (e.g. reload 15, step 2 ticks = 32 ticks = exactly 1 s at 32 TPS).
+///   once mode: it stops at 0 until repowered.
+/// Power on the back (or a wire on top) holds it at the reload value; counting starts on release,
+/// so a pulse restarts it (repowering). State: value = count, facing, aux bit 0 = once (0 = loop,
+/// the default), aux bits 1-2 = step index (1 / 2 / 4 / 8 ticks), on = count > 0.
+/// Memory (saved in SGNL v3, no format change): timer = reload value (0 = default 16),
+/// history = step divider phase, prevIn = powered last tick.
+/// Use cycles the step 1 -> 2 -> 4 -> 8 and then flips loop / once (8 settings, like the Repeator's
+/// buttons); sneak + use steps the reload value 1..64 (wraps) and reloads.
+class cTimerBuffer final : public cCompBehavior {
+ public:
+  static constexpr int kDefaultReload = 16;
+  static constexpr int kSteps[4] = {1, 2, 4, 8};
+  static bool once(CellState s) { return (stAux(s) & 1) != 0; }
+  static int stepIndex(CellState s) { return (stAux(s) >> 1) & 3; }
+  static int reload(const ComponentMemory& m) { return m.timer == 0 ? kDefaultReload : std::min<int>(m.timer, kMaxSignal); }
+  ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
+    const int f = stFacing(st), aux = stAux(st), step = kSteps[stepIndex(st)], r = reload(m);
+    const bool powered = in.back(f) > 0 || in.top > 0;
+    int count = stValue(st);
+    if (powered) { count = r; m.history = 0; }  // held at the reload value; counting starts on release
+    else if (count > 0 || !once(st)) {
+      if (++m.history >= step) {
+        m.history = 0;
+        count = count > 0 ? count - 1 : r;  // loop mode: 0 lasts one step, then reload
+      }
+    }
+    m.prevIn = powered;
+    const int out = std::min(count, kMaxSignal);
+    return {out, 0, makeState(out, f, aux, out > 0)};
+  }
+  bool quiescent(CellState s, const ComponentMemory& m) const override { return once(s) && stValue(s) == 0 && !m.prevIn; }
+  int readLevel(CellState s, const ComponentMemory&) const override { return stValue(s); }
+  std::optional<CellState> use(CellState st, ComponentMemory&) const override {
+    int idx = stepIndex(st) + 1, aux = stAux(st) & 1;
+    if (idx == 4) { idx = 0; aux ^= 1; }
+    return makeState(stValue(st), stFacing(st), aux | (idx << 1), stOn(st));
+  }
+  std::optional<CellState> useAlt(CellState st, ComponentMemory& m) const override {
+    const int r = reload(m) % kMaxSignal + 1;
+    m.timer = uint8_t(r); m.history = 0;
+    return makeState(r, stFacing(st), stAux(st), true);
+  }
+  std::string describe(const BlockDef& d, CellState s) const override {
+    return std::format("{} | {} | count {} | step {} ticks | facing {}", d.name, once(s) ? "once (repower to restart)" : "loop",
+                       stValue(s), kSteps[stepIndex(s)], facingName(stFacing(s)));
   }
 };
 
@@ -210,6 +278,9 @@ class cCatchor final : public cCompBehavior {
   int emitToward(int dir, CellState st, const ComponentMemory& m) const override {
     return wired(st) && dir == outDir(st) ? m.out : 0;
   }
+  /// 2026-10-25 (JD roadmap 7): readable by a Thresholdor in read mode: the caught (match) value
+  /// for as long as its input holds the match (steady, not the one-tick pulse), else 0.
+  int readLevel(CellState st, const ComponentMemory& m) const override { return wired(st) && m.prevIn ? stValue(st) : 0; }
   std::optional<CellState> use(CellState st, ComponentMemory& /*m*/) const override {
     // 2026-10-24 (JD 6:40 PM): RMB always cycles the output left -> right -> centre; an unwired
     // Catchor takes the centre output (bound to the colour bit it has).
@@ -450,6 +521,7 @@ void registerLogic(const Registrar& add) {
   add("fast_latch", std::make_unique<cFastLatch>());
   add("portor", std::make_unique<cPortor>());
   add("fusor", std::make_unique<cFusor>());
+  add("timer_buffer", std::make_unique<cTimerBuffer>());  // 2026-10-25 roadmap 7
 }
 
 }  // namespace lithokraft::components

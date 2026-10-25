@@ -727,6 +727,15 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
       if (!jammers_.jammed(x, y, z, c.mem.channel) &&
           radio_.query(c.mem.channel, x, y, z, dim_, sens, rs, rc)) { in.radioIn = rs; in.radioCol = uint8_t(rc); }
     }
+    if (role == SimRole::Thresholdor && (stAux(stateOf(w, k)) & 2)) {  // 2026-10-25 roadmap 7: read mode only
+      for (int d = 0; d < 4; ++d) {
+        const int nx = x + kDirX[d], nz = z + kDirZ[d];
+        const BlockId nb = w.get(nx, y, nz);
+        if (nb == kInputBuffer) { in.level[d] = std::min(stValue(w.getState(nx, y, nz)), kMaxSignal); continue; }  // wafers held
+        if (const auto nc = comps_.find(packPos(nx, y, nz)); nc != comps_.end())
+          in.level[d] = nc->second.behavior->readLevel(w.getState(nx, y, nz), nc->second.mem);  // pre-tick state: order-free
+      }
+    }
     if (role == SimRole::cOverclockor && c.mem.jammer)
       jammers_.publish(JammerZone{x, y, z, kJammerRadius, c.mem.channel});
     if (fastInputs && c.fast) {

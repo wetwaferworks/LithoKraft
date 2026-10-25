@@ -250,6 +250,11 @@ cBlockReg& mutableRegistry() {
   r.add(def("lithokraft:red_via_z", "Red Via (side, Z)", kSolid | kTransparent, S::Cube, "red_via", "wire", R::Wire, 1, 0, 45));
   r.add(def("lithokraft:blue_via_x", "Blue Via (side, X)", kSolid | kTransparent, S::Cube, "blue_via", "wire", R::Wire, 2, 0, 45));
   r.add(def("lithokraft:blue_via_z", "Blue Via (side, Z)", kSolid | kTransparent, S::Cube, "blue_via", "wire", R::Wire, 2, 0, 45));
+  // 2026-10-25 (JD roadmap 7): Timer Buffer, the comparator-clock input buffer, appended at the END
+  // (stable ids). Behaviour "timer_buffer" (logic_components.cpp). No art yet: the "timer_buffer"
+  // model in the packs' resources.json borrows the Input Buffer faces, and the block is hidden from
+  // the palette / kit / grid (isPaletteHidden) until Cloud's art lands.
+  r.add(def("lithokraft:timer_buffer", "Timer Buffer", kDir | kInteractive, S::Cube, "timer_buffer", "timer_buffer", R::None, 0, 0, 45));
     // Save migration: pre-rename ids remap to the -OR names (2026-10-10).
     r.addAlias("lithokraft:pulsar", "lithokraft:pulsor");
     // 2026-10-16 (JD): the Repeater is now the Repeator; old saves name the old id.
@@ -393,6 +398,7 @@ const BlockId kConnector            = resolveId(blockRegistry(), "lithokraft:con
 const BlockId kLaysor               = resolveId(blockRegistry(), "lithokraft:laysor");
 const BlockId kEmitor               = resolveId(blockRegistry(), "lithokraft:emitor");
 const BlockId kInputBuffer          = resolveId(blockRegistry(), "lithokraft:input_buffer");
+const BlockId kTimerBuffer          = resolveId(blockRegistry(), "lithokraft:timer_buffer");  // 2026-10-25 roadmap 7
 const BlockId kFabor                = resolveId(blockRegistry(), "lithokraft:fabor");
 const BlockId kAutoFabor            = resolveId(blockRegistry(), "lithokraft:autofabor");
 const BlockId kVior                 = resolveId(blockRegistry(), "lithokraft:vior");

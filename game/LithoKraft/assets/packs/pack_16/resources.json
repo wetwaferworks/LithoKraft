@@ -432,6 +432,13 @@
     "side": "buffer_side"
    }
   },
+  "timer_buffer": {
+   "faces": {
+    "top": "buffer_top_in",
+    "front": "buffer_front_out",
+    "side": "buffer_side"
+   }
+  },
   "fabor": {
    "faces": {
     "top": "fabor_top",

@@ -137,7 +137,7 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
   auto& grid = scroll.emplaceContent<ui::cGridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
   for (int i = 0; i < count; ++i) {
     const BlockId b = BlockId(i + 1);
-    if (isSideVia(b)) continue;  // 2026-10-25: side Vias are placement variants of the Via, not palette entries
+    if (isPaletteHidden(b)) continue;  // 2026-10-25: side Vias are placement variants of the Via, not palette entries
     ui::cSlot& slot = grid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
     slot.setIcon(blockIcon(b)).setData(int(b));
     slot.on("click", [this](ui::cWidget& w) {

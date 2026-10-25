@@ -43,6 +43,10 @@ struct ComponentInputs {
   std::array<uint8_t, 4> ch{}; ///< colour channel of the wire / torch on each side (0 = none / component)
   int radioIn = 0;            ///< wireless signal on this cell's channel (receivors only)
   uint8_t radioCol = 0;       ///< colour of the received wireless signal (1 red, 2 blue)
+  /// 2026-10-25 (JD roadmap 7, comparator-clock port): the "container level" of each horizontal
+  /// neighbour (cCompBehavior::readLevel, or the wafer count of an Input Buffer), -1 = nothing
+  /// readable there. Filled only for Thresholdors (the comparator reads what sits behind it).
+  std::array<int, 4> level{-1, -1, -1, -1};
 
   int back(int facing) const { return side[dirBack(facing)]; }
   int left(int facing) const { return side[dirLeft(facing)]; }
@@ -104,6 +108,9 @@ class cCompBehavior : public cBlockBehavior {
   /// class, nothing else (JD's ruling). Powers of two; see
   /// litholattice/sim/tick_rate.h.
   virtual litholattice::TickRate tickRate() const { return {}; }
+  /// 2026-10-25 (JD roadmap 7): the level a Thresholdor in read mode reads from this cell when it
+  /// sits directly behind it (Minecraft's comparator reading a container), 0..64; -1 = not readable.
+  virtual int readLevel(CellState /*state*/, const ComponentMemory& /*mem*/) const { return -1; }
   /// Sneak + use (secondary setting, e.g. a Catchor's match value). Default: nothing.
   virtual std::optional<CellState> useAlt(CellState /*state*/, ComponentMemory& /*mem*/) const { return std::nullopt; }
 };
