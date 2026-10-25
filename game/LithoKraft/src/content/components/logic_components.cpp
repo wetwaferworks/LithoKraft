@@ -26,7 +26,7 @@ class cRepeator final : public cCompBehavior {
     return repeator::encode(stValue(st), stFacing(st), (repeator::delayIndex(st) + 1) & 3, stOn(st));
   }
   std::string describe(const BlockDef& d, CellState s) const override {
-    return std::format("{} | delay {} | out {} | facing {}", d.name, repeator::delayTicks(s), stValue(s), facingName(stFacing(s)));
+    return std::format("{} | delay {} ticks (button {}/4) | out {} | facing {}", d.name, repeator::delayTicks(s), repeator::delayIndex(s) + 1, stValue(s), facingName(stFacing(s)));
   }
 };
 
