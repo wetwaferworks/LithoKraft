@@ -989,8 +989,8 @@ int main(int argc, char** argv) {
     }
     else if (!std::strcmp(argv[i], "--bench-path") && i + 1 < argc) {
       benchPath = argv[++i];
-      if (benchPath != "orbit" && benchPath != "stream" && benchPath != "flyover" && benchPath != "walk" && benchPath != "still" &&
-          benchPath != "whip" && benchPath != "sprint") { std::fprintf(stderr, "--bench-path: orbit|stream|flyover|walk|still|whip|sprint\n"); badArg = true; }
+      if (benchPath != "orbit" && benchPath != "stream" && benchPath != "flyover" && benchPath != "walk" && benchPath != "still" && benchPath != "live" &&
+          benchPath != "whip" && benchPath != "sprint") { std::fprintf(stderr, "--bench-path: orbit|stream|flyover|walk|still|live|whip|sprint\n"); badArg = true; }
     }
     else if (!std::strcmp(argv[i], "--soak")) {
       benchSeconds = 60.0 * num(1, 1440);
@@ -1654,7 +1654,9 @@ static bool lkStepFrame(FrameCtx& F) {
         // usable) and restored when play recaptures.
         const bool wantCap = benchSeconds <= 0 && game.wantsCursorCaptured() && window->focused();  // Cortana 2026-10-15 1925: no cursor grab / topmost in bench
         if (wantCap != window->cursorReallyCaptured()) window->setCursorCaptured(wantCap);
-        window->setTopmost(wantCap && window->cursorReallyCaptured());
+        // 2026-10-25 (Archie capture fix): never topmost on the software renderer: a topmost,
+        // monitor-sized popup is what OBS Window capture and DWM treat as an exclusive surface.
+        window->setTopmost(!display.software && wantCap && window->cursorReallyCaptured());
       }
       if (w > 0 && h > 0) {
         game.uploadEntities();
