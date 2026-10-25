@@ -1388,6 +1388,21 @@ int runSignalSelfTest() {
     check(noWall && wall && stFacing(pw.getState(12, py, 12)) == 1 && pw.get(12, py + 1, 12) == kAir &&
               pw.cellText(12, py, 12) && *pw.cellText(12, py, 12) == "X",
           "POSTS: a Wall Post needs a solid block beside it, faces it (E), is one cell, and holds its own text");
+    {  // 2026-10-25 (JD, Post viewer): the HUD overlay shows all 256 characters, diagonal posts included
+      std::string full;
+      for (int i = 0; i < 256; ++i) full.push_back(char(33 + i % 94));
+      const auto v = post::viewLines(full, false);
+      std::string seen;
+      for (size_t i = 2; i + 2 < v.size(); ++i) seen += v[i].substr(1, 16);
+      bool framed = v.size() == 20 && v[1] == "+----------------+" && v[18] == v[1];
+      for (size_t i = 2; i < 18; ++i) framed = framed && v[i].size() == 18 && v[i].front() == '|' && v[i].back() == '|';
+      check(framed && seen == full && v[0].find("256 / 256") != std::string::npos &&
+                post::layout(full, 10).size() == 16 && v.back().find("Alt") != std::string::npos,
+            "POSTS viewer: framed 16 x 16 grid holds all 256 characters (a diagonal panel shows 160); Alt+use writes");
+      const auto e = post::viewLines("HI\nTHERE", true);
+      check(e[2] == "|HI              |" && e[3] == "|THERE           |" && e[0].find("(writing)") != std::string::npos,
+            "POSTS viewer: new lines break rows, short rows padded, writing mode titled");
+    }
   }
   return fails;
 }

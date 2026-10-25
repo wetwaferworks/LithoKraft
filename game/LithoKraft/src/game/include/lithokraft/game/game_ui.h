@@ -31,6 +31,7 @@ struct HudModel {
   std::vector<std::string> debugLines;     ///< empty: no debug panel (F3)
   std::vector<std::string> controlLines;   ///< controls panel (H)
   std::vector<std::string> bannerLines;    ///< keyboard capture banner (empty: none)
+  std::vector<std::string> postViewLines;  ///< 2026-10-25 Post viewer: title, 16 rows, hint (empty: hidden)
   std::string lookName;                    ///< 2026-10-16 (JD): looked-at block name (empty: hidden)
 };
 
@@ -121,6 +122,10 @@ class cGameUi {
   ui::cPanel* banner_ = nullptr;
   ui::cLabel* bannerTitle_ = nullptr;
   ui::cLabel* bannerText_ = nullptr;
+  ui::cPanel* postView_ = nullptr;      ///< 2026-10-25 Post viewer overlay
+  ui::cLabel* postViewTitle_ = nullptr;
+  ui::cLabel* postViewText_ = nullptr;
+  ui::cLabel* postViewHint_ = nullptr;
   std::array<ui::cSlot*, kHotbarSlots> slots_{};
   ui::cLabel* slotName_ = nullptr;
   ui::cLabel* lookName_ = nullptr;  ///< 2026-10-16 (JD): looked-at block, above the held-item name

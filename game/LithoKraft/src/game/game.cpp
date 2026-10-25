@@ -2382,7 +2382,17 @@ void Game::handleWorldActions() {
     if (s.count > 1) --s.count;
     else s.clear();
   };
-  if (input_.pressed(Action::Use) && altUse) {  // Alt + right click: the component's secondary setting
+  // 2026-10-25 (JD, Post viewer): the overlay follows the look target; it closes when the player
+  // looks away from that post (either half) or out of reach.
+  auto samePost = [&](int x, int y, int z) {
+    return inReach && post::isPost(st.hitBlock) && st.hx == x && st.hz == z && std::abs(st.hy - y) <= 1;
+  };
+  if (postViewOpen_ && !samePost(postViewX_, postViewY_, postViewZ_)) postViewOpen_ = false;
+  if (input_.pressed(Action::Use) && inReach && post::isPost(st.hitBlock) && input_.held(Action::Secondary)) {
+    // Alt + right click on a post = write (the secondary action, as on every component)
+    postViewOpen_ = true; postViewX_ = st.hx; postViewY_ = st.hy; postViewZ_ = st.hz;
+    beginPostEdit(st.hx, st.hy, st.hz);
+  } else if (input_.pressed(Action::Use) && altUse) {  // Alt + right click: the component's secondary setting
     EditCmd c{EditCmd::Kind::Command};
     c.command = SimCommand{kCmdAltUse, st.hx, st.hy, st.hz, 0, 0};
     sim_->edit(c);
@@ -2391,8 +2401,9 @@ void Game::handleWorldActions() {
     const Vec3 fw = player_.forward();
     if (reg.def(st.hitBlock).role == SimRole::Keyboard) {
       beginTyping(st.hx, st.hy, st.hz);
-    } else if (post::isPost(st.hitBlock)) {  // 2026-10-25 Posts: right-click writes on the panel
-      beginPostEdit(st.hx, st.hy, st.hz);
+    } else if (post::isPost(st.hitBlock)) {  // 2026-10-25 (JD): right click views the full text (toggle)
+      const bool again = postViewOpen_ && samePost(postViewX_, postViewY_, postViewZ_);
+      postViewOpen_ = !again; postViewX_ = st.hx; postViewY_ = st.hy; postViewZ_ = st.hz;
     } else if (roleOf(st.hitBlock) == SimRole::Repeator && eye.y > float(st.hy + 1) && fw.y < -1e-4f) {
       // Top-face click: intersect the look ray with the cell's top plane -> the button quadrant.
       const float t = (float(st.hy + 1) - eye.y) / fw.y;
@@ -3402,6 +3413,10 @@ HudModel Game::hudModel() const {
     if (gpuMs_ >= 0.f) std::snprintf(gpu, sizeof gpu, "%.2f ms", gpuMs_);
     std::snprintf(l, sizeof l, "FPS %.0f  avg %.2f ms  p99 %.2f ms  update %.2f ms  GPU %s", fps_, frameAvgMs_, p99Ms_, updateMs_, gpu);
     m.debugLines = {std::string(l)};
+  }
+  if (postViewOpen_ || (typing_ && postTyping_)) {  // 2026-10-25 (JD): Post viewer overlay
+    const SimStats& vs = sim_->stats();
+    if (vs.hit && post::isPost(vs.hitBlock)) m.postViewLines = post::viewLines(vs.hitText, typing_ && postTyping_);
   }
   if (typing_ && postTyping_)
     m.bannerLines = {"POST - type up to 256 characters, Enter = new line, Backspace deletes, Esc ends", "> " + typed_ + "_"};

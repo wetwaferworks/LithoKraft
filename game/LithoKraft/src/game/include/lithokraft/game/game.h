@@ -614,6 +614,8 @@ class Game {
   bool typing_ = false;        // keyboard block typing capture
   int typeX_ = 0, typeY_ = 0, typeZ_ = 0;
   std::string typed_;
+  bool postViewOpen_ = false;  // 2026-10-25 Post viewer overlay (plain right click on a post)
+  int postViewX_ = 0, postViewY_ = 0, postViewZ_ = 0;
   bool postTyping_ = false;    // 2026-10-25 Posts: the typing capture edits a post (not a Keyboard)
   double lastJumpTap_ = -1.0;  // double-tap Jump detection
   float fps_ = 0, frameAvgMs_ = 0, frameMaxMs_ = 0;

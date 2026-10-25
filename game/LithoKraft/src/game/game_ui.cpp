@@ -74,6 +74,18 @@ void cGameUi::rebuildHud() {
   bannerText_ = &bannerStack.add<ui::cLabel>();
   bannerText_->setColor({0.6f, 0.9f, 1.f, 1.f});
 
+  // 2026-10-25 (JD, Post viewer): the full 256 characters of a looked-at Post, centred, at HUD
+  // text size (far larger than the 1/16 glyphs on the panel; diagonal posts show only 160 there).
+  postView_ = &hud_->add<ui::cPanel>("panel");
+  postView_->setLayout(ui::Layout::at({0.5f, 0.5f}, {0.5f, 0.5f}));
+  auto& pvStack = postView_->add<ui::cStackPanel>(ui::Orientation::Vertical, 0.f);
+  postViewTitle_ = &pvStack.add<ui::cLabel>();
+  postViewTitle_->setColor({0.82f, 0.62f, 1.f, 1.f});
+  postViewText_ = &pvStack.add<ui::cLabel>();
+  postViewText_->setColor({0.96f, 0.98f, 1.f, 1.f});
+  postViewHint_ = &pvStack.add<ui::cLabel>("", "hud_small");
+  postViewHint_->setColor({0.75f, 0.8f, 0.9f, 1.f});
+
   splash_ = &hud_->add<ui::cLabel>("Powered by LithoLattice");
   splash_->setId("splash");
   splash_->setColor({0.75f, 0.85f, 1.f, 1.f});
@@ -552,6 +564,13 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
   banner_->setVisible(!m.bannerLines.empty());
   bannerTitle_->setText(m.bannerLines.empty() ? std::string() : m.bannerLines.front());
   bannerText_->setText(m.bannerLines.size() > 1 ? m.bannerLines[1] : std::string());
+  postView_->setVisible(m.postViewLines.size() >= 2);
+  if (m.postViewLines.size() >= 2) {
+    postViewTitle_->setText(m.postViewLines.front());
+    std::vector<std::string> body(m.postViewLines.begin() + 1, m.postViewLines.end() - 1);
+    postViewText_->setText(joinLines(body));
+    postViewHint_->setText(m.postViewLines.back());
+  }
   for (int i = 0; i < kHotbarSlots; ++i) {
     ui::cSlot& slot = *slots_[size_t(i)];
     const ItemStack& st = m.hotbar[size_t(i)];

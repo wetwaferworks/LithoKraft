@@ -54,4 +54,21 @@ inline std::vector<std::string> layout(const std::string& t, int cols, int rows 
   return lines;
 }
 
+/// 2026-10-25 (JD, Post viewer): the HUD overlay for a looked-at post. Line 0 = title, then a
+/// framed 16 x 16 grid holding all 256 characters (every post, diagonal ones included), last = hint.
+inline std::vector<std::string> viewLines(const std::string& t, bool editing) {
+  std::vector<std::string> out;
+  out.push_back("POST - " + std::to_string(t.size()) + " / " + std::to_string(kMaxChars) + " characters" +
+                (editing ? " (writing)" : ""));
+  const std::string edge = "+" + std::string(16, '-') + "+";
+  out.push_back(edge);
+  std::vector<std::string> rows = layout(t, 16, kRows);
+  rows.resize(size_t(kRows));
+  for (std::string& r : rows) out.push_back("|" + r + std::string(16 - r.size(), ' ') + "|");
+  out.push_back(edge);
+  out.push_back(editing ? "Enter = new line, Backspace deletes, Esc ends"
+                        : "Alt + right click = write, right click again or look away = close");
+  return out;
+}
+
 }  // namespace lithokraft::post
