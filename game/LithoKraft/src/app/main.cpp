@@ -815,6 +815,7 @@ int main(int argc, char** argv) {
   // Cortana 2026-10-15 1345: verify-mode summary at exit (when on).
   std::atexit([] { if (litholattice::meshVerifyEnabled()) { const auto s = litholattice::meshVerifyStats(); std::fprintf(stderr, "mesh-verify: checked %llu mismatches %llu skipped %llu\n", (unsigned long long)s.checked, (unsigned long long)s.mismatches, (unsigned long long)s.skipped); } });
   int renderThreadsArg = 0;  // Cortana 2026-10-15 1156: --render-threads N
+  double swScaleArg = 1.0;  // Cortana 2026-10-25 (pass sw3): --sw-scale 0.5|0.75|1.0
   int fpsCapArg = -2; bool noVsync = false; bool noOverlay = false;  // Cortana 2026-10-15 1440: --no-overlay (A/B)  // Cortana 2026-10-15 1610: --fps-cap 30|60|off|auto (-2 = not given), --no-vsync
   bool tpsGiven = false, radiusGiven = false, displayGiven = false, streamGiven = false; int streamingArg = -1;  // CLI wins over settings.json
   bool simAreaGiven = false, streamAreaGiven = false;  // diamond (JD 2026-10-23)
@@ -878,6 +879,7 @@ int main(int argc, char** argv) {
       cfg.screenVertical = o == "vertical";
     }
     else if (!std::strcmp(argv[i], "--render-threads")) { renderThreadsArg = int(num(1, 64)); }  // Cortana 2026-10-15 1156
+    else if (!std::strcmp(argv[i], "--sw-scale")) { swScaleArg = num(0.25, 1.0); }  // pass sw3
     else if (!std::strcmp(argv[i], "--radius")) { cfg.tickRadius = int(num(0, 512)); radiusGiven = true; }
     else if (!std::strcmp(argv[i], "--vkfx")) { vkFxArg = int(num(0, 127)); }  // JD Vulkan push: effect bits for this run
     else if (!std::strcmp(argv[i], "--stream-radius")) { cfg.streamRadius = int(num(1, 64)); streamGiven = true; }  // JD 2026-10-16
@@ -1048,7 +1050,7 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--version")) { std::printf("LithoKraft %s (LithoLattice engine)\n", LITHOKRAFT_VERSION); return 0; }
     else {
       std::printf("usage: LithoKraft [--version] [--selftest] [--dim wafer|organic] [--size chunks] "
-                  "[--tps 32|64|128|256|512] [--tps-unlock (debug: --tps up to 8192, powers of 2)] [--no-euv] [--radius chunks] [--render-threads 1|2|4|8|16|32|64] [--seconds s] [--vsync] [--display windowed|maximized|borderless|fullscreen] [--monitor N] [--resolution WxH] [--refresh Hz] [--log file] "
+                  "[--tps 32|64|128|256|512] [--tps-unlock (debug: --tps up to 8192, powers of 2)] [--no-euv] [--radius chunks] [--render-threads 1|2|4|8|16|32|64] [--sw-scale 0.5|0.75|1.0] [--seconds s] [--vsync] [--display windowed|maximized|borderless|fullscreen] [--monitor N] [--resolution WxH] [--refresh Hz] [--log file] "
                   "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--mcp-stdio] "
                   "[--vk-validation] [--vk-arena host|device|rebar] [--gl-arena on|off] [--seed n] [--cities on|off] [--noise-preview graph.json [--preview-out f.png] "
                   "[--preview-output name] [--preview-size px] [--preview-scale blocks/px] [--preview-y y]]\n");
@@ -1125,6 +1127,7 @@ int main(int argc, char** argv) {
   // settings key; 0 = engine default (4). Engine rounds to a power of two
   // and clamps to hardware threads.
   cSoftwareRenderer::setRenderThreads(unsigned(renderThreadsArg > 0 ? renderThreadsArg : settings.renderThreads));
+  cSoftwareRenderer::setRenderScale(float(swScaleArg));  // pass sw3: software renderer only
   if (mute) settings.muted = true;
   cfg.vkFxOverride = vkFxArg;  // JD Vulkan push: CLI wins for this run only (0.0.1.51: no longer saved)
   cfg.version = LITHOKRAFT_VERSION;
