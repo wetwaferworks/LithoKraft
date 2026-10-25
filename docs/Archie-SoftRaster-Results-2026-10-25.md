@@ -39,3 +39,22 @@ Findings:
 5. Keep span clip (bit 32) as an opt-in. To make it bit-identical, advance sw by accumulated adds to the clipped start, which keeps the
    cheap walk but drops the branch work. Only worth it if steps 1-3 make scan matter again.
 6. Linux ctest: lithokraft_selftest "hot reload diff" fails on the box only (likely mtime granularity). This needs a separate look.
+
+## Steps 1 and 3 prototyped (box, 2026-10-25 ~1:30 PM ET)
+Both are on by default (LL_SW_P2 default now 0xC7). LL_SW_P2=7 restores the earlier path.
+- Step 1 (bit 64): reuse each vertex's emissive sum across a quad's two triangles (same ops, same bits).
+  Emitters are off by default (render.emissive_light), so LL_SW_EMIT=1 is a profiling override that leaves settings untouched.
+  It saved ~133k vertex light sums/frame on flyover, but the frame-time effect is in the noise: 200.8 -> 196.8 ms avg.
+- Step 3 (bit 128): drop triangles whose bbox contains no pixel centre before setup. This removes ~35% of triangles
+  (flyover ~450k -> ~295k; still 44.5k -> 28.3k).
+- A/B: LL_SW_AB showed 0 diff px in every check (step 1 alone with emitters lit; step 3 alone; both at flyover f30 and f60, still f200).
+  Hashes: 24c52df2be14789c x3, cities on 24c52df2be14789c, cities off 43693d018d046b25.
+
+| run | P2=7 avg / p99 ms | default (0xC7) avg / p99 ms |
+|---|---|---|
+| flyover run 1 | 207.3 / 303.0 | 195.4 / 291.7 |
+| flyover run 2 | (232.6 / 425.4, streaming outlier) | 194.9 / 283.6 |
+| still | 30.8 / 47.9 | 24.0 / 33.5 |
+| flyover, emitters forced on | 200.8 / 277.1 | 196.8 / 285.0 |
+
+Flyover is about 5-6% faster. Still is about 20% faster on avg and p99, but the box is noisy, so this needs confirming on the workstation.
