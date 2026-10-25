@@ -67,6 +67,10 @@ class cChunkStreamer {
 
   /// Diamond (Manhattan) footprint for the wanted set + eviction (JD 2026-10-23).
   void setDiamond(bool d) { diamond_ = d; }
+  /// 2026-10-25 stutter pass: requests farther than this (same metric as the footprint) are not
+  /// admitted; resident columns are untouched. The game lowers it while the mesh pool is > 90% full.
+  void setAdmitRadius(int r) { admitR_ = r; }
+  int admitRadius() const { return admitR_; }
 
   /// Main thread, once per frame: request missing columns within the radius of
   /// the player's chunk, nearest first, bounded by the in-flight cap.
@@ -128,6 +132,7 @@ class cChunkStreamer {
   cWorldSave* save_;  // null = generate-only (tests, --no-save)
   std::string dimensionId_;
   int radius_;
+  int admitR_ = 1 << 20;  ///< 2026-10-25 stutter pass (see setAdmitRadius)
   bool diamond_ = false;  ///< diamond (Manhattan) stream footprint (JD 2026-10-23)
   size_t initialCount_ = 0;
   std::unordered_set<uint64_t> requested_;  // loaded or in flight (failures are erased by update(), B-L7)

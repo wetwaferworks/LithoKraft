@@ -1496,10 +1496,30 @@ bool Game::saveWorld(const char* reason, bool wait) {
 // (the build-79 S3 starvation seesaw on device — present and sim starving
 // each other by turns). Freeze recovery stays with the pause state machine
 // (entering Playing clears the latch), exactly as before.
+// 2026-10-25 stutter pass: stream churn counters for the once-a-second split line.
+namespace { size_t g_colsAdded = 0, g_colsEvicted = 0, g_uploadsCapped = 0; }
 void Game::pumpStreaming() {
   if (!streamer_ || !sim_ || !active_) return;
   const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
   litholattice::setFoliageFocus(pcx, pcz);  // 2026-10-18 (Crew Canopy, F-B): sparse-leaf distance origin
+  {  // 2026-10-25 stutter pass: above 90% mesh-pool fill, stop admitting far columns (shrink the
+     // admission radius a step per 250 ms, floor 8) instead of evicting and re-streaming; grow back
+     // below 85%. Resident columns are not touched; eviction keeps its own radius + hysteresis.
+    static Clock::time_point lastAdmit = Clock::now();
+    const int full = effectiveStreamRadius(cfg_);
+    const float fill = renderer_.meshPoolFill();
+    int ar = std::min(streamer_->admitRadius(), full);
+    if (fill < 0.f) ar = full;
+    else if (msBetween(lastAdmit, Clock::now()) >= 250.0) {
+      lastAdmit = Clock::now();
+      const int was = ar;
+      if (fill > 0.90f) ar = std::max(std::min(8, full), ar - 1);
+      else if (fill < 0.85f) ar = std::min(full, ar + 1);
+      if (ar != was && (ar == full || fill > 0.90f) && (ar % 4 == 0 || ar == full))
+        logInfo("stream: mesh pool %.1f%% full; admission radius %d (stream radius %d)", 100.0 * double(fill), ar, full);
+    }
+    streamer_->setAdmitRadius(ar);
+  }
   streamer_->update(pcx, pcz);
   // CAM-2 (P2c): non-player cameras (third/follow/free view camera, MCP
   // pilot cameras) request columns around their own centres within their
@@ -1575,6 +1595,7 @@ void Game::pumpStreaming() {
   }
   chunkColumns_ = active_->chunks.columns().size();
   if (simHold.owns_lock()) simHold.unlock();  // release before evictFarColumns (it takes its own hold)
+  g_colsAdded += added;
   if (added) logInfo("stream: +%zu columns around chunk (%d, %d); %zu loaded", added, pcx, pcz, chunkColumns_);
   evictFarColumns();
 }
@@ -1632,8 +1653,25 @@ void Game::evictFarColumns() {
   std::vector<uint64_t> residentKeys;
   residentKeys.reserve(active_->chunks.columns().size());
   for (const auto& [k, col] : active_->chunks.columns()) residentKeys.push_back(k);
-  const std::vector<uint64_t> candidates = selectEvictionCandidates(residentKeys, pcx, pcz, effectiveStreamRadius(cfg_) /* fix3: sim area always inside stream */,
-                                                                    kEvictHysteresisChunks, kEvictBudgetPerPump, cfg_.diamondStreamArea);
+  std::vector<uint64_t> candidates = selectEvictionCandidates(residentKeys, pcx, pcz, effectiveStreamRadius(cfg_) /* fix3: sim area always inside stream */,
+                                                              kEvictHysteresisChunks, SIZE_MAX, cfg_.diamondStreamArea);
+  // 2026-10-25 stutter pass (hysteresis): a column a camera still streams (CAM-2 chunkLoadRequests)
+  // is kept while within that camera's radius + the same hysteresis band, so unload distance stays
+  // beyond load distance for every stream centre, not only the player's (no evict/re-stream loop).
+  {
+    const auto reqs = camera_.chunkLoadRequests();
+    if (!reqs.empty())
+      std::erase_if(candidates, [&](uint64_t key) {
+        const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
+        for (const auto& rq : reqs) {
+          const int dx = std::abs(cx - rq.cx), dz = std::abs(cz - rq.cz);
+          const int d = cfg_.diamondStreamArea ? dx + dz : std::max(dx, dz);
+          if (d <= std::clamp(rq.radiusChunks, 0, effectiveStreamRadius(cfg_)) + kEvictHysteresisChunks) return true;
+        }
+        return false;
+      });
+  }
+  if (candidates.size() > kEvictBudgetPerPump) candidates.resize(kEvictBudgetPerPump);
   if (candidates.empty()) return;
   // Same hold discipline as insertion (P0a + build 80): nothing is
   // evicted under a running sim, and a refused hold defers the whole
@@ -1686,6 +1724,7 @@ void Game::evictFarColumns() {
   }
   chunkColumns_ = active_->chunks.columns().size();
   if (simHold.owns_lock()) simHold.unlock();
+  g_colsEvicted += evicted;
   if (evicted) logInfo("stream: evicted %zu far columns around chunk (%d, %d); %zu loaded", evicted, pcx, pcz, chunkColumns_);
 }
 
@@ -2431,11 +2470,11 @@ void Game::handleWorldActions() {
     auto& hb = player_.inventory.hotbar();
     int found = -1;
     for (int i = 0; i < kHotbarSize; ++i)
-      if (placedBlockForItem(hb[size_t(i)].itemId) == st.hitBlock) { found = i; break; }
+      if (placedBlockForItem(hb[size_t(i)].itemId) == viaBase(st.hitBlock)) { found = i; break; }
     ItemStack* carry = nullptr;
     if (found < 0)
       for (auto& s : player_.inventory.main())
-        if (!s.empty() && placedBlockForItem(s.itemId) == st.hitBlock) { carry = &s; break; }
+        if (!s.empty() && placedBlockForItem(s.itemId) == viaBase(st.hitBlock)) { carry = &s; break; }
     logInfo("pick block: hotbar slot %d, carry %s", found, carry ? "yes" : "no");
     if (found >= 0) {
       hot_ = found;
@@ -2444,7 +2483,7 @@ void Game::handleWorldActions() {
       ui_.refreshCarry(carrySnapshot());
     } else if (creativeMode()) {
       ItemStack old = std::move(hb[size_t(hot_)]);
-      hb[size_t(hot_)] = ItemStack{uint32_t(st.hitBlock), uint16_t(1)};
+      hb[size_t(hot_)] = ItemStack{uint32_t(viaBase(st.hitBlock)), uint16_t(1)};  // a side Via picks as a Via
       if (!old.empty() && !player_.inventory.placeStack(old))
         logWarn("pick block: inventory full, displaced stack %u lost", unsigned(old.itemId));
       ui_.refreshCarry(carrySnapshot());
@@ -2550,11 +2589,13 @@ void Game::capturePendingScreenshot() {
 // logged once a second during stream benches ("update-split"), to find render-side cost.
 namespace {
 struct UpdateSplit {
-  double ms[10]{};
+  double ms[10]{}, mx[10]{};  // 2026-10-25 stutter pass: + worst frame per section
   int frames = 0;
   Clock::time_point last = Clock::now(), mark;
-  void lap(int i) { const auto t = Clock::now(); ms[i] += msBetween(mark, t); mark = t; }
+  void lap(int i) { const auto t = Clock::now(); const double d = msBetween(mark, t); ms[i] += d; mx[i] = std::max(mx[i], d); mark = t; }
 } g_split;
+// The split line logs during stream benches, or always with LK_FRAME_SPLIT=1.
+bool frameSplitEnv() { static const bool on = [] { const char* e = std::getenv("LK_FRAME_SPLIT"); return e && *e == '1'; }(); return on; }
 const char* const kSplitNames[10] = {"head", "loco", "deceit", "cam", "pumpStream", "actions", "uploadMeshes", "benchStream", "sounds+ents", "ui"};
 }  // namespace
 void Game::update(float dt, int width, int height) {
@@ -2897,12 +2938,15 @@ void Game::update(float dt, int width, int height) {
   updateUi(dt, width, height);
   g_split.lap(9);
   ++g_split.frames;
-  if (stream_ && msBetween(g_split.last, Clock::now()) >= 1000.0) {
-    char buf[512]; int n = 0;
+  if ((stream_ || frameSplitEnv()) && msBetween(g_split.last, Clock::now()) >= 1000.0) {
+    char buf[1024]; int n = 0;
     for (int i = 0; i < 10; ++i)
-      n += std::snprintf(buf + n, sizeof buf - size_t(n), " %s=%.2f", kSplitNames[i], g_split.ms[i] / std::max(1, g_split.frames));
-    logInfo("update-split ms/frame:%s", buf);
+      n += std::snprintf(buf + n, sizeof buf - size_t(n), " %s=%.2f/%.1f", kSplitNames[i], g_split.ms[i] / std::max(1, g_split.frames), g_split.mx[i]);
+    logInfo("update-split ms/frame (avg/max):%s | frames %d, cols +%zu -%zu, capped uploads %zu, mesh queue %zu, pool %.1f%%, admit r %d",
+            buf, g_split.frames, g_colsAdded, g_colsEvicted, g_uploadsCapped, meshQueueDepth(), 100.0 * double(renderer_.meshPoolFill()),
+            streamer_ ? std::min(streamer_->admitRadius(), effectiveStreamRadius(cfg_)) : 0);
     g_split = UpdateSplit{};
+    g_colsAdded = g_colsEvicted = g_uploadsCapped = 0;
   }
 }
 
@@ -3055,11 +3099,21 @@ void Game::uploadMeshes() {
       if (it == pendingMesh_.end()) { pendingOrder_.push_back(k); pendingMesh_.emplace(k, std::move(m)); }
       else if (m.epoch != it->second.epoch || m.seq > it->second.seq) it->second = std::move(m);
     } }
-  constexpr int kUploadBudget = 64;                 // sub-chunks per frame
+  // 2026-10-25 stutter pass: at most 32 sub-chunks or ~1.5 ms of commits per frame, nearest first
+  // (was 64, oldest first): a far burst no longer stalls the frame ahead of the ground underfoot.
+  constexpr int kUploadBudget = 32;                 // sub-chunks per frame
+  constexpr double kUploadMsBudget = 1.5;           // main-thread commit time per frame
   constexpr size_t kUploadBytesBudget = 3u << 20;   // bytes per frame
+  const auto tUploads = Clock::now();
   size_t bytes = 0;
   int uploads = 0;
+  if (pendingOrder_.size() > size_t(kUploadBudget)) {
+    const int pcx = int(std::floor(player_.pos.x / 16)), pcy = int(std::floor(player_.pos.y / 16)), pcz = int(std::floor(player_.pos.z / 16));
+    auto dist = [&](int64_t k) { int x, y, z; unpackPos(k, x, y, z); return (x - pcx) * (x - pcx) + (y - pcy) * (y - pcy) + (z - pcz) * (z - pcz); };
+    std::stable_sort(pendingOrder_.begin(), pendingOrder_.end(), [&](int64_t a, int64_t b) { return dist(a) < dist(b); });
+  }
   for (; !pendingOrder_.empty() && uploads < kUploadBudget;) {
+    if (uploads > 0 && msBetween(tUploads, Clock::now()) > kUploadMsBudget) { g_uploadsCapped += pendingOrder_.size(); break; }
     const int64_t k = pendingOrder_.front();
     auto node = pendingMesh_.find(k);
     if (node == pendingMesh_.end()) { pendingOrder_.pop_front(); continue; }
@@ -3083,6 +3137,7 @@ void Game::uploadMeshes() {
       else if (m.epoch != it->second.epoch || m.seq > it->second.seq) it->second = std::move(m);
     } }
   for (; !pbrPendingOrder_.empty() && uploads < kUploadBudget;) {
+    if (uploads > 0 && msBetween(tUploads, Clock::now()) > kUploadMsBudget) break;
     const int64_t k = pbrPendingOrder_.front();
     auto node = pbrPendingMesh_.find(k);
     if (node == pbrPendingMesh_.end()) { pbrPendingOrder_.pop_front(); continue; }

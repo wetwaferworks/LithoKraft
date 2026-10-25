@@ -181,6 +181,7 @@ void cChunkStreamer::update(int playerCx, int playerCz) {
   for (int dz = -radius_; dz <= radius_; ++dz)
     for (int dx = -radius_; dx <= radius_; ++dx) {
       if (diamond_ && std::abs(dx) + std::abs(dz) > radius_) continue;  // diamond footprint (JD 2026-10-23)
+      if ((diamond_ ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz))) > admitR_) continue;  // pool-pressure admission
       const uint64_t key = litholattice::ChunkKey::make(playerCx + dx, playerCz + dz);
       if (requestable(key, now)) want.emplace_back(streamRequestPriority(dx, dz, diamond_), key);  // fix 3b: diamond-nearest first
     }
@@ -196,6 +197,7 @@ void cChunkStreamer::updateAround(int cx, int cz, int radiusChunks) {
   for (int dz = -r; dz <= r; ++dz)
     for (int dx = -r; dx <= r; ++dx) {
       if (diamond_ && std::abs(dx) + std::abs(dz) > r) continue;  // diamond footprint (JD 2026-10-23)
+      if ((diamond_ ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz))) > admitR_) continue;  // pool-pressure admission
       const uint64_t key = litholattice::ChunkKey::make(cx + dx, cz + dz);
       if (requestable(key, now)) want.emplace_back(streamRequestPriority(dx, dz, diamond_), key);  // fix 3b: diamond-nearest first
     }
