@@ -74,3 +74,9 @@ Static views are shading-bound. Phases 2 and 3 moved FPS by 0 to +5% and GPU ms 
 7. **LithoTexture residency:** when we build LithoTexture, what should drive residency priority? Distance, screen-space size, frustum, or last-seen frame? How should it interact with the streaming governor's budget?
 8. **Pull vs no-pull at distance:** 3p is slower than 3 at r64 (67.6 vs 92.3 FPS) and its 0.1% lows are worse at r32. Is that a hint that pulled meshes cost more to build or upload than they save, or that something in our bucket layout is off?
 9. **Occlusion:** at 25k meshes with 65–85% frustum-culled, is it worth measuring the occlusion gap (for example a depth-only count) before any HZB work? If so, which metric would convince you?
+## Reference rig / minimum spec (JD decision, 7:05 AM ET)
+
+JD decided that the 4 GB NVIDIA GeForce RTX 3050 Ti Laptop GPU (driver 621.01, Vulkan 1.4) is LithoKraft's minimum spec and reference rig. Every Phase 4 number in this doc was measured on that GPU; the logs confirm the selected device was 'vulkan: using NVIDIA GeForce RTX 3050 Ti Laptop GPU'. That makes the 4 GB VRAM budget a hard limit: at r64 the arena used 2.1 GB, which has to fit with room to spare.
+
+- Direction and final verify JD. LithoPipeline designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
+

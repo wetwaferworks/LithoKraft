@@ -81,3 +81,10 @@ The baselines convict neither, so neither was implemented.
 - This run convicted the CPU frustum loop, which takes 5.6-7.3 ms per frame at r64 (about 25k hash-map nodes). That is the 4.2 family, so I implemented 585db08, the Phase 4.2a compact cull list (LL_VK_FASTCULL=1, default off). Same decisions; r64 FPS went from 84.5 to 104.6 and cull from 3.0 to 1.7 ms. Rollback: git reset --hard e2a84e1.
 - The 1% lows did not move (40-55 ms streaming spikes). 4.1, the governor, is next but unproven; it needs per-spike attribution first.
 - Direction and final verify JD. LithoPipeline designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
+
+## Reference rig / minimum spec (JD decision, 7:05 AM ET)
+
+JD decided that the 4 GB NVIDIA GeForce RTX 3050 Ti Laptop GPU (driver 621.01, Vulkan 1.4) is LithoKraft's minimum spec and reference rig. Every Phase 4 number in this doc was measured on that GPU; the logs confirm the selected device was 'vulkan: using NVIDIA GeForce RTX 3050 Ti Laptop GPU'. That makes the 4 GB VRAM budget a hard limit: at r64 the arena used 2.1 GB, which has to fit with room to spare.
+
+- Direction and final verify JD. LithoPipeline designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
+
