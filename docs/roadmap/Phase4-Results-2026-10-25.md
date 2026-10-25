@@ -1,6 +1,6 @@
 # LithoPipeline Phase 4: results (2026-10-25, ~6:30 AM ET)
 
-Direction and final verify JD. LithoPipeline (halves LithoVoxel and LithoTexture) designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie (`Research-Phase4-Streaming-Culling-Elfie-2026-10-25-0520-EDT.md`).
+Direction and final verify JD. LithoPipeline (halves LithoVoxel and LithoTexture) designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie (`Research-Phase4-Streaming-Culling-Elfie-2026-10-25-0520-EDT.md`). LithoPipeline inspired by id Software's Doom 2016 (id Tech 6) and the MegaTexture work that led to it.
 
 ## What landed
 
@@ -88,3 +88,17 @@ JD decided that the 4 GB NVIDIA GeForce RTX 3050 Ti Laptop GPU (driver 621.01, V
 
 - Direction and final verify JD. LithoPipeline designed by Archie, implemented by Cortana; Phase 4 research compiled by Elfie.
 
+## Phase 4 A-D (2026-10-25, ~7:15-7:55 AM ET; Archie's 07:10 reply: `Archie-Phase4-Reply-2026-10-25-0710-EDT.md`)
+
+Direction and final verify JD. LithoPipeline designed by Archie (incl. guidance in her 2026-10-25 07:10 reply), implemented by Cortana. All benches borderless, mode 3 + 4.2a, circuits scene, RTX 3050 Ti Laptop GPU (minimum spec).
+
+| Item | Result | Code |
+|---|---|---|
+| A: 3p upload/eviction "mystery" (Q8) | Mostly a per-frame normalization artifact. Per second at r64 sprint: uploads 722 vs 807 (+12%), evictions 414 vs 432 (+4%); per frame it looked like +52% / +42%, but the FPS ratio (92.3/67.6 = 1.37) explains most of it. Report per-second rates. The real 3p FPS cost (pull path) remains. | none |
+| B: blend split (Q1) | Pull coverage up: r32 sprint 22.7% -> 56.6% of quads, r64 sprint 9.9% -> 28.2%. FPS: r32 117.8 -> 138.0/146.8 (+17-25%); r64 61.1/64.4 -> 42.8/43.6/39.5 (about -33%, repeated). Default on under `LL_VK_PULL=1`; `LL_VK_BLENDSPLIT=0` opts out. Deviation: the blend faces stay Packed12 (not pulled). | packed_quad64.h, vk_renderer.cpp |
+| C: sub-cell (Q3) | Tuple census only (`LL_VK_SUBCELL_CENSUS=1`): sub-cell is now the biggest rejection (r32 16.8 M / r64 33.2 M quads). Unique tuples 6,660 (r32) / 7,158 (r64); top 256 cover only 33.8% / 27.9%; 90% needs 2,987 / 3,905 tuples. Neither a scale flag nor a small LUT reaches 90%. **Packing not implemented**: it needs a wider quad format. Decision is Archie's. | packed_quad64.h, vk_renderer.cpp (census only) |
+| D: fragment-bound test | Flat stub (`LL_VK_FLATFRAG=1`) cuts GPU ms 25% at r48 (5.28 -> 3.98) and 23% at r32. A quarter of the pixels (960x540 windowed) cuts only 4% at r48 (5.09 -> 4.89) and 10% at r32. Not ROP/fill-bound. About 25% of GPU time is fragment-shader cost that does not scale with resolution (likely small-triangle quad shading or fixed FX cost); about 75% is pre-raster. r48 runs during JD's window move (7:30-7:33 ET) were rerun. | chunk.frag, render_vk CMakeLists.txt, vk_pipelines.cpp |
+
+Raw data: `rename-run\mega\fragD.txt`, `fragD_r48rerun.txt`, `pullB.txt`, `pullB_rep.txt`, `pullC_census.txt`.
+
+Gate: build rc=0, ctest 48/48, `24c52df2be14789c` x3, cities on `24c52df2be14789c`, cities off `43693d018d046b25`.
