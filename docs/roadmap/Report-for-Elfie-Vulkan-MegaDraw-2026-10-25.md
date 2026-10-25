@@ -83,3 +83,45 @@ Either should keep the fragment inputs down. Please check GPU time on your side,
 4. Should the smoothness numbers (p99.9, hitches) become part of the standard bench JSON, so all paths report the same metrics?
 
 Phase 2 and Phase 3 results will be added to this report as they land.
+## Smoothness bench and maximized default (added 2026-10-25, 4:25 AM ET)
+
+JD changed the default window to maximized windowed (commit `b4597aa`, rollback `git reset --hard 9f85de9`). His saved `config/settings.json` still says `"displayMode": 2` (borderless), and a saved setting wins over the code default, so his own launches stay borderless until he picks Maximized in Settings. I left that file alone.
+
+Frame times are in milliseconds, taken from each frame of a 60 s flyover. A hitch is a frame longer than 10 ms and more than twice the running average. GPU ms is the whole-frame GPU time from the timestamps.
+
+**Flyover, maximized, 1920x998 (2 runs each)**
+
+| Radius | Mode | FPS | p50 | p99 | p99.9 | Max | Hitches | Std dev | GPU ms |
+|---|---|---|---|---|---|---|---|---|---|
+| 8 | 0 old | 541.2 / 527.1 | 1.77 / 1.82 | 3.76 / 3.81 | 4.09 / 4.15 | 6.52 / 5.49 | 0 / 0 | 0.41 / 0.42 | 1.60 / 1.65 |
+| 8 | 3 V2b | 520.3 / 513.0 | 1.85 / 1.87 | 3.83 / 3.89 | 4.19 / 4.30 | 5.34 / 5.26 | 0 / 0 | 0.43 / 0.45 | 1.67 / 1.70 |
+| 32 | 0 old | 146.7 / 146.7 | 6.80 / 6.84 | 9.44 / 9.42 | 10.17 / 9.99 | 17.35 / 10.36 | 1 / 0 | 1.08 / 1.07 | 6.59 / 6.58 |
+| 32 | 3 V2b | 144.4 / 143.3 | 6.94 / 6.99 | 9.78 / 9.78 | 10.37 / 10.37 | 10.61 / 10.66 | 0 / 0 | 1.14 / 1.14 | 6.70 / 6.74 |
+| 48 | 0 old | 82.9 / 82.3 | 12.06 / 12.10 | 16.22 / 15.92 | 29.77 / 16.75 | 33.99 / 17.61 | 11 / 2 | 2.03 / 1.77 | 11.16 / 11.19 |
+| 48 | 3 V2b | 81.4 / 81.7 | 12.33 / 12.21 | 16.10 / 16.11 | 17.20 / 17.08 | 18.31 / 18.07 | 2 / 1 | 1.82 / 1.82 | 11.28 / 11.27 |
+
+**Heavy test world (`--bench-scene testworld`), flyover path, maximized, 1920x998 (1 run each)**
+
+These are a separate set from the flyover numbers above. The 160 FPS figure in the earlier table was the plain flyover at 1280x720, not this world.
+
+| Radius | Mode | FPS | p50 | p99 | p99.9 | Max | Hitches | Std dev | GPU ms |
+|---|---|---|---|---|---|---|---|---|---|
+| 32 | 0 old | 148.6 | 6.75 | 9.41 | 10.86 | 15.31 | 2 | 1.11 | 6.50 |
+| 32 | 3 V2b | 145.1 | 6.91 | 9.77 | 10.40 | 11.07 | 0 | 1.14 | 6.67 |
+| 48 | 0 old | 82.2 | 12.16 | 16.09 | 17.04 | 17.88 | 2 | 1.83 | 11.19 |
+| 48 | 3 V2b | 81.6 | 12.23 | 16.22 | 17.12 | 18.57 | 3 | 1.89 | 11.22 |
+
+**Small window, 1280x720 (partial: radius 8, 2 runs)**
+
+| Mode | FPS | p50 | p99 | p99.9 | Max | Hitches | Std dev | GPU ms |
+|---|---|---|---|---|---|---|---|---|
+| 0 old | 715.6 / 681.6 | 1.31 / 1.34 | 3.07 / 3.49 | 3.48 / 4.55 | 7.13 / 6.55 | 0 / 0 | 0.40 / 0.51 | 1.16 / 1.19 |
+| 3 V2b | 685.8 / 653.3 | 1.37 / 1.39 | 3.17 / 4.18 | 3.81 / 5.22 | 7.31 / 6.76 | 0 / 0 | 0.42 / 0.59 | 1.21 / 1.22 |
+
+For radius 32 and 48 at 1280x720, see the average-FPS table earlier in this report: 161.8 against 160.0, and 88.9 against 88.3.
+
+**What this shows**
+- Maximized has about 2.1 times the pixels of 1280x720. It costs roughly 10% at radius 32-48 and about 25% at radius 8, which again points to pixel and shading cost.
+- V2b runs 1-3% behind the old path on average.
+- V2b's tail is as good or better. Its worst frames stay within about 1.5x the median. The old path had one run at radius 48 with an 11-hitch, 34 ms spike, and V2b never went above 18.6 ms.
+- On these paths the test world bench comes out at about the same weight as the plain flyover.
