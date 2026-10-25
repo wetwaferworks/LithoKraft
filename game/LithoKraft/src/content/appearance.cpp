@@ -1,4 +1,5 @@
 #include "lithokraft/content/appearance.h"
+#include <algorithm>
 #include <array>
 #include <string>
 #include "lithokraft/content/blocks.h"
@@ -252,7 +253,15 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
   const int f = stFacing(cell.state);
   const FaceMaterial frontM = cell.materials.face(cell.id, FaceSlot::Front, on);
   const int slo[3] = {0, 0, 0}, shi[3] = {16, 2, 16};
-  machineBox(cell, out, slo, shi, on);
+  // 2026-10-25 Thresholdor subtract mode (aux bit 0): CloudAtlas's tinted top when the pack has
+  // it (thresholdor_top_subtract[_on]); until then a placeholder indicator pad (below).
+  const bool thrSub = r == SimRole::Thresholdor && (stAux(cell.state) & 1);
+  const FaceMaterial* subTop = nullptr;
+  if (thrSub) {
+    subTop = on ? cell.materials.named("thresholdor_top_subtract_on") : nullptr;
+    if (!subTop) subTop = cell.materials.named("thresholdor_top_subtract");
+  }
+  machineBox(cell, out, slo, shi, on, subTop);
   auto pad = [&](int x0, int z0, int x1, int z1, int y1 = 3) {
     const int lo[3] = {x0, 2, z0}, hi[3] = {x1, y1, z1};
     machineBox(cell, out, lo, hi, on, &frontM);
@@ -287,6 +296,10 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
     machineBox(cell, out, llo, lhi, on, &lowM);
     machineBox(cell, out, hlo, hhi, on, &highM);
     if (on) pad(6, 0, 10, 2, 4);
+    if (thrSub && !subTop) {  // placeholder: a raised LOW-textured bar across the slab centre = "minus"
+      const int mlo[3] = {4, 2, 7}, mhi[3] = {12, 3, 9};
+      machineBox(cell, out, mlo, mhi, on, &lowM);
+    }
   }
   if (r == SimRole::Pulsor) pad(6, 6, 10, 10);  // gem (CloudAtlas [6,2,5.5]-[10,3,10], rounded)
   const int tlo[3] = {0, 0, 0}, thi[3] = {16, 2, 16};  // top overlays at slab height
@@ -687,6 +700,60 @@ const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def, CellState s
     return wall ? &*wall : nullptr;
   }
   return boxModel(def);
+}
+
+int pickShapeBoxes(const litholattice::ChunkMap& w, const litholattice::cBlockReg& reg, int x, int y, int z,
+                   litholattice::BlockId b, litholattice::PickBox* out, int maxBoxes) {
+  const BlockDef& def = reg.def(b);
+  const CellState st = w.getState(x, y, z);
+  const SimRole r = roleOf(def);
+  const cLithoKraftAppearance& look = static_cast<const cLithoKraftAppearance&>(blockAppearance());
+  int n = 0;
+  // A north-frame box [lo, hi) in 1/16 units, turned like machineBox (foliage::rotated by facing).
+  auto add = [&](int x0, int y0, int z0, int x1, int y1, int z1, int turns) {
+    if (n >= maxBoxes) return;
+    foliage::Quad q{};
+    q.lo[0] = int16_t(x0); q.lo[1] = int16_t(y0); q.lo[2] = int16_t(z0);
+    q.hi[0] = int16_t(x1); q.hi[1] = int16_t(y1); q.hi[2] = int16_t(z1);
+    q.face = 2;
+    const foliage::Quad t = foliage::rotated(q, turns);
+    for (int a = 0; a < 3; ++a) {
+      const int lo = std::min(int(t.lo[a]), int(t.hi[a])), hi = std::max(int(t.lo[a]), int(t.hi[a]));
+      out[n].lo[a] = float(lo) / 16.f; out[n].hi[a] = float(hi) / 16.f;
+    }
+    ++n;
+  };
+  if (def.flags & kAttachable) {  // LEDs, levers, buttons: the mesher's oriented box model
+    const BoxModel* bm = look.boxModel(def, st);
+    if (!bm) return -1;
+    const int af = stAttach(st) ? stAttach(st) : 1;
+    if (def.shape == Shape::Cross && af >= 3 && af <= 6) return -1;  // sheared wall sprite: whole cell
+    const int turns = (af == 1 || af == 2) ? look.boxModelTurns(def, st) : 0;
+    for (const BoxModel::Box& box : bm->orientedBoxes(af, turns)) add(box.min[0], box.min[1], box.min[2], box.max[0], box.max[1], box.max[2], 0);
+    return n;
+  }
+  const int f = stFacing(st);
+  if (look.shapedRender(def)) {  // mirrors meshShaped: 2/16 slab + 1/16 pads
+    const bool on = look.active(def, st);
+    add(0, 0, 0, 16, 2, 16, f);
+    add(6, 2, 0, 10, (r == SimRole::Thresholdor && on) ? 4 : 3, 2, f);  // output pad
+    if (r == SimRole::Keyboard) { add(14, 2, 6, 16, 3, 10, f); return n; }
+    if (r == SimRole::Memor) { add(4, 2, 4, 12, 3, 12, f); return n; }
+    add(6, 2, 14, 10, 3, 16, f);  // input pad
+    if (r == SimRole::Redirector || r == SimRole::Thresholdor) { add(0, 2, 6, 2, 3, 10, f); add(14, 2, 6, 16, 3, 10, f); }
+    if (r == SimRole::Thresholdor && (stAux(st) & 1)) add(4, 2, 7, 12, 3, 9, f);
+    if (r == SimRole::Pulsor) add(6, 2, 6, 10, 3, 10, f);
+    return n;
+  }
+  if (r == SimRole::Repeator) {
+    add(0, 0, 0, 16, 3, 16, f);
+    const int di = repeator::delayIndex(st) & 3;
+    for (int i = di + 1; i < 4; ++i) add(12 - 3 * i, 3, 7, 14 - 3 * i, 4, 9, f);
+    return n;
+  }
+  if (b == kLithographor) { add(0, 0, 0, 16, 11, 16, 0); add(4, 11, 4, 12, 15, 12, 0); add(5, 15, 5, 11, 16, 11, 0); return n; }
+  if (def.shape == Shape::Slab) { add(0, 0, 0, 16, 8, 16, 0); return n; }
+  return -1;
 }
 
 int cLithoKraftAppearance::boxModelTurns(const BlockDef& def, CellState st) const {

@@ -3,6 +3,7 @@
 #pragma once
 #include "lithokraft/engine.h"
 #include "litholattice/render/block_appearance.h"
+#include "litholattice/world/raycast.h"
 
 namespace lithokraft {
 
@@ -29,6 +30,12 @@ class cLithoKraftAppearance final : public IBlockAppearance {
 inline int viaSideVariant(bool sameAbove, bool sameBelow) {
   return sameAbove && sameBelow ? kConnectedSideMid : sameBelow ? kConnectedSideTop : sameAbove ? kConnectedSideBottom : kConnectedSideSingle;
 }
+
+/// 2026-10-25 (JD): the look / target pick shape of a partial block (litholattice::PickShapeFn):
+/// the boxes it is drawn with (slab components, Repeator, Lithographor, LED / lever / button box
+/// models); -1 = full cell. Wire keeps the engine's kFlatPick plate. Installed by Game.
+int pickShapeBoxes(const litholattice::ChunkMap& w, const litholattice::cBlockReg& blocks, int x, int y, int z,
+                   litholattice::BlockId b, litholattice::PickBox* out, int maxBoxes);
 
 /// The shared instance (stateless, safe on mesh worker threads).
 const IBlockAppearance& blockAppearance();

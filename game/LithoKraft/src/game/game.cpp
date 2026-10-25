@@ -1309,6 +1309,7 @@ void Game::loadActive() {
     worldSim->setTortureGate(tortureLever[0], tortureLever[1], tortureLever[2], std::move(torture));
     worldSim->setSceneLevers(std::move(sceneLevers));
   }
+  litholattice::setPickShapeFn(&pickShapeBoxes);  // 2026-10-25 (JD): model-shaped look / target ray
   sim_ = std::make_unique<cSimThread>(active_->chunks, blockRegistry(), std::move(worldSim), std::move(sc),
                                      submitMesh_);
   // Measure-only windowed determinism probe (LL_HASH_AT_TICK=<world tick>; Proposed by JD; co-implemented by JD and Cortana).
