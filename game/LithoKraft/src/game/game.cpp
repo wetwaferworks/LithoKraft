@@ -73,6 +73,7 @@ int effectiveStreamRadius(const lithokraft::GameConfig& c) {
 static int llP2PerfOff() { static const int v = [] { const char* e = std::getenv("LL_P2_PERF_OFF"); return e ? int(std::strtol(e, nullptr, 0)) : 0; }(); return v; }  // Cortana 2026-10-16 1520: A/B perf switch (render/display only)
 
 namespace lithokraft {
+bool asyncChunkUploadOn();  // Cortana 2026-10-25 upload pass (defined above Game::uploadMeshes)
 
 // render.ambient_mode (JD 2026-10-11): 0 = Fraction (cheap default), 1 = NormalizedSun.
 // Clamped here too, so a hand-edited settings value can never reach the renderer raw.
@@ -731,7 +732,15 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
       ctx.traceParams = [this](int cx, int cz, float t0[4], float t1[4]) {
         if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->traceParams(cx, cz, t0, t1);
       };
-      meshOut_.push(meshSubChunk(*in, ctx));
+      ChunkMesh cm = meshSubChunk(*in, ctx);
+      // Cortana 2026-10-25 (box, upload pass; JD-approved): pack + copy into GPU memory here on the
+      // worker (backends with a direct-upload arena: Vulkan ReBAR/host, or a worker-staged device-only
+      // block); the main thread then only publishes the handle. Off unless LL_ASYNC_CHUNK_UPLOAD=1.
+      if (asyncChunkUploadOn() && !cm.verts.empty()) {
+        auto h = std::make_shared<PreparedChunkMeshHandle>();
+        if (renderer_.prepareChunkMeshAsync(cm, h->mesh)) { h->owner = &renderer_; cm.prepared = std::move(h); }
+      }
+      meshOut_.push(std::move(cm));
     });
   };
   std::optional<PlayerMeta> savedPlayer;
@@ -3044,6 +3053,15 @@ void Game::spillRingUpload(uint8_t kind, ChunkMesh&& mesh, litholattice::PbrChun
   ringSpillMax_ = std::max(ringSpillMax_, ringSpill_.size());
 }
 
+// Cortana 2026-10-25 (box, upload pass): LL_ASYNC_CHUNK_UPLOAD=1 opts the game's mesh workers into
+// prepareChunkMeshAsync (the bench_stream [C53-2] path). Default OFF until verified on Vulkan.
+bool asyncChunkUploadOn() {
+  static const bool on = [] { const char* e = std::getenv("LL_ASYNC_CHUNK_UPLOAD"); return e && e[0] == '1'; }();
+  return on;
+}
+static std::atomic<uint64_t> g_uploadsPublished{0};
+uint64_t asyncChunkUploadsPublished() { return g_uploadsPublished.load(std::memory_order_relaxed); }
+
 void Game::uploadMeshes() {
   // Design B Stage 2: retry spilled uploads first — they are the oldest
   // staged entries, and order across the spill/ring boundary is what keeps
@@ -3079,6 +3097,11 @@ void Game::uploadMeshes() {
     // the frame seal), immediate on every other path. A full ring spills
     // the mesh — counted as landed here, because the game has accepted it
     // and the spill retries it in order next frame; it is never dropped.
+    if (m.prepared && m.prepared->mesh.ready) {  // upload pass: already in GPU memory; publish only
+      m.prepared->publish();
+      ++g_uploadsPublished;
+      return true;
+    }
     if (!renderer_.enqueueChunkMesh(std::move(m))) spillRingUpload(0, std::move(m), {});
     return true;
   };
