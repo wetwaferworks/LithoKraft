@@ -28,3 +28,28 @@ selftest.cpp:595 freezes ids), a new translucent block-model path in both
 renderers, two box models with facing, a recipe, and resources.json slots.
 Each of those risks the scenario hashes and the 48-test gate, so it should be
 its own pass.
+## Spec update (JD, 2026-10-25 10:13 ET)
+- Purpose: label builds and leave directions readable in game.
+- Two-block multiblock: a one-block stand below a one-block holographic
+  panel. Placing needs both cells free; breaking either removes both.
+- Standing or wall-mounted (wall: panel on the wall, stand below it).
+- Up to 256 characters with word wrapping; editable on use; saved with the world.
+- `/post <text>` sets the text of the Post under the crosshair.
+- Made from the wafer's virtual or organic woods. Texture slots for Cloud:
+  `post_stand`, `post_panel`, `post_panel_wall`.
+
+## Scoped plan (each step gated: rc=0, 48/48, hashes unchanged)
+1. Blocks: `lithokraft:post_stand`, `lithokraft:post_panel` with new frozen
+   save ids appended (never renumber); facing in block state; box models and
+   pick shapes like torch/wall torch. Two-cell place/break in the edit path.
+2. Text storage: per-panel text keyed by block position in a region side
+   table (e.g. a `posts` section next to r.x.z.llr), UTF-8, capped at 256, with
+   save/load selftests. Old saves load with no posts.
+3. Editing: use on the panel opens a small UI text box (reuse cTextBox and the
+   console input focus path); `post` console command uses the sim raycast
+   target; `/post` works via the new slash strip (ad080be).
+4. Rendering: placeholder translucent cyan panel; text is drawn as a
+   world-space quad from an offscreen text texture or HUD-projected labels
+   within ~16 blocks (cheapest first step: HUD-projected text).
+5. Recipe from virtual/organic wood; Cloud art drops into the slots.
+Estimate: 2-3 focused passes. Hash risk is in step 1 (registry size).
