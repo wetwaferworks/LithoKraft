@@ -74,6 +74,7 @@ int effectiveStreamRadius(const lithokraft::GameConfig& c) {
 static int llP2PerfOff() { static const int v = [] { const char* e = std::getenv("LL_P2_PERF_OFF"); return e ? int(std::strtol(e, nullptr, 0)) : 0; }(); return v; }  // Cortana 2026-10-16 1520: A/B perf switch (render/display only)
 
 namespace lithokraft {
+std::shared_ptr<MeshInput> farLodMeshInput(const MeshInput& in, int f);  // bench_stream.cpp
 bool asyncChunkUploadOn();  // Cortana 2026-10-25 upload pass (defined above Game::uploadMeshes)
 
 // render.ambient_mode (JD 2026-10-11): 0 = Fraction (cheap default), 1 = NormalizedSun.
@@ -692,6 +693,9 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
   if (cfg.materials) emissiveProvider_ = std::make_unique<litholattice::cChunkEmissiveProvider>(cfg.materials);
   // Called on the main thread at load and on the sim thread afterwards; each job keeps the
   // materials it started with, so a hot reload never pulls them out from under a worker.
+  swLodOn_ = renderer_.prefersGreedyMeshes() && !(std::getenv("LL_SW_LOD") && std::atoi(std::getenv("LL_SW_LOD")) == 0);
+  if (const char* r = std::getenv("LL_SW_LOD_RINGS")) std::sscanf(r, "%d,%d,%d", &swLodRing_[0], &swLodRing_[1], &swLodRing_[2]);
+  if (swLodOn_) logInfo("software far LOD: rings %d/%d/%d chunks (LL_SW_LOD=0 off)", swLodRing_[0], swLodRing_[1], swLodRing_[2]);
   submitMesh_ = [this](std::shared_ptr<MeshInput> in) {
     pool_.submit([this, in, mats = resources_.materials(), binary = useBinaryMesher_] {
       if (binary) {
@@ -733,7 +737,22 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
       ctx.traceParams = [this](int cx, int cz, float t0[4], float t1[4]) {
         if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->traceParams(cx, cz, t0, t1);
       };
-      ChunkMesh cm = meshSubChunk(*in, ctx);
+      // 2026-10-25 (box, triangle diet; software path only, Vulkan untouched): far sub-chunks mesh
+      // from a 2x/4x downsampled snapshot (bench-stream lodInput) and drop near-detail quads.
+      const int lod = swLodOn_ ? swLodFor(in->cx, in->cz) : 0;
+      if (swLodOn_) { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_[ChunkKey::make(in->cx, in->cz)] = lod; }
+      const int lf = lod == 0 ? 1 : lod == 1 ? 1 : lod == 2 ? 2 : 4;
+      const std::shared_ptr<MeshInput> src = lf > 1 ? farLodMeshInput(*in, lf) : in;
+      ChunkMesh cm = meshSubChunk(*src, ctx);
+      if (lf > 1)
+        for (PackedVertex& v : cm.verts) { v.x = uint16_t(v.x * lf); v.y = uint16_t(v.y * lf); v.z = uint16_t(v.z * lf); }
+      if (lod >= 1) {
+        auto& vs = cm.verts;
+        size_t w = 0;
+        for (size_t q = 0; q + 3 < vs.size(); q += 4)
+          if (!(vs[q].mode & kShadeLodNear)) { if (w != q) for (int k = 0; k < 4; ++k) vs[w + size_t(k)] = vs[q + size_t(k)]; w += 4; }
+        vs.resize(w);
+      }
       // Cortana 2026-10-25 (box, upload pass; JD-approved): pack + copy into GPU memory here on the
       // worker (backends with a direct-upload arena: Vulkan ReBAR/host, or a worker-staged device-only
       // block); the main thread then only publishes the handle. Off unless LL_ASYNC_CHUNK_UPLOAD=1.
@@ -1515,6 +1534,46 @@ bool Game::saveWorld(const char* reason, bool wait) {
 // (entering Playing clears the latch), exactly as before.
 // 2026-10-25 stutter pass: stream churn counters for the once-a-second split line.
 namespace { size_t g_colsAdded = 0, g_colsEvicted = 0, g_uploadsCapped = 0; }
+int Game::swLodLevel(int d) const {
+  return d > swLodRing_[2] ? 3 : d > swLodRing_[1] ? 2 : d > swLodRing_[0] ? 1 : 0;
+}
+int Game::swLodFor(int cx, int cz) const {
+  const int px = swLodPcx_.load(std::memory_order_relaxed), pz = swLodPcz_.load(std::memory_order_relaxed);
+  return swLodLevel(std::max(std::abs(cx - px), std::abs(cz - pz)));
+}
+
+// 2026-10-25 (box, triangle diet): re-mesh columns whose far-LOD ring changed (1-chunk hysteresis),
+// a bounded batch per frame, under the same between-ticks sim hold the streaming insert uses.
+void Game::pumpSwLod() {
+  if (!swLodOn_ || !sim_ || !active_) return;
+  const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
+  swLodPcx_.store(pcx, std::memory_order_relaxed); swLodPcz_.store(pcz, std::memory_order_relaxed);
+  std::vector<std::pair<int, int>> todo;
+  {
+    std::lock_guard<std::mutex> lk(swLodMu_);
+    for (auto& [key, have] : swLodMeshed_) {
+      const int cx = int(int32_t(uint32_t(key >> 32))), cz = int(int32_t(uint32_t(key)));
+      const int d = std::max(std::abs(cx - pcx), std::abs(cz - pcz));
+      const int want = swLodLevel(d);
+      if (want == have) continue;
+      if (want < have ? swLodLevel(d + 1) == have : swLodLevel(d - 1) == have) continue;  // hysteresis
+      todo.emplace_back(cx, cz);
+      if (todo.size() >= 24) break;
+    }
+  }
+  if (todo.empty()) return;
+  std::unique_lock<std::recursive_mutex> simHold;
+  if (!sim_->holdBetweenTicks(simHold)) return;
+  for (auto [cx, cz] : todo) {
+    const ChunkColumn* c = active_->chunks.column(cx, cz);
+    if (!c) { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_.erase(ChunkKey::make(cx, cz)); continue; }
+    { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_[ChunkKey::make(cx, cz)] = swLodFor(cx, cz); }
+    for (int sy = 0; sy < kSubChunks; ++sy)
+      if (c->subs[sy])
+        submitMesh_(snapshotForMeshing(active_->chunks, blockRegistry(), cx, sy, cz, epoch_, ++initSeq_, active_->belowWorldFill));
+  }
+}
+
 void Game::pumpStreaming() {
   if (!streamer_ || !sim_ || !active_) return;
   const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
@@ -2933,6 +2992,7 @@ void Game::update(float dt, int width, int height) {
   const Vec3 eyePos = playerEyePos(player_, locomotion_.eyeHeight());
   sim_->setRay({eyePos.x, eyePos.y, eyePos.z, f.x, f.y, f.z});
   g_split.lap(3);  // [C53-1]
+  pumpSwLod();
   pumpStreaming();  // generate/load columns around the player; insert finished ones
   g_split.lap(4);
   if (playing && !clickUsed) handleWorldActions();

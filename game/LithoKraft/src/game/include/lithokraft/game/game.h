@@ -371,6 +371,9 @@ class Game {
   /// Per-frame chunk streaming: request columns around the player and insert
   /// finished ones into the active dimension (sim stopped for the insert).
   void pumpStreaming();
+  void pumpSwLod();  ///< software far-LOD ring re-mesh (2026-10-25)
+  int swLodLevel(int d) const;
+  int swLodFor(int cx, int cz) const;
   /// Column eviction (A2 / B-M1): drops resident columns beyond the stream
   /// radius + hysteresis, bounded per call, in its own sim-stopped window
   /// at the end of pumpStreaming(). Dirty or signal-bearing columns are
@@ -515,6 +518,11 @@ class Game {
   std::deque<int64_t> pbrPendingOrder_;                             // sub-chunks waiting, oldest first
   std::unordered_map<int64_t, litholattice::PbrChunkMesh> pbrPendingMesh_;  // newest per sub-chunk
   std::unordered_map<int64_t, uint64_t> pbrMeshSeq_;  // latest uploaded PBR seq per sub-chunk
+  bool swLodOn_ = false;
+  int swLodRing_[3] = {2, 4, 8};  // LL_SW_LOD_RINGS=a,b,c overrides
+  std::atomic<int> swLodPcx_{0}, swLodPcz_{0};
+  std::mutex swLodMu_;
+  std::unordered_map<uint64_t, int> swLodMeshed_;  // column key -> LOD level meshed
   bool useBinaryMesher_ = false;  // mesher option, boot-applied from settings_.mesher
   // Design B Stage 2: ring spill. When the renderer's lock-free upload ring
   // is momentarily full, an upload the ring refused waits here — in order,

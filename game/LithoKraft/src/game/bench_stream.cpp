@@ -91,6 +91,9 @@ std::shared_ptr<MeshInput> lodInput(const MeshInput& in, int f) {
 }
 }  // namespace
 
+// 2026-10-25 (box, triangle diet): shared with the live software-path far LOD (game.cpp).
+std::shared_ptr<MeshInput> farLodMeshInput(const MeshInput& in, int f) { return lodInput(in, f); }
+
 double MsSamples::avg(const std::vector<double>& v) {
   double s = 0; for (double x : v) s += x;
   return v.empty() ? 0.0 : s / double(v.size());
