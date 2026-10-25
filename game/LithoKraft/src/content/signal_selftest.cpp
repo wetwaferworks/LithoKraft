@@ -180,6 +180,42 @@ int runSignalSelfTest() {
   check(thr(30, 40, 20) == 30, "thresholder: swapped refs are sorted (min/max)");
   thr(33, 0, 0);
   check(val(11, y, 46) == 33, "thresholder output drives its front wire at the input strength");
+  // H2) 2026-10-25 (JD): subtract mode, toggled by use (aux bit 0); out = max(0, back - max(sides)).
+  check(stAux(w.getState(10, y, 46)) == 0, "thresholder: placed in compare mode (aux 0)");
+  sim.use(w, 10, y, 46, none);
+  check((stAux(w.getState(10, y, 46)) & 1) == 1, "thresholder: use toggles subtract mode");
+  check(thr(40, 10, 0) == 30 && thr(40, 0, 25) == 15 && thr(40, 10, 25) == 15, "thresholder subtract: back - max(left, right)");
+  check(thr(30, 0, 0) == 30 && thr(20, 30, 0) == 0 && thr(64, 64, 64) == 0, "thresholder subtract: clamps at 0, no side = pass-through");
+  {
+    bool down = true; int prevOut = 99;
+    for (int s = 0; s <= 50; s += 10) { const int o = thr(50, s, 0); down = down && o == 50 - s && o < prevOut; prevOut = o; }
+    check(down, "thresholder subtract: countdown 50 -> 0 as the side steps 0, 10 .. 50");
+  }
+  check(thr(64, 0, 0) == 64 && val(11, y, 46) == 64, "thresholder subtract: 0..64 range, drives its front wire");
+  sim.use(w, 10, y, 46, none);
+  check(stAux(w.getState(10, y, 46)) == 0 && thr(30, 20, 40) == 30 && thr(45, 20, 40) == 0, "thresholder: use again = compare mode, window unchanged");
+  {
+    // Comparator clock: torch -> back; front wire loops round into the right side. Subtract mode
+    // knocks its own output down each time the fed-back side catches up, so it oscillates.
+    put(50, y, 48, kRedTorch); put(51, y, 48, kRedTrace);
+    putF(52, y, 48, kThresholdor, E);
+    put(53, y, 48, kRedTrace); put(53, y, 49, kRedTrace); put(52, y, 49, kRedTrace);
+    sim.use(w, 52, y, 48, none);
+    run(8);
+    int seq[48];
+    for (int i = 0; i < 48; ++i) { run(1); seq[i] = val(52, y, 48); }
+    int hi = 0, lo = 99, period = 0;
+    for (int i = 0; i < 48; ++i) { hi = std::max(hi, seq[i]); lo = std::min(lo, seq[i]); }
+    for (int p = 1; p <= 16 && !period; ++p) {
+      bool same = true;
+      for (int i = 16; i + p < 48; ++i) same = same && seq[i] == seq[i + p];
+      if (same) period = p;
+    }
+    std::printf("  comparator clock out:");
+    for (int i = 0; i < 16; ++i) std::printf(" %d", seq[i]);
+    std::printf(" (period %d)\n", period);
+    check(hi > lo && period >= 2, "thresholder subtract comparator clock oscillates with a steady period");
+  }
 
   // I) Redirector: any side in, front out.
   putF(20, y, 46, kRedirector, E); put(20, y, 45, kBlueTrace); put(21, y, 46, kRedTrace); put(19, y, 46, kRedTrace);

@@ -38,9 +38,20 @@ std::string describeOutput(const BlockDef& d, CellState s) {
 
 /// Back = input, left = LOW reference, right = HIGH reference; output = input when it passes.
 /// One reference: threshold (in >= ref). Both: window comparator (refs sorted). None: pass-through.
+/// 2026-10-25 (JD): subtract mode (aux bit 0; compare = 0, so existing cells / saves are unchanged):
+/// out = max(0, back - max(left, right)), 0..64. Using the block toggles compare <-> subtract (the
+/// same use-cycles-a-setting convention as the Repeator delay and the Redirector front).
 class cThresholdor final : public cCompBehavior {
  public:
+  static constexpr int kSubtract = 1;  // aux bit 0
+  static bool subtract(CellState s) { return (stAux(s) & kSubtract) != 0; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory&) const override {
+    if (subtract(st)) {
+      const int f = stFacing(st), v = std::min(in.back(f), kMaxSignal);
+      const int side = std::min(std::max(in.left(f), in.right(f)), kMaxSignal);
+      const int out = std::max(0, v - side);
+      return {out, 0, makeState(out, f, kSubtract, out > 0)};
+    }
     // SW-H2: pass-through outputs copy the input value — clamp it here (and at
     // the sim's sampling point) so a disk-loaded 65..127 wire value can never
     // propagate into an output. In-range values are untouched.
@@ -49,7 +60,12 @@ class cThresholdor final : public cCompBehavior {
     const int out = (pass && v > 0) ? v : 0;
     return {out, 0, makeState(out, f, 0, out > 0)};
   }
-  std::string describe(const BlockDef& d, CellState s) const override { return describeOutput(d, s); }
+  std::optional<CellState> use(CellState st, ComponentMemory&) const override {
+    return CellState(makeState(stValue(st), stFacing(st), uint8_t(stAux(st) ^ kSubtract), stOn(st)));
+  }
+  std::string describe(const BlockDef& d, CellState s) const override {
+    return std::format("{} | mode {} | out {} | facing {}", d.name, subtract(s) ? "subtract" : "compare", stValue(s), facingName(stFacing(s)));
+  }
 };
 
 /// Linked (default): strongest of back / left / right / wire on top, out the front, any colour.
