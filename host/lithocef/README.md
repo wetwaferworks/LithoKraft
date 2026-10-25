@@ -160,3 +160,7 @@ new targets, no sim changes, no hash movement.
   (expands to `((void)0)`; arguments not evaluated). Errors never go
   through it.
 - `hwlayer_tenants_smoke` gates the above (ctest).
+
+## Phase 3 (2026-10-25): IHwGpu draw-path seat
+
+Shape only, in `IHwGpu.h`; design note in `IHwGpu-DESIGN.md`. Not implemented.
