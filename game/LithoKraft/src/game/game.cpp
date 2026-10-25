@@ -884,7 +884,7 @@ void Game::initScripts() {
 
 void Game::setBenchPath(const std::string& path) {
   benchPath_ = path;
-  if ((path == "stream" || path == "soak") && active_ && active_->generator)
+  if ((path == "stream" || path == "soak" || path == "sprint") && active_ && active_->generator)
     stream_ = std::make_unique<cBenchStreamer>(renderer_, pool_, active_->generator, cfg_.worldChunks, active_->belowWorldFill, std::max(1, cfg_.streamRadius));
 }
 
@@ -907,6 +907,7 @@ void Game::setBenchCamera(float t) {
       player_.pos = {midX, midY + 2.f, zw - (10.f + 0.4f * float(fb_.width))};
       player_.yaw = 1.5708f; player_.pitch = 0.f;
     }
+    benchCam_ = player_.pos;
     return;
   }
   if (benchPath_ == "flyover" && fb_.size > 0) {  // 40 s loop: screen pass, cache / controller pass, stand view
@@ -924,6 +925,7 @@ void Game::setBenchCamera(float t) {
       player_.pos = {midX, top + 16.f, float(fb_.screenZ1) + 12.f};
       player_.yaw = -1.5708f; player_.pitch = -0.55f;
     }
+    benchCam_ = player_.pos;
     return;
   }
   if (benchPath_ == "still") {
@@ -937,6 +939,7 @@ void Game::setBenchCamera(float t) {
         player_.pos = {v[0], v[1], v[2]}; player_.yaw = v[3]; player_.pitch = v[4];
       }
     }
+    benchCam_ = player_.pos;
     return;
   }
   // Phase 4 torture paths (Direction JD, research Elfie, implementation Cortana). Camera only; sim untouched.
@@ -946,12 +949,14 @@ void Game::setBenchCamera(float t) {
     player_.pos = {benchCenter_.x, benchCenter_.y + 20.f, benchCenter_.z};
     player_.yaw = base + 3.14159265f * s; player_.pitch = -0.2f;
     locomotion_.place(player_.pos);  // pin the body too, or locomotion pulls the camera back each update
+    benchCam_ = player_.pos;
     return;
   }
   if (benchPath_ == "sprint") {  // T2/T3: from the spawn along +x at 60 blocks/s, 30 up (~4 chunk borders/s); the play streamer follows
     player_.pos = {benchCenter_.x + 60.f * t, benchCenter_.y + 30.f, benchCenter_.z};
     player_.yaw = 0.f; player_.pitch = -0.25f;
     locomotion_.place(player_.pos);
+    benchCam_ = player_.pos;
     return;
   }
   const bool streaming = benchPath_ == "stream" || (benchPath_ == "soak" && (int(t / 60.f) & 1));
@@ -960,6 +965,7 @@ void Game::setBenchCamera(float t) {
     const float startX = float(cfg_.worldChunks * 16 - 32), z = float(cfg_.worldChunks * 8);
     player_.pos = {startX + 32.f * t, benchCenter_.y + 30.f, z};
     player_.yaw = 0.f; player_.pitch = -0.3f;
+    benchCam_ = player_.pos;
     return;
   }
   if (benchPath_ == "walk") {
@@ -970,11 +976,13 @@ void Game::setBenchCamera(float t) {
     const float a = t * 0.25f;
     player_.pos = {benchCenter_.x + 6.f * std::cos(a), benchCenter_.y + 0.2f, benchCenter_.z + 6.f * std::sin(a)};
     player_.yaw = a + 1.5708f; player_.pitch = -0.08f;
+    benchCam_ = player_.pos;
     return;
   }
   const float a = t * 0.25f;
   player_.pos = {benchCenter_.x + 24.f * std::cos(a), benchCenter_.y + 12.f, benchCenter_.z + 24.f * std::sin(a)};
   player_.yaw = a + 1.5708f; player_.pitch = -0.25f;
+  benchCam_ = player_.pos;
 }
 
 Game::~Game() {
@@ -2820,7 +2828,8 @@ void Game::update(float dt, int width, int height) {
   uploadMeshes();
   g_split.lap(6);  // [C53-1] (includes the PBR/emissive lines just above)
   if (stream_) stream_->setFarLod(settings_.vkFarLod);  // [C54-1]
-  if (stream_) uploadBytes_ += stream_->update(player_.pos.x, player_.pos.z, resources_.materials());
+  // Phase 4 (JD-approved 6:30): follow the bench camera; player_.pos was just reset from the locomotion body.
+  if (stream_) uploadBytes_ += stream_->update(benchSet_ ? benchCam_.x : player_.pos.x, benchSet_ ? benchCam_.z : player_.pos.z, resources_.materials());
   g_split.lap(7);
   uploadMs_ = msBetween(tUp, Clock::now());
   if (rgUpload) rgUpload->release();  // LL_THREEWAY (absent on the Stage 2 ring path by design)

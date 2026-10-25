@@ -440,6 +440,7 @@ class Game {
   cSoundDirector sound_;
   std::vector<SimEvent> simEvents_;
   Vec3 benchCenter_{};
+  Vec3 benchCam_{};  ///< Phase 4 (JD 6:30): last bench camera pose; the bench streamer follows this, not the locomotion body
   std::string benchPath_ = "orbit";
   FramebufferLayout fb_;  // --bench-scene framebuffer placement (flyover path); size 0 = none
   std::unique_ptr<cBenchStreamer> stream_;
