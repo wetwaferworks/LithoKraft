@@ -967,6 +967,9 @@ void Game::setBenchCamera(float t) {
     if (benchPath_ == "live") {
       player_.pos = {58.5f, 270.f, 42.5f}; player_.yaw = 4.712f; player_.pitch = -0.1f;
       menuState_ = MenuState::Playing; showHud_ = true;
+      // 2026-10-25 (box): LL_BENCH_SHOT=N saves one screenshot on live-bench frame N (look checks).
+      static int shotFrame = 0;
+      if (const char* e = std::getenv("LL_BENCH_SHOT"); e && ++shotFrame == std::max(1, std::atoi(e))) logInfo("%s", requestScreenshot(ScreenshotRequest{}).c_str());
     }
     static bool loggedPose = false;  // JD Vulkan push: log the held pose once (screenshot framing)
     if (!loggedPose) { loggedPose = true; logInfo("bench still pose: %.1f,%.1f,%.1f,%.3f,%.3f", player_.pos.x, player_.pos.y, player_.pos.z, player_.yaw, player_.pitch); }
