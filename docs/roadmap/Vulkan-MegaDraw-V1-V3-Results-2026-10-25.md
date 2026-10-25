@@ -99,3 +99,29 @@ For radius 32 and 48 at 1280x720, see the average-FPS table earlier in this repo
 - V2b runs 1-3% behind the old path on average.
 - V2b's tail is as good or better. Its worst frames stay within about 1.5x the median. The old path had one run at radius 48 with an 11-hitch, 34 ms spike, and V2b never went above 18.6 ms.
 - On these paths the test world bench comes out at about the same weight as the plain flyover.
+## Mega-Pipeline Phases 2 and 3 (Cortana, ~5:15-6:05 AM ET)
+
+Commits:
+- `03af049` Phase 2, `LL_VK_PULL=1`. Rollback: `git reset --hard b706863`
+- `25a40b7` Phase 3, `LL_VK_BUCKETS=1`. Rollback: `git reset --hard 03af049`
+
+Both are default off. Each passed its gate: build rc=0, ctest 48/48, hash 24c52df2be14789c x3, cities on 24c52df2be14789c / off 43693d018d046b25.
+
+Results:
+- Frozen-time diffs are at the noise floor.
+- About 8% of quads are pulled. Phase 3 culls about 50% of those.
+- Maximized and borderless benches: within noise (about 0 to +5% FPS, GPU ms unchanged). The GPU is shading-bound.
+- Full tables, deviations and open questions: docs/roadmap/Report-for-Archie-MegaPipeline-2026-10-25.md.
+
+Fresh borderless baseline (mode 0 / mode 3 / P3), FPS:
+
+| Scene | r8 | r32 | r48 |
+|---|---|---|---|
+| Flyover | 518.6 / 522.3 / 515.9 | 146.7 / 147.7 / 153.4 | 87.7 / 87.0 / 88.9 |
+| Test world | 532.0 / 517.2 / 546.8 | 152.2 / 146.8 / 151.6 | 87.0 / 87.4 / 89.2 |
+
+Playtest-Release install (~6:00 AM ET, no LithoKraft running):
+- New SHA-256: 7658DF15...729D. Smoke hash: 24c52df2be14789c.
+- Backup: `LithoKraft.exe.orig-2026-10-25-megapipe` (37C7F333...9E9A).
+- Shortcut: OneDrive\Desktop "LithoKraft (test area, vulkan)".
+- Phase 4 is not started.
