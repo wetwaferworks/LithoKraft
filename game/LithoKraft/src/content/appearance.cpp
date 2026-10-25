@@ -161,8 +161,10 @@ void cLithoKraftAppearance::meshExtra(const CustomBlock& cell, MeshWriter& out) 
     overlay("red", 0);
     overlay("blue", split ? ((stAux(cell.state) & 3) - f) & 3 : 0);
   } else if (roleOf(def) == SimRole::Catchor) {
+    // 2026-10-25 (JD 8:26): the readout mask is authored for the opposite quarter turn, so with
+    // rotation f the digits read upside down from the input side; +2 turns them upright for every facing.
     if (const FaceMaterial* m = cell.materials.named(tex + "_readout_mask"))
-      out.face(cell, 2, lo, hi, *m, {kShadeReadout, uint8_t((stValue(cell.state) & 127) | (stOn(cell.state) ? 128 : 0))}, f);
+      out.face(cell, 2, lo, hi, *m, {kShadeReadout, uint8_t((stValue(cell.state) & 127) | (stOn(cell.state) ? 128 : 0))}, (f + 2) & 3);
   }
 }
 
@@ -299,8 +301,10 @@ bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out)
     overlay("red", 0);
     overlay("blue", split ? ((stAux(cell.state) & 3) - f) & 3 : 0);
   } else if (r == SimRole::Catchor) {
+    // 2026-10-25 (JD 8:26): the readout mask is authored for the opposite quarter turn, so with
+    // rotation f the digits read upside down from the input side; +2 turns them upright for every facing.
     if (const FaceMaterial* m = cell.materials.named(tex + "_readout_mask"))
-      out.face(cell, 2, tlo, thi, *m, {kShadeReadout, uint8_t((stValue(cell.state) & 127) | (stOn(cell.state) ? 128 : 0))}, f);
+      out.face(cell, 2, tlo, thi, *m, {kShadeReadout, uint8_t((stValue(cell.state) & 127) | (stOn(cell.state) ? 128 : 0))}, (f + 2) & 3);
   }
   return true;
 }
