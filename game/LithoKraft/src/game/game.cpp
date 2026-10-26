@@ -2853,7 +2853,13 @@ void Game::update(float dt, int width, int height) {
         std::fabs(double(player_.pos.y) - b.y) > 0.05 ||
         std::fabs(double(player_.pos.z) - b.z) > 0.05)
       locomotion_.place(player_.pos);  // an external write won: reseat (zeroes velocity)
-    if (sim_) {
+    // 2026-10-25 (JD hitch, fix 1): hold blockMutex_ for the whole collision step without waiting
+    // out a sim tick; if the sim is mid-tick, the ticks stay pending and are consumed next frame.
+    std::unique_lock<std::recursive_mutex> locoHold;
+    static int locoSkips = 0;  // game thread only
+    bool locoBusy = false;
+    const bool locoReady = sim_ && (frameHold(*sim_, locoHold, locoSkips, locoBusy) || !locoBusy);
+    if (sim_ && locoReady) {
       const uint64_t wt = sim_->stats().worldTick;
       if (wt < lastLocomotionTick_) lastLocomotionTick_ = wt;  // world reloaded: resync, never fast-forward
       uint64_t ticks = wt - lastLocomotionTick_;
@@ -2928,8 +2934,10 @@ void Game::update(float dt, int width, int height) {
       const uint64_t ticks = wt - lastVitalsTick_;
       lastVitalsTick_ = wt;
       const Vec3 eye = playerEyePos(player_, locomotion_.eyeHeight());
-      const bool headInLiquid = blockIsLiquid(sim_->getBlock(int(std::floor(eye.x)), int(std::floor(eye.y)),
-                                                             int(std::floor(eye.z))));
+      static bool lastHeadInLiquid = false;  // 2026-10-25 (JD hitch): keep the last reading while the sim is mid-tick
+      if (const auto eb = sim_->tryGetBlock(int(std::floor(eye.x)), int(std::floor(eye.y)), int(std::floor(eye.z))))
+        lastHeadInLiquid = blockIsLiquid(*eb);
+      const bool headInLiquid = lastHeadInLiquid;
       // PLY-1: tickVitals normalises the tick count to wall-clock seconds
       // at the sim's target TPS, so drain rates are TPS-invariant.
       playerAdapter_.tickVitals(ticks, headInLiquid, playing && input_.held(Action::Sprint),
