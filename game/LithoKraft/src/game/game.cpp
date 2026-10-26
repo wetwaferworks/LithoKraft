@@ -1159,6 +1159,7 @@ void Game::loadActive() {
             n - tw.missing.size(), blockRegistry().size() - 1, tw.missing.size(), tw.floorY, 16 * tw.screen.scale,
             16 * tw.screen.scale, tw.screen.x0, tw.screen.x0 + 16 * tw.screen.scale - 1, tw.screen.y0,
             tw.screen.y0 + 16 * tw.screen.scale - 1, tw.screen.z, tw.screen.scale, tw.placed);
+    tpMarks_.push_back({"grove", Vec3{float(tw.leafDemoX - 14) + 0.5f, float(tw.floorY + 1), float(tw.leafDemoZ - 3) + 0.5f}});  // 2026-10-25 (JD): /tp grove
     logInfo("test world: crystal leaf grove (8 trees, red/blue-dominant) x %d..%d, y %d..%d, z %d..%d", tw.leafDemoX - 28, tw.leafDemoX,
             tw.floorY + 1, tw.floorY + 7, tw.leafDemoZ - 1, tw.leafDemoZ + 10);  // 2026-10-16 JD leaf pass
     for (BlockId b : tw.missing) logError("test world: could not place '%s'", blockRegistry().def(b).name.data());
@@ -1221,6 +1222,7 @@ void Game::loadActive() {
       const FramebufferLayout fb16 = buildFramebufferScene(cw, fx, floorY + 1, fz, 32, 16);
       logInfo("test world wired screen 16: lamps x %d..%d z %d..%d y %d (frame cache z %d, viewing stand y %d); %d blocks", fx + 8, fx + 24,
               fb16.screenZ0, fb16.screenZ1, floorY + 2, fb16.cacheZ, floorY + 15, fb16.blocks);
+      tpMarks_.push_back({"screen16", Vec3{float(fx + 16) + 0.5f, float(floorY + 1), float(fz - 2) + 0.5f}});  // 2026-10-25 (JD): /tp screen16
       s16Box[0] = fx - 4; s16Box[1] = fx + 40; s16Box[2] = fz - 4; s16Box[3] = fz + 48;
     }    if (cfg_.testWorldExamples) {  // 2026-10-24 (JD): playtest builds only
       ChunkMap& cw = active_->chunks;
@@ -1281,6 +1283,7 @@ void Game::loadActive() {
         const int standY = floorY + 15;
         sp.x = float(fbX) + 0.5f; sp.z = float(fbZ) + 0.5f; sp.y = float(standY + 1);
         // The torture lever on the stand, 2 west / 2 south of spawn, with a lamp beside it that lights while it is on.
+        tpMarks_.push_back({"stand", Vec3{sp.x, sp.y, sp.z}});  // 2026-10-25 (JD): /tp stand (FRAMEBUFFER viewing stand, torture lever)
         tortureLever[0] = fbX - 2; tortureLever[1] = standY + 1; tortureLever[2] = fbZ - 2;
         cw.set(tortureLever[0], tortureLever[1], tortureLever[2], kSwitch);
         cw.setState(tortureLever[0], tortureLever[1], tortureLever[2], withAttach(0, 1));
