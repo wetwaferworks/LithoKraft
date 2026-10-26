@@ -1293,9 +1293,9 @@ int main(int argc, char** argv) {
       const bool simD = wa->sim == litholattice::AreaShape::Diamond, simR = wa->sim == litholattice::AreaShape::Round;
       const bool strD = wa->stream == litholattice::AreaShape::Diamond;
       if (simD != cfg.diamondSimArea || (!simD && simR != cfg.roundSimArea) || strD != cfg.diamondStreamArea || wa->tickRadius != cfg.tickRadius)
-        logWarn("save: configured area (sim %s r%d, stream %s) differs from the saved world's (sim %s r%d, stream %s) in '%s'; using the SAVED area",
-                cfg.diamondSimArea ? "diamond" : cfg.roundSimArea ? "round" : "square", cfg.tickRadius, cfg.diamondStreamArea ? "diamond" : "square",
-                litholattice::areaShapeName(wa->sim), wa->tickRadius, litholattice::areaShapeName(wa->stream), cfg.saveDir.c_str());
+        logInfo("save: world area: this save was created with sim %s r%d, stream %s; config asks for sim %s r%d, stream %s ('%s'). Using the save's area (by design; config applies to new worlds)",  // Playtest 1: info, behavior unchanged
+                litholattice::areaShapeName(wa->sim), wa->tickRadius, litholattice::areaShapeName(wa->stream),
+                cfg.diamondSimArea ? "diamond" : cfg.roundSimArea ? "round" : "square", cfg.tickRadius, cfg.diamondStreamArea ? "diamond" : "square", cfg.saveDir.c_str());
       cfg.diamondSimArea = simD; cfg.roundSimArea = simR; cfg.diamondStreamArea = strD; cfg.tickRadius = wa->tickRadius;
       logInfo("sim tick radius %d chunks, %s area, %s stream area (from the saved world's level.json)", cfg.tickRadius,
               litholattice::areaShapeName(wa->sim), litholattice::areaShapeName(wa->stream));  // fix 3b
@@ -1343,7 +1343,7 @@ int main(int argc, char** argv) {
     std::string err;
     audioOut = openAudioOutput(audio, &err);
     if (audioOut) logInfo("audio: %s", audioOut->description().c_str());
-    else { audio.setEnabled(false); logError("audio: no output device (%s); continuing muted", err.c_str()); }
+    else { audio.setEnabled(false); logInfo("audio: no output device available (%s); running without sound", err.c_str());  /* Playtest 1: info, not error */ }
   }
   {
     auto lkFOwner = std::make_unique<FrameCtx>(); FrameCtx& F = *lkFOwner;  // build 50: frame-loop state on the heap (survives the Emscripten main-loop unwind; see FrameCtx)
