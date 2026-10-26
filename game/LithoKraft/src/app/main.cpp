@@ -1348,6 +1348,10 @@ int main(int argc, char** argv) {
   {
     auto lkFOwner = std::make_unique<FrameCtx>(); FrameCtx& F = *lkFOwner;  // build 50: frame-loop state on the heap (survives the Emscripten main-loop unwind; see FrameCtx)
     cJobPool pool(std::max(1u, std::max(2u, std::thread::hardware_concurrency()) - 2));
+    // 2026-10-26 (Archie triage, streaming hitches): at most 2 background gen/mesh jobs run at
+    // once, so streaming bursts stop preempting render threads mid-frame (stream bench r8 p99
+    // 40.8 -> 23.1 ms, same cols/s). LL_BG_MAX_ACTIVE=N overrides (0 = uncapped, the old way).
+    pool.setDefaultMaxActive(2);
     F.input = std::make_unique<cInputSystem>(loadBindings(argv[0]), inputContexts()); cInputSystem& input = *F.input;
     window->loadGamepadMappings((dataRoot(argv[0]) / "config" / "gamecontrollerdb.txt").string());  // optional
     cWindowClipboard clipboard(*window);  // UI text fields copy / paste through the OS; outlives the game

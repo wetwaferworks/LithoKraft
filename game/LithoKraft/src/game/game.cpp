@@ -1133,7 +1133,12 @@ void Game::loadActive() {
     if (cfg_.testWorldExamples) cfg_.worldChunks = std::max(cfg_.worldChunks, 36);  // 2026-10-24: room for the Examples grid
     cfg_.tickRadius = std::max(cfg_.tickRadius, cfg_.sceneSize / 32 + 4);
   }
+  // 2026-10-26 (JD streaming hitches): the in-play background cap (main.cpp) is lifted for the
+  // blocking world load, which nothing renders over, so load time is unchanged.
+  const int bgCap = pool_.maxActive();
+  pool_.setDefaultMaxActive(0);
   Spawn sp = active_->load(pool_, cfg_.worldChunks);
+  pool_.setDefaultMaxActive(bgCap);
   tpMarks_.clear();  // 2026-10-25 (JD J3): rebuilt below for this load
   std::vector<PatternRomScreen> roms;  // playtest 2026-10-16: handed to the new sim below
   std::vector<cSignalWorldSim::GatedSource> torture;  // 2026-10-24 (JD): LEDs held off by the torture lever
