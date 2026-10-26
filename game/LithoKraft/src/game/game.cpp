@@ -94,6 +94,12 @@ void plinkPublish(const PlayerLocomotion& L, bool reset, uint64_t tick, double d
   g_plink.snap.store(s);
 }
 bool plinkSimOwned(const std::unique_ptr<cSimThread>& sim) { return sim && sim->running(); }
+std::atomic<uint64_t> g_shotFreezeTick = [] {  // see the player hook (item 5 pinned shots)
+  if (!std::getenv("LL_SW_SHOT")) return uint64_t(0);
+  const char* e = std::getenv("LL_BENCH_FREEZE_TICK");
+  return e ? uint64_t(std::strtoull(e, nullptr, 10)) : uint64_t(1024);
+}();
+std::atomic<bool> g_simFrozen{false};
 void locoPlace(const std::unique_ptr<cSimThread>& sim, PlayerLocomotion& L, const Vec3& pos) {
   const uint64_t seq = ++g_plink.placeSeq;
   if (plinkSimOwned(sim)) {
@@ -966,7 +972,17 @@ void Game::setBenchPath(const std::string& path) {
 }
 
 void Game::setBenchCamera(float t) {
-  if (!benchSet_) { benchCenter_ = player_.pos; benchSet_ = true; }
+  // Cortana 2026-10-26 (Archie item 5): in the test world the benches anchor at JD's v8 view
+  // (62,266,46 looking down the rows, yaw 4.712 pitch -0.1) instead of the spawn, so still /
+  // live / walk / orbit share one framing across builds. LL_BENCH_ANCHOR=legacy restores the
+  // old spawn-relative poses. flyover stays screen-relative (already fixed in the test world).
+  static const bool anchorV8 = !(std::getenv("LL_BENCH_ANCHOR") && std::string(std::getenv("LL_BENCH_ANCHOR")) == "legacy");
+  const bool v8 = anchorV8 && testWorld();
+  if (!benchSet_) {
+    benchCenter_ = v8 ? Vec3{62.f, 266.f, 46.f} : player_.pos;
+    benchSet_ = true;
+    if (v8) logInfo("bench anchor: v8 62,266,46 (LL_BENCH_ANCHOR=legacy for the old spawn poses)");
+  }
   // soak: alternate one minute of orbit and one minute of stream (streamed columns are dropped
   // again while orbiting: allocation churn for the drift numbers).
   if (benchPath_ == "flyover" && fb_.vertical) {  // 40 s loop: approach the wall, along the back wiring, stand view
@@ -1009,23 +1025,33 @@ void Game::setBenchCamera(float t) {
     // 2026-10-25 (Archie perf plan): "live" = a held, JD-like play view (testworld looking down
     // the rows to the horizon, ~350-600k tris) with the in-play HUD up, so bench numbers match
     // what JD sees. LL_BENCH_POSE still overrides the pose.
+    if (v8) { player_.pos = {62.f, 266.f, 46.f}; player_.yaw = 4.712f; player_.pitch = -0.1f; }
     if (benchPath_ == "live") {
-      player_.pos = {58.5f, 270.f, 42.5f}; player_.yaw = 4.712f; player_.pitch = -0.1f;
+      if (!v8) { player_.pos = {58.5f, 270.f, 42.5f}; player_.yaw = 4.712f; player_.pitch = -0.1f; }
       menuState_ = MenuState::Playing; showHud_ = true;
       // 2026-10-25 (box): LL_BENCH_SHOT=N saves one screenshot on live-bench frame N (look checks).
       static int shotFrame = 0;
       if (const char* e = std::getenv("LL_BENCH_SHOT"); e && ++shotFrame == std::max(1, std::atoi(e))) logInfo("%s", requestScreenshot(ScreenshotRequest{}).c_str());
     }
-    static bool loggedPose = false;  // JD Vulkan push: log the held pose once (screenshot framing)
-    if (!loggedPose) { loggedPose = true; logInfo("bench still pose: %.1f,%.1f,%.1f,%.3f,%.3f", player_.pos.x, player_.pos.y, player_.pos.z, player_.yaw, player_.pitch); }
     // Playtest 2026-10-16: hold the spawn pose (screenshots); LL_BENCH_POSE="x,y,z,yaw,pitch"
     // overrides it (e.g. a close view of the test world's Pattern ROM screen).
+    // Cortana 2026-10-26 (item 5): the override is applied BEFORE the one-time pose log (the log
+    // used to show the default pose), and the body is pinned there like the torture paths, so
+    // the sim-thread locomotion (item 1) can't drift the held camera.
+    bool poseOverride = false;
     if (const char* e = std::getenv("LL_BENCH_POSE")) {
       float v[5];
       if (std::sscanf(e, "%f,%f,%f,%f,%f", &v[0], &v[1], &v[2], &v[3], &v[4]) == 5) {
         player_.pos = {v[0], v[1], v[2]}; player_.yaw = v[3]; player_.pitch = v[4];
+        poseOverride = true;
+      } else {
+        static bool warned = false;
+        if (!warned) { warned = true; logError("LL_BENCH_POSE: expected x,y,z,yaw,pitch, got '%s' (ignored)", e); }
       }
     }
+    static bool loggedPose = false;  // JD Vulkan push: log the held pose once (screenshot framing)
+    if (!loggedPose) { loggedPose = true; logInfo("bench %s pose: %.2f,%.2f,%.2f,%.4f,%.4f%s", benchPath_.c_str(), player_.pos.x, player_.pos.y, player_.pos.z, player_.yaw, player_.pitch, poseOverride ? " (LL_BENCH_POSE)" : ""); }
+    locoPlace(sim_, locomotion_, player_.pos);
     benchCam_ = player_.pos;
     return;
   }
@@ -1470,6 +1496,16 @@ void Game::loadActive() {
   // Cortana 2026-10-26 (Archie camera-jump decision): the player body steps here, on the sim
   // thread, at the end of every completed world tick (inside the tick's block-mutex window).
   sim_->setPlayerHook([this, sim = sim_.get()](uint64_t wt) {  // raw pointer: unique_ptr::reset nulls sim_ before the join
+    // Cortana 2026-10-26 (item 5): pinned shots freeze the world at a fixed tick (LL_SW_SHOT set:
+    // LL_BENCH_FREEZE_TICK, default 1024 = 2 s at 512 TPS; 0 = off) until the shot is written,
+    // so animated blocks (clocks, Pulsors, screens) show the same state every run. Cap 30 s.
+    if (g_shotFreezeTick && wt >= g_shotFreezeTick && !litholattice::cSoftwareRenderer::shotTaken()) {
+      g_simFrozen.store(true, std::memory_order_release);
+      const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+      while (!litholattice::cSoftwareRenderer::shotTaken() && std::chrono::steady_clock::now() < until)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      g_shotFreezeTick.store(0);
+    }
     uint64_t placeSeq = locoSnap().placeSeq;
     bool reset = false;
     for (const plink::Cmd& c : g_plink.drain()) {
@@ -3738,7 +3774,22 @@ HudModel Game::hudModel() const {
     }
   }
   m.visible = showHud_ && menuState_ == MenuState::Playing;  // F1; the menu has its own overlay
-  if (showDebug_) {      // F3
+  // Cortana 2026-10-26 (item 5): pinned screenshots. With a bench path and LL_SW_SHOT (or
+  // LL_BENCH_PIN=1) the live timing text (F3 block / FPS readout) is left out: run-to-run it was
+  // the only difference between shots of identical code (1-2k px, rows 18-74 and 554-623).
+  static const bool kShotPinned = std::getenv("LL_SW_SHOT") || (std::getenv("LL_BENCH_PIN") && std::getenv("LL_BENCH_PIN")[0] == '1');
+  const bool pinned = kShotPinned && benchSet_;
+  if (kShotPinned) {  // hold the shot frame count until the mesh queue has been empty for 30 frames (cap 1200 frames)
+    static int settled = 0, held = 0;
+    const bool frozenOk = !g_shotFreezeTick || g_simFrozen.load(std::memory_order_acquire);
+    settled = (meshQueueDepth() == 0 && frozenOk) ? settled + 1 : 0;  // count only after the freeze (remeshes from the last ticks)
+    const bool hold = settled < 60 && held < 1800;
+    if (hold) ++held;
+    static bool logged = false;
+    if (!hold && !logged) { logged = true; logInfo("shot pin: released after %d held frames (mesh queue %s, sim %s)", held, settled >= 60 ? "drained" : "NOT drained", g_simFrozen.load() ? "frozen" : "NOT frozen"); }
+    litholattice::cSoftwareRenderer::setShotHold(hold);
+  }
+  if (showDebug_ && !pinned) {      // F3
     const SimStats& st = sim_->stats();
     char l[8][160];
     std::snprintf(l[0], sizeof l[0], "FPS %.0f  frame %.2f ms (max %.1f)", fps_, frameAvgMs_, frameMaxMs_);
@@ -3772,7 +3823,7 @@ HudModel Game::hudModel() const {
     std::snprintf(l[6], sizeof l[6], "renderer: %s", rendererInfo().c_str());  // 2026-10-16 (JD)
     std::snprintf(l[7], sizeof l[7], "%s", releaseInfo().c_str());
     m.debugLines.assign(std::begin(l), std::end(l));
-  } else if (settings_.fpsCounter && !cfg_.capture) {  // F56-4 (Proposed by JD; co-implemented by JD and Cortana): perf readout
+  } else if (settings_.fpsCounter && !cfg_.capture && !pinned) {  // F56-4 (Proposed by JD; co-implemented by JD and Cortana): perf readout
     char l[200], gpu[24] = "n/a";
     if (gpuMs_ >= 0.f) std::snprintf(gpu, sizeof gpu, "%.2f ms", gpuMs_);
     std::snprintf(l, sizeof l, "FPS %.0f  avg %.2f ms  p99 %.2f ms  update %.2f ms  GPU %s", fps_, frameAvgMs_, p99Ms_, updateMs_, gpu);
