@@ -1371,6 +1371,37 @@ void Game::loadActive() {
     }
   }
   player_.pos = {sp.x, sp.y, sp.z}; player_.yaw = sp.yaw; player_.pitch = sp.pitch;
+  {  // 2026-10-26 (JD spawn clip): the setups pick spawn from ONE column's surface (feet at the
+     // column's top + 1), but the body is 2*halfWidth wide and a whole-number x/z spawn straddles
+     // the neighbour columns, so a taller neighbour (a Capacitor Can cluster, a spire) left the
+     // body inside solid cells. Lift the spawn until the full AABB is clear (sim not started yet,
+     // so the map is ours to read), and log what was in the way.
+    const double hw = locomotion_.controller().halfWidth(), ht = std::max(1.8, locomotion_.controller().currentHeight());
+    BlockId hit = kAir;
+    auto blocked = [&](double y) {
+      const int x0 = int(std::floor(player_.pos.x - hw)), x1 = int(std::floor(player_.pos.x + hw - 1e-6));
+      const int z0 = int(std::floor(player_.pos.z - hw)), z1 = int(std::floor(player_.pos.z + hw - 1e-6));
+      const int y0 = int(std::floor(y)), y1 = int(std::floor(y + ht - 1e-6));
+      for (int yy = y0; yy <= y1; ++yy)
+        for (int zz = z0; zz <= z1; ++zz)
+          for (int xx = x0; xx <= x1; ++xx) {
+            const BlockId b = active_->chunks.get(xx, yy, zz);
+            if (b != kAir && blockRegistry().has(b, kSolid)) { hit = b; return true; }
+          }
+      return false;
+    };
+    int lift = 0;
+    BlockId first = kAir;
+    while (lift < 64 && blocked(player_.pos.y)) {
+      if (!lift) first = hit;
+      player_.pos.y = std::floor(player_.pos.y) + 1.f;
+      ++lift;
+    }
+    if (lift)
+      logInfo("spawn: body overlapped '%s' at %.2f,%.2f,%.2f; lifted %d block(s) to y=%.2f",
+              std::string(blockRegistry().def(first).name).c_str(), double(sp.x), double(sp.y), double(sp.z), lift,
+              double(player_.pos.y));
+  }
   spawnPoint_ = player_.pos;
   SimConfig sc;
   sc.tickRate = cfg_.tps; sc.radiusChunks = cfg_.tickRadius; sc.epoch = epoch_; sc.belowWorldFill = active_->belowWorldFill;
