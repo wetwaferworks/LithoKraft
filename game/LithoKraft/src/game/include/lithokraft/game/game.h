@@ -495,6 +495,7 @@ class Game {
   Vec3 spawnPoint_{20.f, 92.f, 20.f};  ///< dimension spawn; `kill` respawns here
   /// 2026-10-25 (JD J3): named teleport targets for this dimension load (testarea, circuits, Examples pads).
   std::vector<std::pair<std::string, Vec3>> tpMarks_;
+  std::vector<cWorldSave::TpMark> userTpMarks_;  ///< 2026-10-25 (JD): /tp set spots, every dimension; persisted in level.json
   std::string teleportCmd(const std::vector<std::string>& args);
   litholattice::cEntityMgr entities_{[this](uint32_t type) {
     return makeEntityBehavior(

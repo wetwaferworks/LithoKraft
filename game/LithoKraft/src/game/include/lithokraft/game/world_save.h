@@ -172,6 +172,11 @@ class cWorldSave {
   /// The saved clock, or nullopt when level.json is absent or predates v2 (err empty) / is unusable (err set).
   static std::optional<WorldClockMeta> readWorldClock(const std::filesystem::path& root, std::string* err);
   bool writeWorldMeta(std::string* err) const;  ///< no-op success when no seed was set
+  /// 2026-10-25 (JD): named /tp spots of this world (optional "tpMarks" array in level.json:
+  /// [{name, dim, x, y, z}]). Absent key = none (older files load unchanged).
+  struct TpMark { std::string name, dim; float x = 0, y = 0, z = 0; };
+  void setTpMarks(std::vector<TpMark> m) { std::lock_guard l(tpMutex_); tpMarks_ = std::move(m); }
+  static std::vector<TpMark> readTpMarks(const std::filesystem::path& root, std::string* err);
   /// The persisted seed for the save at `root`, or nullopt when there is no
   /// level.json (pre-metadata save: the caller's seed stands). A level.json
   /// that exists but is corrupt after crash recovery yields nullopt with
@@ -245,6 +250,8 @@ class cWorldSave {
   std::atomic<bool> hasClock_{false};
   WorldAreaMeta area_;    ///< Fix run 3: level.json v3 area (set once by Game before any save)
   bool hasArea_ = false;
+  mutable std::mutex tpMutex_;      ///< guards tpMarks_ (set on the game thread, written by the save)
+  std::vector<TpMark> tpMarks_;     ///< 2026-10-25: level.json "tpMarks"
   bool lastSaveOk_ = true;  ///< outcome of the last saveDimension (see above)
   std::string lastSaveError_;
   // Cached block-name remap for loadColumn (the table is written by the first

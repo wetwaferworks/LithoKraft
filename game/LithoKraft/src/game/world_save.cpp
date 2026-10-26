@@ -1,3 +1,4 @@
+#include <cmath>
 #include "lithokraft/game/world_save.h"
 #include "lithokraft/content/items.h"  // findItem / findItemByStringId (v4 inventory string ids)
 #include "litholattice/storage/block_names.h"
@@ -218,6 +219,22 @@ bool cWorldSave::writeWorldMeta(std::string* err) const {
     j.add("streamAreaShape", litholattice::Json::string(litholattice::areaShapeName(area_.stream)));
     j.add("tickRadius", litholattice::Json::number(double(area_.tickRadius)));
   }
+  {  // 2026-10-25 (JD): named /tp spots
+    std::lock_guard l(tpMutex_);
+    if (!tpMarks_.empty()) {
+      litholattice::Json arr = litholattice::Json::array();
+      for (const TpMark& m : tpMarks_) {
+        litholattice::Json o = litholattice::Json::object();
+        o.add("name", litholattice::Json::string(m.name));
+        o.add("dim", litholattice::Json::string(m.dim));
+        o.add("x", litholattice::Json::number(m.x));
+        o.add("y", litholattice::Json::number(m.y));
+        o.add("z", litholattice::Json::number(m.z));
+        arr.arr.push_back(std::move(o));
+      }
+      j.add("tpMarks", std::move(arr));
+    }
+  }
   const std::string text = j.dump(2);
   return storage::writeFileAtomic(root_ / "level.json", reinterpret_cast<const uint8_t*>(text.data()), text.size(), err);
 }
@@ -272,6 +289,32 @@ std::optional<cWorldSave::WorldClockMeta> cWorldSave::readWorldClock(const std::
     return std::nullopt;
   }
   return c;
+}
+
+std::vector<cWorldSave::TpMark> cWorldSave::readTpMarks(const std::filesystem::path& root, std::string* err) {
+  std::vector<TpMark> out;
+  const auto path = root / "level.json";
+  std::error_code ec;
+  if (!std::filesystem::exists(path, ec)) return out;
+  storage::Bytes all;
+  if (!storage::readFileAll(path, &all, err)) return out;
+  litholattice::Json j;
+  std::string jerr;
+  if (!litholattice::Json::parse(std::string(all.begin(), all.end()), j, &jerr)) {
+    if (err) *err = path.string() + ": " + jerr;
+    return out;
+  }
+  const litholattice::Json* a = j.get("tpMarks");
+  if (!a) return out;  // older level.json: no marks (err stays empty)
+  if (a->type != litholattice::Json::Type::Array) { if (err) *err = path.string() + ": tpMarks is not an array"; return out; }
+  for (const litholattice::Json& o : a->arr) {
+    TpMark m;
+    m.name = o.getStr("name", "");
+    m.dim = o.getStr("dim", "");
+    m.x = float(o.getNum("x", 0)); m.y = float(o.getNum("y", 0)); m.z = float(o.getNum("z", 0));
+    if (!m.name.empty() && std::isfinite(m.x) && std::isfinite(m.y) && std::isfinite(m.z)) out.push_back(std::move(m));
+  }
+  return out;
 }
 
 std::optional<cWorldSave::WorldAreaMeta> cWorldSave::readWorldArea(const std::filesystem::path& root, std::string* err) {

@@ -388,6 +388,16 @@ int runWiringSelfTest() {
     check(lsave.writeWorldMeta(&err), "level.json v2 writes");
     const auto clk = cWorldSave::readWorldClock(ldir, &cerr);
     check(clk && clk->tick == 0x2'0000'0001ull && clk->time == 123456789ull, "world clock: worldTick + worldTime round-trip in level.json");
+    {  // 2026-10-25 (JD): tp spots round-trip; a level.json without the key has none
+      std::string terr;
+      check(cWorldSave::readTpMarks(ldir, &terr).empty() && terr.empty(), "tp spots: level.json without tpMarks reads as none");
+      lsave.setTpMarks({{"clocks", "wafer", 1.5f, 70.f, -3.25f}, {"home", "organic", 0.f, 64.f, 0.f}});
+      check(lsave.writeWorldMeta(&err), "level.json with tp spots writes");
+      const auto tm = cWorldSave::readTpMarks(ldir, &terr);
+      check(tm.size() == 2 && tm[0].name == "clocks" && tm[0].dim == "wafer" && tm[0].x == 1.5f && tm[0].z == -3.25f && tm[1].dim == "organic",
+            "tp spots: name, dimension and position round-trip in level.json");
+      check(cWorldSave::readWorldClock(ldir, &cerr).has_value(), "tp spots: the world clock still reads beside them");
+    }
     fs::remove_all(dir);
   }
   // ---- B4: procgen plant blocks + live worldgen binding ----

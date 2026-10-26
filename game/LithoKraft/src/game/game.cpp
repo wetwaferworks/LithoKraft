@@ -769,6 +769,13 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
     save_ = std::make_unique<cWorldSave>(cfg_.saveDir, cfg_.materials);
     save_->setSeed(cfg_.seed);  // SV-H2: cfg.seed already carries the persisted-seed override (main.cpp)
     save_->setWorldArea({simAreaShapeOf(cfg_), streamAreaShapeOf(cfg_), cfg_.tickRadius});  // Fix run 3: level.json v3 (main.cpp applies the saved area)
+    {  // 2026-10-25 (JD): the world's named /tp spots (merged with the generated marks at lookup)
+      std::string terr;
+      userTpMarks_ = cWorldSave::readTpMarks(cfg_.saveDir, &terr);
+      if (!terr.empty()) logError("save: %s (no saved tp spots)", terr.c_str());
+      else if (!userTpMarks_.empty()) logInfo("save: %zu tp spot(s) restored", userTpMarks_.size());
+      save_->setTpMarks(userTpMarks_);
+    }
     std::string err;
     savedPlayer = save_->readPlayer(&err);
     if (!err.empty()) logError("save: %s (starting at spawn)", err.c_str());
@@ -1046,11 +1053,40 @@ Game::~Game() {
 // this load (testarea, circuits, Examples pads); exact match first, then a unique prefix ("pixel").
 // Writes player_.pos like kill does; the locomotion body re-seats on the external write (see update()).
 std::string Game::teleportCmd(const std::vector<std::string>& args) {
-  auto names = [this] {
+  const std::string dim = active_ ? active_->id : std::string();
+  auto names = [this, &dim] {
     std::string s = "spawn";
+    for (const auto& m : userTpMarks_)
+      if (m.dim == dim) s += ", " + m.name;
     for (const auto& [k, p] : tpMarks_) s += ", " + k;
     return s;
   };
+  auto lower = [](const std::string& in) {
+    std::string o;
+    for (char ch : in) o += std::isalnum(static_cast<unsigned char>(ch)) ? char(std::tolower(static_cast<unsigned char>(ch))) : '-';
+    return o;
+  };
+  // 2026-10-25 (JD): tp set <name> (here) / tp del <name>: this world's own spots, saved in level.json
+  if (args.size() == 2 && (args[0] == "set" || args[0] == "del")) {
+    const std::string n = lower(args[1]);
+    if (n.empty() || n == "spawn" || n == "set" || n == "del") return "teleport: '" + args[1] + "' is a reserved name";
+    auto it = std::find_if(userTpMarks_.begin(), userTpMarks_.end(), [&](const cWorldSave::TpMark& m) { return m.name == n && m.dim == dim; });
+    std::string msg;
+    if (args[0] == "set") {
+      cWorldSave::TpMark m{n, dim, player_.pos.x, player_.pos.y, player_.pos.z};
+      if (it != userTpMarks_.end()) *it = m; else userTpMarks_.push_back(m);
+      char buf[160];
+      std::snprintf(buf, sizeof buf, "teleport: spot '%s' set at (%.1f, %.1f, %.1f)", n.c_str(), m.x, m.y, m.z);
+      msg = buf;
+    } else {
+      if (it == userTpMarks_.end()) return "teleport: no saved spot '" + n + "' here";
+      userTpMarks_.erase(it);
+      msg = "teleport: spot '" + n + "' deleted";
+    }
+    if (save_) save_->setTpMarks(userTpMarks_);
+    else msg += " (this world is not saved: the spot lasts until exit)";
+    return msg;
+  }
   auto go = [this](const Vec3& p, const std::string& what) {
     player_.pos = p;
     char buf[160];
@@ -1076,6 +1112,8 @@ std::string Game::teleportCmd(const std::vector<std::string>& args) {
   std::string want;
   for (char ch : args[0]) want += char(std::tolower(static_cast<unsigned char>(ch)));
   if (want == "spawn") return go(spawnPoint_, "spawn");
+  for (const auto& m : userTpMarks_)  // saved spots first: a /tp set name shadows a generated one
+    if (m.dim == dim && m.name == want) return go(Vec3{m.x, m.y, m.z}, m.name);
   for (const auto& [k, p] : tpMarks_)
     if (k == want) return go(p, k);
   const std::pair<std::string, Vec3>* hit = nullptr;
