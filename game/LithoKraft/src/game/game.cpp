@@ -1,6 +1,7 @@
 #include <string_view>
 #include "litholattice/script/script_generic.h"
 #include <thread>
+#include "litholattice/core/f3_trace.h"
 #include <unordered_set>  // Cortana 2026-10-15 1455
 // Cortana 2026-10-15 0825/0935/1020: CHUNK-STALL, ALT-TAB, GAME-H1
 #include "lithokraft/game/game.h"
@@ -1583,6 +1584,57 @@ bool Game::saveWorld(const char* reason, bool wait) {
 // refused, not busy) is counted as g_fhLocoUnlocked. The frame thread waits only
 // in locomotion's bounded fallback (counted as blk).
 namespace {  // game thread only
+// 2026-10-26 (JD F3 lag trace): LL_TRACE_F3=1 records one row per frame (movement step,
+// player_.pos, HUD model, render camera, drawn XYZ text) into a ring and writes it to
+// stderr once a second in a single write, so tracing I/O stays off the frame path.
+// LL_TRACE_F3_WALK=1 additionally holds "forward" (plus LL_TRACE_F3_WALK=2: sprint) for
+// an unattended repro. Off by default: every hook is one cached bool test.
+namespace f3t {
+struct Row {
+  uint64_t frame = 0, worldTick = 0, posTick = 0;
+  char loco = '-';  // H held+stepped, U stepped unlocked, B skipped (sim busy), - body not live
+  int ticks = -1;   // ticks consumed by the movement step this frame
+  float pos[3] = {}, hud[3] = {}, cam[3] = {};
+  std::string built, drawn;
+  uint64_t drawnSeq = 0;
+  size_t verts = 0;
+};
+static Row cur;
+static std::vector<Row> ring;
+static uint64_t frameNo = 0, lastPosTick = 0;
+static std::chrono::steady_clock::time_point lastFlush = std::chrono::steady_clock::now();
+static std::string xyzPart(const std::string& s) { const size_t a = s.find("XYZ "); return a == std::string::npos ? s : s.substr(a); }
+static void endFrame() {  // called at the start of the next update(): the renderer has drawn frame `cur`
+  if (cur.frame) {
+    litholattice::f3trace::Drawn& d = litholattice::f3trace::drawn();
+    { std::lock_guard l(d.m); cur.drawn = d.text; cur.drawnSeq = d.seq; cur.verts = d.verts; }
+    ring.push_back(std::move(cur));
+  }
+  cur = Row{};
+  cur.frame = ++frameNo;
+  const auto now = std::chrono::steady_clock::now();
+  if (now - lastFlush < std::chrono::seconds(1) && ring.size() < 2048) return;
+  lastFlush = now;
+  std::string out;
+  out.reserve(ring.size() * 260);
+  char b[512];
+  for (const Row& r : ring) {
+    const std::string bx = xyzPart(r.built), dx = xyzPart(r.drawn);
+    std::snprintf(b, sizeof b,
+                  "f3trace f=%llu wt=%llu posTick=%llu loco=%c/%d pos=%.2f,%.2f,%.2f hud=%.2f,%.2f,%.2f cam=%.2f,%.2f,%.2f "
+                  "built=\"%s\" drawn#%llu=\"%s\" %s verts=%zu (no HUD mesh cache)\n",
+                  (unsigned long long)r.frame, (unsigned long long)r.worldTick, (unsigned long long)r.posTick, r.loco, r.ticks,
+                  r.pos[0], r.pos[1], r.pos[2], r.hud[0], r.hud[1], r.hud[2], r.cam[0], r.cam[1], r.cam[2], bx.c_str(),
+                  (unsigned long long)r.drawnSeq, dx.c_str(), bx == dx ? "same" : "DIFF", r.verts);
+    out += b;
+  }
+  ring.clear();
+  std::fwrite(out.data(), 1, out.size(), stderr);
+  std::fflush(stderr);
+}
+static int walk() { static const int w = [] { const char* e = std::getenv("LL_TRACE_F3_WALK"); return e ? std::atoi(e) : 0; }(); return w; }
+}  // namespace f3t
+
 uint64_t g_fhDeferrals = 0;     // busy-deferrals across all frameHold sites (per second; reset with the split line)
 uint64_t g_fhEscalations = 0;   // always 0 since JD 2026-10-26 12:03 PM (escalation removed)
 uint64_t g_fhBlocks = 0;        // locomotion bounded blocking holds taken
@@ -2785,6 +2837,7 @@ bool frameSplitEnv() { static const bool on = [] { const char* e = std::getenv("
 const char* const kSplitNames[10] = {"head", "loco", "deceit", "cam", "pumpStream", "actions", "uploadMeshes", "benchStream", "sounds+ents", "ui"};
 }  // namespace
 void Game::update(float dt, int width, int height) {
+  if (litholattice::f3trace::on()) f3t::endFrame();  // LL_TRACE_F3
   g_split.mark = Clock::now();
   // lithoscript `wait` pump: script time follows the sim's world-tick
   // counter — deterministic, never wall-clock. A reloaded world resets the
@@ -2870,6 +2923,11 @@ void Game::update(float dt, int width, int height) {
   if (locoLive) {
     pendingLocomotionInput_ =
         (playing && !typing_) ? sampleLocomotionInput() : litholattice::LocomotionInput{};
+    if (litholattice::f3trace::on() && f3t::walk() > 0 && !typing_) {  // LL_TRACE_F3_WALK: unattended forward walk
+      const double cy = std::cos(double(player_.yaw)), sy = std::sin(double(player_.yaw));
+      pendingLocomotionInput_.wishX = cy; pendingLocomotionInput_.wishZ = sy;
+      pendingLocomotionInput_.sprint = f3t::walk() >= 2;
+    }
     const litholattice::Entity& b = locomotion_.body();
     // 0.05 blocks: above float-rounding of the body's double position at
     // any dimension bound, below any real step (max ~0.35 blocks/tick).
@@ -2897,6 +2955,7 @@ void Game::update(float dt, int width, int height) {
       // Cap the catch-up (tick-debugger steps, long hitches): beyond the
       // cap the body simply does not consume the dropped ticks.
       if (ticks > 64) ticks = 64;
+      if (litholattice::f3trace::on()) { f3t::cur.ticks = int(ticks); f3t::cur.loco = locoHeld ? 'H' : 'U'; if (ticks > 0) f3t::lastPosTick = wt; }
       if (ticks > 0) {
         const double dtTick = 1.0 / double(std::max(1, sim_->stats().targetTps));
         // Proposed by JD; co-implemented by JD and Cortana: the Highway Ramp is not a full cell for the player; its
@@ -2942,6 +3001,7 @@ void Game::update(float dt, int width, int height) {
       }
     }
     player_.pos = locomotion_.position();
+    if (litholattice::f3trace::on() && !(sim_ && locoReady)) f3t::cur.loco = 'B';
   } else {
     locomotion_.place(player_.pos);
     if (sim_) lastLocomotionTick_ = sim_->stats().worldTick;  // no catch-up burst on re-entry
@@ -3459,6 +3519,7 @@ FrameParams Game::frameParams(int width, int height) const {
     for (size_t i = 0; i < n; ++i) p.pbrLights[i] = pbrLightsCache_[i];
     p.pbrLightCount = uint32_t(n);
   }
+  if (litholattice::f3trace::on()) { f3t::cur.cam[0] = p.camPos.x; f3t::cur.cam[1] = p.camPos.y; f3t::cur.cam[2] = p.camPos.z; }  // LL_TRACE_F3
   return p;
 }
 
@@ -3587,6 +3648,12 @@ HudModel Game::hudModel() const {
                   playerAdapter_.health(), playerAdapter_.oxygen(), playerAdapter_.stamina(),
                   playerAdapter_.kharge(), double(player_.pos.x), double(player_.pos.y), double(player_.pos.z),
                   int(std::floor(double(player_.pos.x))), int(std::floor(double(player_.pos.y))), int(std::floor(double(player_.pos.z))));  // 2026-10-24 (JD): feet / origin
+    if (litholattice::f3trace::on()) {  // LL_TRACE_F3: the pos this string was built from, and the string
+      f3t::cur.hud[0] = player_.pos.x; f3t::cur.hud[1] = player_.pos.y; f3t::cur.hud[2] = player_.pos.z;
+      f3t::cur.built = l[5];
+      f3t::cur.worldTick = st.worldTick; f3t::cur.posTick = f3t::lastPosTick;
+      f3t::cur.pos[0] = player_.pos.x; f3t::cur.pos[1] = player_.pos.y; f3t::cur.pos[2] = player_.pos.z;
+    }
     std::snprintf(l[6], sizeof l[6], "renderer: %s", rendererInfo().c_str());  // 2026-10-16 (JD)
     std::snprintf(l[7], sizeof l[7], "%s", releaseInfo().c_str());
     m.debugLines.assign(std::begin(l), std::end(l));
