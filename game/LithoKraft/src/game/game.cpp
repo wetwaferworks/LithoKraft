@@ -3060,6 +3060,34 @@ void Game::update(float dt, int width, int height) {
       shownPos = {float(d[0]), float(d[1]), float(d[2])};
     }
     player_.pos = shownPos;
+    {  // Cortana 2026-10-26 (Archie item 4): adaptive background cap. Paused (faded screen):
+       // uncapped. Still > 250 ms: cap 2 (3 on 8+ logical). Moving: cap 1 + yield to render.
+       // <= 4 logical: always cap 1 + yield. World load lifts the cap in loadActive().
+       // LL_BG_MAX_ACTIVE (any value) disables the policy; LL_BG_ADAPTIVE=0 too.
+      static const bool adaptive = !litholattice::BgThrottle::get().maxActiveSet &&
+                                   !(std::getenv("LL_BG_ADAPTIVE") && std::getenv("LL_BG_ADAPTIVE")[0] == '0');
+      if (adaptive) {
+        static const unsigned hw = std::thread::hardware_concurrency();
+        static Vec3 lastP{}; static float lastYaw = 0, lastPitch = 0;
+        static int64_t lastMoveNs = 0; static int curCap = -1; static bool curYield = false;
+        static uint64_t nSwitch = 0;
+        const int64_t now = plink::Link::nowNs();
+        const bool moved = std::fabs(shownPos.x - lastP.x) + std::fabs(shownPos.y - lastP.y) + std::fabs(shownPos.z - lastP.z) > 1e-3f ||
+                           std::fabs(player_.yaw - lastYaw) + std::fabs(player_.pitch - lastPitch) > 1e-4f;
+        lastP = shownPos; lastYaw = player_.yaw; lastPitch = player_.pitch;
+        if (moved) lastMoveNs = now;
+        int cap; bool yieldR;
+        if (hw != 0 && hw <= 4) { cap = 1; yieldR = true; }
+        else if (paused_) { cap = 0; yieldR = false; }
+        else if (now - lastMoveNs > 250'000'000) { cap = hw >= 8 ? 3 : 2; yieldR = false; }
+        else { cap = 1; yieldR = true; }
+        if (cap != curCap || yieldR != curYield) {
+          pool_.setDefaultMaxActive(cap); pool_.setYieldRender(yieldR);
+          curCap = cap; curYield = yieldR;
+          if (++nSwitch <= 16 || nSwitch % 256 == 0) logInfo("bg policy: cap=%d yield=%d (switch %llu)", cap, int(yieldR), (unsigned long long)nSwitch);
+        }
+      }
+    }
     if (litholattice::f3trace::on()) {
       f3t::cur.ticks = int(sn.tick > f3t::lastPosTick ? sn.tick - f3t::lastPosTick : 0);
       f3t::cur.loco = 'S';
