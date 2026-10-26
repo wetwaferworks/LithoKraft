@@ -23,3 +23,14 @@
 - Volumetrics and particles (instanced, deterministic opacity layer that affects vision), script textures (TexGen-style, our own code), radio (Transmitter, Dish multiblock, channels unlock).
 - NPC AI wiring into LithoKraft. The Daemon: record and replay, training pipeline.
 - Moore's-law tick progression as a core mechanic.
+
+## Questions for Archie
+
+- **2026-10-26, item 6 (Candidate D, `LL_SW_TILE64`, commit 78639fb):** the 64x64 tiles ran
+  1.3-2.5x slower than the 16-row strips (workstation, v8 anchor, DebugOpt, 11 threads;
+  e.g. still 17.77 -> 29.33 ms at K=2, 44.76 at K=4). The bins sort quads only by row, so
+  every tile redoes the quad setup for its whole row. It stays off (opt-in only).
+  - Are per-tile bins that also sort by column worth designing?
+  - What causes the 2x2-pixel diffs between strips and tiles (`LL_SW_AB_TILE=1`: 12-1320 px,
+    maxdelta <= 62; strips vs strips = 0 px)? Suspect: per-2x2 mip pick or span-start
+    rounding that depends on the work item's x0.
