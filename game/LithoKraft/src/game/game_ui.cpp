@@ -51,7 +51,7 @@ void cGameUi::rebuildHud() {
   const float k = s();
 
   debugPanel_ = &hud_->add<ui::cPanel>("hud");
-  debugPanel_->setLayout(ui::Layout::at({0, 0}, {0, 0}, {8 * k, 8 * k}));
+  debugPanel_->setLayout(ui::Layout::at({0, 0}, {0, 0}, {8 * k, 24 * k}));  // Playtest 1 #5: top padding (was 8; first line clipped under the header)
   // 2026-10-16 (JD): the look-at line renders red so it stands out; the rest is unchanged.
   auto& debugStack = debugPanel_->add<ui::cStackPanel>(ui::Orientation::Vertical, 0.f);
   debugText_ = &debugStack.add<ui::cLabel>();
@@ -550,7 +550,7 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
   hud_->setVisible(m.visible);
   age_ += dt;
   splash_->setVisible(age_ < kSplashSeconds);
-  debugPanel_->setVisible(!m.debugLines.empty());
+  debugPanel_->setVisible(!m.debugLines.empty() && !menu_);  // Playtest 1 #5: not over the main menu
   {  // split around the "look: " line (red); with no look line everything stays in debugText_
     std::vector<std::string> pre, post;
     std::string look;

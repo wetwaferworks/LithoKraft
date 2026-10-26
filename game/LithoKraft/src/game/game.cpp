@@ -1460,6 +1460,22 @@ void Game::loadActive() {
       player_.pos.y = std::floor(player_.pos.y) + 1.f;
       ++lift;
     }
+    {  // Playtest 1 #1 (2026-10-26): a clear AABB can still be a sealed pocket (solid roof over the
+       // head). Search upward for feet on a solid block, body-height air, and no solid cell in the
+       // 24 cells above the head of the centre column; keep the old spot if none within 96.
+      auto solidAt = [&](int x, int y, int z) { const BlockId b = active_->chunks.get(x, y, z); return b != kAir && blockRegistry().has(b, kSolid); };
+      const int cx = int(std::floor(player_.pos.x)), cz = int(std::floor(player_.pos.z));
+      auto roofed = [&](double y) { const int h = int(std::floor(y + ht)); for (int yy = h; yy < h + 24; ++yy) if (solidAt(cx, yy, cz)) return true; return false; };
+      if (roofed(player_.pos.y)) {
+        const float y0 = player_.pos.y;
+        for (int dy = 1; dy <= 96; ++dy) {
+          const double y = std::floor(y0) + dy;
+          if (solidAt(cx, int(y) - 1, cz) && !blocked(y) && !roofed(y)) { player_.pos.y = float(y); break; }
+        }
+        if (player_.pos.y != y0) logInfo("spawn: sealed pocket at y=%.2f; moved to open air y=%.2f", double(y0), double(player_.pos.y));
+        else logInfo("spawn: sealed pocket at y=%.2f; no open spot within 96 above, kept", double(y0));
+      }
+    }
     if (lift)
       logInfo("spawn: body overlapped '%s' at %.2f,%.2f,%.2f; lifted %d block(s) to y=%.2f",
               std::string(blockRegistry().def(first).name).c_str(), double(sp.x), double(sp.y), double(sp.z), lift,
@@ -3737,9 +3753,15 @@ void Game::handleTyping() {
 std::string Game::targetText() const {
   const SimStats& st = sim_->stats();
   if (!st.hit) return "-";
+  // Playtest 1 #3 (2026-10-26): one compact line, name id @x,y,z; the dense inspector line only
+  // with LL_LOOK_VERBOSE=1. Falls back to the registry name when the catalog has no text.
   std::string text = cBehaviorCatalog::get().describe(st.hitBlock, st.hitState);
+  if (const size_t nl = text.find('\n'); nl != std::string::npos) text.resize(nl);
+  if (text.find_first_not_of(" \t") == std::string::npos) text = std::string(blockRegistry().def(st.hitBlock).name);
   text += "  " + std::string(blockRegistry().idOf(st.hitBlock));  // 2026-10-24 (JD): namespaced id on the look line
-  if (st.hitInfo[0]) { text += "\n"; text += st.hitInfo; }  // inspector: ids, raw state, net, memory
+  text += "  @" + std::to_string(st.hx) + "," + std::to_string(st.hy) + "," + std::to_string(st.hz);
+  static const bool verbose = [] { const char* e = std::getenv("LL_LOOK_VERBOSE"); return e && *e == '1'; }();
+  if (verbose && st.hitInfo[0]) { text += "\n"; text += st.hitInfo; }  // inspector: ids, raw state, net, memory
   if (!st.inReach) text += "  (out of reach)";
   return text;
 }
