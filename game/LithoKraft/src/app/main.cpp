@@ -1002,6 +1002,7 @@ int main(int argc, char** argv) {
     // block in labeled rows, 42 stocked carry slots, infinite placement, Pattern ROM screen);
     // --rom-screen 32|64 picks the demo screen size; --capture hides F3 / controls / hint text.
     else if (!std::strcmp(argv[i], "--test-world")) cfg.benchScene = "testworld";
+    else if (!std::strcmp(argv[i], "--test-world-examples")) { cfg.benchScene = "testworld"; cfg.testWorldExamples = true; }  // 2026-10-25 (JD): test world + Examples pads (clocks, ...) in any build
     else if (!std::strcmp(argv[i], "--rom-screen")) romScreen = int(num(32, 64));
     else if (!std::strcmp(argv[i], "--capture")) cfg.capture = true;
     else if (!std::strcmp(argv[i], "--ui-shot") && i + 1 < argc) uiShot = argv[++i];  // Cortana 2026-10-16
@@ -1095,7 +1096,7 @@ int main(int argc, char** argv) {
     else {
       std::printf("usage: LithoKraft [--version] [--selftest] [--dim wafer|organic] [--size chunks] "
                   "[--tps 32|64|128|256|512] [--tps-unlock (debug: --tps up to 8192, powers of 2)] [--no-euv] [--radius chunks] [--render-threads 1|2|4|8|16|32|64] [--sw-scale 0.5|0.75|1.0] [--seconds s] [--vsync] [--display windowed|maximized|borderless|fullscreen] [--monitor N] [--resolution WxH] [--refresh Hz] [--log file] "
-                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--mcp-stdio] "
+                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--mcp-stdio] "
                   "[--vk-validation] [--vk-arena host|device|rebar] [--gl-arena on|off] [--seed n] [--cities on|off] [--noise-preview graph.json [--preview-out f.png] "
                   "[--preview-output name] [--preview-size px] [--preview-scale blocks/px] [--preview-y y]]\n");
       return 0;
