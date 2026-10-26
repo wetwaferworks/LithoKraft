@@ -277,11 +277,14 @@ size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const Bloc
   // 0.0.1.51 (Cortana): upload at most ~6 MB per frame (the Vulkan staging ring is 8 MB; a
   // bigger burst forced a synchronous copy flush = a main-thread stall). The rest waits.
   for (MeshOut& m : meshes) pendingUploads_.push_back(std::move(m));
-  constexpr size_t kUploadBudget = size_t(6) << 20;
+  // PT4 Target C (2026-10-26, Elfie): the per-frame upload/publish budgets are
+  // env-tunable so pacing can be A/B-tested without a rebuild; the defaults are
+  // the shipped values, unchanged (6 MB staged for the Vulkan ring, 512 publishes).
+  static const size_t kUploadBudget = [] { const char* e = std::getenv("LL_SW_UPLOAD_BUDGET_KB"); const long v = e ? std::atol(e) : 0; return v > 0 ? size_t(v) << 10 : size_t(6) << 20; }();
   // 0.0.1.53 [C53-2] (Proposed by JD, Built by Cortana): worker-written meshes cost the main thread only a
   // publish; they have their own per-frame publish budget (count), the 6 MB budget is for
   // meshes that still go through the staging ring.
-  constexpr int kPublishBudget = 512;
+  static const int kPublishBudget = [] { const char* e = std::getenv("LL_SW_PUBLISH_BUDGET"); const long v = e ? std::atol(e) : 0; return v > 0 ? int(v) : 512; }();
   size_t staged = 0;
   int published = 0;
   while (!pendingUploads_.empty() && staged < kUploadBudget && published < kPublishBudget) {

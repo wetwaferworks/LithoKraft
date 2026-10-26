@@ -1565,17 +1565,33 @@ bool Game::saveWorld(const char* reason, bool wait) {
   return true;
 }
 
-// 2026-10-25 (JD hitch, fix 1): the frame thread never waits out a sim tick. Try for blockMutex_;
-// if the sim is mid-tick, skip this frame (work stays queued). After kMaxBusySkips straight skips
-// it blocks once, so a sim that re-locks back to back cannot starve streaming forever.
-// 2026-10-25 (JD, 9:24 PM): stream pumps pass allowBlock=false: no forced wait ever; columns stay
-// queued until the sim is free (smoothness first). Locomotion keeps the bounded fallback.
+// 2026-10-25 (JD hitch, fix 1): the frame thread does not wait out a sim tick on the
+// streaming paths. Try for blockMutex_; if the sim is mid-tick, skip this frame (work
+// stays queued). Locomotion keeps a bounded blocking fallback (after kMaxBusySkips
+// straight skips it blocks once, so a sim that re-locks back to back cannot starve
+// the player). Stream pumps pass allowBlock=false: no forced wait, ever.
+// 2026-10-26 (code review follow-up, JD ruling 3): every busy-deferral is counted and
+// reported per second on the update-split line (fh defer/esc/blk/loco-unlocked).
+// JD 2026-10-26 12:03 PM: NO forced escalation on stream pumps (allowBlock=false
+// never blocks; columns stay queued until the sim is free); esc stays 0, kept in
+// the line for log-format stability. Locomotion's unlocked fallback (handshake
+// refused, not busy) is counted as g_fhLocoUnlocked. The frame thread waits only
+// in locomotion's bounded fallback (counted as blk).
+namespace {  // game thread only
+uint64_t g_fhDeferrals = 0;     // busy-deferrals across all frameHold sites (per second; reset with the split line)
+uint64_t g_fhEscalations = 0;   // always 0 since JD 2026-10-26 12:03 PM (escalation removed)
+uint64_t g_fhBlocks = 0;        // locomotion bounded blocking holds taken
+uint64_t g_fhLocoUnlocked = 0;  // locomotion steps run without the hold
+}  // namespace
 static bool frameHold(cSimThread& sim, std::unique_lock<std::recursive_mutex>& hold, int& skips, bool& busy,
                       bool allowBlock = true) {
   constexpr int kMaxBusySkips = 8;
-  if (allowBlock && skips >= kMaxBusySkips) { skips = 0; busy = false; return sim.holdBetweenTicks(hold); }
+  if (allowBlock && skips >= kMaxBusySkips) { skips = 0; busy = false; ++g_fhBlocks; return sim.holdBetweenTicks(hold); }
   if (sim.tryHoldBetweenTicks(hold, &busy)) { skips = 0; return true; }
-  if (busy) ++skips;
+  if (busy) {
+    ++skips;
+    ++g_fhDeferrals;
+  }
   return false;
 }
 
@@ -2861,7 +2877,13 @@ void Game::update(float dt, int width, int height) {
     std::unique_lock<std::recursive_mutex> locoHold;
     static int locoSkips = 0;  // game thread only
     bool locoBusy = false;
-    const bool locoReady = sim_ && (frameHold(*sim_, locoHold, locoSkips, locoBusy) || !locoBusy);
+    const bool locoHeld = sim_ && frameHold(*sim_, locoHold, locoSkips, locoBusy);
+    // Handshake refused but NOT busy (frozen / workers outstanding): the step
+    // proceeds WITHOUT the hold and its getBlock reads go direct. Counted
+    // (g_fhLocoUnlocked, split line) since the 2026-10-26 review follow-up —
+    // the hole in the old "never waits" headline is measured, not hidden.
+    if (sim_ && !locoHeld && !locoBusy) ++g_fhLocoUnlocked;
+    const bool locoReady = locoHeld || (sim_ && !locoBusy);
     if (sim_ && locoReady) {
       const uint64_t wt = sim_->stats().worldTick;
       if (wt < lastLocomotionTick_) lastLocomotionTick_ = wt;  // world reloaded: resync, never fast-forward
@@ -3116,11 +3138,14 @@ void Game::update(float dt, int width, int height) {
     char buf[1024]; int n = 0;
     for (int i = 0; i < 10; ++i)
       n += std::snprintf(buf + n, sizeof buf - size_t(n), " %s=%.2f/%.1f", kSplitNames[i], g_split.ms[i] / std::max(1, g_split.frames), g_split.mx[i]);
-    logInfo("update-split ms/frame (avg/max):%s | frames %d, cols +%zu -%zu, capped uploads %zu, mesh queue %zu, pool %.1f%%, admit r %d",
+    logInfo("update-split ms/frame (avg/max):%s | frames %d, cols +%zu -%zu, capped uploads %zu, mesh queue %zu, pool %.1f%%, admit r %d, fh defer/esc/blk/loco-unlocked %llu/%llu/%llu/%llu",
             buf, g_split.frames, g_colsAdded, g_colsEvicted, g_uploadsCapped, meshQueueDepth(), 100.0 * double(renderer_.meshPoolFill()),
-            streamer_ ? std::min(streamer_->admitRadius(), effectiveStreamRadius(cfg_)) : 0);
+            streamer_ ? std::min(streamer_->admitRadius(), effectiveStreamRadius(cfg_)) : 0,
+            (unsigned long long)g_fhDeferrals, (unsigned long long)g_fhEscalations, (unsigned long long)g_fhBlocks,
+            (unsigned long long)g_fhLocoUnlocked);
     g_split = UpdateSplit{};
     g_colsAdded = g_colsEvicted = g_uploadsCapped = 0;
+    g_fhDeferrals = g_fhEscalations = g_fhBlocks = g_fhLocoUnlocked = 0;
   }
 }
 

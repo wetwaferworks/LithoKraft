@@ -233,19 +233,23 @@ std::vector<std::filesystem::path> scanMods(const char* argv0) {
     } else logError("mods: %s: %s", p.string().c_str(), err.c_str());
     break;
   }
-  // Fail-closed key hygiene: the throwaway test key must never ship. In release
-  // builds this is a hard boot refusal; in debug it's a loud warning (dev loop).
-  // Runs before the mods/ early-return below so a stock install can't dodge it.
+  // Fail-closed key hygiene (M3, 2026-10-26): only JD's designated shipping
+  // key may ship. In release builds any other baked key — retired test,
+  // workstation dev, or unknown — is a hard boot refusal; in debug it's a
+  // loud warning (dev loop). Runs before the mods/ early-return below so a
+  // stock install can't dodge it.
   if (litholattice::assets::bakedKeyIsTestKey()) {
 #ifdef NDEBUG
     // Genuine boot refusal (not just "no mods"): returning an empty pack list
     // would let the game boot normally, defeating the fail-closed intent.
-    logError("FATAL: baked-in public key is the retired TEST key — refusing to boot a release build. "
-             "Install JD's real key (see mod_signature.h) and rebuild.");
+    logError("FATAL: baked-in public key is not JD's shipping key (it is: %s) — refusing to boot a release build. "
+             "Install JD's real key (see mod_signature.h) and rebuild.",
+             litholattice::assets::bakedKeyDescription());
     std::exit(1);
 #else
-    logError("WARNING: baked-in public key is the retired TEST key — mods will verify against it. "
-             "Replace before beta (see mod_signature.h).");
+    logError("WARNING: baked-in public key is not JD's shipping key (it is: %s) — mods will verify against it. "
+             "Replace before beta (see mod_signature.h).",
+             litholattice::assets::bakedKeyDescription());
 #endif
   }
   // Trust anchor for structure signatures: JD's baked-in public key. Must be set before
