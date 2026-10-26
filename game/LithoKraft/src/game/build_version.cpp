@@ -12,6 +12,8 @@ const char* gameCounter() { return LITHOKRAFT_GAME_COUNTER; }
 std::string buildInfo() {
 #ifdef NDEBUG
   const char* type = "Release";
+#elif defined(LK_DEBUGOPT)
+  const char* type = "DebugOpt";  // 2026-10-25: optimised, debug logging kept
 #else
   const char* type = "Debug";
 #endif
