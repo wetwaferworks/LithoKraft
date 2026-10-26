@@ -1568,9 +1568,12 @@ bool Game::saveWorld(const char* reason, bool wait) {
 // 2026-10-25 (JD hitch, fix 1): the frame thread never waits out a sim tick. Try for blockMutex_;
 // if the sim is mid-tick, skip this frame (work stays queued). After kMaxBusySkips straight skips
 // it blocks once, so a sim that re-locks back to back cannot starve streaming forever.
-static bool frameHold(cSimThread& sim, std::unique_lock<std::recursive_mutex>& hold, int& skips, bool& busy) {
+// 2026-10-25 (JD, 9:24 PM): stream pumps pass allowBlock=false: no forced wait ever; columns stay
+// queued until the sim is free (smoothness first). Locomotion keeps the bounded fallback.
+static bool frameHold(cSimThread& sim, std::unique_lock<std::recursive_mutex>& hold, int& skips, bool& busy,
+                      bool allowBlock = true) {
   constexpr int kMaxBusySkips = 8;
-  if (skips >= kMaxBusySkips) { skips = 0; busy = false; return sim.holdBetweenTicks(hold); }
+  if (allowBlock && skips >= kMaxBusySkips) { skips = 0; busy = false; return sim.holdBetweenTicks(hold); }
   if (sim.tryHoldBetweenTicks(hold, &busy)) { skips = 0; return true; }
   if (busy) ++skips;
   return false;
@@ -1621,7 +1624,7 @@ void Game::pumpSwLod() {
   std::unique_lock<std::recursive_mutex> simHold;
   static int lodSkips = 0;  // game thread only
   bool lodBusy = false;
-  if (!frameHold(*sim_, simHold, lodSkips, lodBusy)) return;
+  if (!frameHold(*sim_, simHold, lodSkips, lodBusy, /*allowBlock=*/false)) return;
   for (auto [cx, cz] : todo) {
     const ChunkColumn* c = active_->chunks.column(cx, cz);
     if (!c) { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_.erase(ChunkKey::make(cx, cz)); continue; }
@@ -1674,7 +1677,7 @@ void Game::pumpStreaming() {
   std::unique_lock<std::recursive_mutex> simHold;
   static int insertSkips = 0;  // game thread only
   bool insertBusy = false;
-  if (!frameHold(*sim_, simHold, insertSkips, insertBusy)) {
+  if (!frameHold(*sim_, simHold, insertSkips, insertBusy, /*allowBlock=*/false)) {
     if (insertBusy) return;  // sim mid-tick: try next frame, batch stays queued
     static int deferLog = 0;  // game thread only; rate-limited report
     if ((deferLog++ % 256) == 0)
@@ -1816,7 +1819,7 @@ void Game::evictFarColumns() {
   std::unique_lock<std::recursive_mutex> simHold;  // 2026-10-15: see the insertion pump
   static int evictSkips = 0;  // game thread only
   bool evictBusy = false;
-  if (!frameHold(*sim_, simHold, evictSkips, evictBusy)) {
+  if (!frameHold(*sim_, simHold, evictSkips, evictBusy, /*allowBlock=*/false)) {
     if (evictBusy) return;  // sim mid-tick: try next frame, columns stay resident
     static int evictDeferLog = 0;  // game thread only; rate-limited report
     if ((evictDeferLog++ % 256) == 0)
