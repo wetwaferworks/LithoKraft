@@ -1565,6 +1565,17 @@ bool Game::saveWorld(const char* reason, bool wait) {
   return true;
 }
 
+// 2026-10-25 (JD hitch, fix 1): the frame thread never waits out a sim tick. Try for blockMutex_;
+// if the sim is mid-tick, skip this frame (work stays queued). After kMaxBusySkips straight skips
+// it blocks once, so a sim that re-locks back to back cannot starve streaming forever.
+static bool frameHold(cSimThread& sim, std::unique_lock<std::recursive_mutex>& hold, int& skips, bool& busy) {
+  constexpr int kMaxBusySkips = 8;
+  if (skips >= kMaxBusySkips) { skips = 0; busy = false; return sim.holdBetweenTicks(hold); }
+  if (sim.tryHoldBetweenTicks(hold, &busy)) { skips = 0; return true; }
+  if (busy) ++skips;
+  return false;
+}
+
 // Chunk streaming (see chunk_streamer.h): request the columns in the load
 // radius around the player, then insert the finished ones. The sim thread owns
 // active_->chunks while it runs, so insertion takes the sim between ticks
@@ -1608,7 +1619,9 @@ void Game::pumpSwLod() {
   }
   if (todo.empty()) return;
   std::unique_lock<std::recursive_mutex> simHold;
-  if (!sim_->holdBetweenTicks(simHold)) return;
+  static int lodSkips = 0;  // game thread only
+  bool lodBusy = false;
+  if (!frameHold(*sim_, simHold, lodSkips, lodBusy)) return;
   for (auto [cx, cz] : todo) {
     const ChunkColumn* c = active_->chunks.column(cx, cz);
     if (!c) { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_.erase(ChunkKey::make(cx, cz)); continue; }
@@ -1659,7 +1672,10 @@ void Game::pumpStreaming() {
   // Build 80: the stop()/start() fallback is REMOVED from this path (see
   // the header comment above); refusal now defers.
   std::unique_lock<std::recursive_mutex> simHold;
-  if (!sim_->holdBetweenTicks(simHold)) {
+  static int insertSkips = 0;  // game thread only
+  bool insertBusy = false;
+  if (!frameHold(*sim_, simHold, insertSkips, insertBusy)) {
+    if (insertBusy) return;  // sim mid-tick: try next frame, batch stays queued
     static int deferLog = 0;  // game thread only; rate-limited report
     if ((deferLog++ % 256) == 0)
       logWarn("stream: insertion deferred (sim hold refused: %s); batch stays queued",
@@ -1798,7 +1814,10 @@ void Game::evictFarColumns() {
   // evicted under a running sim, and a refused hold defers the whole
   // batch — columns stay resident and are reconsidered on a later pump.
   std::unique_lock<std::recursive_mutex> simHold;  // 2026-10-15: see the insertion pump
-  if (!sim_->holdBetweenTicks(simHold)) {
+  static int evictSkips = 0;  // game thread only
+  bool evictBusy = false;
+  if (!frameHold(*sim_, simHold, evictSkips, evictBusy)) {
+    if (evictBusy) return;  // sim mid-tick: try next frame, columns stay resident
     static int evictDeferLog = 0;  // game thread only; rate-limited report
     if ((evictDeferLog++ % 256) == 0)
       logWarn("stream: eviction deferred (sim hold refused: %s); columns stay resident",
