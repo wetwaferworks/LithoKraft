@@ -3134,7 +3134,10 @@ void Game::update(float dt, int width, int height) {
   updateUi(dt, width, height);
   g_split.lap(9);
   ++g_split.frames;
-  if ((stream_ || frameSplitEnv()) && msBetween(g_split.last, Clock::now()) >= 1000.0) {
+  // 2026-10-26 (Archie triage step 1): the split line (and its fh counters) was suppressed on
+  // non-stream benches (still/live/walk/flyover leave stream_ null) unless LK_FRAME_SPLIT=1.
+  // Every --bench run now emits it; play still needs LK_FRAME_SPLIT=1.
+  if ((stream_ || benchSet_ || frameSplitEnv()) && msBetween(g_split.last, Clock::now()) >= 1000.0) {
     char buf[1024]; int n = 0;
     for (int i = 0; i < 10; ++i)
       n += std::snprintf(buf + n, sizeof buf - size_t(n), " %s=%.2f/%.1f", kSplitNames[i], g_split.ms[i] / std::max(1, g_split.frames), g_split.mx[i]);
