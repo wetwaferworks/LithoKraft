@@ -87,7 +87,7 @@ void registerGameCommands(cConsoleReg& r, GameCommandBindings b) {
   // (camera tp = third person); as a command it is this teleport, so the two never collide.
   for (const char* verb : {"teleport", "tp"}) {
     r.registerCommand(
-        verb, std::string(verb) + " <x y z>|<name> - teleport the player (~ = relative; no arg lists names: spawn, testarea, circuits, ...) (cheat)",
+        verb, std::string(verb) + " <x y z>|<name>|set <name>|del <name> - teleport the player (~ = relative; set/del = this world's saved spots; no arg lists names: spawn, testarea, clocks, ...) (cheat)",
         [b](cConsoleReg& r, const ConsoleArgs& a) {
           std::vector<std::string> args;
           for (size_t i = 1; i < a.size(); ++i) args.push_back(a[i]);
