@@ -1587,7 +1587,7 @@ namespace {  // game thread only
 // 2026-10-26 (JD F3 lag trace): LL_TRACE_F3=1 records one row per frame (movement step,
 // player_.pos, HUD model, render camera, drawn XYZ text) into a ring and writes it to
 // stderr once a second in a single write, so tracing I/O stays off the frame path.
-// LL_TRACE_F3_WALK=1 additionally holds "forward" (plus LL_TRACE_F3_WALK=2: sprint) for
+// LL_TRACE_F3_WALK=1 additionally holds "forward" (2: + sprint, 3: + fly, climbing when blocked) for
 // an unattended repro. Off by default: every hook is one cached bool test.
 namespace f3t {
 struct Row {
@@ -2927,6 +2927,13 @@ void Game::update(float dt, int width, int height) {
       const double cy = std::cos(double(player_.yaw)), sy = std::sin(double(player_.yaw));
       pendingLocomotionInput_.wishX = cy; pendingLocomotionInput_.wishZ = sy;
       pendingLocomotionInput_.sprint = f3t::walk() >= 2;
+      if (f3t::walk() >= 3) {  // 3: fly forward, climbing whenever the last step was blocked
+        static bool flying = false;
+        if (!flying) { flying = true; toggleFly("on"); }
+        static Vec3 lastPos{};
+        pendingLocomotionInput_.jump = std::fabs(player_.pos.x - lastPos.x) + std::fabs(player_.pos.z - lastPos.z) < 1e-3f;
+        lastPos = player_.pos;
+      }
     }
     const litholattice::Entity& b = locomotion_.body();
     // 0.05 blocks: above float-rounding of the body's double position at

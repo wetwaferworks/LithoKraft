@@ -1411,7 +1411,11 @@ int main(int argc, char** argv) {
     // The launch menu opens first (world loaded, sim paused, cinematic camera); the bench
     // harness drives the camera itself and skips it. The loop syncs cursor capture from
     // game.wantsCursorCaptured() every frame.
-    if (benchSeconds <= 0) game.enterMenu();
+    if (benchSeconds <= 0) {
+      game.enterMenu();
+      // 2026-10-26 (F3 lag trace): LL_TRACE_F3_WALK skips straight to play for the unattended repro.
+      if (const char* w = std::getenv("LL_TRACE_F3_WALK"); w && std::atoi(w) > 0) game.enterPlay();
+    }
 
     F.tStart = Clock::now(); F.tLast = F.tStart; F.tTitle = F.tStart; F.tPerf = F.tStart;
     constexpr double kBenchWarmup = 3.0;  // world load + first meshes settle before measuring
