@@ -2,6 +2,7 @@
 #include "litholattice/script/script_generic.h"
 #include <thread>
 #include "litholattice/core/f3_trace.h"
+#include "player_link.h"  // Cortana 2026-10-26: sim-thread body + interpolated display pose
 #include <unordered_set>  // Cortana 2026-10-15 1455
 // Cortana 2026-10-15 0825/0935/1020: CHUNK-STALL, ALT-TAB, GAME-H1
 #include "lithokraft/game/game.h"
@@ -75,6 +76,42 @@ int effectiveStreamRadius(const lithokraft::GameConfig& c) {
 static int llP2PerfOff() { static const int v = [] { const char* e = std::getenv("LL_P2_PERF_OFF"); return e ? int(std::strtol(e, nullptr, 0)) : 0; }(); return v; }  // Cortana 2026-10-16 1520: A/B perf switch (render/display only)
 
 namespace lithokraft {
+namespace {
+// Cortana 2026-10-26 (Archie camera-jump decision): the body is owned by the sim thread while it
+// runs (stepped in the player hook); the frame thread talks to it only through g_plink.
+plink::Link g_plink;
+void plinkPublish(const PlayerLocomotion& L, bool reset, uint64_t tick, double dt, uint64_t placeSeq) {
+  plink::Snap s = g_plink.snap.load();
+  const auto p = L.position();
+  const auto v = L.velocity();
+  if (reset) { s.prev[0] = p.x; s.prev[1] = p.y; s.prev[2] = p.z; }
+  else { for (int i = 0; i < 3; ++i) s.prev[i] = s.curr[i]; }
+  s.curr[0] = L.body().x; s.curr[1] = L.body().y; s.curr[2] = L.body().z;
+  if (reset) for (int i = 0; i < 3; ++i) s.prev[i] = s.curr[i];
+  s.vel[0] = v.x; s.vel[1] = v.y; s.vel[2] = v.z;
+  s.tNs = plink::Link::nowNs(); s.dt = dt; s.tick = tick; s.placeSeq = placeSeq;
+  s.eye = L.eyeHeight(); s.pose = uint8_t(L.pose()); s.flying = L.flying(); s.onGround = L.onGround(); s.placed = L.placed();
+  g_plink.snap.store(s);
+}
+bool plinkSimOwned(const std::unique_ptr<cSimThread>& sim) { return sim && sim->running(); }
+void locoPlace(const std::unique_ptr<cSimThread>& sim, PlayerLocomotion& L, const Vec3& pos) {
+  const uint64_t seq = ++g_plink.placeSeq;
+  if (plinkSimOwned(sim)) {
+    plink::Cmd c; c.kind = plink::Cmd::Place; c.pos[0] = pos.x; c.pos[1] = pos.y; c.pos[2] = pos.z; c.seq = seq;
+    g_plink.push(c);
+  } else {
+    L.place(pos);
+    plinkPublish(L, true, g_plink.snap.load().tick, g_plink.snap.load().dt, seq);
+  }
+}
+void locoSetMode(const std::unique_ptr<cSimThread>& sim, PlayerLocomotion& L, litholattice::LocomotionMode m) {
+  if (plinkSimOwned(sim)) { plink::Cmd c; c.kind = plink::Cmd::Mode; c.mode = m; g_plink.push(c); }
+  else { L.setMode(m); const auto s = g_plink.snap.load(); plinkPublish(L, true, s.tick, s.dt, s.placeSeq); }
+}
+plink::Snap locoSnap() { return g_plink.snap.load(); }
+}  // namespace
+}  // namespace lithokraft
+namespace lithokraft {
 std::shared_ptr<MeshInput> farLodMeshInput(const MeshInput& in, int f);  // bench_stream.cpp
 bool asyncChunkUploadOn();  // Cortana 2026-10-25 upload pass (defined above Game::uploadMeshes)
 
@@ -127,7 +164,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
                                        [this](Vec3 o, Vec3 d, float m, float& hd) {
                                          return cameraRaycast(o, d, m, hd);
                                        },
-                                       [this] { return locomotion_.eyeHeight(); }}),
+                                       [] { return locoSnap().eye; }}),
       mcpController_(input_, {"player"},
                      [this] { return mcpControllable_.load(std::memory_order_relaxed); }),
       mcpView_([this] { return snapshotMcpPlayer(); }),
@@ -593,7 +630,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
         if (st.inReach) return Vec3{st.hx + 0.5f, st.hy + 1.6f, st.hz + 0.5f};
       }
       const Vec3 f = player_.forward();
-      const Vec3 eye = playerEyePos(player_, locomotion_.eyeHeight());
+      const Vec3 eye = playerEyePos(player_, locoSnap().eye);
       return Vec3{eye.x + f.x * 4.f, eye.y + f.y * 4.f, eye.z + f.z * 4.f};
     };
     sb.spawn = [this, spriteTarget](std::string_view name, int count) {
@@ -998,14 +1035,14 @@ void Game::setBenchCamera(float t) {
     const float base = float(int(t / 1.5f) & 1) * 3.14159265f;
     player_.pos = {benchCenter_.x, benchCenter_.y + 20.f, benchCenter_.z};
     player_.yaw = base + 3.14159265f * s; player_.pitch = -0.2f;
-    locomotion_.place(player_.pos);  // pin the body too, or locomotion pulls the camera back each update
+    locoPlace(sim_, locomotion_, player_.pos);  // pin the body too, or locomotion pulls the camera back each update
     benchCam_ = player_.pos;
     return;
   }
   if (benchPath_ == "sprint") {  // T2/T3: from the spawn along +x at 60 blocks/s, 30 up (~4 chunk borders/s); the play streamer follows
     player_.pos = {benchCenter_.x + 60.f * t, benchCenter_.y + 30.f, benchCenter_.z};
     player_.yaw = 0.f; player_.pitch = -0.25f;
-    locomotion_.place(player_.pos);
+    locoPlace(sim_, locomotion_, player_.pos);
     benchCam_ = player_.pos;
     return;
   }
@@ -1430,6 +1467,43 @@ void Game::loadActive() {
   litholattice::setPickShapeFn(&pickShapeBoxes);  // 2026-10-25 (JD): model-shaped look / target ray
   sim_ = std::make_unique<cSimThread>(active_->chunks, blockRegistry(), std::move(worldSim), std::move(sc),
                                      submitMesh_);
+  // Cortana 2026-10-26 (Archie camera-jump decision): the player body steps here, on the sim
+  // thread, at the end of every completed world tick (inside the tick's block-mutex window).
+  sim_->setPlayerHook([this, sim = sim_.get()](uint64_t wt) {  // raw pointer: unique_ptr::reset nulls sim_ before the join
+    uint64_t placeSeq = locoSnap().placeSeq;
+    bool reset = false;
+    for (const plink::Cmd& c : g_plink.drain()) {
+      if (c.kind == plink::Cmd::Place) { locomotion_.place({float(c.pos[0]), float(c.pos[1]), float(c.pos[2])}); placeSeq = c.seq; reset = true; }
+      else locomotion_.setMode(c.mode);
+    }
+    const plink::InputMsg in = g_plink.input.load();
+    const int tps = std::max(1, sim->simThreadWorldTps());
+    const double dtTick = 1.0 / double(tps);
+    if (in.live && locomotion_.placed()) {
+      const auto isSolid = [sim](int x, int y, int z) {
+        const BlockId b = sim->getBlock(x, y, z);
+        return b != kHighwayRamp && blockRegistry().has(b, kSolid);
+      };
+      locomotion_.tick(in.in, isSolid, dtTick);
+      // Proposed by JD; co-implemented by JD and Cortana: the Highway Ramp is not a full cell for the player; its
+      // 1-in-2 surface is applied after each tick (smooth walk-up, no step).
+      namespace hw = litholattice::procgen::ramp::highway;
+      litholattice::Entity& e = locomotion_.mutableBody();
+      if (e.vy <= 0) {
+        const int bx = int(std::floor(e.x)), bz = int(std::floor(e.z)), by = int(std::floor(e.y));
+        for (int cy = by; cy >= by - 1; --cy) {
+          const auto [b, st] = sim->getBlockAndState(bx, cy, bz);
+          if (b != kHighwayRamp) continue;
+          const double top = cy + hw::heightAt(uint32_t(st) & 7u, e.x - bx, e.z - bz);
+          if (e.y < top + (locomotion_.flying() ? 0.0 : 0.2) && e.y > top - 0.75) { e.y = top; e.vy = 0; e.onGround = true; }
+          break;
+        }
+      }
+    } else {
+      reset = true;  // not live: the body holds, display pins to it
+    }
+    plinkPublish(locomotion_, reset, wt, dtTick, placeSeq);
+  });
   // Measure-only windowed determinism probe (LL_HASH_AT_TICK=<world tick>; Proposed by JD; co-implemented by JD and Cortana).
   // At exactly that world tick, on the sim thread inside its mutation window, hash every loaded column
   // (blocks + cell state, sorted by key) plus the signal state, and log it. Nothing is changed.
@@ -2175,14 +2249,14 @@ std::string Game::toggleFly(const std::string& arg) {
   using litholattice::LocomotionMode;
   bool fly;
   if (arg.empty())
-    fly = !locomotion_.flying();
+    fly = !locoSnap().flying;
   else if (arg == "on")
     fly = true;
   else if (arg == "off")
     fly = false;
   else
     return "fly: usage: fly [on|off]";
-  locomotion_.setMode(fly ? LocomotionMode::Fly : LocomotionMode::Walk);
+  locoSetMode(sim_, locomotion_, fly ? LocomotionMode::Fly : LocomotionMode::Walk);
   player_.flying = fly;  // keep the cPlayer flag a faithful mode mirror
   logInfo("fly: locomotion mode -> %s", fly ? "fly" : "walk");
   return std::string("fly: ") + (fly ? "on (locomotion mode: fly)" : "off (locomotion mode: walk)");
@@ -2639,7 +2713,7 @@ void Game::handleWorldActions() {
     c.command = SimCommand{kCmdAltUse, st.hx, st.hy, st.hz, 0, 0};
     sim_->edit(c);
   } else if (input_.pressed(Action::Use) && usable) {
-    const Vec3 eye = playerEyePos(player_, locomotion_.eyeHeight());
+    const Vec3 eye = playerEyePos(player_, locoSnap().eye);
     const Vec3 fw = player_.forward();
     if (reg.def(st.hitBlock).role == SimRole::Keyboard) {
       beginTyping(st.hx, st.hy, st.hz);
@@ -2694,7 +2768,7 @@ void Game::handleWorldActions() {
       lastPlaceT_ = nowT;
       lastPlaceHit_[0] = curTarget[0]; lastPlaceHit_[1] = curTarget[1]; lastPlaceHit_[2] = curTarget[2];
       noteBlockEdit();
-    } else if (!inReach && settings_.bridging && !locomotion_.flying() && fw.y < -0.45f) {
+    } else if (!inReach && settings_.bridging && !locoSnap().flying && fw.y < -0.45f) {
       // D9 walk-bridging: the cell beside the block under the feet, toward the horizontal look.
       const int fx = int(std::floor(player_.pos.x)), fy = int(std::floor(player_.pos.y)) - 1,
                 fz = int(std::floor(player_.pos.z));
@@ -2966,83 +3040,57 @@ void Game::update(float dt, int width, int height) {
         lastPos = player_.pos;
       }
     }
-    const litholattice::Entity& b = locomotion_.body();
-    // 0.05 blocks: above float-rounding of the body's double position at
-    // any dimension bound, below any real step (max ~0.35 blocks/tick).
-    if (!locomotion_.placed() || std::fabs(double(player_.pos.x) - b.x) > 0.05 ||
-        std::fabs(double(player_.pos.y) - b.y) > 0.05 ||
-        std::fabs(double(player_.pos.z) - b.z) > 0.05)
-      locomotion_.place(player_.pos);  // an external write won: reseat (zeroes velocity)
-    // 2026-10-25 (JD hitch, fix 1): hold blockMutex_ for the whole collision step without waiting
-    // out a sim tick; if the sim is mid-tick, the ticks stay pending and are consumed next frame.
-    std::unique_lock<std::recursive_mutex> locoHold;
-    static int locoSkips = 0;  // game thread only
-    bool locoBusy = false;
-    const bool locoHeld = sim_ && frameHold(*sim_, locoHold, locoSkips, locoBusy);
-    // Handshake refused but NOT busy (frozen / workers outstanding): the step
-    // proceeds WITHOUT the hold and its getBlock reads go direct. Counted
-    // (g_fhLocoUnlocked, split line) since the 2026-10-26 review follow-up —
-    // the hole in the old "never waits" headline is measured, not hidden.
-    if (sim_ && !locoHeld && !locoBusy) ++g_fhLocoUnlocked;
-    const bool locoReady = locoHeld || (sim_ && !locoBusy);
-    if (sim_ && locoReady) {
-      const uint64_t wt = sim_->stats().worldTick;
-      if (wt < lastLocomotionTick_) lastLocomotionTick_ = wt;  // world reloaded: resync, never fast-forward
-      uint64_t ticks = wt - lastLocomotionTick_;
-      lastLocomotionTick_ = wt;
-      // Cap the catch-up (tick-debugger steps, long hitches): beyond the
-      // cap the body simply does not consume the dropped ticks.
-      if (ticks > 64) ticks = 64;
-      if (litholattice::f3trace::on()) { f3t::cur.ticks = int(ticks); f3t::cur.loco = locoHeld ? 'H' : 'U'; if (ticks > 0) f3t::lastPosTick = wt; }
-      if (ticks > 0) {
-        const double dtTick = 1.0 / double(std::max(1, sim_->stats().targetTps));
-        // Proposed by JD; co-implemented by JD and Cortana: the Highway Ramp is not a full cell for the player; its
-        // 1-in-2 surface is applied after each tick by rampSupport (smooth walk-up, no step).
-        const auto isSolid = [this](int x, int y, int z) {
-          if (!sim_) return false;
-          const BlockId b = sim_->getBlock(x, y, z);
-          return b != kHighwayRamp && blockRegistry().has(b, kSolid);
-        };
-        const auto rampSupport = [this] {
-          namespace hw = litholattice::procgen::ramp::highway;
-          litholattice::Entity& e = locomotion_.mutableBody();
-          if (e.vy > 0) return;
-          const int bx = int(std::floor(e.x)), bz = int(std::floor(e.z)), by = int(std::floor(e.y));
-          for (int cy = by; cy >= by - 1; --cy) {
-            const auto [b, st] = sim_->getBlockAndState(bx, cy, bz);
-            if (b != kHighwayRamp) continue;
-            const double top = cy + hw::heightAt(uint32_t(st) & 7u, e.x - bx, e.z - bz);
-            // Lift onto the slope when inside it; stick to it when walking down (small gap).
-            if (e.y < top + (locomotion_.flying() ? 0.0 : 0.2) && e.y > top - 0.75) {
-              e.y = top; e.vy = 0; e.onGround = true;
-            }
-            return;
-          }
-        };
-        const uint64_t perTick = worldclock::unitsPerTick(sim_->stats().targetTps);
-        for (uint64_t i = 0; i < ticks; ++i) {
-          locomotion_.tick(pendingLocomotionInput_, isSolid, dtTick);
-          if (sim_) rampSupport();  // Highway Ramp walk surface
-          // Cortana 2026-10-15 2255 [GAME] (JD 22:50): digital prayer, advanced per sim tick from
-          // the body's derived Kneel pose (sneak-bit triple tap, no control-format change).
-          // Cortana 2026-10-16: mealtime windows on the world clock (the clock at tick i).
-          const uint64_t back = (ticks - 1 - i) * perTick;
-          const uint64_t tickTime = worldClock_.time >= back ? worldClock_.time - back : 0;
-          if (const int32_t g = prayer::tick(prayer_, locomotion_.pose() == litholattice::LocomotionPose::Kneel,
-                                             playerAdapter_.staticCharge(), tickTime);
-              g > 0) {
-            playerAdapter_.grantStatic(g);
-            logInfo("prayer: +%d static (%u/%u today, day %u, %s)", g, unsigned(prayer_.prayersToday()),
-                    unsigned(prayer::kPrayersPerDay), unsigned(prayer_.prayerDay), worldclock::hhmm(tickTime).c_str());
-          }
+    // Cortana 2026-10-26 (Archie camera-jump decision): the body steps on the SIM thread (player
+    // hook, once per completed world tick); this thread never waits on the sim lock for movement.
+    // It publishes the input, then shows the pose lerped between the last two ticks (alpha by
+    // wall time), extrapolating by velocity at most one tick when the sim runs late.
+    static Vec3 shownPos{};  // what this thread last wrote to player_.pos
+    static uint64_t prayerTick = 0;
+    plink::Snap sn = locoSnap();
+    if (!sn.placed || std::fabs(player_.pos.x - shownPos.x) > 0.05f || std::fabs(player_.pos.y - shownPos.y) > 0.05f ||
+        std::fabs(player_.pos.z - shownPos.z) > 0.05f)
+      locoPlace(sim_, locomotion_, player_.pos);  // an external write won: reseat (zeroes velocity)
+    g_plink.input.store(plink::InputMsg{pendingLocomotionInput_, 1});
+    sn = locoSnap();
+    if (sn.placeSeq < g_plink.placeSeq) {
+      shownPos = player_.pos;  // reseat not consumed yet: hold the requested position
+    } else {
+      double d[3];
+      plink::displayPos(sn, plink::Link::nowNs(), d);
+      shownPos = {float(d[0]), float(d[1]), float(d[2])};
+    }
+    player_.pos = shownPos;
+    if (litholattice::f3trace::on()) {
+      f3t::cur.ticks = int(sn.tick > f3t::lastPosTick ? sn.tick - f3t::lastPosTick : 0);
+      f3t::cur.loco = 'S';
+      f3t::lastPosTick = sn.tick;
+    }
+    // Digital prayer / mealtime windows stay on this thread, per world tick the body consumed.
+    if (sn.tick < prayerTick || prayerTick == 0) prayerTick = sn.tick;
+    if (sn.tick > prayerTick && sim_) {
+      const uint64_t ticks = std::min<uint64_t>(sn.tick - prayerTick, 64);
+      prayerTick = sn.tick;
+      const uint64_t perTick = worldclock::unitsPerTick(sim_->stats().targetTps);
+      for (uint64_t i = 0; i < ticks; ++i) {
+        const uint64_t back = (ticks - 1 - i) * perTick;
+        const uint64_t tickTime = worldClock_.time >= back ? worldClock_.time - back : 0;
+        if (const int32_t g = prayer::tick(prayer_, litholattice::LocomotionPose(sn.pose) == litholattice::LocomotionPose::Kneel,
+                                           playerAdapter_.staticCharge(), tickTime);
+            g > 0) {
+          playerAdapter_.grantStatic(g);
+          logInfo("prayer: +%d static (%u/%u today, day %u, %s)", g, unsigned(prayer_.prayersToday()),
+                  unsigned(prayer::kPrayersPerDay), unsigned(prayer_.prayerDay), worldclock::hhmm(tickTime).c_str());
         }
       }
     }
-    player_.pos = locomotion_.position();
-    if (litholattice::f3trace::on() && !(sim_ && locoReady)) f3t::cur.loco = 'B';
   } else {
-    locomotion_.place(player_.pos);
-    if (sim_) lastLocomotionTick_ = sim_->stats().worldTick;  // no catch-up burst on re-entry
+    g_plink.input.store(plink::InputMsg{});
+    static Vec3 lastPinned{1e30f, 0, 0};
+    if (std::fabs(player_.pos.x - lastPinned.x) > 1e-4f || std::fabs(player_.pos.y - lastPinned.y) > 1e-4f ||
+        std::fabs(player_.pos.z - lastPinned.z) > 1e-4f) {
+      locoPlace(sim_, locomotion_, player_.pos);
+      lastPinned = player_.pos;
+    }
     pendingLocomotionInput_ = litholattice::LocomotionInput{};
   }
   // --- IPlayer integration (player_adapter.h) ---
@@ -3054,14 +3102,14 @@ void Game::update(float dt, int width, int height) {
   // getBlock at the eye cell per frame (the sanctioned handful-of-queries
   // budget), applied to all elapsed ticks.
   playerAdapter_.syncFromGame(active_ ? mcpDimensionNumber(active_->id) : 0, dt,
-                              locomotion_.velocity());
+                              Vec3{float(locoSnap().vel[0]), float(locoSnap().vel[1]), float(locoSnap().vel[2])});
   if (sim_) {
     const uint64_t wt = sim_->stats().worldTick;
     if (wt < lastVitalsTick_) lastVitalsTick_ = wt;  // world reloaded: resync, never fast-forward
     if (wt > lastVitalsTick_) {
       const uint64_t ticks = wt - lastVitalsTick_;
       lastVitalsTick_ = wt;
-      const Vec3 eye = playerEyePos(player_, locomotion_.eyeHeight());
+      const Vec3 eye = playerEyePos(player_, locoSnap().eye);
       static bool lastHeadInLiquid = false;  // 2026-10-25 (JD hitch): keep the last reading while the sim is mid-tick
       if (const auto eb = sim_->tryGetBlock(int(std::floor(eye.x)), int(std::floor(eye.y)), int(std::floor(eye.z))))
         lastHeadInLiquid = blockIsLiquid(*eb);
@@ -3192,7 +3240,7 @@ void Game::update(float dt, int width, int height) {
   // The interaction ray starts at the EYE (player_.pos is the body's feet
   // since the locomotion wiring; the ray used to start at pos back when
   // pos doubled as the eye).
-  const Vec3 eyePos = playerEyePos(player_, locomotion_.eyeHeight());
+  const Vec3 eyePos = playerEyePos(player_, locoSnap().eye);
   sim_->setRay({eyePos.x, eyePos.y, eyePos.z, f.x, f.y, f.z});
   g_split.lap(3);  // [C53-1]
   pumpSwLod();
@@ -3673,14 +3721,15 @@ HudModel Game::hudModel() const {
     // Live locomotion state (mode + pose from the body's controller):
     // e.g. "walk · sneak", "fly · stand". Replaces the old "flying (no
     // gravity yet)" confession — gravity exists now.
-    const char* modeName = locomotion_.flying() ? "fly" : "walk";
-    const char* poseName = locomotion_.pose() == litholattice::LocomotionPose::Sneak   ? "sneak"
-                           : locomotion_.pose() == litholattice::LocomotionPose::Crawl ? "crawl"
-                             : locomotion_.pose() == litholattice::LocomotionPose::Kneel ? "kneel"  // Cortana 2026-10-15 2240
+    const plink::Snap f3s = locoSnap();
+    const char* modeName = f3s.flying ? "fly" : "walk";
+    const char* poseName = litholattice::LocomotionPose(f3s.pose) == litholattice::LocomotionPose::Sneak   ? "sneak"
+                           : litholattice::LocomotionPose(f3s.pose) == litholattice::LocomotionPose::Crawl ? "crawl"
+                             : litholattice::LocomotionPose(f3s.pose) == litholattice::LocomotionPose::Kneel ? "kneel"  // Cortana 2026-10-15 2240
                                                                                         : "stand";
     std::snprintf(l[3], sizeof l[3], "dim %s  meshes %d/%d  %s \xc2\xb7 %s%s", active_->id.c_str(),
                   meshesReceived_, totalSubs_, modeName, poseName,
-                  locomotion_.onGround() ? "" : " (air)");
+                  f3s.onGround ? "" : " (air)");
     std::snprintf(l[4], sizeof l[4], "look: %s", targetText().c_str());
     std::snprintf(l[5], sizeof l[5], "health %d  oxygen %d  stamina %d  kharge %d  |  XYZ %.2f %.2f %.2f  block %d %d %d",
                   playerAdapter_.health(), playerAdapter_.oxygen(), playerAdapter_.stamina(),
