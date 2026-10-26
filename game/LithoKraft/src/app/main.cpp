@@ -1125,6 +1125,11 @@ int main(int argc, char** argv) {
   }
   if (!hsGiven) { cfg.timingHandshake = settings.timingHandshake; cfg.handshakePhases = settings.handshakePhases; }
   if (!tpsGiven) cfg.tps = settings.tps;  // load() only yields valid modes
+#ifndef NDEBUG
+  // 2026-10-25 (JD): unoptimized Debug can't run the 512 TPS sim; default 128 unless --tps is given
+  // (settings.json is not changed). Release is unaffected.
+  if (!tpsGiven && cfg.tps > 128) { logInfo("tps: Debug build, %d TPS from settings capped to 128 (pass --tps N to override)", cfg.tps); cfg.tps = 128; }
+#endif
   if (!radiusGiven) cfg.tickRadius = settings.tickRadius;
   const char* radiusSource = radiusGiven ? "--radius" : "settings.json";  // F56-6 (logged once the log file is open)
   if (!simAreaGiven) cfg.roundSimArea = settings.roundSimArea;  // F56-7 (Proposed by JD; co-implemented by JD and Cortana): round sim area (CLI --sim-area wins)
