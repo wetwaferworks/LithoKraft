@@ -2151,6 +2151,9 @@ void Game::setPaused(bool p) {
 }
 
 void Game::onFocusChanged(bool focused) {
+  // 2026-10-25 (JD: alt-tab no longer pauses): log every edge and the gate so the next report shows why.
+  logInfo("focus: %s (menu=%d bench=%d inventory=%d editor=%d pause=%d)", focused ? "gained" : "lost", int(menuState_ == MenuState::cMenu),
+          int(benchSet_), int(inventoryOpen_), int(editorOpen()), int(pauseState_));
   if (!focused && menuState_ == MenuState::Playing && !benchSet_ && !inventoryOpen_ && !editorOpen() &&
       pauseState_ == PauseState::Playing) {
     setPaused(true);
