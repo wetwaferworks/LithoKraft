@@ -92,6 +92,12 @@ void cSignalWorldSim::applyTortureGate(ChunkMap& w, const DirtyFn& dirty) {
   }
   if (want == groupLit_) return;
   const std::vector<uint8_t> was = groupLit_.empty() ? std::vector<uint8_t>(want.size(), 0) : groupLit_;
+  {  // 2026-10-25 (JD hitch report): log every lever edge; group n = the scene named in the load-time "lever ... group n" line
+    std::string ch;
+    for (size_t i = 0; i < want.size(); ++i)
+      if (want[i] != was[i]) { ch += ch.empty() ? "" : ", "; ch += (i == 0 ? std::string("master") : "group " + std::to_string(i)) + (want[i] ? " ON" : " OFF"); }
+    litholattice::logInfo("torture lever: %s (master lever %s)", ch.c_str(), on ? "on" : "off");
+  }
   groupLit_ = want;
   gateLit_ = false;
   for (uint8_t v : want) gateLit_ = gateLit_ || v;  // Pattern ROM screens run while any lever is on
