@@ -260,3 +260,5 @@ The main tree was read for lost wakeups, condition-variable waits without predic
   - `timing_handshake.cpp` `stop()` stores `stop_` without the lock, but every wait is a 1 ms `wait_for`, so the worst case is 1 ms of latency, not a hang. The predicate-less `barrierCv_.wait_for` at line 571 sits inside a loop that re-checks.
   - MCP accept uses a timeout. The stdio stop is bounded at 2 s and logged. The chunk streamer drain is bounded and logged.
 - **New watchlist patterns:** entries 2-5 in [SAFETY_WATCHLIST.md](../safety/SAFETY_WATCHLIST.md).
+
+- **R-TST-4 (Medium, test issue, note only): shared temp dir across processes.** In PCH, `engine_assets` failed intermittently under `ctest -j` because `runAssetsSelfTest()` runs in two test binaries (`engine_assets` and `lithokraft_selftest`) that share one fixed temp root, `litholattice-selftest-assets` (`engine/src/assets/assets_selftest.cpp:47`), and the symlink probe in `test_env.h:41` uses a fixed path too. Fixed in PCH `local` with a process-id suffix. The main tree has the same pattern; **main-tree code is not changed here** (JD to decide).
