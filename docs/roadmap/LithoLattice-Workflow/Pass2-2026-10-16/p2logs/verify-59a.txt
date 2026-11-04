@@ -1,0 +1,71 @@
+﻿== running LithoKraft: 
+== cycle (toggle default=on)
+parked LithoKraft-0.0.1.59-a-packed12.exe; LithoKraft.exe is 0.0.1.44: True
+selftest: PASS=1344 FAIL=0 ALL SELFTESTS: OK
+hash cities=on run1 tickRadius=32 : cb32c824f8b3ea98
+hash cities=on run2 tickRadius=16 : cb32c824f8b3ea98
+hash cities=off run1 tickRadius=32 : e015e51cf1559089
+hash cities=off run2 tickRadius=16 : e015e51cf1559089
+hash r4 round=0 run1 : cb32c824f8b3ea98
+hash r4 round=0 run2 : cb32c824f8b3ea98
+hash r4 round=1 run1 : 966be55811fb23a7
+hash r4 round=1 run2 : 966be55811fb23a7
+shot 59a_bulbs_on: True errors=0 shell=
+shot 59a_bulbs_off: True errors=0 shell=
+shot 59a_night: True errors=0 shell=
+shot 59a_tex_closeup: True errors=0 shell=
+shot 59a_tex_oblique: True errors=0 shell=
+shot 59a_wafer_bloom: True errors=0 shell=
+shot 59a_horizon: True errors=0 shell=
+   KNOWN-BENIGN (not counted): [05:29:06.645] ERROR [script] mod throttled after 'void onLoad()': CPU quota exceeded (9896 us > 1024 us/tick budget, overrun #1); hooks skipped for 8 ticks
+GATE PASS: LithoKraft-0.0.1.59-a-packed12.exe
+shortcuts already point at LithoKraft-0.0.1.58-a-blendcull.exe; nothing to do
+shortcut update exit 0
+== gate toggle OFF (LL_VK_PACKED12=0)
+selftest: PASS=1344 FAIL=0 ALL SELFTESTS: OK
+hash cities=on run1 tickRadius=32 : cb32c824f8b3ea98
+hash cities=on run2 tickRadius=16 : cb32c824f8b3ea98
+hash cities=off run1 tickRadius=32 : e015e51cf1559089
+hash cities=off run2 tickRadius=16 : e015e51cf1559089
+hash r4 round=0 run1 : cb32c824f8b3ea98
+hash r4 round=0 run2 : cb32c824f8b3ea98
+hash r4 round=1 run1 : 966be55811fb23a7
+hash r4 round=1 run2 : 966be55811fb23a7
+shot 59aoff_bulbs_on: True errors=0 shell=
+shot 59aoff_bulbs_off: True errors=0 shell=
+shot 59aoff_night: True errors=0 shell=
+shot 59aoff_tex_closeup: True errors=0 shell=
+shot 59aoff_tex_oblique: True errors=0 shell=
+shot 59aoff_wafer_bloom: True errors=0 shell=
+shot 59aoff_horizon: True errors=0 shell=
+GATE PASS: LithoKraft-0.0.1.59-a-packed12.exe
+shortcuts already point at LithoKraft-0.0.1.58-a-blendcull.exe; nothing to do
+shortcut update exit 0
+== engine tests (render module)
+exit=0
+render: Packed12 vertex round trip (12-byte GPU chunk vertex)
+  [PASS] Packed12: exhaustive z 0..511 x layer 0..2047 round trip, 0 mismatches
+  [PASS] Packed12: GLSL decode formula on the packed bytes matches every field
+  [PASS] Packed12: every value of x, y, u, v, faceAo, value, mode round-trips
+  [PASS] Packed12: 2,000,000 random vertices round-trip
+  [PASS] Packed12: z 512 is reported and clamped to 511 (no wrap into the layer bits)
+  [PASS] Packed12: layer 65535 is reported and clamped to 32767 (z untouched)
+  [PASS] Packed12: batch packer (unaligned destination) matches the per-vertex packer
+  [PASS] Packed12: arena alignment 192 is whole 12- and 16-byte vertices and a cache line
+ENGINE TESTS OK
+== engine tests (all)
+exit=1 PASS=2676 FAIL=6
+  [FAIL] sandbox: test symlinks created
+  [FAIL] sandbox: symlink pointing outside the root rejected
+  [FAIL] sandbox: symlink to a prefix-sharing sibling rejected
+  [FAIL] sandbox: symlink loop rejected
+  [FAIL] sandboxed open: attacker swapped the file for a symlink
+  [FAIL] sandboxed open: attacker swapped the intermediate dir
+BENCH 58a_stream64 fps=64.1 avg=15.62 p99=45.86 gpu=2.95 meshMB=n/a arenaMB=1696+0 upB/f=2664777 errors=0 fmt=
+BENCH 59aon_stream64 fps=73.1 avg=13.69 p99=43.70 gpu=4.48 meshMB=1252.3 arenaMB=1279+0 upB/f=2402764 errors=0 fmt=[05:31:48.726] vulkan: chunk vertex format packed12 (12 bytes, arena alignment 192; LL_VK_PACKED12=0 to switch)
+BENCH 59aoff_stream64 fps=68.9 avg=14.51 p99=52.15 gpu=2.58 meshMB=1687.6 arenaMB=1728+0 upB/f=2497488 errors=0 fmt=[05:32:11.144] vulkan: chunk vertex format packed16 (16 bytes, arena alignment 64; LL_VK_PACKED12=1 to switch)
+BENCH 58a_testworld fps=13.1 avg=73.40 p99=383.40 gpu=1.02 meshMB=n/a arenaMB=480+0 upB/f=1145761 errors=0 fmt=
+BENCH 59aon_testworld fps=13.3 avg=104.84 p99=253.99 gpu=0.85 meshMB=349.8 arenaMB=351+0 upB/f=1138949 errors=0 fmt=[05:32:54.313] vulkan: chunk vertex format packed12 (12 bytes, arena alignment 192; LL_VK_PACKED12=0 to switch)
+BENCH 59aoff_testworld fps=10.1 avg=97.27 p99=845.17 gpu=0.98 meshMB=465.8 arenaMB=480+0 upB/f=1146811 errors=0 fmt=[05:33:21.521] vulkan: chunk vertex format packed16 (16 bytes, arena alignment 64; LL_VK_PACKED12=1 to switch)
+== exe check: LithoKraft.exe is 0.0.1.44: True; 0.0.1.59-a-packed12 SHA256 C682C3D106B7735C8836E12DB8C057F88E1AC8E01D0A4FC6BD6186A891984506
+VERIFY DONE 05:33

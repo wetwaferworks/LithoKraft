@@ -1,0 +1,36 @@
+﻿HANDOFF 0.0.1.61 (2026-10-17, Cortana for JD)
+
+Exe: build\Release\LithoKraft-0.0.1.61.exe  SHA-256 F30DDC91000ED7D0801BA645C2F7104C19C9822109EC5FDB143E856C51D01006
+Not promoted. LithoKraft.exe stays 0.0.1.44; RECOMMENDED.txt and the desktop shortcuts still point at 0.0.1.59-b-packed12. GATED.txt now lists 0.0.1.61 (gate pass, no promotion).
+build_counter.txt reads 0.0.1.61 (was 0.0.2.15 before the reset to 0.0.1.60).
+
+What is in .61
+- Every change from the 0.0.1.52 to 0.0.1.60 variant builds (Argon shader/index/draw/staging work, ReBAR direct upload, far LOD, arena alignment, near strip, bit-drop fixes, Vulkan robustness and pacing, sim priority, blend culling, Packed12, lock timing). Variant exes are archived in build\Release\_archive-variants-2026-10-17 (MANIFEST.txt); 0.0.1.59-b stays in place because the shortcuts use it.
+- Experimental render-thread split behind LL_THREEWAY (default off, Vulkan only; falls back to inline rendering otherwise).
+- B61-1 screenshot fix (BUG-0033). Measure-only probes, all off by default.
+
+Toggles and defaults
+- LL_THREEWAY=1: render-thread split. Default off.
+- LL_VK_PACKED12: on by default (0/off/false/no turns it off).
+- LL_VK_STRIP_NEAR: on by default (0 turns it off). LL_VK_FAR_LOD: follows the settings when unset. LL_VK_NO_REBAR: set to disable ReBAR.
+- LL_SIM_TICK_RADIUS (default sim radius 8), LL_SIM_ROUND_AREA (settings default when unset).
+- Measure only, default off: LL_LOCK_TIMING, LL_TICK_PROFILE, LL_HASH_AT_TICK (+ LL_HASH_REGION=cx,cz, default 3,2), LL_HANDOFF_COUNT, LL_SIM_STALL_MS=<ms>@<tick>[x<n>] (Proposed by Herominde; implemented by Cortana).
+
+Verify results (0.0.1.61 final exe)
+- gate.ps1 (no -Promote), LL_THREEWAY=0 and =1: selftest PASS=1344 FAIL=0 both; hashes cities on cb32c824f8b3ea98, cities off e015e51cf1559089, r4 round 966be55811fb23a7 stable; shots 7/7 with 0 counted errors both; GATE PASS both.
+- Headless hashes, split off and on, 2 runs each: all match.
+- Windowed fixed column sets (tick 3072): off/on/off/on all match; handoffs 0 off, about 1,200 on.
+- Lag-burst test (BUG-0035): 4/4 match, mid-burst inserts confirmed with the split on.
+- stream64 15 s, Windows energy saver ON (earlier runs, locked lower CPU/GPU clocks): off 67.3 FPS (avg 14.9 ms, p99 54.2); on 95.3 FPS (avg 10.5 ms, p99 38.6).
+- stream64 15 s, full power (energy saver off, Balanced plan with the Best performance overlay), off/on/off/on with LL_LOCK_TIMING=1:
+    off: 68.7 and 56.8 FPS (avg 14.55/17.61 ms, p50 11.99/14.68, p99 44.1/53.2, lock wait 3.10/3.39 ms per frame)
+    on:  95.5 and 93.9 FPS (avg 10.48/10.66 ms, p50 8.96/8.68, p99 34.5/36.1, lock wait 1.83/1.98 ms per frame)
+    About the same as with energy saver on: this bench is limited by the sim/lock path, not by clocks.
+- Full-power re-verify: gate.ps1 off and on PASS (selftest 1344/0, all hashes match, shots 7/7). Windowed fixed column sets: signal, r4, r8 and r16 match in every run; r24 matches whenever its 2401 columns are loaded by tick 3072, and differs only when streaming has not loaded all of them (2375 to 2398 of 2401). Coverage, not divergence.
+- Gate circuit scene has no windowed mode; the windowed checks use the test world.
+
+Open bugs: BUG-0034 (Mid), BUG-0035 (Low, tested), BUG-0036 (Mid), BUG-0037..0040 (Low). Speed list PERF-61-1..4. Details in BUGFIX_LOG.md.
+
+Windowed runs: p2logs\winrun.ps1, launched hidden. One console only (the engine's own, full output), maximized; the game window centered over it, topmost and in front.
+
+Logs: parked\threeway-split-2026-10-17\round7 (final, lagburst, gate, layout), p2logs\gates (gate output and shot logs), p2logs\shots, p2logs\build-0.0.1.61*.txt.

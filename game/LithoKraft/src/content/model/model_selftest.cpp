@@ -1,6 +1,7 @@
 // model_selftest: self-tests for the .lthm model format + save/place pipeline.
 // Exit code 0 = all pass. Each check prints "ok"/"not ok" (TAP-ish).
 
+#include "litholattice/core/quiet_crt.h"
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -347,6 +348,7 @@ void testLithoStampModels() {
 }  // namespace
 
 int main() {
+  litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr, no dialog
   testRoundTrip();
   testDeterminism();
   testEmptyModel();

@@ -1,0 +1,129 @@
+# Elfie Handoff: LithoLattice / LithoKraft, 2026-10-15
+
+**From:** Cortana (Grok Bot), working for JD on TheWorkstation (Acer Nitro 5 AN515-58: i5-12450H with 4P+4E cores and 12 threads, 16 GB DDR4-3200, Windows, MSVC with VS 18 Build Tools).
+**Built on:** Elfie's engine and game, from the package `LithoLattice-LithoKraft-Full-Source-2026-10-15`.
+**Full source:** `LithoLattice-LithoKraft-Elfie-Handoff-2026-10-15-<HHMM>` (folder and .zip), with `CHANGES.md` at its root. The CHANGES manifest has one row per file.
+
+## Invariants (all held)
+- **Determinism hash:** `aa82e7afb1eff9d3` in Release and Debug after every batch, from handshake-scenario with 2048 ticks and 4 workers. It was never repinned, and no sim or Trace-circuit math changed.
+- **Signing:** the fatal-exit check is intact. The old test key is retired. A new Ed25519 dev keypair was generated, and its public key `04c1766ef29e93b7d36fdf185f64ee958e9dded4c8c82f0dca03029e8a30011c` is baked into mod_signature.h. The private key lives outside the tree under JD's profile (JD-only ACL). It was never read or printed, and it is **not** in this package.
+- **Menus and GUI flow:** unchanged.
+- **Portability:** GCC/Clang and Linux/Mac paths are unchanged. Every Windows-specific change is behind `_WIN32` or `MSVC`. GCC/Clang has **not** been compiled here, so please confirm on Debian.
+
+## What was done, in order
+1. **Windows port** (04:38–05:20). MSVC fixes: `ll_u128`, ctz/sqrt builtins, a narrowing cast, a zero-size array, getpid, bcrypt include order, VS generator selection, and the symlink fallback. Selftest path fixes. Details are in `Windows-Port-Notes-for-Elfie-2026-10-15-0544.md`.
+2. **Signing key retired cleanly** (07:33). Release now boots on the dev key. Release builds are on JD's PATH (build\Release first).
+3. **Hitching diagnosis** (08:07, `Hitching-Diagnosis-2026-10-15-0807.md`). The main cause was chunk stream insert/evict stopping and restarting the sim thread.
+4. **Chunk-load sim fix** (08:25). `SimThread::holdBetweenTicks()`: streaming now takes the block mutex between ticks instead of stop()/start(). The handshake was not redesigned. Doc: `ChunkLoad-Sim-Fix-2026-10-15-0841.md`. The blended-handshake streaming design is in `Handshake-Chunk-Streaming-2026-10-15-0841.md` and was **not** implemented.
+5. **Alt-tab** (09:35). Auto-pause on focus loss is kept. Focus edges are event-driven, the check compares against the real cursor mode, a click in the world resumes, and Esc toggles pause.
+6. **Console** (09:28). Fixed a dangling pointer in `ConsoleRegistry::coerce`. It caused 6 Debug-only console failures, which now pass.
+7. **Source-review fixes** (10:10 onward, from `Source-Review-FINAL-2026-10-15-0940.md`):
+   - **MCP-H1 / CON-H2:** world-query cell counts are overflow-safe (`queryCellsSaturated`, cap 4,194,304 = 2^22). The backend checks the cap before pausing the sim and uses int64 loops.
+   - **MCP-H2:** Windows stdio transport reads with `_read(0)`.
+   - **MCP-H3:** `SO_EXCLUSIVEADDRUSE` on Windows, so no port hijack.
+   - **SAV-H1:** region writes are copy-on-write, and sidecars are written to `.tmp` and atomically renamed before the index write.
+   - **PLT-H1:** the Windows sandbox open refuses reparse points and directories and checks the final path against the sandbox.
+   - **GAME-H1:** entity verts are now relative to a 16-block-snapped origin, so there is no uint16 overflow far from spawn. Software and GL backends updated.
+   - **RND-H1:** the mesher uses a per-job thread_local block-def table.
+   - **RND-H4:** software renderer culls, then draws front to back.
+   - **RND-H3:** one divide per triangle, incremental edge stepping, and perspective-correct varyings.
+   - **RND-H2:** near-plane clipping (Sutherland–Hodgman at w ≥ 1/128), so walls next to the camera no longer vanish.
+   - **SIM-H1: tried and REVERTED.** Unlocking and yielding between catch-up steps made `engine_sim` run 900 s and time out (it took 1.7 s before). The bad copy is kept as `sim_thread.cpp.reverted-SIM-H1-2026-10-15-1035`.
+   - **SIM-H2: deferred.** Catch-up keeps TPS exact, and the hold window is short.
+8. **Multithreaded software raster for the 30–60 FPS target** (11:00–11:16), tuned for the i5-12450H:
+   - A persistent band pool of 8 threads, sized as the largest power of two that is ≤ 8 and ≤ hardware threads − 4, which leaves cores for the 512 TPS sim, the handshake workers and the mesher. No per-frame thread creation.
+   - Each drawn mesh's verts are transformed **once** per frame, split across the threads.
+   - Per-mesh screen row spans come from the projected AABB, plus a per-quad early-out on rows.
+   - **32-row strips** (about 320 KB of colour plus depth at 1280 wide, which fits in one core's L2) are handed out dynamically, so the dense horizon strips don't leave threads idle.
+   - Per-mesh draw state (`groundFx_`, mesh origin) is thread_local.
+   - **AVX2** applies to `software_renderer.cpp` only, on x86-64, without FMA contraction (`-DLL_SW_AVX2=OFF` to opt out). Never AVX-512, and never sim code.
+   - **Output is pixel-identical:** each pixel sees the same triangles in the same order with the same math, because every row recomputes its edge values. Verified by SHA-256 of all 7 biome_capture PNGs before and after each step: all identical.
+   - **The Daemon's MCP vision path is safe.** `run()` returns only after every strip has finished, so post passes, grabFramebuffer and vision capture always see a fully resolved frame. A run mutex serialises the game view against MCP capture renderers that share the pool. `engine_mcp` passes, including the senses tests vision.capture_frame, set_camera and track_player.
+9. **Launch-focus bug** (10:45). JD reported that the window spawned behind other programs but still clipped the cursor, and specified the order: focus, then capture the cursor, then always-on-top. Cortana designed the topmost behaviour: drop topmost on focus loss (auto-pause) and restore it when a click in the world resumes and recaptures. Capture now requires real focus. Menus and alt-tab auto-pause are unchanged.
+10. **Lows:**
+    - Assets symlink fixture prints `[SKIP]` when Windows lacks the symlink privilege, so `engine_assets` now passes.
+    - The input-pump overflow test waits for the actual overrun (up to 10 s) instead of a fixed 2.5 s, so `engine_input` now passes. Same assertions.
+
+**JD ruling: trace trees.** Trace trees in the Trace Forest affecting circuits is **intended**. Tree tips and materials were not changed, and PG-L1 stays Low. Any runtime tree/circuit interaction must live in the deterministic sim, not in worldgen.
+
+## Performance (Release, software renderer, `--bench 12`, self-closing)
+
+The **orbit** path is the representative FPS figure. The **stream** path draws little geometry (render is about 0.8 ms at 720p and 1.4 ms at 1080p), so its FPS mostly measures the update loop, not the rasteriser.
+
+### A. Windowed 1280×720 (batches 1–5)
+| Run | TPS | FPS | p50 / p99 (ms) | render (ms) |
+|---|---|---|---|---|
+| Orbit 512, pre-review baseline | 512 | ~7 | n/a | 134 |
+| Orbit 512, b2 (serial RND-H1/H3/H4) | 512.1 | 11.1 | 89.5 / 133.9 | 87.9 |
+| Orbit 512, b3 (+8 static bands) | 511.8 | 15.6 | 65.6 / 79.1 | 62.5 |
+| Orbit 512, +mesh/quad band reject | n/a | 23.0 | 43.9 / 56.7 | 41.8 |
+| Orbit 512, +transform once | n/a | 28.3 | 35.7 / 46.3 | 33.8 |
+| Orbit 512, b4 (+32-row dynamic strips, 8 thr) | 511.4 | 40.7 | 24.9 / 31.2 | 23.0 |
+| Orbit 512, b5 (same code, re-run, 8 thr) | 511.3 | 35.5 | 28.7 / 37.1 | 26.1 |
+| Stream 512, b4 / b5 | 511.6 / 511.8 | 440.7 / 374.4 | 2.14/3.72 / 2.54/4.75 | 0.80 / 0.88 |
+
+The b4 and b5 builds have the same renderer code. The gap between them is run-to-run and thermal variance on the laptop.
+
+### B. Borderless fullscreen windowed 1920×1080 (JD's new bench mode; b6 and b7)
+| Run | Threads | TPS | FPS | p50 / p99 (ms) | render (ms) |
+|---|---|---|---|---|---|
+| Orbit 512, b6 | 8 (old default) | 511.8 | 28.8 | 34.7 / 42.3 | 32.5 |
+| **Orbit 512, b7, new default** | **4** | 511.7 | **19.4** | 51.9 / 65.6 | 49.5 |
+| **Orbit 512, b7, `--render-threads 8`** | **8** | 511.8 | **29.4** | 34.0 / 41.6 | 31.9 |
+| Orbit 32, b7 | 4 | 32 | 19.6 | 51.4 / 66.4 | 49.1 |
+| Stream 512, b6 | 8 | 511.7 | 283.6 | 3.34 / 5.98 | 1.53 |
+| Stream 512, b7 | 4 | 511.8 | 311.8 | 3.03 / 5.29 | 1.42 |
+| Stream 512, b7 rt8 | 8 | 511.9 | 311.6 | 3.06 / 4.98 | 1.44 |
+
+**Against the target** (30–60 FPS with the world on screen at 512 TPS):
+- **Met at 720p** with 8 threads (35.5–40.7 FPS).
+- **At 1080p borderless, just under:** 29.4 FPS with 8 threads, and 19.4 FPS with the new 4-thread default.
+- The sim holds 511.7–511.9 TPS in every run.
+- To reach 30+ at 1080p on 4 threads, the next steps are AVX2 8-wide span shading in the per-pixel shader and hierarchical-Z / per-tile early reject.
+
+**Pixel identity.** SHA-256 of all 7 biome_capture PNGs matched the pre-banding reference after every step, including the 4-thread b7 build.
+
+**Mesh rate by thread count** was not re-measured. Earlier figures were 3,980 sub-chunks/s on 1 thread and 966/s on 12 threads, which suggests contention when meshing on many threads. Worth a look.
+
+## Display default and render threads (JD, 11:53 / 11:56)
+- **Borderless is the default.**
+  - GAME `settings.h`: the `displayMode` default goes from 0 (Windowed) to 2 (Borderless).
+  - GAME `config/settings.json`: `"displayMode": 2`.
+  - `--display` still overrides.
+  - No .lnk shortcuts passed `--display maximized`, so none were changed.
+  - The launch-focus and topmost code is mode-independent: it uses GLFW focus plus GLFW_FLOATING, and the menus are unchanged. Batch benches ran borderless and showed `display: borderless … 1920x1080`.
+- **Render threads** are ENGINE-level: `SoftwareRenderer::setRenderThreads(unsigned)` and `renderThreads()`.
+  - **Default 4.** Requests are rounded down to a power of two, clamped to hardware threads (a 2-thread machine gets 2 or fewer), and capped at 64.
+  - Changes apply between frames. The game view and MCP vision captures still serialise through the run mutex.
+  - **Overrides:** CLI `--render-threads N` (1..64), or settings key `"renderThreads"` (0 = engine default). The CLI wins.
+- **`hitch-logs/run-batch.ps1`** now runs every bench with `--display borderless` and adds orbit and stream runs at 512 TPS with `--render-threads 8`. Backups: `.orig-2026-10-15-1153` and `.orig-2026-10-15-1200`.
+
+## Scope from JD (11:52)
+From here on, optimisation is ENGINE-level only, with priority on the mod SDK: mod.json, static-linked native mods behind a DLL-ready boundary, content mods, and signing. **No mod-SDK work was started this session.** It is first on the pending list.
+
+CHANGES.md tags every file ENGINE, GAME or TOOLS, and spells out the split for the MIXED findings.
+
+## Tests (Debug ctest)
+- **Before:** 42/48.
+- **Now:** 44/48 expected (see the final run). `engine_assets` and `engine_input` were fixed; `engine_core` passes on rerun (3/3).
+- **Remaining failures (environment, not code):**
+  - `engine_systerian`: masters are outside the repo, in `user/files/cistercian`.
+  - `engine_litho_formula`: wafer.json is outside the tree.
+  - `engine_storage`: 6 symlink checks need Developer Mode or admin.
+  - `lithokraft_selftest`: same environment classes.
+- **One-off:** in batch 4, `engine_core` hung once at 0% CPU and was killed. It passed 3 direct reruns and a 3× ctest repeat. It does not link the renderer. The likely cause is a rare job-system test race, so please keep an eye on it.
+
+## Pending, for Elfie
+- **Mod SDK (engine, JD priority):** harden mod.json, the static-linked native mod boundary (keep it DLL-ready), content mods, and signing UX.
+- **1080p at 4 threads:** reach 30+ FPS with AVX2 span shading and early tile reject.
+- **PG-H1** (feature seams): needs the height graph plumbed into features.
+- **SIM-H2** is deferred. SIM-H1 needs a design that doesn't starve engine_sim.
+- **Mediums, and Lows not listed above:**
+  - Symlink `[SKIP]` for console_selftest:440, crypto_selftest:219 and the engine_tests storage block.
+  - Skip-if-missing for out-of-repo test data (cistercian masters, wafer.json).
+- **Vulkan** still draws no entities (GAME-H1 covers software and GL).
+- **Blended handshake streaming** is design only.
+- **GCC/Clang/Linux/Mac** build and test confirmation.
+
+## Launch (Release, normal title screen and menus)
+`build\Release\LithoKraft.exe --renderer software --display maximized` (Vulkan: `--renderer vulkan --display maximized`).

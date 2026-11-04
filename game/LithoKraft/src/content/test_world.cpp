@@ -1,4 +1,5 @@
 // Playtest test world: see test_world.h. 2026-10-16 (JD).
+#include <cstdlib>
 #include "lithokraft/content/test_world.h"
 #include <algorithm>
 #include <cmath>
@@ -347,12 +348,24 @@ TestWorldLayout buildTestWorld(ChunkMap& w, int sx, int floorY, int sz, int scre
         const BlockId b = idOf(names[i]);
         if (b == kAir) continue;
         const int x = sx + 12 - i * 2;
-        const CellState st = b == kRepeator ? repeator::encode(0, 2, i - 9, on) : makeState(0, 2, 0, on);
+        const CellState st = b == kRepeator ? repeator::encode(0, 2, i - 8, on)  /* PlayM: settings 1..4 = 4/8/16/32 as before */ : makeState(0, 2, 0, on);
         put(x, floorY + 1, z, b, st);
         if (on) put(x, floorY + 1, z - 1, blue ? kBlueTorch : kRedTorch, withAttach(0, 1));
         else put(x, floorY + 1, z - 1, blue ? kBlueTrace : kRedTrace, 0);
       }
     }
+  }
+  // 2026-11-01 (box, captures): LL_TW_TRACE_DEMO=1 lays red + blue Trace straight / corner / cross
+  // east of the tint demo for look checks. Off by default (test world unchanged).
+  if (const char* e = std::getenv("LL_TW_TRACE_DEMO"); e && e[0] == '1') {
+    auto pat = [&](int x0, int z0, BlockId tr) {
+      for (int i = 0; i < 5; ++i) put(x0 + i, floorY + 1, z0, tr, 0);                                  // straight
+      for (int i = 0; i < 3; ++i) put(x0 + i, floorY + 1, z0 + 2, tr, 0);                               // corner
+      put(x0 + 2, floorY + 1, z0 + 3, tr, 0); put(x0 + 2, floorY + 1, z0 + 4, tr, 0);
+      for (int i = -2; i <= 2; ++i) { put(x0 + 6 + i, floorY + 1, z0 + 3, tr, 0); put(x0 + 6, floorY + 1, z0 + 3 + i, tr, 0); }  // cross
+    };
+    pat(sx + 16, sz - 10, kRedTrace);
+    pat(sx + 16, sz - 3, kBlueTrace);
   }
   L.spawnX = float(sx) + 0.5f;
   L.spawnZ = float(sz) + 0.5f;
@@ -416,8 +429,8 @@ std::vector<TestWorldExample> buildTestWorldExamples(ChunkMap& w, const TestWorl
       // measured lap period in ticks ("T"); pulse lamp left, Fast Latch toggle lamp right.
       for (int i = 0; i < 4; ++i) {
         const int cx = bx + 2 + 14 * i, cz = bz + 10;
-        e.blocks += buildRingClock(w, cx, y, cz, i);
-        const std::string t = std::to_string(kRingClockPeriod[i]) + "T";
+        e.blocks += buildRingClock(w, cx, y, cz, i + 1);  // PlayM: settings 1..4 = 4/8/16/32 ticks (unchanged scene)
+        const std::string t = std::to_string(kRingClockPeriod[i + 1]) + "T";
         int tx = cx + 1 + 4 * int(t.size()) - 1;
         for (char c : t) {
           if (const char* gl = glyph(c))

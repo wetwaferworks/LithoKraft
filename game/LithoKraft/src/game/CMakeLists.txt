@@ -15,8 +15,8 @@ execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CUR
 if(NOT LK_GIT_COMMIT)
   set(LK_GIT_COMMIT "nogit")
 endif()
-add_library(lithokraft_game STATIC build_version.cpp game.cpp world_save.cpp chunk_streamer.cpp bench_stream.cpp actions.cpp input_selftest.cpp dimensions.cpp wafer_biomes.cpp wafer_pulse.cpp structures.cpp controls_panel.cpp player.cpp resource_manager.cpp sound_director.cpp
-            game_ui.cpp game_ui_selftest.cpp script_editor.cpp ui_input_bridge.cpp ui_script_bindings.cpp settings.cpp extensible_facet.cpp
+add_library(lithokraft_game STATIC build_version.cpp game.cpp world_save.cpp chunk_streamer.cpp bench_stream.cpp FrameDumpHub.cpp FrameVideoEncoder.cpp L0NeighbourHold.cpp StreamFillTracker.cpp actions.cpp input_selftest.cpp dimensions.cpp wafer_biomes.cpp wafer_pulse.cpp structures.cpp controls_panel.cpp player.cpp resource_manager.cpp sound_director.cpp
+            game_ui.cpp cWorldCatalog.cpp cWorldPicker.cpp game_ui_selftest.cpp script_editor.cpp ui_input_bridge.cpp ui_script_bindings.cpp settings.cpp extensible_facet.cpp
             settings_cvars.cpp game_commands.cpp world_query.cpp silica_biome.cpp
             etching.cpp lithography.cpp signing.cpp wiring_selftest.cpp
             screenshot.cpp fragment_gallery.cpp screenshot_selftest.cpp
@@ -33,6 +33,12 @@ litholattice_module_options(lithokraft_game)
 # (adapter, vitals/oxygen tick, stat persistence, MCP snapshot source).
 target_sources(lithokraft_game PRIVATE player_adapter.cpp)
 target_link_libraries(lithokraft_game PUBLIC litholattice_player)
+
+# 2026-10-31 (JD): Save World (tick-boundary snapshot + pool write) and in-process Load World.
+target_sources(lithokraft_game PRIVATE cWorldSnapshot.cpp cAsyncSaver.cpp cWorldConfigBuilder.cpp cFolderPicker.cpp cWorldLoadSoak.cpp cWorldFileCheck.cpp cTickStabilityMeter.cpp)
+if(WIN32)
+  target_link_libraries(lithokraft_game PRIVATE ole32 shell32 uuid psapi)  # cFolderPicker: IFileOpenDialog
+endif()
 
 # Locomotion integration (player_locomotion.{h,cpp}): the local player's
 # Entity body + engine LocomotionController, stepped per sim tick by Game.

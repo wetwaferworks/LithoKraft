@@ -1,0 +1,15 @@
+batch b7 2026-10-15T11:57:04
+REL=0
+DBG=0
+build\Release handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+build-debug\Debug handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+stream 32 tps=31.9 min=31.9 fps=325.9 p50=2.9010 p99=4.9749 render=1.4007 update=0.8497 hitches=4 tick=0.6524/0.6910 mesh=4.7434
+stream 512 tps=512 min=511.8 fps=311.8 p50=3.0309 p99=5.2855 render=1.4238 update=0.9260 hitches=5 tick=0.5355/0.5865 mesh=4.1967
+orbit 32 tps=32 min=31.9 fps=19.6 p50=51.3677 p99=66.4202 render=49.0685 update=0.9690 hitches=2 tick=0.5802/0.7006 mesh=0.0000
+orbit 512 tps=512 min=511.7 fps=19.4 p50=51.9134 p99=65.5542 render=49.5325 update=1.1147 hitches=1 tick=0.4849/0.5045 mesh=0.0000
+stream 512 rt8 tps=512 min=511.9 fps=311.6 p50=3.0589 p99=4.9758 render=1.4394 update=0.9170 hitches=6 tick=0.5321/0.5654 mesh=4.4157
+orbit 512 rt8 tps=512 min=511.8 fps=29.4 p50=33.9769 p99=41.5719 render=31.8938 update=1.1600 hitches=1 tick=0.5438/0.5692 mesh=0.0000
+ 6/48 Test  #6: engine_systerian .................***Failed    0.83 sec
+14/48 Test #14: engine_storage ...................***Failed    1.03 sec
+19/48 Test #19: engine_litho_formula .............***Failed    0.22 sec
+DONE

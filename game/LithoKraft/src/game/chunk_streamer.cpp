@@ -1,4 +1,7 @@
 #include "lithokraft/game/chunk_streamer.h"
+#include "litholattice/core/lf_job_queue.h"  // 2026-11-01 LL_LF_GEN
+#include "lithokraft/game/stall_timer.h"  // 2026-11-01 LL_STALL_TIMING
+#include <atomic>
 #include <algorithm>
 #include <chrono>
 #include <thread>
@@ -115,21 +118,41 @@ void cChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
   for (const auto& [dist2, key] : want) {
     (void)dist2;
     if (inFlight_->load(std::memory_order_relaxed) >= kMaxInFlight) break;
+    // Frame-aware budget (2026-10-28, see setRequestBudget): the
+    // cycle's new-request grant is spent; later wants wait a frame.
+    // S4: the emergency floor raises the effective grant for data /
+    // collision generation admissions only (see setRequestBudgetFloor).
+    const int effBudget = requestFloor_ >= 0 ? std::max(requestBudget_, requestFloor_) : requestBudget_;
+    if (effBudget >= 0 && admittedThisCycle_ >= effBudget) break;
     const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
     if (!centreInRange(cx, cz)) continue;  // B-L2: per-column edge guard (a wide radius near the bound)
     if (!requested_.insert(key).second) continue;
     inFlight_->fetch_add(1, std::memory_order_relaxed);
+    ++admittedThisCycle_;
     cWorldSave* save = save_;
     const std::string dim = dimensionId_;
-    pool_.submit([save, dim, cx, cz, key, done = done_, failed = failed_, n = inFlight_, ready = readyCount_, gen = gen_] {
+    auto job = [save, dim, cx, cz, key, done = done_, failed = failed_, n = inFlight_, ready = readyCount_, gen = gen_] {
       JobGuard guard{n, failed, key};  // SW-H3: decrements (and reports failure) on ALL exits
       try {
         // Disk first: a column the player edited in an earlier session must come
         // back as saved, not as fresh terrain (SW-H1: its SGNL payload rides
         // along in the result and is imported by the Game on insertion).
         if (save) {
+          // 2026-11-01 LL_STALL_TIMING: aggregate streamed-load time (worker thread; a log line per 256 loads)
+          const auto lt0 = cStallTimer::enabled() ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
           cWorldSave::LoadedColumn loaded = save->loadColumn(dim, cx, cz);
+          if (cStallTimer::enabled()) {
+            static std::atomic<uint64_t> ns{0}, cnt{0}, worst{0};
+            const uint64_t d = uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - lt0).count());
+            ns.fetch_add(d, std::memory_order_relaxed);
+            for (uint64_t w = worst.load(std::memory_order_relaxed); d > w && !worst.compare_exchange_weak(w, d, std::memory_order_relaxed);) {}
+            if ((cnt.fetch_add(1, std::memory_order_relaxed) + 1) % 256 == 0)
+              litholattice::logInfo("stall streamed loadColumn: %llu loads, avg %.3f ms, worst %.3f ms (%s)",
+                                    (unsigned long long)cnt.load(), ns.load() / 1e6 / double(cnt.load()), worst.load() / 1e6,
+                                    save->lockFreeIo() ? "lock-free io" : "old io");
+          }
           if (loaded.status == cWorldSave::ColumnLoad::Loaded) {
+            if (loaded.column) loaded.column->state.setStage(litholattice::ChunkStage::StagedSim);  // P5: GEN -> STAGED_SIM
             done->push(StreamedColumn{std::move(loaded.column), std::move(loaded.signal), true});
             ready->fetch_add(1, std::memory_order_relaxed);
             guard.success = true;
@@ -145,6 +168,7 @@ void cChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
         }
         std::unique_ptr<litholattice::ChunkColumn> col = gen->generate(cx, cz);
         if (col) {
+          col->state.setStage(litholattice::ChunkStage::StagedSim);  // P5: GEN -> STAGED_SIM
           done->push(StreamedColumn{std::move(col), {}, false});
           ready->fetch_add(1, std::memory_order_relaxed);
           guard.success = true;
@@ -156,7 +180,13 @@ void cChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
       } catch (...) {
         logError("stream: column %d,%d job threw a non-std exception (left empty, will retry)", cx, cz);
       }
-    });
+    };
+    // 2026-11-01 (JD LL_LF_GEN=1 + LL_LF_JOBS=1): fresh generation runs on the lock-free queue.
+    // A world with a save keeps cJobPool: cWorldSave::loadColumn takes loadMutex_/storesMutex_ --
+    // unless the save runs the lock-free I/O path (LL_LF_LOAD / LL_LF_SAVE), which takes neither.
+    static const bool kLfGen = [] { const char* e = std::getenv("LL_LF_GEN"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
+    if (kLfGen && (!save || save->lockFreeIo()) && litholattice::cLfJobQueue::enabled()) litholattice::cLfJobQueue::shared().submit(std::move(job));
+    else pool_.submit(std::move(job));
   }
 }
 
@@ -166,6 +196,7 @@ int streamRequestPriority(int dx, int dz, bool diamond) {
 }
 
 void cChunkStreamer::update(int playerCx, int playerCz) {
+  admittedThisCycle_ = 0;  // a new frame cycle opens (frame-aware budget)
   if (!gen_) return;
   if (!centreInRange(playerCx, playerCz)) {  // B-L2: refuse out-of-packPos-range centres
     if (!boundWarned_) {
@@ -239,6 +270,32 @@ std::vector<uint64_t> selectEvictionCandidates(const std::vector<uint64_t>& resi
     if (out.size() >= budget) break;
     out.push_back(key);
   }
+  return out;
+}
+
+std::vector<StreamedColumn> cChunkStreamer::takeReadyPromote(size_t budget, int centerCx, int centerCz, bool spiralActive,
+                                                             size_t* bypassed) {
+  // Same staging step as takeReadyUpTo (backoff cleared on success), then the
+  // P5 promotion rule: ring-center bypass first, then the per-tick budget.
+  std::vector<StreamedColumn> rest = takeReadyUpTo(0);
+  (void)rest;  // takeReadyUpTo(0) only stages
+  std::vector<StreamedColumn> out;
+  size_t nb = 0;
+  if (spiralActive) {
+    for (auto it = staged_.begin(); it != staged_.end();) {
+      if (it->column && litholattice::spawnSpiralBypass(true, it->column->cx, it->column->cz, centerCx, centerCz)) {
+        out.push_back(std::move(*it));
+        it = staged_.erase(it);
+        ++nb;
+      } else {
+        ++it;
+      }
+    }
+  }
+  const size_t n = std::min(budget, staged_.size());
+  for (size_t i = 0; i < n; ++i) out.push_back(std::move(staged_[i]));
+  staged_.erase(staged_.begin(), staged_.begin() + std::ptrdiff_t(n));
+  if (bypassed) *bypassed = nb;
   return out;
 }
 

@@ -9,14 +9,33 @@
 #include "litho_stamp_models.h"
 
 #include <algorithm>
+#include <atomic>
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 
+#include "litholattice/core/log.h"
 #include "model.h"
 
 namespace lithokraft::model {
 namespace {
+
+// --stub-models toggle (set by main.cpp before Game construction).
+std::atomic<bool> g_stubEnabled{false};
+
+// The stub: the smallest useful stampable model — a flat 8x8 plate one
+// cell high. Palette 1 is mapped by both shipped lithoform_stamp
+// features (wafer: dead_silicon; organic: dirt), so the loader's
+// unmapped-palette skip can never empty it out.
+litholattice::procgen::LithoStampModel stubModel() {
+  litholattice::procgen::LithoStampModel m;
+  m.size = 8;
+  for (int z = 0; z < 8; ++z)
+    for (int x = 0; x < 8; ++x)
+      m.cells.push_back(litholattice::procgen::LithoStampCell{x, 0, z, 1});
+  return m;
+}
 
 bool saneName(std::string_view name) {
   const std::string key(name);
@@ -56,10 +75,19 @@ std::optional<litholattice::procgen::LithoStampModel> loadOnce(std::string_view 
 
 }  // namespace
 
+void setLithoStampModelStubEnabled(bool on) {
+  g_stubEnabled.store(on, std::memory_order_release);
+  if (on)
+    litholattice::logInfo("models: --stub-models ON — unresolved Litho Formula presets resolve to a flat 8x8 stub wafer (bench only)");
+}
+
+bool lithoStampModelStubEnabled() { return g_stubEnabled.load(std::memory_order_acquire); }
+
 std::optional<litholattice::procgen::LithoStampModel> loadLithoStampModel(std::string_view name) {
   static std::mutex mutex;
   static std::map<std::string, std::optional<litholattice::procgen::LithoStampModel>, std::less<>>
       cache;
+  static std::set<std::string> stubLogged;  // names whose stub substitution was logged (under mutex)
   const std::string key(name);
   {
     std::lock_guard<std::mutex> lock(mutex);
@@ -67,9 +95,18 @@ std::optional<litholattice::procgen::LithoStampModel> loadLithoStampModel(std::s
     if (it != cache.end()) return it->second;
   }
   auto m = loadOnce(name);
+  const bool stubbed = !m && lithoStampModelStubEnabled();
+  if (stubbed) m = stubModel();
   {
     std::lock_guard<std::mutex> lock(mutex);
     cache[key] = m;
+    // Log inside the lock, once per name: the cached stub means this
+    // branch runs only on the name's first resolution anyway, and the
+    // set keeps it to one line even if two threads raced the first load.
+    if (stubbed && stubLogged.insert(key).second)
+      litholattice::logWarn("models: --stub-models: unresolved preset '%s' — flat 8x8 stub wafer substituted "
+              "(bench only; the real registry reconciles with the workstation tree)",
+              key.c_str());
   }
   return m;
 }

@@ -1,0 +1,1484 @@
+LithoLattice sim self-test
+  [PASS] torch on unpowered block is lit
+  [PASS] red wire strength 64 at torch, decays 1 per block (55 after 10)
+  [PASS] lamp lit by red wire
+  [PASS] blue wire beside red wire stays at 0 (colours never connect)
+  [PASS] signal reaches 64 blocks then dies; lamp at 71 stays off
+  [PASS] inverter: block unpowered -> torch lit -> lamp lit
+  [PASS] tick 1 after closing gap: wire powers block, torch still lit (1-tick inverter delay)
+  [PASS] tick 2: torch off, downstream lamp off
+  [PASS] after re-opening gap: lamp back on
+  [PASS] wire climbs a staircase (63 one block up)
+  [PASS] staircase cut by a block above the lower wire
+  [PASS] breaking the last wire turns the lamp off
+  [PASS] red torch does not power blue wire
+  [PASS] blue torch does not power red wire
+  [PASS] blue torch powers blue wire (64, 63)
+  [PASS] lamp lit by blue wire
+  [PASS] blue wire powering a block turns the red torch on it off
+  [PASS] blue torch powers block above; block feeds red, blue and on-top wire at 64
+  [PASS] lamp lit through wire from a torch-powered block
+  [PASS] lamp lit directly by an adjacent torch-powered block
+  [PASS] torch on a torch-powered block is off (torch tower)
+  [PASS] lamp directly above a torch is lit
+  [PASS] air above a torch carries no power
+  [PASS] removing the lower torch relights the tower torch
+  [PASS] repeator re-boosts 62 -> 64 into the other colour
+  [PASS] repeator is one-way (front never feeds back)
+  [PASS] fresh repeator = delay 2 (legacy 1 migrates to 2)
+  [PASS] right-click cycles repeator delay (2 -> 4), new encoding
+  [PASS] repeator delay 4 is 2 ticks slower than delay 2
+  [PASS] three clicks reach delay 16
+  [PASS] repeator delay 16 is 14 ticks slower than delay 2
+  [PASS] legacy repeator delays 1-8 migrate to the nearest of 2/4/8/16 (ties short)
+  [PASS] thresholder: no reference -> passes the input
+  [PASS] thresholder: LOW ref only = threshold (in >= ref)
+  [PASS] thresholder: HIGH ref only = threshold too
+  [PASS] thresholder: both refs = window comparator
+  [PASS] thresholder: swapped refs are sorted (min/max)
+  [PASS] thresholder output drives its front wire at the input strength
+  [PASS] redirector: side input 25 comes out the front
+  [PASS] redirector ignores signal arriving at its front
+  [PASS] memory cell stores a pulse of 17
+  [PASS] memory cell holds 17 and outputs it continuously
+  [PASS] memory cell overwritten by a new value (40)
+  [PASS] memory cell cleared by a side pulse (0 = empty)
+  [PASS] pulsar: clock edge fires data 23 down 38 wires without decay
+  [PASS] pulse lasts 1 tick and the memory cell stored 23
+  [PASS] pulsar: clock held high fires once (rising edge only), carrying the new data (9)
+  [PASS] pulsar: next rising clock edge fires again (12)
+  [PASS] fast latch toggles on a pulse, holds, toggles off on the next
+  [PASS] switch on powers wire on every side (64)
+  [PASS] switch off
+  [PASS] button pulses for 10 ticks
+  [PASS] SIXBIT mapping (A=33, 0=16, space=0, _=63)
+  [PASS] right-click toggles keyboard typing capture
+  [PASS] keyboard: 'A' = 1-tick pulse of 34 out the front
+  [PASS] keyboard: Enter = 1 on the right control port
+  [PASS] color lamps take strength 61: tier 16 -> colour 12 (wrap), tier 64 -> 60
+  [PASS] wrap mapping: 0 off, 1 = first colour, N+1 wraps
+  [PASS] lamps terminate the signal (wire behind a color lamp stays 0)
+  [PASS] plain lamp lit by an adjacent switch
+  [PASS] pulsar: every fire reports a PulsorFire sound cue carrying its data strength
+  [PASS] tone block: s=34 -> one Tone cue (A4), held without repeats; 0 -> silent cue; output stays 0
+SELFTEST OK (0 failures)
+  [PASS] attached switch on top powers its support (lamp beside it) and the dust below the support
+  [PASS] wall torch turns off when its support is powered; attach faces survive ticks and toggles
+  [PASS] attached button pulses its support (lamp on, then off) and keeps its attach face
+  [PASS] button and switch have ll-box-1 box models
+  display scene: lamp lit 12 / 400 ticks, 12 flashes
+  [PASS] display scene: ring clock runs and the bank fires its stored colour repeatedly
+  framebuffer scene: 12 stages... stage-3 cell changed 166 times, lamp flashed 167 times in 2000 ticks
+  [PASS] framebuffer scene: cache controller runs and the screen shifts frames down
+  [PASS] incremental per-network re-flood matches a full pass every tick (framebuffer + display, 1500 ticks)
+  framebuffer wall: lamp lit 1993 / 2000 ticks with afterglow 17
+  framebuffer wall: stage-6 cell changed 166 times, lamp flashed 1 times in 2000 ticks (0.074 ms/tick incl. probes, 6122 blocks)
+  [PASS] framebuffer wall: vertical wire stairs carry clock + data, frames shift up the wall
+  [PASS] redirector scene: every pixel lights only from its own wire colour (red / blue / both)
+  [PASS] redirector: using the adjacent red wire cycles only the red front (pixel 0 goes dark, blue front unchanged)
+  [PASS] via: a red via stack carries the wire up losslessly (64 bottom -> 64 top)
+  [PASS] via: a blue via standing against a lit red via stays dark (no sideways links)
+  [PASS] glass: glass over a wire blocks the stair climb (control stair without glass is lit)
+  wall-pixel 1 row(s): px0 fired 18, last px fired 17 in 2500 ticks; 0 floating wires
+  [PASS] wall-pixel 1 row: every pixel fires repeatedly, alone, left to right, showing its caught value
+  [PASS] catchor: sneak + use (alt-use command) clears the binding for rebind
+  wall-pixel 16 row(s): px0 fired 18, last px fired 17 in 2500 ticks; 0 floating wires
+   per row (px0/px15): 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17 18/17
+  [PASS] wall-pixel 16 rows: per-row drivers + vias, every pixel of every row fires alone in order with its value
+  stairs over silicon      : up 63/62 down 62 | block over the lower wire -> upper 0 (should cut)
+  stairs over glass        : up 63/62 down 62 | block over the lower wire -> upper 0 (should cut)
+  stairs over frosted glass: up 63/62 down 62 | block over the lower wire -> upper 0 (should cut)
+  stairs over ceramic      : up 63/62 down 62 | block over the lower wire -> upper 0 (should cut)
+  stairs over silicon slab : up 63/62 down 62 | block over the lower wire -> upper 63 (should pass)
+  [PASS] wire stairs: climb onto / descend from silicon, glass, frosted glass, ceramic and slab steps (1 per block)
+  [PASS] wire stairs: silicon / glass / frosted glass / ceramic over the lower wire cut the stair; a slab does not
+  [PASS] ceiling wire: hangs under glass and carries the signal (64 -> 61 over 4)
+  via: bottom 64 top 64 after-top 63 beside 0 | blue beside red 0
+  [PASS] via: 8-high climb is lossless, nothing links to its side, blue never picks up red
+  repeator -> silicon: top 64 beyond 64 | under 64, repeator behind it -> 64 | glass top 0 beyond 0, ceramic top 0 beyond 0
+  [PASS] repeator hard-powers the silicon block it faces: wire on top, beyond, hanging underneath and a repeator behind it all pick it up
+  [PASS] repeator into glass / ceramic: never powered, nothing beyond lights
+  wire torture perf: 1176 stair wires toggled every tick: 1.547 ms/tick (647 TPS max), 1176 lit at peak
+  component sleep, pattern wall 32: 0 differing ticks; ticked 92% of components; 0.412 vs 0.359 ms/tick
+  [PASS] component sleep: identical world every checked tick (pattern wall, wire torture, wall-pixel, sawtooth)
+  component sleep, wire torture: 0 differing ticks; ticked 100% of components; 0.059 vs 0.050 ms/tick
+  [PASS] component sleep: identical world every checked tick (pattern wall, wire torture, wall-pixel, sawtooth)
+  component sleep, wall-pixel 16: 0 differing ticks; ticked 75% of components; 0.336 vs 0.335 ms/tick
+  [PASS] component sleep: identical world every checked tick (pattern wall, wire torture, wall-pixel, sawtooth)
+  component sleep, sawtooth: 0 differing ticks; ticked 100% of components; 0.038 vs 0.028 ms/tick
+  [PASS] component sleep: identical world every checked tick (pattern wall, wire torture, wall-pixel, sawtooth)
+  redirector red -> blue: out trace 64, next 63
+  [PASS] redirector transfers red Trace in -> blue Trace out (colourless output)
+  redirector blue -> red: out trace 64, next 63
+  [PASS] redirector transfers blue Trace in -> red Trace out (colourless output)
+  [PASS] split redirector: red lane out its front into blue Trace; idle blue lane stays dark
+  [PASS] catchor (colourless) -> split redirector: feeds both lanes, both fronts fire
+  wire-torture scene: field flips 299 / 299 ticks, catchor lamp-ticks 447, hard-powered top 64, glass/ceramic lamps 0, 0 floating, 0.040 ms/tick
+  [PASS] wire-torture scene: stair field flips every tick, Catchor -> Redirector chain fires, hard power only through silicon, no floating wire
+  sawtooth 16x4: 0 wrong colours, 0 cross-talk cells, 0 floating
+  [PASS] sawtooth wall: red / blue wires packed side by side, every pixel independent (single-pixel drive lights only it), pattern colours exact
+  pattern wall 32x32 phases (ms/tick over 3000): comps 0.255 mark 0.016 wires 0.010 lamps 0.030
+  pattern wall 32x32: pure sim 0.351 ms/tick (1000 ticks, no probes)
+  pattern wall 32x32 circles: 0 dark, 0 wrong-colour lights, min 13 lights/pixel in 2000 ticks, 0 floating, 0.329 ms/tick (incl. readback)
+  [PASS] pattern wall 32x32 circles: every pixel lights repeatedly with exactly its pattern colour, no floating wire
+  pattern wall 64x64 phases (ms/tick over 3000): comps 1.063 mark 0.186 wires 0.056 lamps 0.310
+  pattern wall 64x64: pure sim 1.696 ms/tick (1000 ticks, no probes)
+  pattern wall 64x64 checkers: 0 dark, 0 wrong-colour lights, min 111 lights/pixel in 2000 ticks, 0 floating, 1.737 ms/tick (incl. readback)
+  [PASS] pattern wall 64x64 checkers: every pixel lights repeatedly with exactly its pattern colour, no floating wire
+  [PASS] catchor: auto-wires to the first touching wire (west, red), keeps it; output centre -> left -> right; sneak+use clears binding, then steps match
+  [PASS] catchor -> redirector: the Catchor is its input; use cycles centre -> left -> right (never back, never up/down)
+  [PASS] wire support: on a block or under a ceiling only; vias need none; removing the support un-supports it
+  [PASS] LED bottom attach: Red/Blue LED hang under a solid block; no support, no attach
+  floating wires: circuits 0, display 0, framebuffer 0, wall 0, redirector 0
+  [PASS] bench scenes: no floating wire (every wire on a block or under a ceiling)
+  [PASS] wireless: lamp lights through transmittor -> receivor (no wire between)
+  [PASS] wireless: channel isolation (ch-2 receivor ignores ch-1 broadcast)
+  [PASS] wireless: sneak+use channel cycling returns to ch 1
+  [PASS] wireless: input mode goes silent with no input
+  [PASS] wireless: beacon mode transmits without wire input
+  [PASS] jammer: no jammer installed, signal passes
+  [PASS] jammer: jammer on ch 1 allows ch-1 traffic through
+  [PASS] jammer: ch-2 traffic jammed by ch-1 jammer
+  [PASS] jammer: ch-2 traffic passes when jammer allows ch 2
+  [PASS] radio: strongest in-range broadcast wins
+  [PASS] radio: out-of-range broadcast unheard (link budget)
+  [PASS] radio: receivor sensitivity extends range (the Dish hears better)
+  [PASS] radio: channel filter (nothing on ch 2)
+  [PASS] radio: broadcasts expire after one tick without refresh
+  [PASS] TRACE-A1 isolation: red run at 64..55 beside blue run - every blue cell stays 0 (incl. beside the red torch)
+  [PASS] TRACE-A2 isolation: blue run at 64..55 beside red run - every red cell stays 0 (incl. beside the blue torch)
+  [PASS] TRACE-B1 decay: red run is exactly 64@1, 63@2, 60@5, 55@10, 32@33, 25@40 (1 per block, no more, no less)
+  [PASS] TRACE-B2 decay: blue run decays identically (64@1, 63@2, 60@5, 32@33, 25@40)
+  [PASS] TRACE-C1 round trip (red): torch -> 6 trace -> lamp lit; first trace 64 and no cell exceeds 64
+  [PASS] TRACE-C2 round trip (blue): torch -> 6 trace -> lamp lit; first trace 64 and no cell exceeds 64
+  [PASS] TRACE-C3 round trip is live: breaking the red run's last trace turns its lamp off; the blue lamp stays lit
+Content self-test (LithoKraft on the engine SDK)
+  [PASS] SFX place / break / click / pulsar fire: audible at once, silent within 300 ms
+  [PASS] block registry: game rows after engine Air, roles / shapes / game flags round-trip
+  [PASS] materials blocks: 7 JD blocks appended dense after the shrubs (ids 67-73), string ids round-trip
+  [PASS] foliage blocks: 6 appended dense (ids 82-87), Shape::Custom, non-solid
+  [PASS] crystal leaves: 4 appended dense (ids 88-91), Cube, kLeaves, not kOpaque
+  [PASS] lithographor: id 92 (appended; Aluminum Ramp 93 follows), Custom directional cuboid model, tex lithographor
+  [PASS] aluminum ramp: appended last (id 93), Custom directional slope, aluminum_block texture
+  [PASS] highway ramp: appended last (id 94), Custom 2-block slope, aluminum_block texture
+  [PASS] highway ramp: state packing, 4 facings, continuous 1:2 surface across both halves
+  [PASS] chipor viewport: own texture name chipor_viewport
+  [PASS] foliage models: deterministic leaf hashes, block stacks match kind heights
+  [PASS] foliage meshes: one shared quad list per kind, inside the kind's cell column
+  foliage quads: 1475 raw -> 1461 merged (1% fewer)
+  [PASS] foliage meshes: coplanar merge never adds quads
+  [PASS] foliage variants: quarter turns stay in the cell and 4 turns are the identity
+  foliage LOD: 1461 detail quads -> 556 cross-hatch quads (all kinds)
+  [PASS] foliage LOD: every kind has a cross-hatch variant (two centre planes, fewer quads than the detail mesh)
+  [PASS] foliage assets: assets/models/foliage/*.lthm match the generator (re-export with biome_capture --foliage-write-assets)
+  [PASS] lithography blocks: 8 appended dense at ids 74-81 (namespaced; Emitor = Lamp, others no sim role), Laysor see-through
+  [PASS] lithography blocks: Laysor blended; the Emitor is a Lamp whose front aperture lights only when powered
+  [PASS] substrate: semi-transparent (kTransparent, not kOpaque), solid and breakable
+  [PASS] insulators: Insulatnor / Insulator / Insulatxor solid + opaque + cuts wire, never powerable
+  [PASS] gravity block: neutral solid placeholder, no behavior, no sim role (function JD-open)
+  [PASS] registerBlock: malformed namespace ids refused, well-formed id registers (F-M4)
+  [PASS] appearance: wire strips mesh through IBlockAppearance (3 strips, red tint, strength 40)
+  [PASS] appearance: wafer silicon faces tag kShadeGroundPulse (ground pulse)
+  [PASS] appearance: Trace Bulbs (40/41) tag kShadeAlphaBlend (CloudAtlas ghost shell)
+  [PASS] material bindings: CloudAtlas bulb cores load (3584 leaves) with rim 40/42, core 41/43, Trace 5/6
+  [PASS] material bindings: etched blocks load with base 50 / line 51
+  [PASS] material bindings: traversal and missing ids rejected
+CONTENT SELFTEST OK
+Audio self-test (offline, no device)
+  [PASS] notes: A4 = 440 Hz, C2 65.4 Hz, names C4 / D#7, '-' for none
+  [PASS] pulse 50% at A4 measures 440 Hz
+  [PASS] triangle at C3 measures 130.8 Hz
+  [PASS] saw at 1000 Hz
+  [PASS] 4-bit wave table at 220 Hz
+  [PASS] pulse duty 12.5 / 25 / 50 / 75 % (fraction of high samples)
+  [PASS] ADSR: 10 ms attack, 40 ms decay to 0.5, 50 ms release to silence
+  [PASS] LFSR noise: 15-bit is balanced, 7-bit short mode repeats every 127
+  [PASS] presets: SID3 = 3 full voices; DMG = 2 pulse + wave + noise (unsupported waveforms coerced)
+  [PASS] SPSC command queue: 200k items across threads, in order, no locks
+  [PASS] engine: queued A4 note plays 440 Hz in stereo; note-off fades to silence
+  [PASS] muted engine drops commands
+  [PASS] voice allocator: stable per source, steals the oldest when full
+  [PASS] spatial: 1/(1+d/16) falloff, walls halve volume, out-of-range silent
+  [PASS] spatial: stereo pan hard-right / hard-left / center
+  [PASS] spatial: echo delay 100 ms at 34 blocks (340 m/s)
+  [PASS] spatial: audibleSounds filters by range, loudest first
+  [PASS] spatial: update() ages sounds out
+  [PASS] spatial: audibleSounds sorts by perceived volume (near-quiet beats far-loud)
+  [PASS] spatial: update() keeps future-stamped events (no tick underflow)
+  [PASS] spatial: update() still ages out genuinely old events
+  [PASS] spatial: reverb 0.0 in open air, 1.0 fully enclosed
+  [PASS] occlusion field: baked flood matches per-pair DDA raycast on a full-wall layout
+  [PASS] occlusion field: deterministic — same layout, scrambled build order -> identical bytes
+  [PASS] occlusion field: radius clamps to 32, out-of-field reads occluded
+  [PASS] occlusion field: degenerate radius clamps to 1
+  [PASS] occlusion field: amortized path agrees bit-exactly with the direct per-pair path on random layouts
+  [PASS] virtualization: silent advance, bit-identical resume (sweep/hold/noise), retrigger un-virtualizes
+  [PASS] allocator: steals oldest virtualized voice before the oldest audible one
+  [PASS] SIMD: addInto + gain/clamp/duplicate bit-identical to scalar
+  [PASS] synth mix: SIMD batch accumulation bit-identical to the scalar per-sample loop
+  [PASS] occlusion cadence: default = bake on chunk change, no tick cadence, radius 16
+  [PASS] occlusion cadence: default bakes only on chunk change
+  [PASS] occlusion cadence: ultra option bakes every tick
+  [PASS] occlusion cadence: every-N-ticks, knobs exposed
+  [PASS] occlusion cadence: move-beyond-threshold triggers an early re-bake
+  [PASS] effect bypass: threshold is the named constant kEffectBypassDistance (48 blocks)
+  [PASS] effect bypass: virtualized always bypassed; distant (> 48 blocks) bypassed; near kept
+  [PASS] effect bypass: bypassed == dry with zero frames filtered; enabled -> reverb tail
+  [PASS] streaming: worker-thread decode, double-buffered handoff, 440 Hz intact, clean EOS
+  [PASS] shedder: starts at level 0 (current behavior)
+  [PASS] shedder: 0->1->3 after 8 over-budget callbacks, one level per 64 calm
+  [PASS] shedder: thresholds configurable
+  [PASS] degradation: no pressure -> level 0, behavior unchanged
+  [PASS] engine: shed level follows measured load
+  [PASS] engine: level 1 virtualizes quiet release tails, never fresh attacks
+  [PASS] engine: level 2 caps the voice count (upper half virtualized)
+  [PASS] degradation: half-rate render preserves pitch/timeline (aliasing, not dropout)
+  [PASS] codecs: sniff wav/flac/opus/vorbis/unknown
+  [PASS] codecs: wav 16-bit stereo decodes exactly, EOS at end
+  [PASS] codecs: wav 8-bit mono converts unsigned and duplicates to stereo
+  [PASS] codecs: wav float32 stereo passes through exactly
+  [PASS] codecs: wav truncated / unsupported tag / >stereo fail cleanly
+  [PASS] codecs: flac STREAMINFO parses (44.1k/stereo/16-bit/1000f), frames stubbed
+  [PASS] codecs: opus OpusHead parses (48k/stereo), packets stubbed
+  [PASS] codecs: vorbis identification parses (44.1k/stereo), packets stubbed
+  [PASS] codecs: factory rejects unknown data with an error
+  [PASS] audio: tap starts disarmed
+  [PASS] audio: drainTap on a fresh engine yields nothing
+  [PASS] audio: tap arms
+  [PASS] audio: silent mix taps as 512 zero frames
+  [PASS] audio: tap captures the playing note (nonzero)
+  [PASS] audio: forced shed reaches level 3
+  [PASS] audio: tap drains under full shed (ladder intact)
+  [PASS] audio: disarmed tap records nothing
+  [PASS] audio: tap ring overflows by dropping oldest (bounded)
+  [PASS] occlusion: start(Inline) sets rate without spawning
+  [PASS] occlusion: start(Full) after Inline really starts
+  [PASS] occlusion: fresh query gain is 1.0 (clear)
+  [PASS] occlusion: clear path keeps gain at 1.0
+  [PASS] occlusion: out-of-range gain reads 1.0 (safe)
+  [PASS] occlusion: gain() sees appended queries via the published snapshot
+  [PASS] occlusion: setInline(false) exits inline mode and restarts at Full
+  [PASS] raycast: same-voxel ray is clear even when all neighbors are solid
+  [PASS] raycast: cross-voxel ray through solid is blocked
+  [PASS] raycast: long ray through air is clear
+  [PASS] raycast: beyond 64-block hearing range reads blocked
+AUDIO SELFTEST OK
+  [PASS] focus lost / gained: held keys and buttons are released (no stuck movement)
+  [PASS] mod input: valid action registers
+  [PASS] mod input: duplicate action refused
+  [PASS] mod input: bad mod id refused
+  [PASS] mod input: bad action id refused
+  [PASS] mod input: empty display name refused
+  [PASS] mod input: same action id under another mod registers
+  [PASS] mod input: actions are namespaced per mod (no shadowing engine or other mods)
+  [PASS] mod input: only the namespaced id resolves
+  [PASS] mod input: unregisterMod drops the mod's actions
+  [PASS] mod input: key events delivered when the UI does not want the keyboard
+  [PASS] mod input: key events withheld while a system modal/text field has focus
+  [PASS] mod input: router is standalone - registration and policy need no device handles
+  [PASS] mod input: delivering a key event to a mod cannot inject into the engine pipeline
+Input SDK self-test (fixture vocabulary)
+  [PASS] game-declared ActionSet: names, kinds, intended shared input, bindings JSON round trip over defaults
+  [PASS] contexts declared by the game: opaque context gates lower actions, pop resumes
+  [PASS] input pump (threaded): 500 events arrive in order with monotonic pump timestamps
+  [PASS] input pump (manual): owner-driven polling delivers every event in order
+  [PASS] input pump: queue overflow drops the newest events and counts them
+INPUT SDK SELFTEST OK
+Game input self-test (LithoKraft actions, injected events)
+  [PASS] defaults: MC keyboard/mouse + gamepad, several bindings per action, no conflicts (Place/Use share RMB)
+  [PASS] button actions: pressed / held / released; a click within one frame still presses
+  [PASS] gamepad: stick + trigger drive actions with analog values; disconnect releases everything
+  [PASS] deadzones: radial on sticks (direction kept, rescaled), linear on triggers / axes
+  [PASS] look axis: mouse pixels x sensitivity; right stick x look speed x dt
+  [PASS] contexts: inventory hides movement/hotbar/Break, keeps debug + raw UI events; pushes apply next frame (E does not re-toggle)
+  [PASS] typing: Alt+Enter (display toggle) is not a text Enter
+  [PASS] UI bridge: Alt+Enter never reaches widgets as Enter; plain Enter still does
+  [PASS] typing: text channel gets chars + Enter/Backspace (with repeat); letters never reach actions; no text outside typing
+  [PASS] focus loss releases held keys (no stuck movement)
+  [PASS] JSON: round trip; missing actions keep defaults; unknown entries warned; syntax errors rejected
+  [PASS] config file: created from defaults on first run, then loaded back unchanged
+  [PASS] replay: a recorded event stream reproduces the same actions
+  [PASS] names: every key name round-trips (incl. X)
+INPUT SELFTEST OK
+Assets self-test (throwaway packs)
+  [PASS] pack stack: a file resolves to the highest pack that has it; a higher resources.json replaces a definition
+  [PASS] missing fallback: absent file, wrong size, unsafe path and unknown names all map to the magenta checker (id 0)
+  [PASS] manifest errors: a syntax error rejects the pack (file + position); bad sections / version are warnings
+  [PASS] palettes (row 0) and animation strips (frames as consecutive layers, sidecar timing, inline override)
+  [PASS] block models: face -> side -> all -> missing; active falls back to base; UV rects; animated faces; wire pieces; masks
+  [PASS] shaders: loaded from pack files per stage with overrides and includes; a half program is skipped (built-in used)
+  [PASS] shader includes: expanded in place; cycles and missing files are errors
+  [PASS] hot reload diff: reports exactly the changed texture
+  [PASS] litho svg: cistercian_1.svg decodes at 64x64, violet stroke pixels present, corners transparent
+  [PASS] litho svg: malformed input -> nullopt + err
+  [PASS] litho svg: 32 and 64 rasterizations both succeed with different buffers
+  [PASS] litho svg: Image::load routes .svg by extension at intrinsic size (100x140)
+  [PASS] litho svg: svg test pack opens
+  [PASS] litho svg: .svg texture loads through loadImage at pack tile size into the registry; reload identical (cache)
+  [PASS] provenance: test pack opens
+  [PASS] provenance: def json parses
+  [PASS] provenance: correct marker -> Verified
+  [PASS] provenance: no marker -> Absent (ordinary third-party)
+  [PASS] provenance: wrong crc32 -> Mismatch
+  [PASS] provenance: tampered bytes hash differently (sanity)
+  [PASS] provenance: certified .svg loads at pack tile size with content
+  [PASS] provenance: mismatch warns 'treated as third-party' but the texture still loads
+  [PASS] sig: no signature.json -> Unsigned
+  [PASS] sig: test mod signed (ephemeral key)
+  [PASS] sig: valid signature -> Verified
+  [PASS] sig: tampered mod -> Invalid (refused)
+  [PASS] sig: other-key mod signed
+  [PASS] sig: untrusted key -> Invalid (refused)
+  [PASS] sig: malformed signature.json -> Invalid
+[SKIP] sig: symlink fixture (no symlink privilege on this Windows account)
+  [PASS] mods: dependency chain past depth 64 -> error recorded, walk terminates (E L5)
+  [PASS] mods: shallow chain still resolves dependency-first
+  [PASS] svg cache: bounded at kMaxEntries under 200 stores
+  [PASS] svg cache: same file via a different spelling hits the canonical key
+  [PASS] provenance: animation pack opens
+  [PASS] provenance: valid marker on an animation verifies silently (E L8)
+  [PASS] mods: dep range "" -> manifest error, no exception (App. E M1 repro 1)
+  [PASS] mods: dep range ">" -> manifest error, no exception (App. E M1 repro 2)
+  [PASS] mods: dep range ">=" (prefix, no version) -> manifest error
+  [PASS] mods: valid dep ranges (*, bare, >=, =, ^, ~) still parse
+  [PASS] mods: loadModDirectory skips hostile mod.json, good mod still loads, error reported
+ASSETS SELFTEST OK
+  (the next two job errors are expected)
+  [PASS] job batch: a throwing job is caught and counted, the batch still completes
+  [PASS] job pool: a throwing job does not terminate, waitIdle() still returns
+Procgen self-test (noise, graph, pipeline)
+  [PASS] perlin 2D: finite, in [-1.00, 1.00] (saw -0.871..0.849), continuous (max step 0.0036 per 0.001)
+  [PASS] perlin 3D: finite, in [-1.00, 1.00] (saw -0.891..0.791), continuous (max step 0.0034 per 0.001)
+  [PASS] perlin 4D: finite, in [-1.00, 1.00] (saw -0.877..0.831), continuous (max step 0.0033 per 0.001)
+  [PASS] opensimplex2f 2D: finite, in [-1.00, 1.00] (saw -1.000..1.000), continuous (max step 0.0099 per 0.001)
+  [PASS] opensimplex2f 3D: finite, in [-1.00, 1.00] (saw -0.996..0.985), continuous (max step 0.0066 per 0.001)
+  [PASS] opensimplex2f 4D: finite, in [-1.00, 1.00] (saw -0.967..0.965), continuous (max step 0.0067 per 0.001)
+  [PASS] opensimplex2s 2D: finite, in [-1.00, 1.00] (saw -0.993..0.991), continuous (max step 0.0061 per 0.001)
+  [PASS] opensimplex2s 3D: finite, in [-1.00, 1.00] (saw -0.991..0.994), continuous (max step 0.0058 per 0.001)
+  [PASS] opensimplex2s 4D: finite, in [-1.00, 1.00] (saw -0.991..0.838), continuous (max step 0.0049 per 0.001)
+  [PASS] value 2D: finite, in [-1.00, 1.00] (saw -0.996..0.993), continuous (max step 0.0033 per 0.001)
+  [PASS] value 3D: finite, in [-1.00, 1.00] (saw -0.983..0.972), continuous (max step 0.0032 per 0.001)
+  [PASS] value 4D: finite, in [-1.00, 1.00] (saw -0.986..0.952), continuous (max step 0.0028 per 0.001)
+  [PASS] cellular 2D: finite, in [0.00, 2.00] (saw 0.007..1.068), continuous (max step 0.0014 per 0.001)
+  [PASS] cellular 3D: finite, in [0.00, 2.00] (saw 0.026..1.068), continuous (max step 0.0014 per 0.001)
+  [PASS] cellular 4D: finite, in [0.00, 2.00] (saw 0.051..1.105), continuous (max step 0.0014 per 0.001)
+  [PASS] white 2D: finite, in [-1.00, 1.00] (saw -1.000..1.000)
+  [PASS] white 3D: finite, in [-1.00, 1.00] (saw -1.000..1.000)
+  [PASS] white 4D: finite, in [-1.00, 1.00] (saw -1.000..1.000)
+  [PASS] cellular f2 manhattan 2D: finite, in [0.00, 8.00] (saw 0.147..1.758), continuous (max step 0.0020 per 0.001)
+  [PASS] cellular f2 manhattan 3D: finite, in [0.00, 8.00] (saw 0.281..1.726), continuous (max step 0.0020 per 0.001)
+  [PASS] cellular f2 manhattan 4D: finite, in [0.00, 8.00] (saw 0.381..1.911), continuous (max step 0.0020 per 0.001)
+  [PASS] cellular f2 chebyshev 2D: finite, in [0.00, 2.00] (saw 0.098..1.248), continuous (max step 0.0010 per 0.001)
+  [PASS] cellular f2 chebyshev 3D: finite, in [0.00, 2.00] (saw 0.136..0.999), continuous (max step 0.0010 per 0.001)
+  [PASS] cellular f2 chebyshev 4D: finite, in [0.00, 2.00] (saw 0.164..0.858), continuous (max step 0.0010 per 0.001)
+  [PASS] cellular f2-f1 manhattan 2D: finite, in [0.00, 8.00] (saw 0.000..1.396), continuous (max step 0.0040 per 0.001)
+  [PASS] cellular f2-f1 manhattan 3D: finite, in [0.00, 8.00] (saw 0.000..1.388), continuous (max step 0.0040 per 0.001)
+  [PASS] cellular f2-f1 manhattan 4D: finite, in [0.00, 8.00] (saw 0.000..1.451), continuous (max step 0.0040 per 0.001)
+  [PASS] cellular f2-f1 chebyshev 2D: finite, in [0.00, 2.00] (saw 0.000..1.109), continuous (max step 0.0020 per 0.001)
+  [PASS] cellular f2-f1 chebyshev 3D: finite, in [0.00, 2.00] (saw 0.000..0.828), continuous (max step 0.0020 per 0.001)
+  [PASS] cellular f2-f1 chebyshev 4D: finite, in [0.00, 2.00] (saw 0.000..0.711), continuous (max step 0.0020 per 0.001)
+  [PASS] fractal fbm 2D: finite, in [-1.00, 1.00] (saw -0.766..0.781), continuous (max step 0.0086 per 0.001)
+  [PASS] fractal fbm 3D: finite, in [-1.00, 1.00] (saw -0.729..0.689), continuous (max step 0.0069 per 0.001)
+  [PASS] fractal fbm 4D: finite, in [-1.00, 1.00] (saw -0.619..0.626), continuous (max step 0.0062 per 0.001)
+  [PASS] fractal ridged 2D: finite, in [0.00, 1.00] (saw 0.045..0.948), continuous (max step 0.0160 per 0.001)
+  [PASS] fractal ridged 3D: finite, in [0.00, 1.00] (saw 0.076..0.969), continuous (max step 0.0112 per 0.001)
+  [PASS] fractal ridged 4D: finite, in [0.00, 1.00] (saw 0.129..0.979), continuous (max step 0.0097 per 0.001)
+  [PASS] fractal billow 2D: finite, in [-1.00, 1.00] (saw -0.946..0.637), continuous (max step 0.0173 per 0.001)
+  [PASS] fractal billow 3D: finite, in [-1.00, 1.00] (saw -0.968..0.528), continuous (max step 0.0139 per 0.001)
+  [PASS] fractal billow 4D: finite, in [-1.00, 1.00] (saw -0.979..0.365), continuous (max step 0.0113 per 0.001)
+  [PASS] fractal turbulence 2D: finite, in [0.00, 1.00] (saw 0.027..0.819), continuous (max step 0.0087 per 0.001)
+  [PASS] fractal turbulence 3D: finite, in [0.00, 1.00] (saw 0.016..0.764), continuous (max step 0.0070 per 0.001)
+  [PASS] fractal turbulence 4D: finite, in [0.00, 1.00] (saw 0.010..0.683), continuous (max step 0.0056 per 0.001)
+  [PASS] fractal pingpong 2D: finite, in [0.00, 1.00] (saw 0.016..0.978), continuous (max step 0.0128 per 0.001)
+  [PASS] fractal pingpong 3D: finite, in [0.00, 1.00] (saw 0.015..0.966), continuous (max step 0.0108 per 0.001)
+  [PASS] fractal pingpong 4D: finite, in [0.00, 1.00] (saw 0.047..0.951), continuous (max step 0.0092 per 0.001)
+  [PASS] domain warp 2D: finite, in [-1.00, 1.00] (saw -0.986..0.980), continuous (max step 0.0083 per 0.001)
+  [PASS] domain warp 3D: finite, in [-1.00, 1.00] (saw -0.962..0.959), continuous (max step 0.0063 per 0.001)
+  [PASS] domain warp 4D: finite, in [-1.00, 1.00] (saw -0.964..0.844), continuous (max step 0.0068 per 0.001)
+  [PASS] pingpong: name parses (pingpong / ping_pong) and round-trips
+  [PASS] pingpong: distinct from ridged, output in [0, 1]
+    pingpong golden sample3(0.37, 1.5, -0.91) = 0.58929199
+  [PASS] pingpong: golden value pinned (implementation-defined, from the 2026-10-13 first run)
+  [PASS] curl2: deterministic (same point -> same vector)
+    curl2 golden at (1.25, -3.5) = (-1.98410475, 0.735200942)
+  [PASS] curl2: different seed -> different field
+    curl2: max |div| 2.384e-05, max |v| 6.182 over the sample grid
+  [PASS] curl2: finite and non-degenerate over a sample grid
+  [PASS] curl2: divergence-free (same-stencil discrete identity, float residual only)
+  [PASS] curl2: golden value pinned (implementation-defined, from the 2026-10-13 first run)
+  [PASS] curl3: deterministic
+    curl3 golden at (0.5, -1.25, 2.75) = (-0.521783113, 0.101734757, -3.30431461)
+    curl3: max |div| 3.576e-05, max |v| 11.93 over the sample grid
+  [PASS] curl3: finite and non-degenerate over a sample grid
+  [PASS] curl3: divergence-free (same-stencil discrete identity, float residual only)
+  [PASS] curl3: golden value pinned (implementation-defined, from the 2026-10-13 first run)
+  [PASS] cellular id: non-zero for cellular noise
+  [PASS] cellular id: same seed + position -> same id
+  [PASS] cellular id: 2D form deterministic
+  [PASS] cellular id: scan across cells sees multiple ids (14)
+  [PASS] cellular id: locally constant inside a cell
+  [PASS] cellular id: different seed -> different id at the same position
+  [PASS] cellular id: non-cellular noise returns 0
+    cellular id golden at (0.2, 0.3, 0.1) seed 42 = 57e1faba
+  [PASS] cellular id: golden value pinned (implementation-defined, from the 2026-10-13 first run)
+  [PASS] noise: same seed reproduces, different seed differs
+  [PASS] noise: sampleBatch matches scalar sampling
+  [PASS] graph: parses every node type (17 nodes)
+  [PASS] graph: JSON round trip is lossless (dump -> parse -> dump)
+  [PASS] graph: compiles
+  [PASS] graph: round-tripped graph evaluates identically, no NaN
+  [PASS] graph: numeric output becomes a constant node
+  [PASS] graph: select above threshold + falloff picks b (-1 * 30 + 70)
+  [PASS] graph: cache node and batch match scalar evaluation
+  [PASS] graph: rejects unknown node type (node 'a': unknown node type 'sparkle')
+  [PASS] graph: rejects missing input (node 'a': missing input 'input')
+  [PASS] graph: rejects unknown parameter (node 'a': unknown parameter 'vaule' for type 'constant')
+  [PASS] graph: rejects unknown input node (node 'a': unknown input node 'nope')
+  [PASS] graph: rejects unknown output node (output 'o': unknown node 'b')
+  [PASS] graph: compile rejects cycles (graph has a cycle through node 'a')
+  [PASS] graph nodes: base noise graph compiles
+  [PASS] graph nodes: abs node compiles
+  [PASS] graph nodes: abs node matches its definition on every grid point
+  [PASS] graph nodes: invert node compiles
+  [PASS] graph nodes: invert node matches its definition on every grid point
+  [PASS] graph nodes: power node (sign-preserving square) compiles
+  [PASS] graph nodes: power node (sign-preserving square) matches its definition on every grid point
+  [PASS] graph nodes: power node (sign-preserving sqrt) compiles
+  [PASS] graph nodes: power node (sign-preserving sqrt) matches its definition on every grid point
+  [PASS] graph nodes: standalone fractal node compiles
+  [PASS] graph nodes: fractal node deterministic, finite, differs from plain noise
+  [PASS] graph nodes: fractal node without a fractal block is rejected (node 'f': a 'fractal' node needs a fractal block)
+  [PASS] graph nodes: standalone warp node compiles
+  [PASS] graph nodes: warp node deterministic, finite, differs from unwarped noise
+  [PASS] graph nodes: warp node without a warp block is rejected (node 'w': a 'warp' node needs a warp block)
+  [PASS] biomes: multi-noise picks the nearest climate point (weights ignore unused parameters)
+  [PASS] biomes: ties go to the earlier biome
+  [PASS] pipeline: generator JSON loads
+  [PASS] pipeline: unknown material rejected (terrain: unknown material 'lava')
+  [PASS] pipeline: chunks identical serial vs 2 JobPool threads
+  [PASS] pipeline: surface layers and top state follow the biome
+  [PASS] pipeline: worm caves carve underground (8652 blocks), ore veins placed (541)
+  [PASS] pipeline: the ravine carver cuts real surface gashes (12 carved surface columns)
+  [PASS] seeding: dimensions and neighbouring chunks get distinct seeds
+  [PASS] ruins: generator JSON with ruins carver loads
+  [PASS] ruins: unknown biome in density rejected (expected ':' at 131)
+  [PASS] ruins: missing crust list rejected (expected ':' at 131)
+  [PASS] ruins: chunk-local determinism (same seed identical, other seed differs)
+  [PASS] ruins: traces (347) and via stubs (88) placed
+  [PASS] ruins: nothing reaches the surface margin (0 violations)
+  [PASS] ruins: traces route orthogonally (0 diagonal trace contacts)
+  [PASS] ruins: density follows the biome (zero-density biome ~ruin-free)
+  [PASS] ruins: no large air pockets (largest 2, total 8)
+  [PASS] wafer: biome_heightmap generator loads
+  [PASS] wafer: same seed -> same biome map and identical chunk (two independent loads)
+  [PASS] wafer: different seed -> different biome map
+  [PASS] wafer: pinned-climate chunk is perfectly flat (height 60 everywhere)
+  [PASS] wafer: flat biome surface uses its own top material
+  [PASS] wafer: dead biome uses its own (stone-keyed) surface material
+  [PASS] wafer: biome_heightmap/biome count mismatch rejected (terrain: 'biome_heightmap' has 1 entries but the generator defines 3 biomes)
+  [PASS] wafer: extraSurface code rule runs after the JSON surface rules
+  [PASS] blend: at a biome point the weight is ~one-hot on it
+  [PASS] blend: midpoint splits 50/50 and sums to 1
+  [PASS] blend: far away the nearest biome dominates
+  [PASS] blend: weights are continuous (no hard border in no-man's-land)
+  [PASS] blend: deterministic, biomeCount reports the table
+  [PASS] blend: blended selector JSON loads
+  [PASS] blend: unknown selector type rejected (biomes: unknown selector type 'nope' (multi_noise, blended))
+  [PASS] blend: blend_radius <= 0 rejected (biomes: the 'blended' selector needs blend_radius > 0)
+  [PASS] blend: pipeline fills 2 normalized weights per column
+  [PASS] blend: ~pure biomes at the scan ends (60 -> 100)
+  [PASS] blend: no hard wall (max adjacent height step 2 <= 4)
+  [PASS] blend: a real gradient exists (42 columns strictly between)
+  [PASS] blend: palettes pure outside the band
+  [PASS] blend: palettes dither inside the band (noisy gradient, not a line)
+  [PASS] blend: same seed -> identical weights and chunk
+  [PASS] trees: unknown biome name rejected (feature 't': unknown biome 'nope')
+  [PASS] trees: density outside [0, 1] rejected (feature 't': density for biome 'forest' must be in [0, 1])
+  [PASS] trees: missing material rejected (feature 't': missing 'trunk')
+  [PASS] trees: loads with no biomes section (density is the default)
+  [PASS] trees (B-L3): scalar density without a biomes object is ignored (feature spawns nowhere)
+  [PASS] canopy: same seed+pos -> identical spec
+  [PASS] canopy: same seed+pos -> identical stamp
+  [PASS] canopy: 64 positions -> >=16 distinct signatures (23 distinct)
+  [PASS] canopy: all four archetypes appear (round/spire/parasol/lobed)
+  [PASS] canopy: every stamp nonempty and inside the documented radii
+  [PASS] canopy: spire silhouette is taller than wide
+  [PASS] canopy: parasol silhouette is wider than tall
+    canopy perf: 0.035 ms/tree (1000 trees, 106484 cells total)
+  [PASS] trees: code-built pipeline via Builder::feature() builds
+  [PASS] trees: 3x3 chunks match the position-keyed replica exactly (no phantoms, terrain untouched)
+  [PASS] trees: margin replay writes cross-boundary blocks (2180 blocks, no clipping)
+  [PASS] trees: the same chunk regenerates identically
+  [PASS] trees: a different seed places different trees
+  [PASS] trees: generator JSON with the three feature types loads
+  [PASS] trees: pipeline fills one-hot biome weights (5 biomes)
+  [PASS] trees: every initiated base stands in an allowed biome (strict gate, incl. Dead Zones)
+  [PASS] trees: all three features initiate (305/140/73 bases)
+  [PASS] trees: 4.6/chunk in forest, 0.2/chunk on flats
+  [PASS] trees: blocks match expected bases (no phantoms, no missing trunks)
+  [PASS] trees: margin-only bases 25 (8.2%, border approximation)
+  [PASS] trees: 21% red tips (1360 red, 5237 blue)
+  [PASS] blend: 30/70 weights scale density
+  [PASS] blend: one-hot weight keeps full density
+  [PASS] blend: one-hot on the other biome
+  [PASS] blend: 25/75 weights scale density
+  [PASS] blend: no weights -> dominant biome density
+  [PASS] blend: empty maps -> zero density
+  [PASS] blend: blended and one-hot pipelines build
+  [PASS] blend: 50/50 tree bases are a strict subset of the one-hot bases (414 of 842)
+  [PASS] blend: 50/50 blend keeps 49% of trees
+  [PASS] structures: generator JSON with a structure feature loads
+  [PASS] structures: feature visits as a StructureFeature
+  [PASS] structures: reach = blueprint extent (1)
+  [PASS] structures: blueprint kept 4 cells
+  [PASS] structures: cell_size loaded
+  [PASS] structures: biomeAt agrees with the constant climate
+  [PASS] structures: sampleBiomes batch == biomeAt singles
+  [PASS] structures: rejected (unknown biome): feature 's': unknown biome 'nope'
+  [PASS] structures: rejected (unknown material): feature 's': unknown material 'nope'
+  [PASS] structures: rejected (missing blueprint): feature 's': 'blueprint' must be a non-empty array of {d, m} cells (or use 'structure': "<name>")
+  [PASS] structures: negative dy (buried) loads
+  [PASS] structures: rejected (bad d): feature 's': blueprint cell needs 'd': [dx, dy, dz]
+  [PASS] structures: rejected (unknown type): feature 's': unknown type 'hut' (ore_vein, worley_ore, dungeon, trace_tree, capacitor_cans, resonator_spire, structure, lithoform_stamp, groundcover, rock_formation)
+  [PASS] structures: placement generator loads
+  [PASS] structures: hut found
+  [PASS] structures: interior cells roll bases at density 1.0
+  [PASS] structures: basesInRect deterministic
+  [PASS] structures: different seed -> different bases
+  [PASS] structures: empty rect -> no bases
+  [PASS] structures: same chunk twice -> identical
+  [PASS] structures: test JSON parses
+  [PASS] structures: feature-stripped generator loads
+  [PASS] structures: the hut actually placed blocks
+  [PASS] structures: never-overwrite + above-surface + attributed to a base
+  [PASS] caves: worm code-built pipeline builds
+  [PASS] caves: 3x3 worm chunks match the independent replica exactly (cross-chunk replay)
+  [PASS] caves: legacy worms carve real tunnels (4931 blocks)
+  [PASS] caves: worms respect the surface margin (nothing carved in the top 6)
+  [PASS] caves: no floating debris from worm spheres
+  [PASS] caves: the same worm chunk regenerates identically
+  [PASS] caves: a different seed walks different worms
+  [PASS] caves: branched worm pipeline builds
+  [PASS] caves: branched worms match the replica exactly (forks land on the parent path)
+  [PASS] caves: branches add tunnel (5884 > 4931)
+  [PASS] caves: every branch starts exactly on its parent's path
+  [PASS] caves: cavern code-built pipeline builds
+  [PASS] caves: 3x3 cavern chunks match the independent replica exactly (chambers line up)
+  [PASS] caves: chambers carved (100 replicated, 2422 blocks)
+  [PASS] caves: caverns respect the surface margin (nothing carved in the top 6)
+  [PASS] caves: no floating debris from cavern ellipsoids
+  [PASS] caves: the same cavern chunk regenerates identically
+  [PASS] caves: wobble-rim cavern pipeline builds
+  [PASS] caves: wobble-rim carving never leaves its chamber ellipsoid
+  [PASS] caves: the wobble rim never eats the guaranteed core
+  [PASS] caves: the cleanup sweep dissolves wobble-rim floaters
+  [PASS] caves: the wobble rim changes the carve vs the pure ellipsoid
+  [PASS] caves: ravine code-built pipeline builds
+  [PASS] caves: 3x3 ravine chunks match the independent replica exactly (gashes line up)
+  [PASS] caves: ravines cut real gashes (36145 blocks)
+  [PASS] caves: ravines never carve below the bottom margin
+  [PASS] caves: ravine gashes open at the surface
+  [PASS] caves: sloped walls (deep centerline cut 24, feathered rim 2)
+  [PASS] caves: no floating debris from ravine cuts
+  [PASS] caves: the same ravine chunk regenerates identically
+  [PASS] caves: cavern JSON with per-biome density loads
+  [PASS] caves: JSON cavern matches the replica through the biome-gated path
+  [PASS] caves: per-biome density holds (zero-density biome grows no chambers, 29 chambers all western)
+  [PASS] caves: gated caverns carve (528 blocks)
+  [PASS] caves: rejected (unknown carver type): trailing input after top-level value
+  [PASS] caves: rejected (cavern density names unknown biome): trailing input after top-level value
+  [PASS] caves: rejected (ravine density names unknown biome): trailing input after top-level value
+  [PASS] caves: rejected (worm density names unknown biome): trailing input after top-level value
+  [PASS] caves: configured ravine JSON loads
+  [PASS] caves: worm JSON with branch fields and density loads
+  [PASS] cheese: pipeline builds
+  [PASS] cheese: carved fraction in a sane band (5262 cells, 0.100758)
+  [PASS] cheese: uncarved pillars remain (286 of 1024 columns untouched in the band)
+  [PASS] cheese: surface margin respected (nothing carved in the top 8 below the surface)
+  [PASS] cheese: same chunk regenerates identically
+  [PASS] cheese: different seed -> different field
+  [PASS] spaghetti: tubes carved (3136 cells in the band)
+  [PASS] spaghetti: bounded thickness (max interior depth 1 blocks to solid, a tube not a blob)
+  [PASS] spaghetti: tubes are filled (fullest 3x3x3 core has 26 of 27 carved)
+  [PASS] spaghetti: carved cells form connected tubes (isolated fraction 0.001594)
+  [PASS] spaghetti: same seed regenerates identically
+  [PASS] spaghetti: different seed -> different tubes
+  [PASS] noodle: tubes carved (2308 cells in the band)
+  [PASS] noodle: bounded thickness (max interior depth 1)
+  [PASS] noodle: thinner than spaghetti (cells 2308 < 3136, fullest core 22 <= 26)
+  [PASS] noodle: carved cells form connected tubes (isolated fraction 0.048094)
+  [PASS] cheese/spaghetti/noodle: JSON carvers load
+  [PASS] ruins open: pipelines build (default + open mode)
+    ruins default-mode hash: 8d0168dd575353a1
+  [PASS] ruins open: default mode hash equals the pre-open-mode inlay golden (pinned 2026-10-13)
+  [PASS] ruins open: default mode regenerates identically across pipelines
+  [PASS] ruins open: open mode creates real air volume (582 buried air vs 2 inlay-only)
+  [PASS] ruins open: rubble scattered on the new floors (109 cells)
+  [PASS] ruins open: open volumes stay buried (surface margin respected, no rubble at the surface)
+  [PASS] ruins open: open mode changes the chunk vs default mode
+  [PASS] ruins open: JSON open_mode loads
+  [PASS] mountains: mountain_range node math (64 * 0.5^2 * 1 = 16)
+  [PASS] mountains: foothill mask falloff (smoothstep(0.5) = 0.5 -> 32)
+  [PASS] mountains: mask below mask_low gates the uplift to 0
+  [PASS] mountains: peak cone math (96 * 0.75^2 = 54)
+  [PASS] mountains: peak is 0 beyond its radius
+  [PASS] mountains: peak reaches full amplitude at distance 0
+  [PASS] mountains: mask_low >= mask_high rejected (graph: node 'n': 'mask_high' must be > 'mask_low')
+  [PASS] mountains: peak radius <= 0 rejected (graph: node 'n': 'radius' must be > 0)
+  [PASS] mountains: peak sharpness < 0 rejected (graph: node 'n': 'sharpness' must be >= 0)
+  [PASS] mountains: uplift generator loads
+  [PASS] mountains: same seed -> byte-identical heights and chunk (two independent loads)
+  [PASS] mountains: known-seed spot heights
+  [PASS] mountains: different seed -> different relief
+  [PASS] mountains: uplift_amplitude scales the uplift linearly (full ~= 2x half, +-1)
+  [PASS] mountains: uplift actually lifts terrain (max +25 >= 16)
+  [PASS] mountains: omitted uplift behaves exactly like uplift_amplitude 0
+  [PASS] mountains: no cliffs at biome borders (max adjacent step 2 <= 8 across 128 columns)
+  [PASS] mountains: real relief across the scan (range 34 >= 30)
+  [PASS] mountains: unknown uplift output rejected (terrain: graph has no output 'nope')
+  [PASS] mountains: uplift_amplitude without uplift rejected (terrain: 'uplift_amplitude' needs an 'uplift' output)
+  [PASS] rivers: generator JSON with river carver loads
+  [PASS] rivers: reference generator (no carver) loads
+  [PASS] rivers: missing water_material rejected (carver 'river': missing 'water_material')
+  [PASS] rivers: unknown routing_output rejected (carver 'river': graph has no output 'nope')
+  [PASS] rivers: unknown biome density rejected (carver 'river': unknown biome 'nope')
+  [PASS] rivers: traceRiver deterministic (identical points for the same seed)
+  [PASS] rivers: traced path never flows uphill (monotone within uphillTol)
+  [PASS] rivers: chunk determinism (same seed identical, other seed differs)
+  [PASS] rivers: channels carved with water (231 water cells, 205 carved columns in 3x3 chunks)
+  [PASS] rivers: water is level-16 source, only in carved columns at/below the bank
+  [PASS] rivers: assembled 3x3 matches the independent carve replica in every column (205 carved columns)
+  [PASS] rivers: the channel crosses chunk borders (37 carved columns on chunk edges, continuous across the seams)
+  [PASS] rivers: flat-terrain + routing_output generator loads
+  [PASS] rivers: sloped banks, no vertical slots (52 carved, max adjacent step 2, isolated 0)
+Diversity self-test (ecosystem & environment)
+  [PASS] groundcover: generator JSON loads
+  [PASS] groundcover: tufts placed (88)
+  [PASS] groundcover: flowers placed (45)
+  [PASS] groundcover: pebbles placed (26)
+  [PASS] groundcover: nothing buried below the surface
+  [PASS] groundcover: biome tint written to flower state bytes
+  [PASS] groundcover: deterministic across runs
+  [PASS] groundcover: neighbour chunk also covered
+  [PASS] groundcover: entry without material rejected (feature 'gc': missing 'material')
+  [PASS] rocks: generator JSON loads
+  [PASS] rocks: formations rise above the surface (598 blocks)
+  [PASS] rocks: deterministic across runs
+  [PASS] rocks: spire profile loads
+  [PASS] transitions: generator JSON loads
+  [PASS] transitions: plain generator loads for comparison
+  [PASS] transitions: bands rewrite some columns (122)
+  [PASS] transitions: transition biome appears in the map
+  [PASS] transitions: only border columns are rewritten
+  [PASS] transitions: deterministic across runs
+  [PASS] transitions: unknown biome rejected (biome_transitions: unknown biome 'nope')
+  [PASS] worley: F1 deterministic for identical inputs
+  [PASS] worley: F1 finite and in range
+  [PASS] worley: F1 varies with seed
+  [PASS] worley: field dips below vein threshold somewhere
+  [PASS] worley_ore: generator JSON loads
+  [PASS] worley_ore: veins placed (2395 blocks)
+  [PASS] worley_ore: veins confined to the y band, none floating
+  [PASS] worley_ore: deterministic across runs
+  [PASS] worley_ore: clustered variant loads
+  [PASS] fauna: generator JSON loads
+  [PASS] fauna: mild table has 2 entries
+  [PASS] fauna: pack range parsed
+  [PASS] fauna: pack defaults to [1, 4]
+  [PASS] fauna: cold table empty (no section)
+  [PASS] fauna: out-of-range biome empty
+  [PASS] fauna: faunaAt matches faunaForBiome(biomeAt)
+  [PASS] fauna: unknown biome rejected (fauna: unknown biome 'nope')
+  [PASS] palettes: cosmic (void islands) profile loads
+  [PASS] palettes: underwafer (lava tubes) profile loads
+  [PASS] palettes: cosmic deterministic
+  [PASS] palettes: underwafer has worley ore (1214)
+  [PASS] palettes: cosmic fauna hook present
+  [PASS] snowcap: generator JSON loads
+  [PASS] snowcap: every column capped (256/256)
+  [PASS] snowcap: deterministic
+  [PASS] snowcap: high snow line -> no snow
+  [PASS] snowcap: latitude falloff (equator bare, pole capped)
+  [PASS] sand_drifts: generator JSON loads
+  [PASS] sand_drifts: drift patches painted (69)
+  [PASS] sand_drifts: confined to the hot biome
+  [PASS] sand_drifts: deterministic
+DIVERSITY SELFTEST OK
+  [PASS] diversity self-test: all checks pass
+Litho Formula voxelizer self-test
+  [PASS] sampler anchor: lithoR(phi, circle) == 1 for all phi
+  [PASS] sphere volume at 64 within 6% (N=129593, rel err 0.0385)
+  [PASS] watertight fill: all 105015 deep-interior sphere cells filled (no holes)
+  [PASS] resolutions 16/32/64: coords in [0,res)^3, octree at level log2(res)
+  [PASS] invalid resolutions (24, 0, 7, 100, -8) rejected: empty result
+  [PASS] degenerate (NaN) params: empty result, no crash
+  [PASS] star (m=5) smoke: non-empty, bounded in [0,32)^3 (N=10272)
+  [PASS] star (m=5): deterministic across runs
+LITHO VOXELIZER SELFTEST OK
+StructRegistry self-test (registry, placement solver, structure block)
+[07:07:00.691] structreg: 'jd:hut' registered unsigned (fingerprint 17a0381a6c66b76ac0fe481c6a44e51e693d12bc64c93a08124c0fae1954e33a)
+  [PASS] registry: register ok
+  [PASS] registry: duplicate rejected (first wins)
+  [PASS] registry: no variants rejected
+  [PASS] registry: empty name rejected
+  [PASS] registry: non-positive weight rejected
+  [PASS] registry: find returns the entry
+  [PASS] registry: unknown name -> nullptr
+  [PASS] registry: size counts accepted entries
+  [PASS] registry: sealed
+  [PASS] registry: sealed refuses registration
+  [PASS] registry: sealed still reads
+  [PASS] registry: resetForTests clears
+  [PASS] placement: separation test produced bases
+  [PASS] placement: separation keeps bases >= spacing apart (39 bases)
+  [PASS] placement: separation deterministic across runs
+  [PASS] variants: pool holds 3 variants
+  [PASS] variants: identical construction -> identical bases (deterministic)
+  [PASS] structure block: capture finds 8 cells
+  [PASS] structure block: capture sorted, relative, correct material
+  [PASS] structure block: capture skips structure blocks
+  [PASS] structure block: place writes 8 cells
+  [PASS] structure block: capture -> place round-trip identical
+[07:07:00.692] structreg: 'jd:testcube' registered unsigned (fingerprint 17a0381a6c66b76ac0fe481c6a44e51e693d12bc64c93a08124c0fae1954e33a)
+  [PASS] structure block: SAVE registers the capture
+  [PASS] structure block: SAVE duplicate name rejected
+  [PASS] structure block: LOAD places 8 cells
+  [PASS] structure block: LOAD unknown name places nothing
+  [PASS] structure block: SAVE -> LOAD round-trip identical
+[07:07:00.692] structreg: 'jd:watchtower' registered unsigned (fingerprint 17a0381a6c66b76ac0fe481c6a44e51e693d12bc64c93a08124c0fae1954e33a)
+  [PASS] loader: test structure registered
+  [PASS] loader: 'structure' + 'blueprint' rejected (mutually exclusive)
+  [PASS] loader: unknown structure name rejected
+  [PASS] loader: 'structure' name + rule fields load
+  [PASS] loader: bad anchor rejected
+  [PASS] identity: fingerprint deterministic, 64 hex chars
+  [PASS] identity: reordered cells, same hash
+  [PASS] identity: different blueprint, different hash
+  [PASS] identity: good name ok
+  [PASS] identity: good name ok 2
+  [PASS] identity: bad name rejected: 'nocolon'
+  [PASS] identity: bad name rejected: 'UPPER:name'
+  [PASS] identity: bad name rejected: 'jd:'
+  [PASS] identity: bad name rejected: ':name'
+  [PASS] identity: bad name rejected: 'a:b:c'
+  [PASS] identity: bad name rejected: 'jd:watch tower'
+  [PASS] identity: bad name rejected: ''
+  [PASS] identity: bad name rejected: 'jd:watch-tower'
+  [PASS] identity: bad name rejected: 'jd:name!'
+  [PASS] identity: malformed name refused with reason
+[07:07:00.725] structreg: 'jd:watchtower' registered unsigned (fingerprint 17a0381a6c66b76ac0fe481c6a44e51e693d12bc64c93a08124c0fae1954e33a)
+  [PASS] identity: register ok
+[07:07:00.725] structreg: 'jd:hut' registered unsigned (fingerprint 17a0381a6c66b76ac0fe481c6a44e51e693d12bc64c93a08124c0fae1954e33a)
+  [PASS] identity: register ok 2
+[07:07:00.725] structreg: 'mod:village' registered unsigned (fingerprint 17a0381a6c66b76ac0fe481c6a44e51e693d12bc64c93a08124c0fae1954e33a)
+  [PASS] identity: register ok 3
+  [PASS] identity: stored fingerprint matches computed
+  [PASS] identity: findByFingerprint round-trip
+  [PASS] identity: unknown fp -> null
+  [PASS] identity: list() in registration order
+  [PASS] identity: findByNamespace jd -> 2
+  [PASS] identity: findByNamespace mod -> 1
+  [PASS] identity: findByNamespace unknown -> empty
+  [PASS] identity: findByPrefix jd:watch -> 1
+  [PASS] identity: findByPrefix jd: -> 2
+  [PASS] identity: empty prefix matches all
+  [PASS] identity: fp hex parses
+[07:07:00.774] structreg: 'jd:signed' registered with signature (fingerprint 17a0381a6c66b76ac0fe481c6a44e51e693d12bc64c93a08124c0fae1954e33a)
+  [PASS] identity: signed registration ok
+  [PASS] identity: trusted signature
+  [PASS] identity: fp hex parses
+  [PASS] identity: tampered entry refused (fail closed)
+  [PASS] identity: refused entry not stored
+  [PASS] identity: fp hex parses
+[07:07:00.904] structreg: 'jd:selfsigned' registered with signature (fingerprint 17a0381a6c66b76ac0fe481c6a44e51e693d12bc64c93a08124c0fae1954e33a)
+  [PASS] identity: unknown-key sig registers
+  [PASS] identity: unknown key reported
+  [PASS] identity: malformed sig refused
+  [PASS] identity: unsigned entry
+  [PASS] identity: unknown name unsigned
+STRUCTREGISTRY SELFTEST OK
+Diversity self-test (ecosystem & environment)
+  [PASS] groundcover: generator JSON loads
+  [PASS] groundcover: tufts placed (88)
+  [PASS] groundcover: flowers placed (45)
+  [PASS] groundcover: pebbles placed (26)
+  [PASS] groundcover: nothing buried below the surface
+  [PASS] groundcover: biome tint written to flower state bytes
+  [PASS] groundcover: deterministic across runs
+  [PASS] groundcover: neighbour chunk also covered
+  [PASS] groundcover: entry without material rejected (feature 'gc': missing 'material')
+  [PASS] rocks: generator JSON loads
+  [PASS] rocks: formations rise above the surface (598 blocks)
+  [PASS] rocks: deterministic across runs
+  [PASS] rocks: spire profile loads
+  [PASS] transitions: generator JSON loads
+  [PASS] transitions: plain generator loads for comparison
+  [PASS] transitions: bands rewrite some columns (122)
+  [PASS] transitions: transition biome appears in the map
+  [PASS] transitions: only border columns are rewritten
+  [PASS] transitions: deterministic across runs
+  [PASS] transitions: unknown biome rejected (biome_transitions: unknown biome 'nope')
+  [PASS] worley: F1 deterministic for identical inputs
+  [PASS] worley: F1 finite and in range
+  [PASS] worley: F1 varies with seed
+  [PASS] worley: field dips below vein threshold somewhere
+  [PASS] worley_ore: generator JSON loads
+  [PASS] worley_ore: veins placed (2395 blocks)
+  [PASS] worley_ore: veins confined to the y band, none floating
+  [PASS] worley_ore: deterministic across runs
+  [PASS] worley_ore: clustered variant loads
+  [PASS] fauna: generator JSON loads
+  [PASS] fauna: mild table has 2 entries
+  [PASS] fauna: pack range parsed
+  [PASS] fauna: pack defaults to [1, 4]
+  [PASS] fauna: cold table empty (no section)
+  [PASS] fauna: out-of-range biome empty
+  [PASS] fauna: faunaAt matches faunaForBiome(biomeAt)
+  [PASS] fauna: unknown biome rejected (fauna: unknown biome 'nope')
+  [PASS] palettes: cosmic (void islands) profile loads
+  [PASS] palettes: underwafer (lava tubes) profile loads
+  [PASS] palettes: cosmic deterministic
+  [PASS] palettes: underwafer has worley ore (1214)
+  [PASS] palettes: cosmic fauna hook present
+  [PASS] snowcap: generator JSON loads
+  [PASS] snowcap: every column capped (256/256)
+  [PASS] snowcap: deterministic
+  [PASS] snowcap: high snow line -> no snow
+  [PASS] snowcap: latitude falloff (equator bare, pole capped)
+  [PASS] sand_drifts: generator JSON loads
+  [PASS] sand_drifts: drift patches painted (69)
+  [PASS] sand_drifts: confined to the hot biome
+  [PASS] sand_drifts: deterministic
+DIVERSITY SELFTEST OK
+  [PASS] silicon_cities: QuinticQ16 runs 0..65536, midpoint 32768, monotone
+  [PASS] silicon_cities: QuinticQ16 clamps outside [0, 64]
+  [PASS] silicon_cities: bus width 4u << ((h >> 24) & 3) gives 4/8/16/32
+  [PASS] silicon_cities: M1 ramp is 1:2 and rises exactly 8 over 16 blocks
+  [PASS] silicon_cities: M2 ramp rises exactly 16 over 32 blocks
+  [PASS] silicon_cities: district mix ~3/8 quarry, 2/8 SRAM, 1/8 clock/ALU/LithoHub (1480/1009/547/558/502 of 4096)
+  [PASS] silicon_cities: hub offsets stay in 64..191 inside their own sector, negative sectors included
+  [PASS] silicon_cities: no hub hash collisions in 4096 sectors (4096 unique)
+  [PASS] silicon_cities: mostly dormant: 767/4096 live
+  [PASS] silicon_cities: 10-15% of bus links unconnected (1054/8192)
+  [PASS] silicon_cities: no city-seed collisions across 2048 dimension seeds (seed 0 included)
+  [PASS] silicon_cities: seed 0 at the origin does not hash to zero
+  [PASS] silicon_cities: ramp state packs facing 2 + shape 2 + hanging 1 bits (< 32)
+  [PASS] silicon_cities: ramp corner heights: straight 2, inner 3, outer 1 high corners
+  [PASS] silicon_cities: lone ramp stays straight
+  [PASS] silicon_cities: outer corners snap (left kept, right stored as next facing)
+  [PASS] silicon_cities: inner corners snap (left kept, right stored as next facing)
+  [PASS] silicon_cities: outer-left keeps the NW corner high, outer-right the NE corner
+  [PASS] silicon_cities: inner-left drops the SE corner, inner-right the SW corner
+  [PASS] silicon_cities: a same-facing ramp beside it blocks the corner (canTakeShape)
+  [PASS] silicon_cities: generator with silicon_cities loads
+  [PASS] silicon_cities: identical output twice (sector 0)
+  [PASS] silicon_cities: hub pad at base_y (alu, sector 0)
+  [PASS] silicon_cities: cities change the hub chunk (sector 0)
+  [PASS] silicon_cities: enabled:false is byte-identical to no city stage (sector 0)
+  [PASS] silicon_cities: identical output twice (sector -3)
+  [PASS] silicon_cities: hub pad at base_y (quarry, sector -3, negative coords)
+  [PASS] silicon_cities: cities change the hub chunk (sector -3)
+  [PASS] silicon_cities: enabled:false is byte-identical to no city stage (sector -3)
+  [PASS] silicon_cities: --cities off overrides enabled:true
+  [PASS] silicon_cities: --cities on overrides enabled:false
+  [PASS] silicon_cities: in-world M1 ramp climbs from 120 to 128 (120 -> 128)
+  [PASS] silicon_cities: worldgen ramps on steps, undersides and edges (4162 cells, 3037 hanging)
+  [PASS] silicon_cities: worldgen ramps snap inner/outer corners where edges meet (5 corners)
+  [PASS] silicon_cities: ramp pass is deterministic
+SILICON CITIES SELFTEST OK
+PROCGEN SELFTEST OK
+  [PASS] ui: anchors: fill with insets (10,20 760x540)
+  [PASS] ui: anchors: pivot + offset (bottom centre) (350,542 100x50)
+  [PASS] ui: vertical stack: sizes, flex share, margins, spacing (0,0 200x40)(2,48 194x73)(0,131 200x169)
+  [PASS] ui: horizontal stack: fixed + flex child, right anchored
+  [PASS] ui: grid: row-major cells with spacing (512,512 10x10)
+  [PASS] ui: panel padding (theme) insets children (8,8 84x84)
+  [PASS] ui: label measures multi-line text
+  [PASS] ui: theme: parse glyph + scale 
+  [PASS] ui: theme: colour arrays and padding
+  [PASS] ui: theme: new class inherits the default, hex colours with alpha
+  [PASS] ui: theme: unknown class falls back to default
+  [PASS] ui: theme: unknown key rejected (style 'button': unknown key 'colour')
+  [PASS] ui: theme: bad colour rejected (style 'button': bad value for 'text')
+  [PASS] ui: focus: Tab skips non-focusable, wraps; Shift+Tab goes back
+  [PASS] ui: focus: disabled widgets are skipped
+  [PASS] ui: focus: Up moves to the widget above
+  [PASS] ui: navigation: arrows move between grid cells
+  [PASS] ui: focus: click focuses the focusable target
+  [PASS] ui: focus: hiding the focused widget clears focus
+  [PASS] ui: focus: Escape releases keyboard focus
+  [PASS] ui: text: line/column <-> offset
+  [PASS] ui: text: insert at caret
+  [PASS] ui: text: typing coalesces into one undo step
+  [PASS] ui: text: redo
+  [PASS] ui: text: backspace joins lines
+  [PASS] ui: text: Ctrl+Shift+Right selects a word
+  [PASS] ui: text: multi-line insert replaces the selection
+  [PASS] ui: text: newline keeps indentation
+  [PASS] ui: text: Home toggles first non-blank / column 0
+  [PASS] ui: text: vertical moves keep the preferred column
+  [PASS] ui: text: single-line buffer drops newlines (cdab)
+  [PASS] ui: editor: typing, Enter, Tab inserts spaces
+  [PASS] ui: editor: select all, copy, paste
+  [PASS] ui: editor: Ctrl+Z undoes the paste
+  [PASS] ui: editor: Ctrl+S emits save
+  [PASS] ui: editor: positionAt(caretRect) round-trips
+  [PASS] ui: editor: Shift+Right selects, Ctrl+X cuts
+  [PASS] ui: editor: line numbers drawn, clip balanced
+  [PASS] ui: textbox: click focuses, type, Enter submits, Backspace
+  [PASS] ui: button: click on release inside + Enter; script handler gets the id
+  [PASS] ui: checkbox: click toggles
+  [PASS] ui: slider: pointer capture keeps dragging outside, clamps to max
+  [PASS] ui: number field: typing clamps to 0..64, Down and wheel step
+  [PASS] ui: list: keyboard selection and activate
+  [PASS] ui: tree: expand and enter children
+  [PASS] ui: tree: Left goes to parent, collapses
+  [PASS] ui: dropdown: popup list, keyboard choose
+  [PASS] ui: paint: clip stack balanced, current values drawn
+  [PASS] ui: menubar: click opens, keyboard runs an item and closes
+  [PASS] ui: menu: submenu by keyboard
+  [PASS] ui: menubar: Right switches menus, outside click closes
+  [PASS] ui: context menu: script item
+  [PASS] ui: modal: blocks input below
+  [PASS] ui: modal: Tab cycles inside the dialog only
+  [PASS] ui: dialog: button closes it
+  [PASS] ui: dialog: Escape closes
+  [PASS] ui: modal: input below works again after closing
+  [PASS] ui: tooltip: shown after the hover delay
+  [PASS] ui: factory: JSON tree with properties and script handlers 
+  [PASS] ui: factory: unknown type rejected (ui: unknown widget type 'panle')
+  [PASS] ui: factory: unknown key rejected with path (ui/panel[0]: unknown key 'txt' for type 'label')
+  [PASS] ui: divider: horizontal measures thickness height
+  [PASS] ui: divider: vertical measures thickness width
+  [PASS] ui: divider: thickness clamps to >= 1
+  [PASS] ui: divider: never interactive
+  [PASS] ui: divider: paints one accent rect, clip balanced
+  [PASS] ui: mod UI: reserved style 'dialog' rejected in mod JSON
+  [PASS] ui: mod UI: reserved style 'tooltip' rejected in mod JSON
+  [PASS] ui: mod UI: reserved style 'mod_panel' rejected in mod JSON
+  [PASS] ui: mod UI: reserved style 'mod_badge' rejected in mod JSON
+  [PASS] ui: mod UI: reserved-style set is exactly the engine-applied/system classes
+  [PASS] ui: mod UI: bad mod id refused
+  [PASS] ui: mod UI: bad panel id refused
+  [PASS] ui: mod UI: empty title refused
+  [PASS] ui: mod UI: overlong title refused
+  [PASS] ui: mod UI: unknown widget type rejected in mod JSON
+  [PASS] ui: mod UI: panel builds, carries the mod id and the engine frame class
+  [PASS] ui: mod UI: badge strip spans the panel top
+  [PASS] ui: mod UI: MOD badge tag is painted by the engine
+  [PASS] ui: mod UI: badge paint leaves the clip stack balanced
+  [PASS] ui: mod UI: hostile layout builds (confinement is structural, not a reject)
+  [PASS] ui: mod UI: no mod widget rect may intersect the badge strip
+  [PASS] ui: mod UI: badge survives a hostile child (painted last, on top)
+  [PASS] ui: mod UI: 64-deep layout refused (no factory stack overflow)
+  [PASS] ui: mod UI: 1100-node layout refused (node budget)
+  [PASS] ui: mod UI: 300-widget layout refused (per-panel widget budget)
+  [PASS] ui: mod UI: panel attaches to the main layer, never as modal/popup
+  [PASS] game ui: HudUiRenderer: draws after the legacy HUD, nested clips intersect, glyphs cut (42 verts)
+  [PASS] game ui: HudUiRenderer: paint order kept; images resolve to swatches (magenta if unknown)
+[07:07:00.988] AngelScript 2.38.0 ready (sandbox: allowlisted bindings only)
+  [PASS] game ui: script bindings: widget event calls the script handler, which reads / writes widgets by id
+  [PASS] game ui: script bindings: ui_show builds JSON UI; its handler closes itself
+[07:07:00.992] AngelScript 2.38.0 ready (sandbox: allowlisted bindings only)
+[07:07:00.993] scripts: 2 file(s) from C:\Users\JDWETW~1\AppData\Local\Temp\lithokraft_ui_selftest_scripts-6952
+[07:07:00.993] [script] v1
+  [PASS] game ui: script editor: opens with the first scripts/*.as file
+[07:07:00.994] script editor: saved a.as, hot reloading scripts
+[07:07:00.994] scripts: 2 file(s) from C:\Users\JDWETW~1\AppData\Local\Temp\lithokraft_ui_selftest_scripts-6952
+[07:07:00.995] [script] v2
+  [PASS] game ui: script editor: Ctrl+S saves and hot-reloads (onLoad ran again)
+[07:07:00.995] script editor: saved a.as, hot reloading scripts
+[07:07:00.996] scripts: 2 file(s) from C:\Users\JDWETW~1\AppData\Local\Temp\lithokraft_ui_selftest_scripts-6952
+[07:07:00.996] [script] a.as (1,1) info: Compiling void onLoad()
+[07:07:00.997] [script] v2
+  [PASS] game ui: script editor: a compile error keeps the old scripts running, jumps to the error (a.as (3,3): Expected ';')
+  [PASS] game ui: script editor: Esc with unsaved changes asks first
+  [PASS] game ui: HUD: hotbar is bottom-centred; clicking a slot selects it
+  [PASS] game ui: HUD: hotbar slot 0 renders the Fragment stack with its item icon, selected
+  [PASS] game ui: HUD: a tool stack renders with its item icon
+  [PASS] game ui: HUD: a block stack renders with its block icon
+  [PASS] game ui: HUD: the selected slot's name reads 'The Fragment' (the real stack, not a block)
+  [PASS] game ui: HUD: rebuilt at scale 2 for 1080p windows (auto)
+  [PASS] game ui: inventory: modal dialog; shift-click picks the block
+  [PASS] game ui: palette: the dialog title honestly reads 'Block palette (creative)', not 'Creative inventory'
+  [PASS] game ui: palette: the dialog explains the full-stack give
+  [PASS] game ui: inventory: Escape closes it and tells the game
+  [PASS] game ui: inventory: closing from the game sends no callback
+  [PASS] game ui: settings: save writes config/settings.json (creating directories)
+  [PASS] game ui: settings: load round-trips every field
+  [PASS] game ui: settings: a corrupt file falls back to defaults
+  [PASS] game ui: settings: out-of-range values clamp to the nearest valid (volume 1, tps 128, radius 0, pbrTier 3)
+  [PASS] game ui: settings: a missing file loads defaults
+  [PASS] game ui: menu: openMenu builds the overlay
+  [PASS] game ui: menu: the 'title' style gives the big title text
+  [PASS] game ui: menu: big LITHOKRAFT title
+  [PASS] game ui: menu: tagline reads 'A LITHOLATTICE GAME'
+  [PASS] game ui: menu: version footer shows the plumbed version
+  [PASS] game ui: menu: divider under the tagline
+  [PASS] game ui: menu: Play / Settings / Exit buttons
+  [PASS] game ui: menu: Play dispatches the play callback
+  [PASS] game ui: menu: Settings dispatches openSettings
+  [PASS] game ui: menu: Exit dispatches quit
+  [PASS] game ui: menu: Enter on the focused Play button starts the game
+  [PASS] game ui: menu: HUD scale preference overrides the auto scale
+  [PASS] game ui: menu: HUD scale 0 falls back to auto
+  [PASS] game ui: gui scale: auto = largest whole scale fitting 960x540 (720p 1, 1080p 2, 4K 4, min 1)
+  [PASS] game ui: gui scale: a fixed 1-4 choice is kept, capped to the 640x360 safe canvas
+  [PASS] game ui: gui text: every glyph scale is a whole number of pixels per font texel
+  [PASS] game ui: menu: closeMenu removes the overlay
+  [PASS] game ui: pause: Resume / Settings / Exit to menu / Quit to desktop
+  [PASS] game ui: pause: Resume closes the dialog and reports it
+  [PASS] game ui: pause: Settings reports openSettings and keeps the pause dialog
+  [PASS] game ui: pause: Exit to menu dispatches exitToMenu
+  [PASS] game ui: pause: Quit to desktop dispatches quit
+  [PASS] game ui: settings: openSettings shows the dialog
+  [PASS] game ui: settings: the dialog is the top modal
+  [PASS] game ui: settings: Audio / Video / Graphics / Sim tabs
+  [PASS] game ui: settings: volume slider initialised from the current settings
+  [PASS] game ui: settings: the volume slider reports changes
+  [PASS] game ui: settings: mute checkbox initialised
+  [PASS] game ui: settings: the mute checkbox reports changes
+  [PASS] game ui: settings: display mode dropdown initialised (Fullscreen)
+  [PASS] game ui: settings: the display dropdown reports changes
+  [PASS] game ui: settings: the HUD scale dropdown reports changes
+  [PASS] game ui: settings: tick rate dropdown initialised (128)
+  [PASS] game ui: settings: the tick rate dropdown reports changes
+  [PASS] game ui: settings: tick radius field initialised
+  [PASS] game ui: settings: the tick radius field reports changes
+  [PASS] game ui: settings: the EUV checkbox reports changes
+  [PASS] game ui: settings: PBR transparency dropdown initialised from the current settings
+  [PASS] game ui: settings: the PBR transparency dropdown reports changes (live tier)
+  [PASS] game ui: settings: PBR tier pairing hint label present
+  [PASS] game ui: settings: Escape closes the dialog
+[PASS] wiring: Vehicle: mount once, second rider refused
+[PASS] wiring: Vehicle: thrust/speed/lift/fuel deterministic from controls
+[PASS] wiring: Glider: glide ratio hook
+[PASS] wiring: Vehicle: dismount clears rider
+[PASS] wiring: B6: Etchor block registered as lithokraft:etchor
+[PASS] wiring: B6: Etchor id appends directly after the certificate table (append-only, no renumber)
+[PASS] wiring: B6: Etchor carries SimRole::Etchor
+[PASS] wiring: B6: 'etchor' behaviour registered in the catalog
+[PASS] wiring: B6: Etchor readout resolves through its behaviour
+[PASS] wiring: B6: etch input is the Wafer Silicon blank
+[PASS] wiring: B6: etch output is the Chipor item (block-backed id)
+[PASS] wiring: B6: etch with a wafer + name succeeds
+[PASS] wiring: B6: etch consumed exactly one wafer
+[PASS] wiring: B6: output is one Chipor stack bearing the name-field value
+[PASS] wiring: B6: the name field overwrites the chip's display name
+[PASS] wiring: B6: second identical etch succeeds
+[PASS] wiring: B6: identical named chips stack together (identity stacking)
+[PASS] wiring: B6: etch with no wafer left fails and changes nothing
+[PASS] wiring: B6: etch beside plain chips succeeds
+[PASS] wiring: B6: named output never merges into the plain chip stack
+[PASS] wiring: B6: plain chip adds never merge into a named stack
+[PASS] wiring: B6: empty name field etches a plain chip
+[PASS] wiring: B6: empty-name output carries no stack data
+[PASS] wiring: B6: over-cap name refused (not truncated), wafer untouched
+[PASS] wiring: B6: control characters in the name field refused
+[PASS] wiring: B7: curve bands are powers of two doubling every 4 levels, base 8
+[PASS] wiring: B7: curve totals match the proposal (level 16 = 480, level 32 = 8160)
+[PASS] wiring: B7: level derives from total static
+[PASS] wiring: B7: spending 3 levels from level 16 lands on the level-13 floor
+[PASS] wiring: B7: overspend is refused
+[PASS] wiring: B7: Certificate of Clarity is registered (DECIDED design)
+[PASS] wiring: B7: Certificate of Knowledge is registered (DECIDED 2026-10-13)
+[PASS] wiring: B7: unknown certificate id resolves to nothing
+[PASS] wiring: B7: signing a stack succeeds
+[PASS] wiring: B7: signing spent 2 levels (level 10 -> 8 floor, enchanting-style)
+[PASS] wiring: B7: the stack splits -- 2 unsigned remain
+[PASS] wiring: B7: the signed item is its own stack carrying the certificate id
+[PASS] wiring: B7: duplicate certificate on one item refused, static untouched
+[PASS] wiring: B7: second signing (5 levels from level 8) lands on the level-3 floor
+[PASS] wiring: B7: insufficient level refused, static untouched
+[PASS] wiring: B7: unknown certificate refused
+[PASS] wiring: B7: empty slot refused
+[PASS] wiring: B6/B7: player.lat v5 writes
+[PASS] wiring: B6/B7: written file reads back at the current version
+[PASS] wiring: B6/B7: name field + certificate list survive the save round trip
+[PASS] wiring: B6/B7: plain stacks round-trip with no data attached
+[PASS] wiring: B6/B7: hand-built v4 player.lat writes
+[PASS] wiring: B6/B7: a v4 save still loads after the v5 bump (stacks plain, nothing lost)
+[PASS] wiring: world clock: a day is 32 real minutes (61,440 ticks at 32 TPS)
+[PASS] wiring: world clock: 32 real minutes per day at every TPS on the 32..512 ladder
+[PASS] wiring: world clock: 24 h clock reads 09:00 after 9 game hours
+[PASS] wiring: world clock: a v6 play clock migrates at 32 TPS
+[PASS] wiring: prayer: windows are 09:00-09:32, 13:00-13:32, 17:00-17:32
+[PASS] wiring: prayer: a kneel outside the mealtime windows grants nothing
+[PASS] wiring: prayer: 64 in-window kneel ticks grant nothing (needs > 64)
+[PASS] wiring: prayer: the 65th in-window tick grants max(1, 2% of 8) = 1 static at level 0
+[PASS] wiring: prayer: one prayer per window (a second kneel in the same window pays nothing)
+[PASS] wiring: prayer: a clock rewound a day does not reopen the windows
+[PASS] wiring: prayer: ...and the next real day pays again
+[PASS] wiring: prayer: kneel ticks before 09:00 do not count toward the window
+[PASS] wiring: prayer: ...and the 65th tick inside the window pays
+[PASS] wiring: prayer: breakfast + lunch + dinner = 3 per day max
+[PASS] wiring: prayer: a new world day resets the windows
+[PASS] wiring: prayer: reward = 2% of the next level's cost
+[PASS] wiring: prayer: deterministic for one kneel/clock sequence
+[PASS] wiring: player.lat v7 writes
+[PASS] wiring: save: the player file is player.lat
+[PASS] wiring: player.lat v7: mealtime prayer block round-trips
+[PASS] wiring: hand-built v6 player.dat writes
+[07:07:01.015] save: loading legacy player.dat (the next save writes player.lat)
+[PASS] wiring: save: a legacy v6 player.dat loads (play clock kept for migration)
+[PASS] wiring: hand-built v5 player.dat writes
+[07:07:01.019] save: loading legacy player.dat (the next save writes player.lat)
+[PASS] wiring: save: a legacy v5 player.dat loads (no prayer state)
+[PASS] wiring: save: the next save migrates to player.lat
+[PASS] wiring: save: player.lat wins over the leftover player.dat
+[PASS] wiring: level.json v1 (no clock) writes
+[PASS] wiring: world clock: a level.json without a clock reads as absent
+[PASS] wiring: level.json v2 writes
+[PASS] wiring: world clock: worldTick + worldTime round-trip in level.json
+[PASS] wiring: B4: seven procgen plant blocks registered (Cross, texture-index order, ids 58-64 after Etchor)
+[PASS] wiring: B4: biome formula rows resolve to leaf (5) / blob (6) plant textures
+[PASS] wiring: B4: wafer generator loads (groundcover materials resolve fail-closed)
+[PASS] wiring: B4: scan window covers DicingPlains and ResonatorSpires
+[PASS] wiring: B4: formula leaf shrubs generate in DicingPlains
+[PASS] wiring: B4: formula blob shrubs generate in ResonatorSpires
+[PASS] wiring: B4: worldgen no longer places silica_grass as groundcover
+[PASS] wiring: B4: regenerated chunk is cell-identical (deterministic)
+  litho wired: lithography: formed; laser LR, expose(top)=111, mask(bottom)=10101, code=175, wafers=8
+[PASS] wiring: litho: powered Emitors light (Lamp role) and keep their facing
+[PASS] wiring: litho: wired machine formed, both side lasers hit the top row
+[PASS] wiring: litho: expose bits 111 (middle fed by lit Trace), mask bits 10101 from strongly powered feeders
+[PASS] wiring: litho: 8 wafers in the back buffer, front clear, ready to etch
+[PASS] wiring: litho: unwired machine formed but dark (no laser, no fed Connectors) - refuses to etch
+[PASS] wiring: litho: a missing canon block unforms the machine with a named reason
+[PASS] wiring: litho: nearest-Etchor search finds the machine within 6 blocks only
+[PASS] wiring: litho: back-buffer wafer count clamps 0..64 and keeps facing/aux/on
+[07:07:01.163]   resources: worldgen/wafer.json from lithokraft
+[07:07:01.164]   resources: worldgen/organic.json from lithokraft
+[07:07:01.165]   resources: ui/theme.json from lithokraft
+[07:07:01.165] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[07:07:01.165]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[07:07:01.165]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[07:07:01.165]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[07:07:01.165]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[07:07:01.165]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[07:07:01.165]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[07:07:01.165]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[07:07:01.165]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+  [PASS] sprite host: 9 starter defs registered (formula Image x5, SVG diamond, Systerian glyph, pack icon, animated pulse, spark)
+  [PASS] sprite host: fx:star5 and fx:star5_orange are distinct defs (tint is a def property) over the same generated image
+  [PASS] sprite host: PNG file + PNG bytes registration both accept the pack's certificate-table icon
+  [PASS] sprite host: registration is first-wins by name (re-register keeps the original def)
+  [PASS] sprite host: atlas builds (version >= 1, page 0) with a placed frame rect for fx:star5
+  [PASS] sprite host: spawn 3 + burst 28 = 31 live instances
+  [PASS] sprite host: all instances survive 10 ticks (spark lifetimes are 15..40)
+  [PASS] sprite host: emitQuads -> 31 render quads and 31x4 software verts
+  [PASS] sprite host: quad order is cutout first, additive last (the core's emission contract)
+  [PASS] sprite host: animated def advances its atlas frame after ticksPerFrame sim ticks
+  [PASS] sprite host: burst sparks die on their lifetimes; the immortal star markers remain
+  [PASS] sprite host: clear removes every instance
+  [PASS] sprite capture: wafer scene generated + meshed for the software render
+  [PASS] sprite capture: the spawned star billboard is visible in the software-rendered world frame
+  [PASS] sprite capture: capture PNG + atlas PNG written to ~/workspace/user/files/
+  [PASS] locomotion: the body falls under gravity (airborne, descending)
+  [PASS] locomotion: the body lands (onGround)
+  [PASS] locomotion: the body rests exactly at floor height with zero fall speed
+  [PASS] locomotion: the landed body stays put (no sinking, no jitter)
+  [PASS] locomotion: walking into a wall stops at halfWidth from it, never inside
+  [PASS] locomotion: the wall-stopped body stays grounded at floor height
+  [PASS] locomotion: the body traverses the 1-block tunnel
+  [PASS] locomotion: the tunnel forces the Crawl pose (zero crawl input)
+  [PASS] locomotion: the eye height inside the tunnel is the crawl height (0.4)
+  [PASS] locomotion: the body emerges from the tunnel standing (eye 1.62)
+  [PASS] locomotion: a deliberate crawl request drops the body to the Crawl pose
+  [PASS] locomotion: fly mode rises on Jump at fly vertical speed
+  [PASS] locomotion: fly mode ignores gravity (no sag with no input)
+  [PASS] locomotion: fly mode descends on Sneak
+  [PASS] locomotion: the adapter mirrors the body's TRUE velocity after a walk tick
+  [PASS] locomotion: the adapter position follows the body
+  [PASS] locomotion: a teleport tick reports zero velocity once (position still mirrors)
+  [PASS] locomotion: the adapter's legacy derived-velocity sync is unchanged
+  [PASS] vitals (PLY-1): equal wall-clock oxygen drain at 32 vs 512 TPS
+  [PASS] vitals (PLY-1): 32 TPS calibration unchanged (full 64-point bar drains in 512 ticks)
+  [PASS] vitals (PLY-1): equal wall-clock oxygen refill at 32 vs 512 TPS
+  [PASS] vitals (PLY-1): per-tick calls at 512 TPS accumulate to the same drain (no fractional loss)
+  [PASS] locomotion: the Crawl action has default bindings (C / DpadRight)
+  [PASS] locomotion: the Crawl action is in the action info table
+  [PASS] locomotion: the Crawl action is in the Gameplay input context
+  [PASS] fps cap: Settings default is -1 (auto 60/30; Cortana 2026-10-15 1610)
+  [PASS] fps cap: settings.json round-trips fpsCap=60
+  [PASS] fps cap: settings.json load clamps 5000 -> 1000
+  [PASS] fps cap: settings.json load clamps -5 -> -1 (auto)
+  [PASS] fps cap: pacer default off — endFrameAndWait is a no-op
+  [PASS] fps cap: pacer clamps cap to 1000
+  [PASS] fps cap: a 60 FPS cap holds a fresh frame to its ~16.7 ms interval (bounded measured check)
+  [PASS] fps cap: an overrun frame waits nothing (no catch-up debt)
+  [PASS] fps cap: setCapFps(0) disables pacing (live change back to off)
+  [PASS] fps cap: render.fps_cap cvar registered, default -1 (auto)
+  [PASS] fps cap: cvar set 120 flows through the settings apply path
+  [PASS] fps cap: cvar set clamps to 1000 through the apply path
+  [PASS] fps cap: cvar set 0 turns the cap off through the apply path
+  [PASS] ai host: ai.enabled cvar registered, default 0 (off)
+  [PASS] ai host: bound but disabled constructs no AiWorld (default is safe)
+  [PASS] ai host: advance() while disabled is a no-op (no construction, no effect)
+[07:07:01.363] ai: AiWorld constructed over the live world (ai.enabled; hz 10, mob cap 64)
+  [PASS] ai host: enabling constructs the AiWorld + WalkCache over the live map
+  [PASS] ai host: AiWorld rate is the engine-clamped 8..16 Hz
+  [PASS] ai host: spawn through the production AiWorld works
+  [PASS] ai host: advance(32 ticks, 32 TPS) ran 10 AI ticks at 10 Hz (not 32)
+  [PASS] ai host: the spawned mob pathed and moved toward its goal
+  [PASS] ai host: advance(512 ticks, 512 TPS) added 10 AI ticks (rate independent of world TPS)
+  [PASS] ai host: disabling destroys the AiWorld
+[07:07:01.427] ai: AiWorld constructed over the live world (ai.enabled; hz 10, mob cap 64)
+  [PASS] ai host: re-enabling constructs a fresh, empty AiWorld (no stale state)
+  [PASS] ai host: unbind while enabled destroys the AiWorld
+[07:07:01.493] ai: AiWorld constructed over the live world (ai.enabled; hz 10, mob cap 64)
+  [PASS] ai host P0: SimRole::Wire cell carries the track bit (real NavRules)
+  [PASS] ai host P0: kGameClimbable cell carries the climb bit
+  [PASS] ai host P0: kGameFluid cell carries the fluid bit
+  [PASS] ai host P0: climb mode ascends a ladder column through the host cache
+  [PASS] ai host P0: cell reads passable before the edit
+  [PASS] ai host P0: cache stays stale until the tick boundary (no mid-plan churn)
+  [PASS] ai host P0: advance() drains edit posts -- cell is solid in the cache
+  [PASS] ai host P0: after the drain, walk detours around the new wall
+  [PASS] ai host B-H1: queue starts empty while disabled
+  [PASS] ai host B-H1: 1000+ edits while disabled queue NOTHING (posts dropped at the sink)
+  [PASS] ai host B-H1: queue still empty after advance() while disabled
+[07:07:01.646] ai: AiWorld constructed over the live world (ai.enabled; hz 10, mob cap 64)
+  [PASS] ai host B-H1: enabling starts from an empty queue
+  [PASS] ai host B-H1: an edit while enabled queues exactly one post
+  [PASS] ai host B-H1: cache is stale before the drain (post queued, not yet applied)
+  [PASS] ai host B-H1: advance() drains the queue to empty
+  [PASS] ai host B-H1: the drained post invalidated the edited cell (enabled path intact)
+  [PASS] ai host B-H1: edits after disabling queue nothing again
+  [PASS] deceitor: titanium oxide is a liked item (JD-named)
+  [PASS] deceitor: Wafer Silicon is not a liked item
+  [PASS] deceitor: silica seed is not a liked item
+  [PASS] deceitor: spawn through the director works
+  [PASS] deceitor: brain registered itself with the director
+  [PASS] deceitor: approach face is the Smile (identical to a Receiptor's)
+  [PASS] deceitor: barter offer on the ground is consumed
+  [PASS] deceitor: a completed barter marks the mob fed
+  [PASS] deceitor: barter leaves the mob neutral
+  [PASS] deceitor: exactly one barter return is tossed
+  [PASS] deceitor: ordinary return comes from the ordinary pool (existing items only)
+  [PASS] deceitor: liked offer is consumed and feeds
+  [PASS] deceitor: liked return comes from the enthusiastic pool
+  [PASS] deceitor: liked barter completes promptly (walk + short beat)
+  [PASS] deceitor: no smile is shown to a turned back (mask needs a face)
+  [PASS] deceitor: unfed + back turned eventually triggers betrayal (seeded roll)
+  [PASS] deceitor: open hostility drops the mask (Scowl)
+  [PASS] deceitor: the betrayed mob chases and lands melee damage
+  [PASS] deceitor: no betrayal while the player faces the mob, even unfed
+  [PASS] deceitor (fed setup): barter completed
+  [PASS] deceitor: no betrayal inside the fed window, back turned or not
+  [PASS] deceitor: interacting opens NO interface (the tell vs a Receiptor)
+  [PASS] deceitor: a failed click provokes (grace runs)
+  [PASS] deceitor: a throw inside the grace window diverts to barter, not hostility
+  [PASS] deceitor: a failed click with no throw turns hostile at grace expiry
+  [PASS] deceitor: the attacked mob turns hostile
+  [PASS] deceitor: pack retaliation — nearby Deceitors go hostile together
+  [PASS] deceitor: a Deceitor outside the pack radius stays neutral
+  interchange: OK
+  [PASS] dimensions: cosmic and underwafer resolve in the registry (B5)
+  [PASS] dimensions: void stays unregistered (infinite extent, no packPos representation)
+  [PASS] dimensions: overworld alias still resolves to organic
+  [PASS] dimensions: cosmic/underwafer generators load without fail-closed errors
+  [PASS] dimensions: built-in fallback JSON exists for cosmic and underwafer
+  [PASS] dimensions: cosmic smoke load -- spawn on a crust surface inside the solid band (y < 256)
+  [PASS] dimensions: cosmic is all-air at y >= 256 (the Empty, as air until a medium field exists)
+  [PASS] dimensions: underwafer smoke load -- spawn on a stone surface in the deep band
+  spawn: wafer load(6) -> (58.0, 266.0, 42.0), surfaceY at that column = 265
+  [PASS] spawn: wafer spawn resolves to air just above the surface at its column (no float)
+  [PASS] spawn garden: seed-311 formula shrub stands west of the wafer spawn
+  [PASS] spawn garden: seed-314 formula shrub stands east of the wafer spawn
+  [PASS] spawn garden: the spawn cell itself stays clear
+  [PASS] spawn garden: exactly one 311 and one 314 shrub in the whole wafer
+  [PASS] spawn garden: regeneration reproduces both shrubs at the same cells
+  [PASS] spawn garden: seeds 311/314 share one alpha mask (156 filled px) and differ in colour
+  [PASS] wafer demo: 9 plain lamps, 7 lit at launch (repeator, comparator, redirector rows included)
+  [PASS] wafer demo: lamp wall (32) + color lamps lit at launch
+  [PASS] wafer: surface near layer 256 of 768, only the crust is generated (empty sections skipped; feature spires may add a 4th section)
+  [PASS] save: player metadata (position, look, dimension, hotbar) round trip
+  [PASS] save: blocks, cell states and component memory / timers restore bit for bit
+  [PASS] spawn garden: both shrubs survive the save/load round trip
+  [PASS] save: the restored world ticks identically to the original (70 more ticks)
+  [PASS] save: a damaged player.lat is detected (CRC), not misread
+  [PASS] save (P2b-1): player.lat (current version) round-trips the full inventory (hotbar + offhand + main + gear, Fragment + tool + block stacks)
+  [PASS] save (P2b-1): a saved Fragment is kept across save/load — the boot grant does not duplicate it
+  [PASS] save (P2b-1): a v3 player.lat loads with an empty inventory and its raw-id hotbar intact
+  [PASS] save (P2b-1): v4 hotbar + inventory string ids name-remap on load (rename alias follows); an unknown item drops alone
+  [PASS] save (C-L1): player.lat with trailing bytes after the last block is refused
+  [PASS] save (C-L1): writePlayer refuses a 300-slot hotbar instead of truncating its u8 count
+  [PASS] worldgen: same seed gives identical columns with 1, 4 and all threads
+  [PASS] worldgen: two fresh loads of a dimension (terrain + structures) are identical
+  [PASS] save: save / edit / save / edit+tick / save, then regenerate + load matches bit for bit (cells, states, component memory)
+  [PASS] save: the partially saved world ticks identically after load
+  [PASS] blocks: save ids are explicit and frozen (silicon, red_torch, switch, button, lamp)
+  [PASS] save: block ids are unique 'lithokraft:' names, saves write the name table, and a legacy save (no table) migrates as the current order
+  [PASS] save (C-4): a torn blocks.names primary heals from the intact backup generation; every column loads
+  [PASS] save (C-4): a corrupt blocks.names with no intact generation + regions present fails closed (load refuses, save refuses, table untouched)
+  [PASS] save (SV-H3): a torn player.lat primary heals from the backup generation
+  [PASS] save (SV-H2): the world seed persists in level.json and reads back exactly (uint64) with no CLI seed
+  [PASS] save (SV-H1): a failed region flush surfaces as failure (never 'on disk') and the kept pending records land on retry
+  [PASS] p1-stream: source circuit lives before save (memor stored the decayed 62, lamp lit)
+  [PASS] p1-stream (SW-H1/C-M4): loadColumn returns the column AND its per-column SGNL payload
+  [PASS] p1-stream (B-M3): a never-saved column reports NotSaved (generate fresh), distinct from unreadable
+  [PASS] p1-stream (SW-H1): scanColumn + importState restores the streamed column's component memory bit for bit
+  [PASS] p1-stream (SW-H1): the streamed circuit is ALIVE after reload (lamp lit, memor still holds 62)
+  [PASS] p1-stream (C-M4): loadDimension on the same instance after streamed loads returns exactly the dimension's state (no residue, no cross-path sweep)
+  [PASS] p1-stream (SW-H2): a disk-loaded wire value of 100 is clamped TO 64 at the component input (memor stores 64)
+  [PASS] p1-stream (B-M3): corrupt name table => Unreadable on every call (fail closed per column, no latch, never 'never saved')
+  [PASS] p1-stream (SW-H1/H3): ChunkStreamer delivers the disk column with its SGNL payload through the job pool
+  [PASS] p1-stream (B-M3/B-L7): an unreadable streamed column is not delivered, not generated over, and its key is un-requested for a backed-off retry
+  [PASS] stream (B-M2): takeReadyUpTo(3) never returns more than 3, and all 9 requested columns arrive across successive pumps
+  [PASS] packPos (B-L2): in-range coordinates round-trip exactly; z = +2^20 is out of range and aliases onto (x=1, z=-2^20)
+  [PASS] light (B-L5): addSource level 200 clamps to kMaxLight (64)
+  [PASS] trace strengths (B-M4): the full pass records the wire's final strength under its WORLD packPos key
+  [PASS] trace strengths (B-M4): the same local coords in another chunk have NO slot (world keying), and kNoSlot != real slot 0
+  [PASS] storage (C-M3): a region file over the 64 MiB cap is refused at open, before any whole-file read
+  [PASS] storage (C-L2): two recoveries keep BOTH torn primaries (.torn and .torn.1); the first evidence is never overwritten
+  [PASS] storage (C-L3): a malformed AnvilRegion index entry is normalised to absent, logged and counted (not silent)
+  [PASS] evict (A2): a freshly inserted column starts clean (dirty=false, generation=0)
+  [PASS] evict (A2): ChunkMap::set marks the resident column dirty and bumps its generation
+  [PASS] evict (A2): the circuit column is sim-indexed and exports per-column SGNL state
+  [PASS] evict (A2): saveColumns persists a dirty column (blocks + SGNL) before eviction
+  [PASS] evict (A2): unscanColumn leaves NO ghost components (export is empty for the evicted column)
+  [PASS] evict (A2): ChunkMap::erase removes the column exactly once
+  [PASS] evict (A2): ticking after eviction resurrects nothing (no ghost sim state)
+  [PASS] evict (A2): loadColumn returns the evicted column with its SGNL payload
+  [PASS] evict (A2): generate->mutate->evict->reload restores SGNL state bit for bit
+  [PASS] evict (A2): generate->mutate->evict->reload produces a bit-exact world hash (blocks + states + SGNL)
+  [PASS] evict (A2): a clean, signal-free column evicts with no save (fast path)
+  [PASS] evict (A2): clean column evict/reload equality (regenerated column hashes identically)
+  [PASS] evict (A2): eviction is bounded per pump (budget 4)
+  [PASS] evict (A2): resident column count stays bounded (1681 explored -> 441 within radius+hysteresis)
+  [PASS] evict (A2): no candidates inside the hysteresis band (no boundary thrash)
+  [PASS] evict (A2): ChunkStreamer::forgetColumn removes the requested_ entry (re-streamable)
+  [PASS] item-use (A3/B1a): handlers registered for defined items only (Seedor, silica seed, Fragment stub)
+  [PASS] item-use (A3/B1a): Seedor dispatch tills silicon soil (ToolAction::Till behavior)
+  [PASS] item-use (A3/B1a): Seedor on dead silicon fails (defined refusal), world unchanged
+  [PASS] item-use (A3/B1a): silica seed dispatch plants on tilled soil
+  [PASS] item-use (A3/B1a): the Fragment's use fails closed as decision-pending (JD C3 open verb)
+  [PASS] item-use (A3/B1a): undefined items fail closed (logged), never fake success
+  [PASS] density (A5): material-class table values land in BlockDef (earth 20, stone 50, ceramic 80, glass 10, Chipor 70)
+  [PASS] density (A5): every solid block carries density > 0; every non-solid stays 0 (never consulted)
+  [PASS] density (A5): penetration 30 pierces a dirt wall (density 20) — density flows from block data
+  [PASS] density (A5): penetration 10 stops and despawns at a dirt wall (density 20)
+  [PASS] density (A5): penetration 30 stops at a ceramic wall (density 80) that dirt let through
+  [PASS] density (A5): penetration 90 pierces ceramic (density 80) — the pierce rule discriminates by data
+  mesher: column (2,2) own surface sub-chunk sy=16 -> 2692 verts
+  [PASS] mesher produces quads for a surface sub-chunk
+  [PASS] overlay geometry (shared by the GL and Vulkan backends): rect + shadowed text quads, font atlas
+  [PASS] vulkan: headless instance + physical devices (loader 1.4.341, Intel(R) UHD Graphics (Vulkan 1.3.267), Microsoft Direct3D12 (Intel(R) UHD Graphics) (Vulkan 1.2.359), NVIDIA GeForce RTX 3050 Ti Laptop GPU (Vulkan 1.4.351), Microsoft Direct3D12 (NVIDIA GeForce RTX 3050 Ti Laptop GPU) (Vulkan 1.2.359), Microsoft Direct3D12 (Microsoft Basic Render Driver) (Vulkan 1.2.359))
+  [PASS] wafer unload frees all chunks
+  [PASS] organic world loads with both biomes (plains + hills); 'overworld' alias works
+  [PASS] organic worldgen: worm caves and dirt veins underground, surface intact
+  [PASS] worldgen: built-in generators embedded; world seed changes organic terrain, wafer is seed-independent
+  [PASS] scripts dir: dev build edits the source tree; shipping (or no source tree) uses the exe copy
+  [PASS] scripts dir: --scripts exe|source|<dir> overrides; missing folders give none
+[07:07:03.525]   resources: worldgen/wafer.json from lithokraft
+[07:07:03.527]   resources: worldgen/organic.json from lithokraft
+[07:07:03.527]   resources: ui/theme.json from lithokraft
+[07:07:03.528] resources: base < lithokraft < LithoKraft default textures (64px) | 372 textures (0 missing), 2 animations, 5 palettes, 96 models, 3/3 shader programs from packs
+[07:07:03.528]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_bottom'
+[07:07:03.528]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_mid'
+[07:07:03.528]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_single'
+[07:07:03.528]   resources: LithoKraft default textures (64px) model 'blue_via': unknown face 'side_top'
+[07:07:03.528]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_bottom'
+[07:07:03.528]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_mid'
+[07:07:03.528]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_single'
+[07:07:03.528]   resources: LithoKraft default textures (64px) model 'red_via': unknown face 'side_top'
+  [PASS] game pack: worldgen/wafer.json and worldgen/organic.json resolve through the pack stack
+  [PASS] hotbar: every block has a textures/ui/icons icon in the pack stack (16 x 16 for the HUD)
+  [PASS] software textures (BUG-0003): full pack resolution kept, texel == source pixel (tile 64)
+  [PASS] software textures: render.tex_res 32 cap (Chromebook tier) honoured
+  [PASS] items: every non-block item has a textures/ui/icons icon in the pack stack (16 x 16 for the HUD)
+  [PASS] items: fresh spawn inventory holds the Fragment + every lore tool item
+  [PASS] hotbar: a block icon paints as pixel rects, not a single swatch
+  [PASS] pack_64 resources.json: every texture loads into the registry, 24+ block models
+  [PASS] block models: front/back/left/right files, active top, side and slab fallbacks (as before the refactor)
+  [PASS] pulsor firing strip: 6 frames at 50 ms from its .json sidecar, animated only while active
+  [PASS] tone block (art v1.8): idle faces, playing top, 4-frame 100 ms looping front strip
+  [PASS] materials: wire pieces, palettes and shader masks resolved from the models (no names in C++)
+  [PASS] build counter: Alpha a.b.c.d, 0.0.1.63 -> 0.0.2.0, 0.0.63.63 -> 0.1.0.0, full wrap; generated header present
+  [PASS] shaders: chunk / hud / line load from assets/shaders through the pack stack
+  [PASS] look-at readout: describe() per block behaviour (repeator, wire, color lamp, tone, plain)
+[07:07:03.559] AngelScript 2.38.0 ready (sandbox: allowlisted bindings only)
+[07:07:03.560] scripts: 1 file(s) from R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\scripts
+[07:07:03.560] [script] Hello from AngelScript! LithoKraft is booting in dimension: selftest
+  [PASS] AngelScript: scripts/hello.as loads and onLoad() logs
+[07:07:03.561] AngelScript 2.38.0 ready (sandbox: allowlisted bindings only)
+  (the next script error is expected)
+[07:07:03.561] [script] sandbox (1,1) info: Compiling void onLoad()
+  [PASS] AngelScript sandbox: unregistered system() call does not compile
+[07:07:03.562] AngelScript 2.38.0 ready (sandbox: allowlisted bindings only)
+  [PASS] AngelScript sandbox: infinite loop aborted by time budget
+[07:07:04.065] selftest run one
+[07:07:04.074] selftest run two
+  [PASS] log file: timestamped lines, flushed per line (tail-able)
+  [PASS] log file: previous run rotated to lithokraft.prev.log
+  [PASS] save: v1 -> v2 migration inserts channel/beacon before the key count
+  [PASS] save: malformed v1 state fails migration cleanly
+  (selftest invoked with --timing-handshake: the handshake section below A/B-compares both modes in-process)
+Timing Handshake determinism (256-tick circuit scenario, hs-design §6.4)
+  [PASS] handshake: outcome-hash air sub-chunk matches the naive loop
+  hashes: legacy=65f1675cbbe9269b hs(w1,p4)=65f1675cbbe9269b hs(w4,p4)=65f1675cbbe9269b hs(w4,p8)=65f1675cbbe9269b
+  [PASS] handshake: 256-tick scenario hash matches legacy (workers 1, phases 4)
+  [PASS] handshake: 256-tick scenario hash matches legacy (workers 4, phases 4)
+  [PASS] handshake: 256-tick scenario hash matches legacy (workers 4, phases 8)
+== control stream: PRE stamping, (tick, seq) order, accounting
+  [PASS] control: nothing extracts before its stamp tick
+  [PASS] control: all three events extract at their stamp tick
+  [PASS] control: live events stamped (seq 0,1,2 / tick 7) in submission order
+  [PASS] control: accounting exact after a clean drain (0 late, 0 dropped, 0 violations)
+== control stream: pre-stamped injection merges by (tick, seq)
+  [PASS] control: injected + live events all extract
+  [PASS] control: application order is (tick, seq), not arrival order
+  [PASS] control: live seq continues past injected seqs (no collision)
+  [PASS] control: past-stamp extractions are accounted as late, never dropped
+== control stream: recording tap (the IDemoRecord feed)
+  [PASS] control: the tap reproduces the applied stream verbatim (stamps intact)
+  [PASS] control: takeRecord drains (a second take is empty)
+  [PASS] control: recording off retains nothing
+== control stream: v1 format round-trip + fail-closed parse
+  [PASS] control: format writes
+  [PASS] control: format parses its own output
+  [PASS] control: header round-trips (seed, mode, tick rate, phases, declared counts)
+  [PASS] control: every event kind round-trips field-for-field (edit/ray/chunk/locomotion/frame)
+  [PASS] control: truncated stream fails closed (no partial events)
+  [PASS] control: a flipped payload byte fails the checksum, whole parse refused
+  [PASS] control: bad magic refused even with a valid checksum
+  [PASS] control: unknown event kind refused (fail-closed)
+  [PASS] control: line format carries seq/tick/kind/source for inspection
+== demo record: round trip through a bare ControlStream
+  [PASS] demo: recorder begin turns the stream recording tap on
+  [PASS] demo: recorder session echoes the session info (seed, mode, tick rate, phases)
+  [PASS] demo: events extract at their stamp ticks (4 of 7 by tick 122)
+  [PASS] demo: the remaining events extract by tick 125
+  [PASS] demo: the recorder captured every applied event
+  [PASS] demo: recorder finish writes the trailer
+  [PASS] demo: recorder reports no error after a clean finish
+  [PASS] demo: the record starts with the LLDM preamble and carries a trailer
+  [PASS] demo: parseDemo of the round trip is complete, not truncated, no error
+  [PASS] demo: parsed session round-trips (seed, mode, tick rate, phases, stream + demo versions)
+  [PASS] demo: trailer fields exact (final hash, total events, total ticks)
+  [PASS] demo: every event round-trips field-for-field (all five kinds)
+  [PASS] demo: at least two segments were framed and recovered
+  [PASS] demo: DemoPlayer loads the round-trip bytes (complete)
+  [PASS] demo: DemoPlayer submitInto reproduces the exact stamped stream on a fresh stream
+== demo record: stream-level non-perturbation (attach / detach)
+  [PASS] demo: attach/detach of a recorder leaves the extracted stream identical (recording off)
+  [PASS] demo: recorder attach/detach leaves dropped == 0 and orderViolations == 0
+== demo record: fail-closed / recovery matrix
+  [PASS] demo: flipped file magic -> BadMagic
+  [PASS] demo: bumped demo format version -> UnsupportedVersion
+  [PASS] demo: flipped payload byte inside a segment -> SegmentChecksum (hard error, not truncated)
+  [PASS] demo: cut mid-record in the final segment -> truncated, prefix events recovered
+  [PASS] demo: trailer removed -> truncated with ALL events recovered
+  [PASS] demo: trailer totalEvents tampered (checksum recomputed) -> TrailerCountMismatch
+  [PASS] demo: broken trailer checksum -> TrailerChecksum
+  (segment magic mapping produced: SegmentBadMagic)
+  [PASS] demo: smashed segment LLCS magic -> hard segment error (SegmentBadMagic or SegmentChecksum)
+== demo record: analysis queries on the known script
+  [PASS] demo: summarizeDemo total matches the script size
+  [PASS] demo: summarizeDemo byKind exact (3 edits, 1 ray, 1 chunk, 1 locomotion, 1 frame)
+  [PASS] demo: summarizeDemo bySource exact (Local 3, McpPilot 3, Script 1)
+  [PASS] demo: summarizeDemo tick span exact (100..125)
+  [PASS] demo: demoEventsInTickRange interior range returns exactly its events (seq 1..4)
+  [PASS] demo: demoEventsInTickRange outside all ticks returns empty
+ALL SELFTESTS: OK

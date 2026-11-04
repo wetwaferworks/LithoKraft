@@ -4,8 +4,15 @@
 // default: the CPU baseline every machine runs; gl33, or Vulkan with --renderer vulkan,
 // falling back to gl33) -> game.
 // Input runs on the main thread only (see docs/ARCHITECTURE.md, "Input").
+#include "litholattice/core/lf_job_queue.h"
+#include "litholattice/core/named_thread_load.h"
+#include "litholattice/core/work_trace.h"  // duplicate-work trace
+#include "lithokraft/game/exit_watchdog.h"  // 2026-10-31 close-hang
+#include "litholattice/core/quiet_crt.h"
 #include "litholattice/core/lock_timing.h"
-#include "litholattice/render/mesher.h"  // Cortana 2026-10-15 1345: --verify-mesh
+#include "litholattice/render/mesher.h"
+#include "litholattice/render/FallbackReasonStats.h"  // fix (a): [unified-mesher-reasons]
+#include "litholattice/world/column_table.h"  // M5 stats  // Cortana 2026-10-15 1345: --verify-mesh
 #include "litholattice/procgen/silicon_cities.h"  // --cities on|off
 #include <atomic>
 #include <charconv>
@@ -27,10 +34,15 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>  // GetConsoleWindow / SetWindowPos: console always on top (JD 2026-10-25)
+// JD 2026-10-30: hybrid-GPU laptops: ask the NVIDIA/AMD drivers for the dedicated GPU (GL).
+// Must be exported from the EXE itself (not a static lib).
+extern "C" { __declspec(dllexport) DWORD NvOptimusEnablement = 1; __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1; }
 #endif
 #include <algorithm>
 #include <cstdio>
 #include "litholattice/core/process_memory.h"
+#include "litholattice/core/memory_ledger.h"  // Gate 0
+#include "litholattice/core/hitch_capture.h"  // LL_HITCH_CAPTURE
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -49,10 +61,15 @@
 #include "noise_preview.h"
 #include "scripts_dir.h"
 #include "selftest.h"
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/emscripten.h>  // build 50: emscripten_set_main_loop_arg for the interactive web present fix
+#if defined(__wasm__)
+#include "litholattice/platform/lk_web.h"  // build 50 lineage: lk_frame_loop_set for the interactive web present fix
 #endif
 #include "perf_headless.h"
+#include "BenchSampleGate.h"  // bench steady-state gate (JD 2026-10-30)
+static std::string g_frameDumpDir;  // --frame-dump DIR (showcase capture)
+#include "lithokraft/game/FrameDumpHub.h"       // showcase --frame-dump
+#include "lithokraft/game/cWorldConfigBuilder.h"  // 2026-10-31 (JD): in-process Load World
+#include "lithokraft/game/FrameVideoEncoder.h"
 #include "handshake_test.h"
 #include "control_latency.h"
 #include "control_stream_test.h"
@@ -61,14 +78,18 @@
 #include "litholattice/audio/audio_output.h"
 #include "litholattice/core/log.h"
 #include "litholattice/core/threading.h"
+#include "litholattice/core/thread_census.h"
+#include "thread_layout.h"  // 2026-10-31 (JD): LL_THREAD_LAYOUT  // Thread Handshake: --cores (JD t3349u item 3)
 #include "litholattice/core/time.h"
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/game/actions.h"
 #include "lithokraft/game/game.h"
+#include "lithokraft/game/cWorldCatalog.h"  // 2026-10-30: world picker relaunch
 #include "lithokraft/game/build_version.h"  // 2026-10-16 (JD): Alpha build counter
 #include "build_counter.h"  // 2026-10-18 (JD): rolling build counter (8 wheels, base 64; generated per build)
 #include "lithokraft/game/modWarnings.h"  // 2026-10-18 (JD): boot-log warnings for unofficial mods (default-ON)
 #include "lithokraft/game/world_save.h"  // SV-H2: cWorldSave::readWorldSeed (level.json) before Game construction
+#include "litho_stamp_models.h"  // --stub-models toggle (Litho Formula model registry)
 #include "lithokraft/game/resource_manager.h"
 #include "lithokraft/game/settings.h"
 #include "litholattice/input/input_system.h"
@@ -381,6 +402,9 @@ std::vector<std::filesystem::path> packStack(const AssetDirs& assets, const std:
 std::filesystem::path dataRoot(const char* argv0) {
   namespace fs = std::filesystem;
   std::error_code ec;
+  // 2026-11-01 (box, bench isolation): LL_DATA_ROOT=<dir> puts config/ and logs/ there instead of the
+  // source tree (bench/capture copies must not read or write the player config). Unset = unchanged.
+  if (const char* e = std::getenv("LL_DATA_ROOT"); e && e[0]) return fs::path(e);
   fs::path root = LITHOKRAFT_SOURCE_DIR;
   if (root.empty() || !fs::is_directory(root / "src", ec)) root = fs::absolute(fs::path(argv0), ec).parent_path();
   return root;
@@ -490,6 +514,11 @@ Display createDisplay(const std::string& backend, bool vsync, bool validation, c
   }
   d.window = Window::create({1280, 720, "LithoKraft", vsync, GraphicsApi::OpenGL33, disp});
   if (d.window) d.renderer = createGL33Renderer(&Window::glProcAddress, glArena);
+  if (!d.renderer) {  // JD 2026-10-30: Vulkan -> GL 3.3 -> software (last resort)
+    logError("renderer: OpenGL 3.3 unavailable (%s); falling back to software", d.window ? "GL 3.3 renderer init failed" : "no OpenGL 3.3 window");
+    d.window.reset();
+    return createDisplay("software", vsync, validation, present, disp, vkArena, glArena, swapImages);
+  }
   return d;
 }
 }  // namespace lithokraft
@@ -757,7 +786,7 @@ struct SwRenderWorker {
 // boundaries, so a hand-rolled while loop rendered forever into a buffer
 // nobody ever saw (interactive boot = black canvas; bench mode, which
 // exits, presented its final frame — the tell). The fix drives the loop
-// through emscripten_set_main_loop_arg, whose registration unwinds main();
+// through lk_frame_loop_set, whose registration unwinds main();
 // everything the loop touches therefore lives in this heap struct, never
 // in main()'s abandoned stack frame. Native and bench runs iterate the
 // same step function in a plain while loop — behaviour unchanged.
@@ -769,6 +798,10 @@ struct FrameCtx {
   Display* display = nullptr;
   double benchSeconds = 0, runSeconds = 0;
   std::string benchPath, benchJson, uiShot;
+  lithokraft::cBenchSampleGate benchGate;  ///< JD 2026-10-30: sample only after streaming settles
+  lithokraft::cStreamFillTracker streamFill;  ///< JD 2026-10-30: --stream-bench fill timing
+  bool streamBench = false, streamBenchReported = false;
+  std::string streamBenchJson;
   bool noOverlay = false;
   std::string rname, present;
   // Owned by the context: constructed during main()'s setup (through the
@@ -805,10 +838,40 @@ struct FrameCtx {
   double ovUpdSum = 0; int ovUpdN = 0;
 };
 
-#if !defined(__EMSCRIPTEN__)
+#if !defined(__wasm__)
 // JD 2026-10-24: Settings > Graphics > Renderer. After the normal exit (world saved), start the
 // same exe again with the same arguments and --renderer <new>, then this process returns.
 static std::string g_relaunchBackend;
+static std::string g_expectSaveDir;  // 2026-10-31: --expect-save-dir (world relaunch check)
+static std::vector<std::string> g_worldSwitchArgs;  // 2026-10-30 (JD): world picker relaunch
+// 2026-10-31 (JD, relaunch fix): the world-picker relaunch keeps EVERY launch arg (--log, --cores,
+// bench dirs, ...; env flags are inherited) except the ones that select a world, which come from the
+// pick. --expect-save-dir tells the child which folder it must open so it can verify it.
+static std::vector<std::string> worldRelaunchArgs(int argc, char** argv, const std::vector<std::string>& pick,
+                                                  const std::string& defaultSaveDir) {
+  static const char* kWithValue[] = {"--save-dir", "--spawn", "--bench-scene", "--renderer", "--expect-save-dir"};
+  static const char* kFlag[] = {"--test-world", "--test-world-examples", "--flat-lab", "--bolt-lab"};
+  std::vector<std::string> out;
+  for (int i = 1; i < argc; ++i) {
+    bool skip = false;
+    for (const char* f : kWithValue) if (!std::strcmp(argv[i], f)) { skip = true; if (i + 1 < argc) ++i; break; }
+    if (!skip) for (const char* f : kFlag) if (!std::strcmp(argv[i], f)) { skip = true; break; }
+    if (!skip) out.emplace_back(argv[i]);
+  }
+  out.insert(out.end(), pick.begin(), pick.end());
+  std::string folder;
+  bool worldFlag = false;
+  for (size_t i = 0; i < pick.size(); ++i) {
+    if (pick[i] == "--save-dir" && i + 1 < pick.size()) folder = pick[i + 1];
+    for (const char* f : kFlag) if (pick[i] == f) worldFlag = true;
+    if (pick[i] == "--bench-scene") worldFlag = true;
+  }
+  if (folder.empty() && !worldFlag) folder = defaultSaveDir;  // "Default world" = the default save
+  if (folder.empty()) folder = "-";                            // built-in test world: no save folder
+  else folder = std::filesystem::absolute(folder).lexically_normal().string();
+  out.emplace_back("--expect-save-dir"); out.push_back(folder);
+  return out;
+}
 static void relaunchWithRenderer(int argc, char** argv, const std::string& backend) {
   std::vector<std::string> args{argv[0]};
   for (int i = 1; i < argc; ++i) {
@@ -839,7 +902,7 @@ static void relaunchWithRenderer(int argc, char** argv, const std::string& backe
 #endif
 static bool lkStepFrame(FrameCtx& F);
 static void lkShutdownTail(FrameCtx& F);
-#if defined(__EMSCRIPTEN__)
+#if defined(__wasm__)
 static void lkFrameThunk(void* p);
 #endif
 
@@ -850,18 +913,33 @@ static void lkFrameThunk(void* p);
 static void lkConsoleTopmost() {
 #if defined(_WIN32)
   if (const char* e = std::getenv("LK_CONSOLE_TOPMOST"); e && !std::strcmp(e, "0")) return;
-  if (HWND hwnd = GetConsoleWindow())
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+  HWND hwnd = GetConsoleWindow();
+  if (!hwnd) return;
+  // Windows Terminal as the default terminal (defterm): GetConsoleWindow() is conhost's hidden
+  // PseudoConsoleWindow, not a real window. Re-ordering it TOPMOST surfaces it as a second, blank
+  // black console beside the Terminal window. Target the window that owns it (the Terminal) instead.
+  char cls[64] = {};
+  if (GetClassNameA(hwnd, cls, int(sizeof(cls))) && !std::strcmp(cls, "PseudoConsoleWindow")) {
+    HWND owner = GetAncestor(hwnd, GA_ROOTOWNER);
+    if (!owner || owner == hwnd) return;
+    hwnd = owner;
+  }
+  SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 #endif
 }
 
 int main(int argc, char** argv) {
+  if (litholattice::argsRequestTestMode(argc, argv)) litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr in test modes
   lkConsoleTopmost();
   GameConfig cfg;
   std::string uiShot, uiView = "hud";  // Cortana 2026-10-16: bench UI screenshot (--ui-shot FILE --ui-view hud|menu|settings|pause)
   double runSeconds = 0, benchSeconds = 0; bool vsync = false, noSave = false; int romScreen = 32;
   // Cortana 2026-10-15 1345: verify-mode summary at exit (when on).
+  std::atexit([] { if (std::getenv("LL_COW_STATS") || std::getenv("LL_COW_VERIFY")) { const auto c = litholattice::cowStats(); std::fprintf(stderr, "cow-columns: %s pins %llu gathers %llu subs-published %llu full-columns %llu evicted %llu retained %.1f MB verify %llu mismatches %llu\n", litholattice::cowColumnsEnabled() ? "on" : "off", (unsigned long long)c.pins, (unsigned long long)c.gathers, (unsigned long long)c.subsPublished, (unsigned long long)c.columnsFullPublished, (unsigned long long)c.evictedColumns, double(c.retainedBytes) / 1048576.0, (unsigned long long)c.verifyChecked, (unsigned long long)c.verifyMismatches); } });  // render pipeline M5
+  std::atexit([] { if (litholattice::unifiedMesherEnabled()) { const auto u = litholattice::unifiedMesherStats(); std::fprintf(stderr, "unified-mesher: meshes %llu checked %llu mismatches %llu unpublished %llu quads %llu bytes %llu lod-quads %llu lod-fallback %llu fallback-verts %llu fallback-checked %llu fallback-mismatches %llu skirt-quads %llu splits %llu\n", (unsigned long long)u.meshes, (unsigned long long)u.checked, (unsigned long long)u.mismatches, (unsigned long long)u.unpublished, (unsigned long long)u.quads, (unsigned long long)u.residentBytes, (unsigned long long)u.lodQuads, (unsigned long long)u.lodFallback, (unsigned long long)u.fbVerts, (unsigned long long)u.fbChecked, (unsigned long long)u.fbMismatches, (unsigned long long)u.skirtQuads, (unsigned long long)u.splits); { const auto& fr = litholattice::FallbackReasonStats::instance(); std::fprintf(stderr, "%s\n%s\n", fr.reasonsLine().c_str(), fr.detailLine().c_str()); } const auto pv = litholattice::canonPullVerifyStats(); if (pv.checked) std::fprintf(stderr, "canon-pull: checked %llu mismatches %llu\n", (unsigned long long)pv.checked, (unsigned long long)pv.mismatches); } });  // render pipeline M3 (M10: skirt-quads, M12: canon-pull)
+  std::atexit([] { litholattice::workTraceFlush(); });  // duplicate-work trace (LL_WORK_TRACE=<file>)
   std::atexit([] { if (litholattice::meshVerifyEnabled()) { const auto s = litholattice::meshVerifyStats(); std::fprintf(stderr, "mesh-verify: checked %llu mismatches %llu skipped %llu\n", (unsigned long long)s.checked, (unsigned long long)s.mismatches, (unsigned long long)s.skipped); } });
+  unsigned coresArg = 0;  // JD t3349u item 3: --cores N (CLI > LITHO_CORES > hardware)
   int renderThreadsArg = 0;  // Cortana 2026-10-15 1156: --render-threads N
   double swScaleArg = 0.5;  // Cortana 2026-10-25 (pass sw3): --sw-scale 0.5|0.75|1.0; default 0.5 (540p at 1080p, exact 2x nearest upscale; Archie 2026-10-25), 1.0 opt-in
   int fpsCapArg = -2; bool noVsync = false; bool noOverlay = false;  // Cortana 2026-10-15 1440: --no-overlay (A/B)  // Cortana 2026-10-15 1610: --fps-cap 30|60|off|auto (-2 = not given), --no-vsync
@@ -872,12 +950,13 @@ int main(int argc, char** argv) {
   std::string vkArena = "device";
   bool glArena = true;
   std::string saveDir, presentMode, benchPath = "orbit", benchJson;
+  bool streamBench = false; std::string streamBenchJson;  // --stream-bench [file.json]
   std::string pack = "pack_64";
   bool packGiven = false;  // 2026-10-24: --pack wins over the 128 px GPU default
   std::vector<std::string> extraPacks;
   bool mute = false;
-  std::string backend = "software";  // JD's standard: the CPU path is the baseline default;
-                                     // gl33/vulkan are the GPU offload, selected explicitly
+  std::string backend = "vulkan";  // JD 2026-10-30: Vulkan is the default renderer; GL 3.3 is the
+                                   // logged fallback when Vulkan init fails, software the last resort
   bool rendererGiven = false;  // --renderer wins over settings.json "renderer" (JD 2026-10-24)
 #ifdef NDEBUG
   bool vkValidation = false;
@@ -899,6 +978,7 @@ int main(int argc, char** argv) {
   std::string perfJson;
   bool badArg = false;
   bool tpsUnlock = false;  // debug: lifts the 512 TPS cap for benches
+  bool stubModels = false;  // --stub-models: unresolved Litho Formula presets resolve to a stub wafer (bench only)
   for (int i = 1; i < argc; ++i) {
     // Numeric option value: the whole next argument must parse and lie in [lo, hi], else the
     // run stops with a message (a typo used to become 0 silently, and sizes were unbounded).
@@ -926,6 +1006,7 @@ int main(int argc, char** argv) {
       if (o != "flat" && o != "vertical") { std::fprintf(stderr, "--screen-orient: flat|vertical\n"); badArg = true; }
       cfg.screenVertical = o == "vertical";
     }
+    else if (!std::strcmp(argv[i], "--cores")) { coresArg = unsigned(num(1, 4096)); }  // JD t3349u item 3
     else if (!std::strcmp(argv[i], "--render-threads")) { renderThreadsArg = int(num(1, 64)); }  // Cortana 2026-10-15 1156
     else if (!std::strcmp(argv[i], "--sw-scale")) { swScaleArg = num(0.25, 1.0); }  // pass sw3
     else if (!std::strcmp(argv[i], "--radius")) { cfg.tickRadius = int(num(0, 512)); radiusGiven = true; }
@@ -994,29 +1075,55 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--bench-path") && i + 1 < argc) {
       benchPath = argv[++i];
       if (benchPath != "orbit" && benchPath != "stream" && benchPath != "flyover" && benchPath != "walk" && benchPath != "still" && benchPath != "live" &&
-          benchPath != "whip" && benchPath != "sprint") { std::fprintf(stderr, "--bench-path: orbit|stream|flyover|walk|still|live|whip|sprint\n"); badArg = true; }
+          benchPath != "whip" && benchPath != "sprint" && benchPath != "zigzag") { std::fprintf(stderr, "--bench-path: orbit|stream|flyover|walk|still|live|whip|sprint|zigzag\n"); badArg = true; }
     }
     else if (!std::strcmp(argv[i], "--soak")) {
       benchSeconds = 60.0 * num(1, 1440);
       benchPath = "soak";
     }
     else if (!std::strcmp(argv[i], "--bench-json") && i + 1 < argc) benchJson = argv[++i];
+    else if (!std::strcmp(argv[i], "--stream-bench")) {  // JD 2026-10-30: streaming fill bench, alongside --bench
+      streamBench = true;
+      if (i + 1 < argc && argv[i + 1][0] != '-') streamBenchJson = argv[++i];
+    }
     else if (!std::strcmp(argv[i], "--no-save")) noSave = true;
     // Playtest 2026-10-16 (JD): --test-world = --bench-scene testworld (flat pad, every registry
     // block in labeled rows, 42 stocked carry slots, infinite placement, Pattern ROM screen);
     // --rom-screen 32|64 picks the demo screen size; --capture hides F3 / controls / hint text.
     else if (!std::strcmp(argv[i], "--test-world")) cfg.benchScene = "testworld";
+    else if (!std::strcmp(argv[i], "--spawn") && i + 1 < argc) cfg.startSpawn = argv[++i];  // 2026-10-30 (JD): world picker relaunch target
+    else if (!std::strcmp(argv[i], "--bolt-lab")) { cfg.benchScene = "boltlab"; cfg.dimension = "flatlab"; }  // 2026-10-30 (JD): Bolt PCHIE Lab stations on the Flat Lab plain
+    else if (!std::strcmp(argv[i], "--flat-lab")) { cfg.benchScene = "testworld"; cfg.testWorldExamples = true; cfg.dimension = "flatlab"; }  // 2026-10-30 (JD): flat white Ceramic plain, every component row + every Examples / torture build
     else if (!std::strcmp(argv[i], "--test-world-examples")) { cfg.benchScene = "testworld"; cfg.testWorldExamples = true; }  // 2026-10-25 (JD): test world + Examples pads (clocks, ...) in any build
     else if (!std::strcmp(argv[i], "--rom-screen")) romScreen = int(num(32, 64));
     else if (!std::strcmp(argv[i], "--capture")) cfg.capture = true;
+    else if (!std::strcmp(argv[i], "--showcase") && i + 1 < argc) {  // JD 2026-10-30: wafer generation showcase
+      const std::string what = argv[++i];
+      if (what != "wafer") { std::fprintf(stderr, "--showcase: wafer\n"); badArg = true; }
+      else {
+        backend = "vulkan"; rendererGiven = true;
+        litholattice::setUnifiedMesher(true);
+        _putenv_s("LL_VERIFY_OFF", "1"); litholattice::setMeshVerify(false);
+        cfg.capture = true; noSave = true; benchPath = "showcase";
+        if (benchSeconds <= 0) benchSeconds = 50;
+        if (display0.width <= 0) { display0.width = 1920; display0.height = 1080; }
+      }
+    }
+    else if (!std::strcmp(argv[i], "--frame-dump") && i + 1 < argc) g_frameDumpDir = argv[++i];  // showcase video: DIR/frames.mp4 via ffmpeg (LL_FFMPEG or PATH)
     else if (!std::strcmp(argv[i], "--ui-shot") && i + 1 < argc) uiShot = argv[++i];  // Cortana 2026-10-16
     else if (!std::strcmp(argv[i], "--ui-view") && i + 1 < argc) uiView = argv[++i];
     else if (!std::strcmp(argv[i], "--verify-mesh")) litholattice::setMeshVerify(true);  // Cortana 2026-10-15 1345
+    else if (!std::strcmp(argv[i], "--no-verify")) { _putenv_s("LL_VERIFY_OFF", "1"); litholattice::setMeshVerify(false); }  // verify-off switch (DebugOpt benchmarks)
+    else if (!std::strcmp(argv[i], "--unified-mesher")) litholattice::setUnifiedMesher(true);  // render pipeline M2
+    else if (!std::strcmp(argv[i], "--legacy-mesher")) litholattice::setUnifiedMesher(false);  // render pipeline M2 (regression bisect)
     else if (!std::strcmp(argv[i], "--save-dir") && i + 1 < argc) saveDir = argv[++i];
+    else if (!std::strcmp(argv[i], "--expect-save-dir") && i + 1 < argc) g_expectSaveDir = argv[++i];  // 2026-10-31: relaunch check
     else if (!std::strcmp(argv[i], "--no-euv")) cfg.euv = false;
     else if (!std::strcmp(argv[i], "--timing-handshake")) { cfg.timingHandshake = true; hsGiven = true; }
     else if (!std::strcmp(argv[i], "--no-timing-handshake")) { cfg.timingHandshake = false; hsGiven = true; }
     else if (!std::strcmp(argv[i], "--handshake-phases")) cfg.handshakePhases = int(num(1, 16));
+    else if (!std::strcmp(argv[i], "--handshake-workers")) cfg.handshakeWorkers = int(num(1, 64));  // G2 suspect-3 A/B (2026-10-28): cap the Timing Handshake pull-worker pool (default 0 = authority auto)
+    else if (!std::strcmp(argv[i], "--stub-models")) stubModels = true;  // bench only: stub unresolved Litho Formula presets (see litho_stamp_models.h)
     else if (!std::strcmp(argv[i], "--handshake-test")) runHandshakeTest = true;
     else if (!std::strcmp(argv[i], "--control-latency")) wantControlLatency = true;
     else if (!std::strcmp(argv[i], "--control-test")) wantControlTest = true;
@@ -1094,30 +1201,40 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--perf-headless")) { runPerf = true; if (i + 1 < argc && argv[i + 1][0] != '-') perfJson = argv[++i]; }
     else if (!std::strcmp(argv[i], "--bench-scene") && i + 1 < argc) {
       cfg.benchScene = argv[++i];
-      if (cfg.benchScene != "default" && cfg.benchScene != "circuits" && cfg.benchScene != "display" && cfg.benchScene != "framebuffer" && cfg.benchScene != "redirector" && cfg.benchScene != "wall-pixel" && cfg.benchScene != "pattern-wall" && cfg.benchScene != "sawtooth" && cfg.benchScene != "wire-torture" && cfg.benchScene != "litho" && cfg.benchScene != "litho-wired" && cfg.benchScene != "testworld") { std::fprintf(stderr, "--bench-scene: default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld\n"); badArg = true; }
+      if (cfg.benchScene != "default" && cfg.benchScene != "circuits" && cfg.benchScene != "display" && cfg.benchScene != "framebuffer" && cfg.benchScene != "redirector" && cfg.benchScene != "facings" && cfg.benchScene != "wall-pixel" && cfg.benchScene != "pattern-wall" && cfg.benchScene != "sawtooth" && cfg.benchScene != "wire-torture" && cfg.benchScene != "litho" && cfg.benchScene != "litho-wired" && cfg.benchScene != "testworld" && cfg.benchScene != "boltlab") { std::fprintf(stderr, "--bench-scene: default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld\n"); badArg = true; }
     }
     else if (!std::strcmp(argv[i], "--version")) { std::printf("LithoKraft %s (LithoLattice engine)\n", LITHOKRAFT_VERSION); return 0; }
     else {
       std::printf("usage: LithoKraft [--version] [--selftest] [--dim wafer|organic] [--size chunks] "
                   "[--tps 32|64|128|256|512] [--tps-unlock (debug: --tps up to 8192, powers of 2)] [--no-euv] [--radius chunks] [--render-threads 1|2|4|8|16|32|64] [--sw-scale 0.5|0.75|1.0] [--seconds s] [--vsync] [--display windowed|maximized|borderless|fullscreen] [--monitor N] [--resolution WxH] [--refresh Hz] [--log file] "
-                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--mcp-stdio] "
-                  "[--vk-validation] [--vk-arena host|device|rebar] [--gl-arena on|off] [--seed n] [--cities on|off] [--noise-preview graph.json [--preview-out f.png] "
+                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--showcase wafer] [--frame-dump dir] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--flat-lab] [--bolt-lab] [--spawn name] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--stream-bench [file.json]] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--no-verify] [--mcp-stdio] "
+                  "[--vk-validation] [--vk-arena host|device|rebar] [--gl-arena on|off] [--handshake-workers n] [--stub-models] [--seed n] [--cities on|off] [--noise-preview graph.json [--preview-out f.png] "
                   "[--preview-output name] [--preview-size px] [--preview-scale blocks/px] [--preview-y y]]\n");
       return 0;
     }
   }
   if (badArg) return 2;
+  cThreadLayout::apply();  // 2026-10-31 (JD): before the census boots
+  // JD t3349u item 3: --cores beats LITHO_CORES beats hardware; set before the census boots.
+  if (coresArg && !litholattice::cThreadCensus::setCliCores(coresArg))
+    std::fprintf(stderr, "--cores: ignored, the thread census already booted\n");
+  // --stub-models: arm the model-registry stub BEFORE the Game (and with
+  // it dimension/generator loading) exists. No-op when the flag is absent:
+  // unresolved presets keep failing closed.
+  if (stubModels) lithokraft::model::setLithoStampModelStubEnabled(true);
   // cPlayer settings (config/settings.json next to config/input.json): CLI flags win.
   const std::string settingsPath = (dataRoot(argv[0]) / "config" / "settings.json").lexically_normal().string();
-#ifdef LK_PLAYTEST_SPAWN
-  // 2026-10-25 fix pass (JD J2): playtest builds default to Borderless (index 2); a saved displayMode
-  // and --display still win. Shipping builds keep the Maximized default from settings.h.
-  GameSettings settingsDefaults;
-  settingsDefaults.displayMode = 2;
-  GameSettings settings = GameSettings::load(settingsPath, settingsDefaults);
-#else
+  // 2026-10-31 (JD t3678u/t3679u): every build (Debug, DebugOpt, Release) launches Borderless
+  // fullscreen. No config define gates this. --display windowed|maximized|fullscreen is the opt-out;
+  // Settings > Display still changes the mode live for the session.
   GameSettings settings = GameSettings::load(settingsPath);
-#endif
+  // 2026-10-31 (JD): the saved Settings > Display choice persists across runs (Borderless stays the
+  // default when settings.json has none). --display only sets this run's mode and never rewrites the
+  // saved value. LL_DISPLAY_FORCE_BORDERLESS=1 restores the old forced-Borderless launch.
+  if (!displayGiven) {
+    const char* fb = std::getenv("LL_DISPLAY_FORCE_BORDERLESS");
+    if (fb && fb[0] == '1') settings.displayMode = 2;
+  }
   if (!rendererGiven && benchSeconds <= 0) backend = settings.renderer;  // JD 2026-10-24: saved renderer is the startup default
   // 2026-10-24 (JD): GPU renderers default to the 128 px pack (CloudAtlas HD tops + nearest 2x of
   // pack_64) when Texture resolution is Auto or 128. The software renderer stays on pack_64 (its
@@ -1186,6 +1303,7 @@ int main(int argc, char** argv) {
   cfg.vkFxOverride = vkFxArg;  // JD Vulkan push: CLI wins for this run only (0.0.1.51: no longer saved)
   cfg.version = LITHOKRAFT_VERSION;
   cfg.settings = settings;
+  cfg.worldPicker = benchSeconds <= 0;  // 2026-10-30 (JD): interactive launches: Play opens the world picker
   cfg.settingsPath = settingsPath;
   const ScriptsDirChoice scripts = findScriptsDir(argv[0], scriptsMode);
   cfg.scriptsDir = scripts.dir;
@@ -1199,16 +1317,28 @@ int main(int argc, char** argv) {
     if (saveDir.empty() && !noSave) saveDir = (dataRoot(argv[0]) / "saves" / "playtest").lexically_normal().string();
   }
 #endif
+  if (cfg.benchScene == "boltlab" && saveDir.empty()) noSave = true;  // 2026-10-30: rebuilt every launch, like the test world
   if (cfg.benchScene == "testworld") {
 #ifdef LK_PLAYTEST_SPAWN
     cfg.testWorldExamples = true;  // 2026-10-24 (JD): Examples section, playtest builds only
 #endif
     cfg.sceneSize = romScreen >= 64 ? 64 : 32;
-    // The test world is rebuilt every launch; a save would restore its columns over the fresh
-    // build (and never touch JD's real world). Fresh every time unless --save-dir is given.
+    // 2026-11-01 (JD): the test world now PERSISTS. The generator still runs every launch, then the
+    // saved columns load over it (loadDimension runs after the scene build), so JD's builds come back
+    // and untouched columns stay the fresh build. Own dir per world: <data root>/saves/flatlab |
+    // testworld | testworld-examples. Benches never save (cfg.saveDir below needs benchSeconds <= 0).
+    // LL_TESTWORLD_FRESH=1: old behaviour (fresh every launch, never saved).
+    static const bool kFresh = [] { const char* e = std::getenv("LL_TESTWORLD_FRESH"); return e && e[0] == '1'; }();
+    if (saveDir.empty() && !noSave && !kFresh) {
+      const char* id = cfg.dimension == "flatlab" ? "flatlab" : (cfg.testWorldExamples ? "testworld-examples" : "testworld");
+      saveDir = (dataRoot(argv[0]) / "saves" / id).lexically_normal().string();
+    }
     if (saveDir.empty()) noSave = true;
   }
-  if (!noSave && benchSeconds <= 0) cfg.saveDir = saveDir.empty() ? (dataRoot(argv[0]) / "saves" / "world").lexically_normal().string() : saveDir;
+  // 2026-11-01 PlayM (JD): a --soak run with an explicit --save-dir saves and reloads like a real session
+  // (save -> quit -> reload checks); every other bench stays save-free.
+  const bool soakSaves = benchPath == "soak" && !saveDir.empty() && !noSave;
+  if (!noSave && (benchSeconds <= 0 || soakSaves)) cfg.saveDir = saveDir.empty() ? (dataRoot(argv[0]) / "saves" / "world").lexically_normal().string() : saveDir;
   if (runHandshakeTest) return runHandshakeTests();
   if (runScenario) return runHandshakeScenario(scenarioTicks, scenarioMode, scenarioWorkers, scenarioPhases);
   if (wantControlLatency) return runControlLatency();
@@ -1269,6 +1399,15 @@ int main(int argc, char** argv) {
   // read; a late override would regenerate untouched (dirty-only-saved)
   // columns from the wrong seed under the saved ones. The Wafer is pinned
   // to seed 0 inside worldgen and is unaffected either way.
+  // 2026-10-31 (JD, Load World): the launch config BEFORE the saved-world overrides, so an
+  // in-process load rebuilds the next world's config by the same rules (cWorldConfigBuilder).
+  const cWorldConfigBuilder::Launch worldLaunch{cfg, saveDir, noSave,
+#ifdef LK_PLAYTEST_SPAWN
+                                                true,
+#else
+                                                false,
+#endif
+                                                romScreen, dataRoot(argv[0]).lexically_normal().string()};
   if (!cfg.saveDir.empty()) {
     std::string seedErr;
     if (const auto persisted = cWorldSave::readWorldSeed(cfg.saveDir, &seedErr)) {
@@ -1283,6 +1422,15 @@ int main(int argc, char** argv) {
       logError("save: world metadata in '%s' is unreadable (%s); falling back to %s seed %llu", cfg.saveDir.c_str(), seedErr.c_str(),
                seedGiven ? "the --seed" : "the default", (unsigned long long)cfg.seed);
     }
+  }
+  // 2026-10-31 (JD): the relaunched process verifies it opened the requested folder (moved after the log
+  // file opens, so the line lands in the --log file; bench runs have saves off and say so).
+  if (!g_expectSaveDir.empty() && benchSeconds > 0 && !soakSaves) logInfo("world relaunch check: bench run, saves off (requested '%s')", g_expectSaveDir.c_str());
+  else if (!g_expectSaveDir.empty()) {
+    const std::string got = cfg.saveDir.empty() ? std::string("-") : std::filesystem::absolute(cfg.saveDir).lexically_normal().string();
+    auto lower = [](std::string v) { for (char& c : v) c = char(std::tolower((unsigned char)c)); return v; };
+    if (lower(got) == lower(g_expectSaveDir)) logInfo("world relaunch check: OK, opened '%s'", got.c_str());
+    else logError("world relaunch check: MISMATCH, requested '%s' but opened '%s'", g_expectSaveDir.c_str(), got.c_str());
   }
   // Fix run 3 (2026-10-23): a saved world's area (level.json v3) WINS, like
   // its seed: the world keeps the sim/stream footprint it was played with.
@@ -1346,8 +1494,51 @@ int main(int argc, char** argv) {
     else { audio.setEnabled(false); logInfo("audio: no output device available (%s); running without sound", err.c_str());  /* Playtest 1: info, not error */ }
   }
   {
-    auto lkFOwner = std::make_unique<FrameCtx>(); FrameCtx& F = *lkFOwner;  // build 50: frame-loop state on the heap (survives the Emscripten main-loop unwind; see FrameCtx)
-    cJobPool pool(std::max(1u, std::max(2u, std::thread::hardware_concurrency()) - 2));
+    auto lkFOwner = std::make_unique<FrameCtx>(); FrameCtx& F = *lkFOwner;  // build 50: frame-loop state on the heap (survives the web main-loop unwind; see FrameCtx)
+    // S5 (Archie stamp, 2026-10-28): the mobile concurrency ceiling for
+    // heavy background work lives HERE, in this pool's sizing... never at
+    // thread creation in the host layer (a refused create aborts the
+    // engine; Build86d device evidence). This one pool carries chunk
+    // generation, mesh building, and the world load. On small hosts
+    // (1..8 cores) it is capped at min(6, hw-2) workers; larger hosts
+    // keep the house default below. Long-lived subsystem threads (sim /
+    // Timing Handshake, audio, input, render) are not on this pool and
+    // are never capped by it. Pool size changes scheduling only, never
+    // simulation results.
+    // Q1 trim (Archie exec summary, 2026-10-28, via JD): the small-host
+    // cap drops 6 -> 3... maxActive(2) admits at most 2 background jobs
+    // at once (her 2026-10-26 triage below), so 3 = 2 active + 1
+    // feeder/spare; the other 3 threads only added wakeup traffic to
+    // the census (14 workers total on the phone). S5's principle is
+    // unchanged (the cap lives here, never at creation); only the
+    // number moves, by the same designer's word.
+    const unsigned hwCores = std::thread::hardware_concurrency();
+    unsigned poolWorkers = std::max(1u, std::max(2u, hwCores) - 2);  // house default
+    if (hwCores >= 1 && hwCores <= 8) {
+      const unsigned smallCap = (unsigned)std::max(1, std::min(3, (int)hwCores - 2));
+      poolWorkers = std::min(poolWorkers, smallCap);
+    }
+    // Thread Handshake P4 (Archie t3353u): no private threads any more. The game pool is a
+    // background-lane VIEW over the engine's shared pool: gen/mesh/load jobs run on lent
+    // capacity one job (one stage) at a time, and every Timing Handshake epoch reclaims it,
+    // so shard jobs never queue behind world-gen. poolWorkers (Archie's small-host cap of 3
+    // included) is now the view's concurrency cap; the shared pool's lendCap also limits it.
+    // Step 10 (default off): LL_DED_LAYOUT=6|8 gives gen/mesh/vertex work 2 dedicated workers
+    // of their own (lock-free with LL_POOL_LOCKFREE=1) instead of a view on the shared pool.
+    const char* dedLayout = std::getenv("LL_DED_LAYOUT");
+    const bool ded = dedLayout && (dedLayout[0] == '6' || dedLayout[0] == '8');
+    std::unique_ptr<cJobPool> dedPool;
+    if (ded) {
+      dedPool = std::make_unique<cJobPool>(2u);
+      poolWorkers = 2;
+      logInfo("threads: LL_DED_LAYOUT=%c: 2 dedicated mesh/vertex workers (%s), shared pool %u", dedLayout[0],
+              dedPool->lockFree() ? "lock-free" : "LOCKED: set LL_POOL_LOCKFREE=1", cJobPool::shared().size());
+    }
+    logInfo("%s", cThreadLayout::describe().c_str());
+    cJobPool pool(ded ? *dedPool : cJobPool::shared(), cJobPool::Lane::Background, poolWorkers);
+    logInfo("jobs: game job pool (gen/mesh/load) is a background view on the shared pool: up to %u at once "
+            "(lend cap %u of %u shared workers; hardware_concurrency %u)",
+            poolWorkers, pool.lendCap(), cJobPool::shared().size(), hwCores);
     // 2026-10-26 (Archie triage, streaming hitches): at most 2 background gen/mesh jobs run at
     // once, so streaming bursts stop preempting render threads mid-frame (stream bench r8 p99
     // 40.8 -> 23.1 ms, same cols/s). LL_BG_MAX_ACTIVE=N overrides (0 = uncapped, the old way).
@@ -1413,6 +1604,7 @@ int main(int argc, char** argv) {
     // game.wantsCursorCaptured() every frame.
     if (benchSeconds <= 0) {
       game.enterMenu();
+      if (!cfg.startSpawn.empty()) game.startAt(cfg.startSpawn);  // 2026-10-30: picked from the world picker
       // 2026-10-26 (F3 lag trace): LL_TRACE_F3_WALK skips straight to play for the unattended repro.
       if (const char* w = std::getenv("LL_TRACE_F3_WALK"); w && std::atoi(w) > 0) game.enterPlay();
     }
@@ -1426,8 +1618,14 @@ int main(int argc, char** argv) {
       benchSeconds = 2;
       logInfo("ui-shot: no --bench given, running a 2 s self-closing bench for the capture");
     }
+    if (streamBench && benchSeconds <= 0) benchSeconds = 10;  // --stream-bench alone: a 10 s steady-state bench after the fill
     if (benchSeconds > 0) runSeconds = kBenchWarmup + benchSeconds;
     if (benchSeconds > 0) game.setBenchPath(benchPath);
+    if (benchSeconds > 0) {  // JD 2026-10-30: steady-state sampling; the stream workload paths keep the plain warm-up
+      const bool exempt = game.benchStreamer() != nullptr || benchPath == "stream" || benchPath == "soak" || benchPath == "showcase";
+      F.benchGate.configure(kBenchWarmup, lithokraft::cBenchSampleGate::capFromEnv(), exempt);
+      if (!exempt) runSeconds += F.benchGate.capS();  // trimmed to gate-open + bench seconds when the gate opens
+    }
     if (benchSeconds > 0 && !uiShot.empty()) game.debugShowUi(uiView);
     F.uiShotDone = uiShot.empty() || benchSeconds <= 0;
     const std::string rname = renderer->name();
@@ -1517,7 +1715,7 @@ int main(int argc, char** argv) {
     // the loop body / shutdown tail are lkStepFrame()/lkShutdownTail().
     // Native and bench runs iterate lkStepFrame directly — the exact
     // semantics of the original while loop. The interactive WEB run
-    // instead registers lkStepFrame as the Emscripten main loop: with a
+    // instead registers lkStepFrame as the web main loop: with a
     // hand-rolled while loop the proxied pthread's task never ends, the
     // browser never gets the task boundary it uses to present the
     // OffscreenCanvas, and the canvas stays black forever even though the
@@ -1527,30 +1725,92 @@ int main(int argc, char** argv) {
     F.window = window; F.renderer = renderer; F.display = &display;
     F.benchSeconds = benchSeconds; F.runSeconds = runSeconds;
     F.benchPath = benchPath; F.benchJson = benchJson; F.uiShot = uiShot;
+    F.streamBench = streamBench; F.streamBenchJson = streamBenchJson;
     F.noOverlay = noOverlay; F.rname = rname; F.present = present;
-#if defined(__EMSCRIPTEN__)
-    if (benchSeconds <= 0 &&
-        !EM_ASM_INT({ return (typeof process === 'object' && typeof process.versions === 'object' &&
-                              typeof process.versions.node === 'string') ? 1 : 0; })) {
-      logInfo("web present: interactive loop via emscripten_set_main_loop (task boundary per frame)");
-      emscripten_set_main_loop_arg(&lkFrameThunk, &F, 0, true);
+#if defined(__wasm__)
+    if (benchSeconds <= 0 && !lk_host_is_node()) {
+      logInfo("web present: interactive loop via lk_frame_loop_set (task boundary per frame)");
+      lk_frame_loop_set(&lkFrameThunk, &F, 0, 1);
     } else {
       logInfo("web present: direct frame loop (bench or Node)");
     }
 #endif
-    while (lkStepFrame(F)) {}
+    for (;;) {
+      while (lkStepFrame(F)) {}
+      // 2026-10-31 (JD, Load World): an in-process world load. The old Game is destroyed (its
+      // destructor writes the exit save to disk and joins the sim, streamer and jobs), the
+      // renderer drops its chunk meshes, and the next Game is built on the same window,
+      // renderer, pool, resources, audio and input. Threeway / MCP hold references into the
+      // Game, so those runs (and LL_WORLD_RELAUNCH=1) keep the relaunch path.
+      if (!(F.game && F.game->worldLoadRequested())) break;
+      Game::WorldLoadRequest req = F.game->takeWorldLoadRequest();
+      std::vector<std::string> args = req.args;
+      if (!req.folder.empty()) { args.push_back("--save-dir"); args.push_back(req.folder); }
+#if !defined(__wasm__)
+      if (threewayOn || swThreewayOn || F.mcpServer || benchSeconds > 0) {
+        logInfo("world load '%s': threeway / mcp run, relaunching instead of loading in-process", req.label.c_str());
+        g_worldSwitchArgs = args; g_worldSwitchArgs.push_back("--renderer"); g_worldSwitchArgs.push_back(backend);
+        break;
+      }
+#endif
+      std::string note;
+      GameConfig next = cWorldConfigBuilder::build(worldLaunch, req.args, req.folder, &note);
+      next.settings = F.game->settings();  // the player's live settings carry over
+      logInfo("world load '%s': tearing down the current world%s%s", req.label.c_str(), note.empty() ? "" : " | ", note.c_str());
+      const auto tl0 = Clock::now();
+      F.game.reset();               // exit save on disk; sim, streamer, jobs joined
+      renderer->clearChunkMeshes();  // no mesh of the old world survives into the new one
+      const auto tl1 = Clock::now();
+      F.game = std::make_unique<Game>(next, *renderer, pool, resources, audio, input);
+      Game& ng = *F.game;
+      if (!ng.ok()) { logError("world load '%s' FAILED: the new world did not build; exiting", req.label.c_str()); break; }
+      ng.setClipboard(&clipboard);
+      ng.setDisplayModeApplier([window](DisplayMode mode) {
+        DisplayDesc d = window->display();
+        d.mode = mode;
+        window->setDisplay(d);
+      });
+      ng.enterMenu();
+      if (!next.startSpawn.empty()) ng.startAt(next.startSpawn);
+      else ng.enterPlay();
+      F.tLast = Clock::now();
+      logInfo("world load '%s': done | teardown %.0f ms, build %.0f ms | save '%s'", req.label.c_str(),
+              std::chrono::duration<double, std::milli>(tl1 - tl0).count(),
+              std::chrono::duration<double, std::milli>(F.tLast - tl1).count(), next.saveDir.empty() ? "(none)" : next.saveDir.c_str());
+    }
     lkShutdownTail(F);
-#if !defined(__EMSCRIPTEN__)
+#if !defined(__wasm__)
     if (F.game && F.game->restartRequested()) g_relaunchBackend = F.game->settings().renderer;
+    if (F.game && !F.game->worldSwitchArgs().empty()) { g_worldSwitchArgs = F.game->worldSwitchArgs(); g_worldSwitchArgs.push_back("--renderer"); g_worldSwitchArgs.push_back(backend); }  // JD 2026-10-30: keep the renderer this run used
+#endif
+#if !defined(__wasm__)
+    if (g_relaunchBackend.empty() && g_worldSwitchArgs.empty()) lithokraft::cExitWatchdog::arm("logs");  // 2026-10-31 close-hang: final exit only
 #endif
     F.game.reset();   // game dies before the renderer and window, as at the old block-scope exit
+    { const char* e = std::getenv("LL_SHUTDOWN_DRAIN_MS"); litholattice::cLfJobQueue::stopShared(e ? std::atol(e) : 10000L); }  // PlayM (JD 10:30): LF job queue stop step
     F.input.reset();
   }  // game (sim thread, mesh jobs) shuts down before the renderer and window
   display.renderer.reset();
+  if (!g_worldSwitchArgs.empty()) {  // 2026-10-31 (JD): say exactly which world folder the relaunch opens
+    const auto rargs = worldRelaunchArgs(argc, argv, g_worldSwitchArgs, (dataRoot(argv[0]) / "saves" / "world").string());
+    logInfo("world relaunch: opening folder '%s'", rargs.back().c_str());
+  }
   logInfo("exit");
   logCloseFile();
-#if !defined(__EMSCRIPTEN__)
+#if !defined(__wasm__)
   if (!g_relaunchBackend.empty()) relaunchWithRenderer(argc, argv, g_relaunchBackend);
+  else if (!g_worldSwitchArgs.empty()) {
+    const auto rargs = worldRelaunchArgs(argc, argv, g_worldSwitchArgs, (dataRoot(argv[0]) / "saves" / "world").string());
+    std::string line;
+    for (const auto& a : rargs) line += " " + a;
+    std::fprintf(stderr, "world relaunch: opening folder '%s' | args:%s\n", rargs.back().c_str(), line.c_str());
+    cWorldCatalog::instance().launch(argv[0], rargs);
+  }
+  // 2026-10-31 (JD close-hang): everything is saved and joined; skip static destructors (a pool or
+  // census teardown that waits on a spinning worker kept the process alive at high CPU after the
+  // window closed). The one atexit flush that matters runs first. LL_EXIT_FAST=0 kill switch.
+  { static const bool fast = [] { const char* e = std::getenv("LL_EXIT_FAST"); return !(e && e[0] == '0'); }();
+    if (fast) { litholattice::workTraceFlush(); std::fflush(nullptr); std::_Exit(0); } }
 #endif
   return 0;
 }
@@ -1593,7 +1853,7 @@ static bool lkStepFrame(FrameCtx& F) {
   constexpr bool kDebugBuild = false;
 #endif
   constexpr double kBenchWarmup = 3.0;  // mirrors main()'s setup constant of the same name/value
-  if (window->shouldClose()) return false;
+  if (window->shouldClose()) { logInfo("exit: window close requested (paused=%d)", int(game.paused())); return false; }
       if (benchSeconds <= 0 && appliedFpsCap == -1 && game.settings().fpsCap == -1) {  // auto resolve
         if (++autoFrames > 60) autoRenderSum += msRender;
         if (autoFrames == 180) {
@@ -1619,12 +1879,24 @@ static bool lkStepFrame(FrameCtx& F) {
       const double frameMs = msBetween(tLast, now);
       worstMs = std::max(worstMs, frameMs);
       tLast = now;
+      if (litholattice::cHitchCapture::enabled() && frames + perfFrames > 0) {  // LL_HITCH_CAPTURE: stage breakdown of frames > 2x median
+        static litholattice::cHitchCapture hcap;  // main thread only
+        static int hcLogged = 0; static auto hcSec = now;
+        if (secondsBetween(hcSec, now) >= 1.0) { hcSec = now; hcLogged = 0; }
+        const litholattice::cHitchCapture::Taken wk = litholattice::cHitchCapture::take();
+        const double med = hcap.noteFrame(frameMs);
+        if (med > 0 && frameMs > 2.0 * med && hcLogged++ < 5)  // max 5 lines/s
+          logInfo("hitch-capture: frame %.2f ms (median %.2f) | main input %.2f update %.2f upload %.2f render %.2f present %.2f | "
+                  "workers gather %.2f mesh %.2f vertex %.2f ms over %llu jobs (max job %.2f) | mesh-queue %zu upload-bytes %zu",
+                  frameMs, med, msInput, msUpdate - game.lastUploadMs(), game.lastUploadMs(), msRender, msPresent,
+                  wk.ms[0], wk.ms[1], wk.ms[2], (unsigned long long)wk.jobs, wk.maxJobMs, size_t(game.meshQueueDepth()), size_t(game.lastUploadBytes()));
+      }
       if (frames + perfFrames > 0) {  // hitch: a frame over 2x the running average (and over 10 ms)
         if (avgFrameMs > 0 && frameMs > 2.0 * avgFrameMs && frameMs > 10.0 && ++hitches <= 3)  // max 3 lines/s
           logInfo("hitch: frame %.1f ms (avg %.2f ms)", frameMs, avgFrameMs);
         avgFrameMs = avgFrameMs > 0 ? avgFrameMs * 0.95 + frameMs * 0.05 : frameMs;
         perfSumMs += frameMs; perfMaxMs = std::max(perfMaxMs, frameMs); ++perfFrames; perfMs.push_back(frameMs);
-        if (benchSeconds > 0 && secondsBetween(tStart, now) > kBenchWarmup) {
+        if (benchSeconds > 0 && F.benchGate.open()) {
           // msUpdate / msRender still hold the previous frame's split (this frameMs ends here).
           benchMs.push_back(frameMs);
           br.minSum += frameMs; ++br.minFrames;
@@ -1635,16 +1907,37 @@ static bool lkStepFrame(FrameCtx& F) {
           br.secRender += msRender; br.secPresent += msPresent; br.secBytes += double(game.lastUploadBytes()); ++br.secFrames;
         }
       }
+      if (benchSeconds > 0 && !F.benchGate.open() &&
+          F.benchGate.update(tStart, now, F.benchGate.wantsProbe(tStart, now) && game.streamSettled())) {
+        runSeconds = F.benchGate.openedAfterS() + benchSeconds;
+        const char* why = game.streamUnsettledReason();
+        logInfo("bench: sampling opens at %.2f s (%s%s%s), chunks=%zu of %zu in radius, mesh-queue %zu", F.benchGate.openedAfterS(),
+                F.benchGate.reasonName(), why ? "; still waiting on " : "", why ? why : "", game.loadedColumnCount(),
+                game.streamFootprintColumns(), game.meshQueueDepth());
+      }
+      if (F.streamBench && !F.streamFill.finished()) {  // --stream-bench: run start -> every footprint column streamed in
+        if (!F.streamFill.started()) F.streamFill.start(tStart);
+        if (game.sampleStreamFill(F.streamFill, now)) {
+          F.streamFill.finish(now);
+          F.streamFill.report(F.renderer->name(), game.streamFootprintColumns(), F.streamBenchJson.c_str());
+          F.streamBenchReported = true;
+        }
+      }
       if (runSeconds > 0 && secondsBetween(tStart, now) > runSeconds) return false;
 
       int w, h; window->framebufferSize(w, h);
       // 0.0.1.54 [C54-2] (Proposed by JD; co-implemented by JD and Cortana): LL_BENCH_SHOT_AT=<s> delays the --ui-shot (far-view LOD shots).
       static const double kShotAt = [] { const char* e = std::getenv("LL_BENCH_SHOT_AT"); return e ? std::atof(e) : 0.0; }();
       if (!uiShotDone && secondsBetween(tStart, now) > std::max(kBenchWarmup, kShotAt)) { game.requestUiShot(uiShot); uiShotDone = true; }
-      if (benchSeconds > 0) game.setBenchCamera(float(secondsBetween(tStart, now)));
+      if (!g_frameDumpDir.empty() && !lithokraft::cFrameDumpHub::instance().sink()) {  // --frame-dump DIR: frames -> ffmpeg at 30 fps
+        static lithokraft::cFrameVideoEncoder encoder(g_frameDumpDir, tStart);
+        lithokraft::cFrameDumpHub::instance().install(&encoder);
+        std::atexit([] { if (auto* s = lithokraft::cFrameDumpHub::instance().sink()) { s->close(); lithokraft::cFrameDumpHub::instance().install(nullptr); } });
+      }
+      if (benchSeconds > 0) game.setBenchCamera(float(F.benchGate.cameraSeconds(tStart, now)));
       const auto tUp = Clock::now();
       game.update(dt, w, h);
-      if (benchSeconds > 0) game.setBenchCamera(float(secondsBetween(tStart, now)));
+      if (benchSeconds > 0) game.setBenchCamera(float(F.benchGate.cameraSeconds(tStart, now)));
       const auto tRender = Clock::now();
       msUpdate = msBetween(tUp, tRender);
       ovUpdSum += msUpdate; ++ovUpdN;  // F56-4
@@ -1662,6 +1955,7 @@ static bool lkStepFrame(FrameCtx& F) {
         }
         wasFocused = foc;
       }
+      if (game.worldLoadRequested()) return false;  // 2026-10-31 (JD): Load World (main() rebuilds the Game)
       if (game.quitRequested()) window->requestClose();
       // Compare against GLFW's REAL cursor mode, not the cached flag.
       {
@@ -1672,9 +1966,15 @@ static bool lkStepFrame(FrameCtx& F) {
         // usable) and restored when play recaptures.
         const bool wantCap = benchSeconds <= 0 && game.wantsCursorCaptured() && window->focused();  // Cortana 2026-10-15 1925: no cursor grab / topmost in bench
         if (wantCap != window->cursorReallyCaptured()) window->setCursorCaptured(wantCap);
+        // 2026-10-31 (JD): maximize / restore / resize while captured re-applies the grab, so the
+        // OS clip rectangle and the relative-mouse centre follow the new client area.
+        static int capW = 0, capH = 0;
+        if (wantCap && (w != capW || h != capH) && capW + capH > 0) { window->setCursorCaptured(false); window->setCursorCaptured(true); }
+        capW = w; capH = h;
         // 2026-10-25 (Archie capture fix): never topmost on the software renderer: a topmost,
         // monitor-sized popup is what OBS Window capture and DWM treat as an exclusive surface.
-        window->setTopmost(!display.software && wantCap && window->cursorReallyCaptured());
+        // 2026-10-31 (JD): never topmost in any mode (borderless must minimize and Alt-Tab like a normal window).
+        window->setTopmost(false);
       }
       if (w > 0 && h > 0) {
         game.uploadEntities();
@@ -1785,13 +2085,14 @@ static bool lkStepFrame(FrameCtx& F) {
         ovUpdSum = 0; ovUpdN = 0;
         logInfo("%s p99=%.2fms hitches=%d", game.perfLine(perfFrames / perfSince, perfFrames ? perfSumMs / perfFrames : 0.0, perfMaxMs).c_str(),
                 percentile(perfMs, 0.99), hitches);
+        if (::litholattice::cMemoryLedger::enabled()) logInfo("mem ledger: %s ws=%.1fMiB", ::litholattice::cMemoryLedger::line().c_str(), double(processWorkingSetBytes()) / 1048576.0);  // Gate 0
         if (benchSeconds > 0) {
           const uint64_t mem = processWorkingSetBytes();
           br.memPeak = std::max(br.memPeak, mem);
           const auto ssOpt = game.simStats();
           if (!ssOpt) return true;  // (was: continue — skip the rest of this bench second)
           const SimStats& ss = ssOpt->get();
-          if (secondsBetween(tStart, now) > kBenchWarmup) br.tick.push_back(ss.tickMs);
+          if (F.benchGate.open()) br.tick.push_back(ss.tickMs);
           const double f = std::max(1, br.secFrames);
           std::string streamPart;
           if (cBenchStreamer* bs = game.benchStreamer()) {
@@ -1806,7 +2107,7 @@ static bool lkStepFrame(FrameCtx& F) {
           logInfo("bench-sec frame: input=%.3f update=%.3f upload=%.3f render=%.3f present=%.3f ms, upload=%.0f B/frame, tick=%.3f ms, ram=%.1f MB%s",
                   br.secInput / f, br.secUpdate / f, br.secUpload / f, br.secRender / f, br.secPresent / f, br.secBytes / f, ss.tickMs, double(mem) / 1048576.0,
                   streamPart.c_str());
-          if (benchPath == "soak" && br.minFrames > 0 && secondsBetween(tStart, now) - kBenchWarmup >= 60.0 * (br.minuteNo + 1)) {
+          if (benchPath == "soak" && br.minFrames > 0 && F.benchGate.sinceOpenS(now) >= 60.0 * (br.minuteNo + 1)) {
             br.minuteFrame.push_back(br.minSum / br.minFrames); br.minuteRam.push_back(double(mem) / 1048576.0);
             logInfo("soak minute=%d frame_avg=%.3fms ram=%.1fMB (drift vs minute 1: %+.3f ms, %+.1f MB)", br.minuteNo + 1, br.minuteFrame.back(),
                     br.minuteRam.back(), br.minuteFrame.back() - br.minuteFrame.front(), br.minuteRam.back() - br.minuteRam.front());
@@ -1892,7 +2193,34 @@ static void lkShutdownTail(FrameCtx& F) {
           std::fclose(fp);
         }
       }
-      const std::vector<double> rawMs = benchMs;  // Phase 4.0: frame order (percentile() sorts benchMs in place)
+      // Hitch diagnosis (Direction JD, 2026-10-30): LL_SPIKE_TRACE=<file> writes every measured frame over 2x the
+      // median with its stage split, upload bytes and mesh-queue depth, plus a per-stage offender summary. Tooling only.
+      if (const char* sf = std::getenv("LL_SPIKE_TRACE"); sf && *sf && !benchMs.empty()) {
+        std::vector<double> srt = benchMs;
+        std::nth_element(srt.begin(), srt.begin() + srt.size() / 2, srt.end());
+        const double med = srt[srt.size() / 2];
+        if (FILE* fp = std::fopen(sf, "w")) {
+          const char* names[5] = {"input", "update", "upload", "render", "present"};
+          const std::vector<double>* st[5] = {&br.input, &br.update, &br.upload, &br.render, &br.present};
+          size_t spikes = 0, worstBy[5] = {}; double excessBy[5] = {}, at = 0;
+          std::fprintf(fp, "# median %.3f ms; frame t_s ms input update upload render present upload_bytes mesh_queue top_stage\n", med);
+          for (size_t i = 0; i < benchMs.size(); ++i) {
+            const double ms = benchMs[i];
+            if (ms > 2.0 * med) {
+              ++spikes;
+              int top = 0; double v[5];
+              for (int s = 0; s < 5; ++s) { v[s] = i < st[s]->size() ? (*st[s])[i] : 0.0; if (v[s] > v[top]) top = s; }
+              ++worstBy[top]; excessBy[top] += ms - med;
+              std::fprintf(fp, "%zu %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.0f %.0f %s\n", i, at, ms, v[0], v[1], v[2], v[3], v[4],
+                           i < br.uploadBytes.size() ? br.uploadBytes[i] : 0.0, i < br.meshQueue.size() ? br.meshQueue[i] : 0.0, names[top]);
+            }
+            at += ms / 1000.0;
+          }
+          std::fprintf(fp, "# spikes %zu of %zu frames (>2x median)\n", spikes, benchMs.size());
+          for (int s = 0; s < 5; ++s) std::fprintf(fp, "# top %s: %zu spikes, excess %.1f ms\n", names[s], worstBy[s], excessBy[s]);
+          std::fclose(fp);
+        }
+      }      const std::vector<double> rawMs = benchMs;  // Phase 4.0: frame order (percentile() sorts benchMs in place)
       const double avg = avgOf(benchMs), p50 = percentile(benchMs, 0.5), p99 = percentile(benchMs, 0.99), mx = percentile(benchMs, 1.0);
       {  // Phase 4.0 (Direction JD, research Elfie, implementation Cortana): lows + worst frames. Method: "1% low" =
          // 1000 / mean of the slowest 1% of measured frames (0.1% likewise); times are seconds after the warmup.
@@ -1923,10 +2251,11 @@ static void lkShutdownTail(FrameCtx& F) {
       const double genAvg = bs ? MsSamples::avg(bs->genMs.run) : 0, genP99 = bs ? MsSamples::pct(bs->genMs.run, 0.99) : 0;
       const double meshAvg = bs ? MsSamples::avg(bs->meshMs.run) : 0, meshP99 = bs ? MsSamples::pct(bs->meshMs.run, 0.99) : 0;
       const double genRate = bs ? double(bs->totalGenerated) / benchSeconds : 0, meshRate = bs ? double(bs->totalMeshed) / benchSeconds : 0;
-      logInfo("bench renderer=%s present=%s path=%s seconds=%.0f frames=%zu rthreads=%u avg=%.3fms p50=%.3fms p99=%.3fms max=%.3fms "
+      logInfo("bench renderer=%s present=%s path=%s seconds=%.0f frames=%zu rthreads=%u avg=%.3fms p50=%.3fms p99=%.3fms chunks=%zu max=%.3fms sample_start=%.2fs(%s) "
               "input=%.3f update=%.3f upload=%.3f render=%.3f present=%.3f ms upload=%.0f B/frame tick=%.3f/%.3fms gen=%.1f cols/s (%.2f/%.2fms) "
               "mesh=%.1f subs/s (%.3f/%.3fms) ram=%.1f->%.1f MB (peak %.1f)",
-              renderer->name(), present.c_str(), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, mx, avgOf(br.input),
+              renderer->name(), present.c_str(), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, game.loadedColumnCount(), mx,
+              F.benchGate.openedAfterS(), F.benchGate.reasonName(), avgOf(br.input),
               avgOf(br.update), avgOf(br.upload), avgOf(br.render), avgOf(br.present), avgOf(br.uploadBytes), avgOf(br.tick), percentile(br.tick, 0.99), genRate,
               genAvg, genP99, meshRate, meshAvg, meshP99, double(br.memStart) / 1048576.0, double(br.memEnd) / 1048576.0,
               double(br.memPeak) / 1048576.0);
@@ -1934,37 +2263,43 @@ static void lkShutdownTail(FrameCtx& F) {
         logInfo("soak drift: frame %+.3f ms, ram %+.1f MB over %zu minutes (same-path minutes: %+.3f ms)", br.minuteFrame.back() - br.minuteFrame.front(),
                 br.minuteRam.back() - br.minuteRam.front(), br.minuteFrame.size(),
                 br.minuteFrame.size() >= 3 ? br.minuteFrame.back() - br.minuteFrame[br.minuteFrame.size() % 2 ? 0 : 1] : 0.0);
-      std::printf("BENCH %s present=%s display=%s path=%s frames=%zu avg=%.3f ms p99=%.3f ms\n", renderer->name(), present.c_str(),
-                  displayModeName(window->display().mode), benchPath.c_str(), benchMs.size(), avg, p99);
+      std::printf("BENCH %s present=%s display=%s path=%s frames=%zu avg=%.3f ms p99=%.3f ms chunks=%zu\n", renderer->name(), present.c_str(),
+                  displayModeName(window->display().mode), benchPath.c_str(), benchMs.size(), avg, p99, game.loadedColumnCount());
       if (!benchJson.empty()) {
         if (std::FILE* f = openForWrite(benchJson.c_str())) {
           std::fprintf(f,
                        "{\n  \"renderer\": \"%s\", \"present\": \"%s\", \"display\": \"%s\", \"path\": \"%s\", \"seconds\": %.0f, \"frames\": %zu, \"render_threads\": %u,\n"
-                       "  \"frame_ms\": {\"avg\": %.4f, \"p50\": %.4f, \"p99\": %.4f, \"max\": %.4f},\n"
+                       "  \"frame_ms\": {\"avg\": %.4f, \"p50\": %.4f, \"p99\": %.4f, \"max\": %.4f}, \"chunks_loaded\": %zu, \"chunks_in_radius\": %zu,\n"
+                       "  \"sample_start\": {\"s\": %.3f, \"reason\": \"%s\"},\n"
                        "  \"main_thread_ms\": {\"input\": %.4f, \"update\": %.4f, \"upload\": %.4f, \"render\": %.4f, \"present\": %.4f},\n"
                        "  \"upload_bytes_per_frame\": %.0f, \"sim_tick_ms\": {\"avg\": %.4f, \"p99\": %.4f},\n"
                        "  \"stream\": {\"columns_per_s\": %.2f, \"gen_ms_avg\": %.4f, \"gen_ms_p99\": %.4f, \"subchunks_per_s\": %.2f, "
                        "\"mesh_ms_avg\": %.4f, \"mesh_ms_p99\": %.4f},\n"
-                       "  \"ram_mb\": {\"start\": %.1f, \"end\": %.1f, \"peak\": %.1f},\n  \"soak_drift\": {\"frame_ms\": %.4f, \"ram_mb\": %.1f, \"minutes\": %zu}\n}\n",
-                       renderer->name(), present.c_str(), displayModeName(window->display().mode), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, mx, avgOf(br.input),
+                       "  \"ram_mb\": {\"start\": %.1f, \"end\": %.1f, \"peak\": %.1f},\n  \"soak_drift\": {\"frame_ms\": %.4f, \"ram_mb\": %.1f, \"minutes\": %zu},\n  \"thread_readout\": \"%s\",\n  \"memory_ledger\": %s\n}\n",
+                       renderer->name(), present.c_str(), displayModeName(window->display().mode), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, mx,
+                       game.loadedColumnCount(), game.streamFootprintColumns(), F.benchGate.openedAfterS(), F.benchGate.reasonName(), avgOf(br.input),
                        avgOf(br.update), avgOf(br.upload), avgOf(br.render), avgOf(br.present), avgOf(br.uploadBytes), avgOf(br.tick), percentile(br.tick, 0.99),
                        genRate, genAvg, genP99, meshRate, meshAvg, meshP99, double(br.memStart) / 1048576.0, double(br.memEnd) / 1048576.0,
                        double(br.memPeak) / 1048576.0,
                        br.minuteFrame.empty() ? 0.0 : br.minuteFrame.back() - br.minuteFrame.front(),
-                       br.minuteRam.empty() ? 0.0 : br.minuteRam.back() - br.minuteRam.front(), br.minuteFrame.size());
+                       br.minuteRam.empty() ? 0.0 : br.minuteRam.back() - br.minuteRam.front(), br.minuteFrame.size(),
+                       ::litholattice::cNamedThreadLoad::instance().summary(benchSeconds).c_str(),  // LL_THREAD_READOUT (empty when off)
+                       ::litholattice::cMemoryLedger::json().c_str());  // Gate 0
           std::fclose(f);
         } else {
           logError("bench: cannot write %s", benchJson.c_str());
         }
       }
+      if (F.streamBench && !F.streamBenchReported)  // the run ended before the fill completed
+        F.streamFill.report(renderer->name(), game.streamFootprintColumns(), F.streamBenchJson.c_str());
     }
 }
 
-#if defined(__EMSCRIPTEN__)
+#if defined(__wasm__)
 static void lkFrameThunk(void* p) {
   FrameCtx& F = *static_cast<FrameCtx*>(p);
   if (!lkStepFrame(F)) {
-    emscripten_cancel_main_loop();
+    lk_frame_loop_cancel();
     lkShutdownTail(F);
     F.game.reset();
     F.input.reset();

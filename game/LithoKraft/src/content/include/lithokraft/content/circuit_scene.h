@@ -20,12 +20,12 @@ int buildLithoMachine(ChunkMap& world, int cx, int y, int cz, bool wired);
 /// (size - 8) / 4 banks of size - 6 lamps. Returns the number of blocks placed.
 int buildDisplayScene(ChunkMap& world, int x0, int y, int z0, int size);
 /// 2026-10-24 test area Clocks pad: the display scene's self-running ring clock (four Repeators
-/// at delay index delayIndex 0..3 = 2/4/8/16 ticks, kicked once by a Pulsor) with two taps:
+/// at delay setting delayIndex 0..5 = 2/4/8/16/32/64 ticks (repeator.h), kicked once by a Pulsor) with two taps:
 /// a pulse lamp at (x0+4, y, z0+5) and a Fast Latch at (x0+6, y, z0+4) toggling a lamp at
 /// (x0+6, y, z0+6) once per lap. Footprint 7 x 7 from (x0, z0). Returns blocks placed.
 int buildRingClock(ChunkMap& world, int x0, int y, int z0, int delayIndex);
 /// Measured lap period in ticks (= 4 x delay; the latch lamp blinks at twice this) for each delay index (signal selftest checks these).
-inline constexpr int kRingClockPeriod[4] = {16, 32, 64, 128};  // 2026-10-24: delays 4/8/16/32
+inline constexpr int kRingClockPeriod[6] = {8, 16, 32, 64, 128, 256};  // PlayM: by setting, delays 2/4/8/16/32/64 (4 Repeators per lap)
 
 /// Where the framebuffer scene put things (for the flyover camera and the viewing stand).
 struct FramebufferLayout { int x0 = 0, z0 = 0, y = 0, size = 0, screenZ0 = 0, screenZ1 = 0, cacheZ = 0, columns = 0, blocks = 0;
@@ -49,6 +49,9 @@ FramebufferLayout buildFramebufferWall(ChunkMap& world, int x0, int y, int z0, i
 /// a wire. n Redirectors from x0 along +x, rows z0 (red), z0 + 1 (Redirectors / lamps), z0 + 2
 /// (blue). Torches at x0 - 1 feed both lines. Returns blocks placed.
 int buildRedirectorScene(ChunkMap& world, int x0, int y, int z0, int n);
+// 2026-10-31 (JD): readout facing check. Three 4-way clusters (Thresholdor, Memor, Catchor) centred at
+// x0-6 / x0 / x0+6, z0: a red torch in the middle, one block per side facing outward (back on the torch).
+int buildFacingsScene(ChunkMap& world, int x0, int y, int z0);
 /// Wall-pixel screen (decoder design): rows x width (even, <= 16) colour lamps standing in the
 /// plane z = zw from y + 1 up, two blocks per row with glass between. Each pixel has a Catchor
 /// (match i + 1) on its row's red line, so it shows the caught value as its colour. Each row has its

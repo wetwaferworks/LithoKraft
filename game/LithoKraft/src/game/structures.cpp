@@ -104,7 +104,7 @@ Spawn buildDemoCircuit(ChunkMap& w, int ox, int oz) {
   put(12, y, 29, kBlueTrace); put(12, y, 30, kLamp);              // control port (right = south)
   // Fast Latch: press the cButton -> toggles -> Lamp.
   put(22, y, 28, kButton);
-  put(23, y, 28, kFastLatch, makeState(0, E));
+  put(23, y, 28, kLatchor, makeState(0, E));
   put(24, y, 28, kRedTrace); put(25, y, 28, kLamp);
   // Redirector: a Switch on its left side, output out the front -> Lamp.
   put(30, y, 27, kSwitch, makeState(0, 0, 0, true));

@@ -2,6 +2,7 @@
 // The engine (litholattice::cBlockReg) only stores these rows; everything they mean is here.
 #pragma once
 #include <cstdint>
+#include <vector>
 #include "lithokraft/engine.h"
 #include "litholattice/world/block.h"
 
@@ -26,7 +27,9 @@ extern const BlockId kThresholdor;
 extern const BlockId kRedirector;
 extern const BlockId kPulsor;
 extern const BlockId kMemor;
-extern const BlockId kFastLatch;
+extern const BlockId kLatchor;
+extern const BlockId kFusorSum;  ///< PlayN (JD): Fusor adder (old Fusor id = kFusor = Breakor)
+extern const BlockId kRandor;  ///< 2026-10-31 (JD): random range block
 extern const BlockId kSwitch;
 extern const BlockId kButton;
 extern const BlockId kKeyboard;
@@ -158,9 +161,9 @@ constexpr uint32_t kGameFluid = uint32_t(kFirstGameFlag) << 3;      // swimmable
 /// What a block does in the signal sim (stored in BlockDef::role).
 enum class SimRole : uint16_t {
   None, Wire, Torch, Lamp, ColorLamp,
-  Repeator, Thresholdor, Redirector, Pulsor, Memor, FastLatch, Switch, cButton, Keyboard, Tone, Catchor,
+  Repeator, Thresholdor, Redirector, Pulsor, Memor, Latchor, Switch, cButton, Keyboard, Tone, Catchor,
   cSignalTransmittor, cSignalReceivor, cDish, cOverclockor, Lithographor, Chipor, cPortor, cFusor,
-  Etchor,  // appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
+  Etchor, Randor, cFusorSum,  // cFusorSum appended PlayN; Randor appended 2026-10-31; Etchor appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
 };
 constexpr SimRole roleOf(const BlockDef& d) { return SimRole(d.role); }
 /// Lets content code compare the engine's raw BlockDef::role with a SimRole (found by ADL).
@@ -216,6 +219,13 @@ inline bool isSideVia(BlockId b) { return viaAxis(b) > 0; }
 /// 2026-10-25: blocks kept out of the creative palette, test-world kit and block grid (placement
 /// variants, or no art yet). Still placeable by id / command and in scenes.
 inline bool isPaletteHidden(BlockId b) { return isSideVia(b) || b == kTimerBuffer; }
+/// 2026-10-31 (JD): the creative palette list, built from the block registry in registry order (new blocks
+/// append themselves). Skips air; internal / placement-variant blocks only when `includeHidden` is false.
+std::vector<BlockId> paletteBlocks(bool includeHidden = false);
+/// 2026-10-31 (JD): the creative palette grouped for display (Trace, lamps/LEDs, building, other);
+/// LL_PALETTE_GROUPS=0 = registry order. `rank` = curated order inside the Trace family.
+int paletteFamily(BlockId b, int* rank = nullptr);
+std::vector<BlockId> paletteBlocksGrouped();
 /// The vertical (item) form of any via: side vias drop as their base colour.
 inline BlockId viaBase(BlockId b) { return (b == kRedViaX || b == kRedViaZ) ? kRedVia : (b == kBlueViaX || b == kBlueViaZ) ? kBlueVia : b; }
 /// The side-lying variant of a vertical via for axis 1 (X) or 2 (Z); other blocks unchanged.

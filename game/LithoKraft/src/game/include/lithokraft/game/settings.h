@@ -40,10 +40,10 @@ struct GameSettings {
   float masterVolume = 0.6f;  ///< 0..1; matches the cAudioEngine default gain
   bool muted = false;
   int hudScale = 0;       ///< 0 = auto, else a fixed GUI scale (1-4)
-  int displayMode = 1;    ///< index into kSettingsDisplayModes (Cortana 2026-10-25: default Maximized windowed per JD; was 2 Borderless, 0 Windowed before that)
-  /// Renderer backend at startup: "software" (shipped default), "gl33" or "vulkan" (JD 2026-10-24).
+  int displayMode = 2;    ///< 2026-10-31 (JD t3678u): Borderless default in every build; index into kSettingsDisplayModes (Cortana 2026-10-25: default Maximized windowed per JD; was 2 Borderless, 0 Windowed before that)
+  /// Renderer backend at startup: "vulkan" (shipped default, JD 2026-10-30), "software" or "gl33" (JD 2026-10-24).
   /// Settings > Graphics > Renderer saves the world and relaunches with it; --renderer still wins.
-  std::string renderer = "software";
+  std::string renderer = "vulkan";
   bool vsync = true;      ///< 2026-10-24 (JD): default ON. boot-only: the window is created with it
   int tps = 32;           ///< one of kSettingsTpsModes (kDefaultTps)
   int tickRadius = 6;     ///< 2026-10-24 (JD): default 6. simulation distance, 0..512 chunks; boot-only. F56-10 (JD 2026-10-17): default 8; 16/32 are stress-test options; env LL_SIM_TICK_RADIUS (was 16 since F55-5)

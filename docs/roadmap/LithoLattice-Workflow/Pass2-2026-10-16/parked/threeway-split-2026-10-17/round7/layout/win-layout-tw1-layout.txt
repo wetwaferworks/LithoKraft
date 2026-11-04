@@ -1,0 +1,5 @@
+consoleFound=True consoleMaximized=True consoleRect=0,0,1920,1080
+gameFound=True gameRect=311,136,1609,903 workArea=0,0,1920x1040 centerOffset=0,0
+gameForeground=True
+visibleWindowsOfGamePid=GLFW30 PseudoConsoleWindow 
+exit=0

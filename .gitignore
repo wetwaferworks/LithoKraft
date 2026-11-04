@@ -35,3 +35,13 @@ _private/
 *.orig
 *.reverted-*
 *.spans-reverted-*
+
+# 2026-11-04: source only (JD)
+game/LithoKraft/saves/
+game/LithoKraft/logs/
+game/LithoKraft/config/
+LITHOKRAFT_BUILD_COUNTER.txt*
+BUILD_COUNTER*
+*.orig-2026-11-04
+
+Lore/X-Raw-*.json

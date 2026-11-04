@@ -29,6 +29,8 @@ struct HudModel {
   int selected = 0;
   bool visible = true;                     ///< F1 hides everything
   std::vector<std::string> debugLines;     ///< empty: no debug panel (F3)
+  std::string tickLine;                    ///< 2026-10-31 (JD): tick stability readout (empty: hidden)
+  int tickLevel = 0;                       ///< 0 green (holding), 1 yellow (dipping), 2 red (dropping)
   std::vector<std::string> controlLines;   ///< controls panel (H)
   std::vector<std::string> bannerLines;    ///< keyboard capture banner (empty: none)
   std::vector<std::string> postViewLines;  ///< 2026-10-25 Post viewer: title, 16 rows, hint (empty: hidden)
@@ -50,6 +52,8 @@ class cGameUi {
     /// (Last, so positional initializers stay valid.) Playtest 2026-10-16: carry slot (0..41, Inventory::allSlots order) clicked in the
     /// inventory dialog's "Carry" grid: swap it into the selected hotbar slot.
     std::function<void(int carryIndex)> pickCarry;
+    std::function<void()> saveWorld;  ///< 2026-10-31 (JD): pause menu "Save world"
+    std::function<void()> loadWorld;  ///< 2026-10-31 (JD): pause menu "Load world" (opens the world picker)
   };
 
   explicit cGameUi(Callbacks callbacks);
@@ -125,6 +129,8 @@ class cGameUi {
   float hotbarScale_ = kHotbarScale;  ///< kHotbarScale capped to the window (hotbarScaleFor)
   ui::cPanel* debugPanel_ = nullptr;
   ui::cLabel* debugText_ = nullptr;
+  ui::cLabel* tickText_ = nullptr;       ///< 2026-10-31 (JD): tick stability line (coloured)
+  ui::cPanel* tickPanel_ = nullptr;
   ui::cLabel* debugLook_ = nullptr;      ///< 2026-10-16 (JD): the look-at line, red
   ui::cLabel* debugTextPost_ = nullptr;  ///< debug lines after the look-at line
   ui::cPanel* controlsPanel_ = nullptr;
@@ -151,6 +157,8 @@ class cGameUi {
   std::string version_;
   ui::cDialog* settings_ = nullptr;
   int hudScalePref_ = 0;  // 0 = auto
+  float autoScale_ = 1.f;  // 2026-10-31: auto GUI scale for the fixed-size F3 overlay
+  void setDebugStyle(ui::Theme& t, float autoK);
 
   void rebuildMenu();
 };

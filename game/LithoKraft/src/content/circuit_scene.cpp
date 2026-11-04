@@ -83,7 +83,7 @@ int buildRingClock(ChunkMap& w, int x0, int y, int z0, int delayIndex) {
   put(ox + 2, oz + 2, kBlueTrace); rep(ox + 1, oz + 2, W);
   put(ox, oz + 2, kBlueTrace);     rep(ox, oz + 1, N);
   put(ox, oz + 3, kBlueTrace); put(ox, oz + 4, kLamp);                          // pulse tap
-  put(ox + 2, oz + 3, kFastLatch, S); put(ox + 2, oz + 4, kRedTrace); put(ox + 2, oz + 5, kLamp);  // toggle tap
+  put(ox + 2, oz + 3, kLatchor, S); put(ox + 2, oz + 4, kRedTrace); put(ox + 2, oz + 5, kLamp);  // toggle tap
   return placed;
 }
 FramebufferLayout buildFramebufferScene(ChunkMap& w, int x0, int y, int z0, int size, int pixels) {
@@ -253,6 +253,36 @@ int buildRedirectorScene(ChunkMap& w, int x0, int y, int z0, int n) {
     const bool redPixel = ((o / 2) & 1) == 0;
     // One lane per pixel; the other is off (the output is colourless, so a parked lane would leak).
     put(x, y, z0 + 1, kRedirector, redPixel ? CellState(makeState(0, E, 4 | N) | (1u << 14)) : CellState(makeState(0, S, 4 | E) | (1u << 13)));
+  }
+  return placed;
+}
+int buildFacingsScene(ChunkMap& w, int x0, int y, int z0) {
+  constexpr int N = 0, E = 1, S = 2, W = 3;
+  int placed = 0;
+  auto put = [&](int x, int yy, int z, BlockId b, CellState st = 0) {
+    if (w.set(x, yy, z, b)) { if (st) w.setState(x, yy, z, st); ++placed; }
+  };
+  for (int z = z0 - 4; z <= z0 + 4; ++z)
+    for (int x = x0 - 10; x <= x0 + 10; ++x) {  // facings
+      for (int yy = y; yy <= y + 3; ++yy) w.set(x, yy, z, kAir);
+      put(x, y - 1, z, kWaferSilicon);
+    }
+  // 2026-10-31 11:35 PM (JD): a Latchor (the reference readout, set 64) diagonal to each block, same facing.
+  const BlockId kinds[3] = {kThresholdor, kMemor, kCatchor};
+  for (int k = 0; k < 3; ++k) {
+    const int lx = x0 + (k - 1) * 6;
+    put(lx + 1, y, z0 - 2, kLatchor, makeState(0, N, 0, false));
+    put(lx + 2, y, z0 + 1, kLatchor, makeState(0, E, 0, false));
+    put(lx - 1, y, z0 + 2, kLatchor, makeState(0, S, 0, false));
+    put(lx - 2, y, z0 - 1, kLatchor, makeState(0, W, 0, false));
+  }
+  for (int k = 0; k < 3; ++k) {
+    const int cx = x0 + (k - 1) * 6;
+    put(cx, y, z0, kRedTorch);
+    put(cx, y, z0 - 1, kinds[k], makeState(0, N, 0, false));
+    put(cx + 1, y, z0, kinds[k], makeState(0, E, 0, false));
+    put(cx, y, z0 + 1, kinds[k], makeState(0, S, 0, false));
+    put(cx - 1, y, z0, kinds[k], makeState(0, W, 0, false));
   }
   return placed;
 }

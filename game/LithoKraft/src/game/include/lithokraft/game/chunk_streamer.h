@@ -33,6 +33,7 @@
 #include <vector>
 #include "litholattice/core/threading.h"
 #include "litholattice/world/chunk_map.h"
+#include "litholattice/world/chunk_ingress.h"
 #include "litholattice/world/column_generator.h"
 
 namespace lithokraft {
@@ -72,6 +73,27 @@ class cChunkStreamer {
   void setAdmitRadius(int r) { admitR_ = r; }
   int admitRadius() const { return admitR_; }
 
+  /// 2026-10-28 frame-aware request budget (Archie: optimization
+  /// design; Elfie: co-implementation; JD: direction + debugging):
+  /// the max NEW column requests admitted per frame cycle — update()
+  /// opens the cycle and spends first (player priority), updateAround
+  /// spends what is left. -1 (the default) is the legacy behaviour:
+  /// admission bounded only by the in-flight cap in pumpRequests.
+  void setRequestBudget(int n) { requestBudget_ = n; }
+  int requestBudget() const { return requestBudget_; }
+
+  /// S4 emergency floor (2026-10-28, Archie ruling): a floor under the
+  /// per-cycle admission of NEW generation jobs (the wafer data /
+  /// collision stage). The Game sets 4 while the player is within 2
+  /// chunks of unloaded ground, -1 (the default) otherwise. Admission
+  /// uses max(budget, floor) when a floor is set, so the frame-aware
+  /// EMA grant can never starve data generation at the world edge.
+  /// This gates ONLY job admission: finished columns still pass the
+  /// Game's bounded insertion (kStreamInsertBudget) and the ordinary
+  /// mesh submission path — render-mesh compilation is not raised.
+  void setRequestBudgetFloor(int n) { requestFloor_ = n; }
+  int requestBudgetFloor() const { return requestFloor_; }
+
   /// Main thread, once per frame: request missing columns within the radius of
   /// the player's chunk, nearest first, bounded by the in-flight cap.
   void update(int playerCx, int playerCz);
@@ -98,6 +120,13 @@ class cChunkStreamer {
   /// per-frame budget; the snapshot-then-insert discipline is unchanged
   /// (columns are fully generated/loaded before they are ever handed out).
   std::vector<StreamedColumn> takeReadyUpTo(size_t max);
+  /// Thread Handshake P5 promotion pop (Archie ruling, R7): drains the Sim
+  /// Ingress into staging, then hands out every staged column inside the
+  /// ring-center bypass (spawnSpiralBypass: Chebyshev 1 around (centerCx,
+  /// centerCz), only while `spiralActive`) regardless of budget, plus up to
+  /// `budget` others in staging order. `*bypassed` gets the bypass count
+  /// (those do not spend the budget).
+  std::vector<StreamedColumn> takeReadyPromote(size_t budget, int centerCx, int centerCz, bool spiralActive, size_t* bypassed);
   bool hasReady() const { return !staged_.empty() || readyCount_->load(std::memory_order_relaxed) > 0; }
   /// Column eviction (A2 / B-M1): forgets a RESIDENT column the Game has
   /// evicted — removes its requested_ entry (so a later update() may
@@ -133,12 +162,17 @@ class cChunkStreamer {
   std::string dimensionId_;
   int radius_;
   int admitR_ = 1 << 20;  ///< 2026-10-25 stutter pass (see setAdmitRadius)
+  int requestBudget_ = -1;    ///< frame-aware budget (see setRequestBudget)
+  int requestFloor_ = -1;     ///< S4 emergency floor (see setRequestBudgetFloor); -1 = no floor
+  int admittedThisCycle_ = 0; ///< admissions since the last update() opened a cycle
   bool diamond_ = false;  ///< diamond (Manhattan) stream footprint (JD 2026-10-23)
   size_t initialCount_ = 0;
   std::unordered_set<uint64_t> requested_;  // loaded or in flight (failures are erased by update(), B-L7)
   std::unordered_map<uint64_t, Retry> retries_;  // failed keys: attempt count + backoff deadline (main thread)
-  std::shared_ptr<litholattice::cHandoffQueue<StreamedColumn>> done_ =
-      std::make_shared<litholattice::cHandoffQueue<StreamedColumn>>();
+  // Thread Handshake P5: the Sim Ingress - worldgen/load jobs (many producers)
+  // -> main-thread promotion (one consumer). Lock-free ring, lossless overflow.
+  std::shared_ptr<litholattice::cIngress<StreamedColumn>> done_ =
+      std::make_shared<litholattice::cIngress<StreamedColumn>>(64);
   std::shared_ptr<litholattice::cHandoffQueue<uint64_t>> failed_ =
       std::make_shared<litholattice::cHandoffQueue<uint64_t>>();
   std::shared_ptr<std::atomic<int>> inFlight_ = std::make_shared<std::atomic<int>>(0);

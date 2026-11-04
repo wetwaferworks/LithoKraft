@@ -31,6 +31,7 @@
 // concurrently with the server thread, and the console command handler
 // itself (private registry; its body is a thin parse over the same
 // grantPermissions call checked in step 4).
+#include "litholattice/core/quiet_crt.h"
 #include <cstdio>
 #include <optional>
 #include <string>
@@ -62,6 +63,7 @@ struct ScriptedTransport final : litholattice::mcp::IStdioTransport {
 }  // namespace
 
 int main() {
+  litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr, no dialog
   using namespace lithokraft;
   namespace mcp = litholattice::mcp;
 

@@ -20,7 +20,7 @@ bool needsFloorSupport(BlockId b) {
   if (d.shape != Shape::Cube && !(d.flags & kSolid)) return true;  // partial, non-solid
   // MARKED per-block list (JD 2026-10-24): Memor needs a solid block beneath; the Keyboard is a
   // non-solid cube in data but renders as a 2/16 slab, so it is partial and needs one too.
-  return b == kMemor || b == kKeyboard || b == kFastLatch;  // Fast Latch: slab placeholder, same rule (JD 2026-10-24)
+  return b == kMemor || b == kKeyboard || b == kLatchor;  // Fast Latch: slab placeholder, same rule (JD 2026-10-24)
 }
 bool floorSupported(const ChunkMap& w, int x, int y, int z) { return blockRegistry().has(w.get(x, y - 1, z), kSolid); }
 }  // namespace
@@ -200,7 +200,7 @@ void cSignalWorldSim::onBlockChanged(ChunkMap& w, int x, int y, int z, BlockId n
     if (post::isStanding(w.get(x, y + 1, z)) && post::isUpper(w.getState(x, y + 1, z))) w.set(x, y + 1, z, kAir);
     if (post::isStanding(w.get(x, y - 1, z)) && !post::isUpper(w.getState(x, y - 1, z))) w.set(x, y - 1, z, kAir);
   }
-  signal_.onBlockChanged(x, y, z, now);
+  signal_.onBlockChanged(x, y, z, now, roleOf(w.get(x, y - 1, z)) == SimRole::Wire);  // LL_EDIT_LOCAL hint
   sounds_.push_back({now == kAir ? SoundCue::Break : SoundCue::Place, 0, x, y, z});
 }
 
@@ -212,12 +212,19 @@ bool cSignalWorldSim::use(ChunkMap& w, int x, int y, int z, const DirtyFn& dirty
 
 void cSignalWorldSim::command(ChunkMap& w, const SimCommand& c, const DirtyFn& dirty) {
   if (c.code == kCmdKeyPulse) signal_.keyPulse(c.x, c.y, c.z, c.a, c.b);
-  else if (c.code == kCmdAltUse && signal_.use(w, c.x, c.y, c.z, dirty, true)) sounds_.push_back({SoundCue::Click, 0, c.x, c.y, c.z});
+  else if (c.code == kCmdAltUse) {
+    // 2026-10-31 (JD, Alt+wheel): `a` = how many secondary steps (0 = 1). The 1..64 settings wrap
+    // through 64 states, so 63 steps is one step back (Alt + wheel down).
+    const int n = (c.a >= 1 && c.a <= 63) ? c.a : 1;
+    bool any = false;
+    for (int i = 0; i < n; ++i) any = signal_.use(w, c.x, c.y, c.z, dirty, true) || any;
+    if (any) sounds_.push_back({SoundCue::Click, 0, c.x, c.y, c.z});
+  }
   // Cortana 2026-10-15 2215 [GAME]: Repeator top-button select (JD D4) and walk-bridging (JD D9).
   else if (c.code == kCmdRepeatorSet) {
     if (blockRegistry().def(w.get(c.x, c.y, c.z)).role == uint16_t(SimRole::Repeator)) {
       const CellState s = w.getState(c.x, c.y, c.z);
-      w.setState(c.x, c.y, c.z, repeator::encode(stValue(s), stFacing(s), c.a & 3, stOn(s)));
+      w.setState(c.x, c.y, c.z, repeator::withColour(repeator::encode(stValue(s), stFacing(s), (int(c.a) >= repeator::kSettings ? repeator::kSettings - 1 : int(c.a) < 0 ? 0 : int(c.a)), stOn(s)), repeator::colourOf(s)));
       dirty(c.x, c.y, c.z);
       sounds_.push_back({SoundCue::Click, 0, c.x, c.y, c.z});
     }
@@ -364,8 +371,11 @@ void cSignalWorldSim::onHsCommit(uint64_t phase, uint64_t /*cycleTick*/, uint32_
   if (sub == 2) {
     // Propagate barrier passed: replay the deferred strength writes in
     // canonical order on this (sim) thread.
-    if (!signal_.hsCycleSkipped() && !signal_.hsFullPass()) signal_.hsApplyStrengthPending();
+    if (!signal_.hsCycleSkipped() && !signal_.hsFullPass()) signal_.hsApplyStrengthPending(&hsDirty_);
     else if (signal_.hsFullPass()) signal_.hsPropagateFull(*hsWorld_, hsDirty_);
+    if (!signal_.hsCycleSkipped()) signal_.hsRefreshSoft(*hsWorld_);  // 2026-11-01 PlayL: same-tick soft, before the lamp phase
+    if (!signal_.hsCycleSkipped()) signal_.hsSettle(*hsWorld_, hsDirty_);  // 2026-11-01 PlayM: same-tick components (serial, sim thread)
+    signal_.hsFinalizeComponents();  // PlayM: deferred component side effects, canonical key order
   } else if (sub == 3) {
     // Lamp barrier passed: replay collected dirties through the real dirty
     // fn (canonical: shard order, ascending keys inside each batch), merge

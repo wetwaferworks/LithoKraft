@@ -1,0 +1,322 @@
+MSBuild version 18.10.1-1.26427.6+3cd27c13e for .NET Framework
+
+  Checking File Globs
+  LithoKraft build counter bump
+  -- LithoKraft build counter: Alpha 0.0.2.2
+  GenericCodeGen.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\glslang\Release\GenericCodeGen.lib
+  MachineIndependent.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\glslang\Release\MachineIndependent.lib
+  OSDependent.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\glslang\OSDependent\Windows\Release\OSDependent.lib
+  SPIRV.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\SPIRV\Release\SPIRV.lib
+  litholattice_nanosvg.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\assets\Release\litholattice_nanosvg.lib
+  litholattice_stb.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\assets\Release\litholattice_stb.lib
+  litholattice_core.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\core\Release\litholattice_core.lib
+  litholattice_anim.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\anim\Release\litholattice_anim.lib
+  angelscript.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\angelscript-build\Release\angelscript.lib
+  litholattice_subdiv.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\subdiv\Release\litholattice_subdiv.lib
+  litholattice_crypto.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\crypto\Release\litholattice_crypto.lib
+  litholattice_assets.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\assets\Release\litholattice_assets.lib
+  litholattice_procgen.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\procgen\Release\litholattice_procgen.lib
+  glfw.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glfw-build\src\Release\glfw3.lib
+  litholattice_audio.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\audio\Release\litholattice_audio.lib
+  litholattice_systerian.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\systerian\Release\litholattice_systerian.lib
+  litholattice_ui.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\ui\Release\litholattice_ui.lib
+  litholattice_index.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\index\Release\litholattice_index.lib
+  litholattice_input.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\input\Release\litholattice_input.lib
+  litholattice_entity.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\entity\Release\litholattice_entity.lib
+  litholattice_mcp.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\mcp\Release\litholattice_mcp.lib
+  litholattice_player.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\player\Release\litholattice_player.lib
+  litholattice_projectile.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\projectile\Release\litholattice_projectile.lib
+  litholattice_sprite.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\sprite\Release\litholattice_sprite.lib
+  lithokraft_model.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\content\model\Release\lithokraft_model.lib
+  litholattice_world.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\world\Release\litholattice_world.lib
+  lithokraft_authored_models.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\content\model\Release\lithokraft_authored_models.lib
+  glslang.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\glslang\Release\glslang.lib
+  lithokraft_litho_formula_bake.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\content\model\Release\lithokraft_litho_formula_bake.lib
+  lithokraft_vegetation.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\content\vegetation\Release\lithokraft_vegetation.lib
+  glslang-default-resource-limits.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\glslang\Release\glslang-default-resource-limits.lib
+  author_models.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\author_models.exe
+  authored_models_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\authored_models_selftest.exe
+  author_vegetation.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\author_vegetation.exe
+  glslang-standalone.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\StandAlone\Release\glslang.exe
+  bake_litho_formula.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\bake_litho_formula.exe
+  litholattice_storage.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\storage\Release\litholattice_storage.lib
+  litholattice_sim.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\sim\Release\litholattice_sim.lib
+  litholattice_mods.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\mods\Release\litholattice_mods.lib
+  litholattice_ai.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\ai\Release\litholattice_ai.lib
+  litholattice_script.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\script\Release\litholattice_script.lib
+  litholattice_defrag.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\defrag\Release\litholattice_defrag.lib
+  lithokraft_agent_models.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\content\model\Release\lithokraft_agent_models.lib
+  litho_formula_gallery_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\litho_formula_gallery_selftest.exe
+  agent_models_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\agent_models_selftest.exe
+  litholattice_platform.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\platform\Release\litholattice_platform.lib
+  litho_sign.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\litho_sign.exe
+  litholattice_render.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\render\Release\litholattice_render.lib
+  litholattice_miniaudio_impl.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\audio\Release\litholattice_miniaudio_impl.lib
+  litholattice_console.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\console\Release\litholattice_console.lib
+  litholattice_audio_device.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\audio\Release\litholattice_audio_device.lib
+  litholattice_camera.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\camera\Release\litholattice_camera.lib
+  litholattice_render_vk.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\render_vk\Release\litholattice_render_vk.lib
+  lithokraft_content.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\content\Release\lithokraft_content.lib
+  litholattice_net.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\net\Release\litholattice_net.lib
+  litholattice_camera_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\camera\Release\litholattice_camera_selftest.exe
+  litholattice_player_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\player\Release\litholattice_player_selftest.exe
+  litholattice_entity_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\entity\Release\litholattice_entity_selftest.exe
+  litholattice_projectile_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\projectile\Release\litholattice_projectile_selftest.exe
+  litholattice_locomotion_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\entity\Release\litholattice_locomotion_selftest.exe
+  litholattice_sprite_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\sprite\Release\litholattice_sprite_selftest.exe
+  litholattice_systerian_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\systerian\Release\litholattice_systerian_selftest.exe
+  litholattice_texture.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\texture\Release\litholattice_texture.lib
+  litholattice_tests.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\tests\Release\litholattice_tests.exe
+  model_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\model_selftest.exe
+  ai_host_selftest.cpp
+  vegetation_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\vegetation_selftest.exe
+  build_version.cpp
+  game.cpp
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(51,75): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(65,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(71,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(76,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(904,30): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(906,16): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(2720,30): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(2722,16): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  game_ui.cpp
+  game_ui_selftest.cpp
+  settings.cpp
+  settings_cvars.cpp
+  Generating Code...
+  lithokraft_game.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\Release\lithokraft_game.lib
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/texture_gen.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/texture_gen.exp
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/biome_capture.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/biome_capture.exp
+  texture_gen.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\texture_gen.exe
+  biome_capture.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\biome_capture.exe
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_screenshot_selftest.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_screenshot_selftest.exp
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_silica_selftest.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_silica_selftest.exp
+  lithokraft_screenshot_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_screenshot_selftest.exe
+  lithokraft_silica_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_silica_selftest.exe
+  headless_harness.cpp
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_scout_selftest.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_scout_selftest.exp
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_items_selftest.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_items_selftest.exp
+  lithokraft_scout_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_scout_selftest.exe
+  lithokraft_items_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_items_selftest.exe
+  harness_selftest.cpp
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_markdown_selftest.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_markdown_selftest.exp
+  lithokraft_markdown_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_markdown_selftest.exe
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_fragment_selftest.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_fragment_selftest.exp
+  lithokraft_fragment_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_fragment_selftest.exe
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_chipor_selftest.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/lithokraft_chipor_selftest.exp
+  lithokraft_chipor_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_chipor_selftest.exe
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/interchange_capture.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/interchange_capture.exp
+  interchange_capture.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\interchange_capture.exe
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/city_capture.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/city_capture.exp
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/harness_selftest.cpp')
+  
+  city_capture.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\city_capture.exe
+  main.cpp
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+  mcp_wiring_selftest_main.cpp
+  headless_harness.cpp
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\main.cpp(998,63): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\main.cpp(697,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\main.cpp(699,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\main.cpp(1039,40): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_mcp_wiring_selftest.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/mcp_wiring_selftest_main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\headless\lithokraft_headless.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/headless/headless_harness.cpp')
+  
+  selftest.cpp
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/selftest.cpp')
+  
+  Generating Code...
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\selftest.cpp(730,30): warning C4456: declaration of 'blob' hides previous local declaration [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+      R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\selftest.cpp(342,26):
+      see declaration of 'blob'
+  
+  Generating Code...
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/headless/Release/lithokraft_mcp_wiring_selftest.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/headless/Release/lithokraft_mcp_wiring_selftest.exp
+  lithokraft_mcp_wiring_selftest.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_mcp_wiring_selftest.exe
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/headless/Release/lithokraft_headless.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/headless/Release/lithokraft_headless.exp
+  lithokraft_headless.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\lithokraft_headless.exe
+  Generating Code...
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/LithoKraft.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/LithoKraft.exp
+  lithokraft.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\LithoKraft.exe

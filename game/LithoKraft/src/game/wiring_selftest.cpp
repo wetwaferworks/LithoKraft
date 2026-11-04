@@ -530,6 +530,79 @@ int runWiringSelfTest() {
           "litho: back-buffer wafer count clamps 0..64 and keeps facing/aux/on");
   }
 
+  {  // 2026-10-30 LL_SIGNAL_LAZYNETS: lazy net invalidation is bit-identical to the eager rebuild.
+     // Same world, same schedule: empty columns stream in and out far from the circuits, then the
+     // wired machine's own column is evicted and an empty one takes its place.
+    auto run = [](bool lazy, uint64_t& builds, bool relink = false, bool moving = false, uint64_t* relinks = nullptr, bool isle = false, bool edge = false, uint64_t* drops = nullptr) {
+      ChunkMap w;
+      w.setRegistry(&blockRegistry());
+      auto addCol = [&](int cx, int cz) {
+        if (w.column(cx, cz)) return;
+        auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz;
+        w.insert(std::move(col));
+      };
+      for (int cz = 0; cz < 4; ++cz)
+        for (int cx = 0; cx < 6; ++cx) addCol(cx, cz);
+      buildLithoMachine(w, 24, 10, 24, true);
+      buildLithoMachine(w, 64, 10, 24, false);
+      cSignalSim sim;
+      sim.setLazyNets(lazy);
+      sim.setRelinkNets(relink);
+      sim.setEdgeRelink(edge);
+      if (isle) for (int x = 3; x <= 7; ++x) w.set(x, 10, 52, kRedTrace);  // a net wholly inside column (0,3)
+      for (int cz = 0; cz < 4; ++cz)
+        for (int cx = 0; cx < 6; ++cx) sim.scanColumn(w, cx, cz);
+      std::vector<uint64_t> trace;
+      for (int t = 0; t < 80; ++t) {
+        const int fx = 10 + t % 3;
+        if (t % 4 == 1) addCol(fx, 8);
+        if (t % 4 == 3 && w.column(10 + (t - 2) % 3, 8)) { sim.unscanColumn(10 + (t - 2) % 3, 8); w.erase(10 + (t - 2) % 3, 8); }
+        if (t == 50) { sim.unscanColumn(1, 1); w.erase(1, 1); }
+        if (t == 60) { addCol(1, 1); sim.scanColumn(w, 1, 1); }
+        if (isle && t == 55) { sim.unscanColumn(0, 3); w.erase(0, 3); }
+        if (isle && t == 65) { addCol(0, 3); for (int x = 3; x <= 7; ++x) w.set(x, 10, 52, kRedTrace); sim.scanColumn(w, 0, 3); }
+        if (moving && t == 30) { w.set(30, 10, 30, kRedTrace); sim.onBlockChanged(30, 10, 30, kRedTrace); }
+        if (moving && t == 40) { w.set(30, 10, 30, kAir); sim.onBlockChanged(30, 10, 30, kAir); }
+        if (moving) sim.tick(w, (t / 6) % 6, (t / 9) % 4, 2, [](int, int, int) {});  // area walks across both machines
+        else sim.tick(w, 0, 0, 100, [](int, int, int) {});
+        uint64_t h = 1469598103934665603ull;
+        for (int x = 0; x < 96; ++x)
+          for (int z = 0; z < 64; ++z)
+            for (int y = 0; y < 32; ++y) { h ^= uint64_t(w.getState(x, y, z)) + (uint64_t(w.get(x, y, z)) << 32); h *= 1099511628211ull; }
+        for (const auto& kv : sim.exportState())
+          for (uint8_t c : kv.second) { h ^= c; h *= 1099511628211ull; }
+        trace.push_back(h);
+      }
+      builds = sim.netBuilds();
+      if (relinks) *relinks = sim.netRelinks();
+      if (drops) *drops = sim.edgeDrops();
+      return trace;
+    };
+    uint64_t eagerBuilds = 0, lazyBuilds = 0;
+    const auto eager = run(false, eagerBuilds);
+    const auto lazyT = run(true, lazyBuilds);
+    std::printf("  lazy nets: eager %llu net builds, lazy %llu, trace %s (final %016llx)\n", (unsigned long long)eagerBuilds,
+                (unsigned long long)lazyBuilds, eager == lazyT ? "MATCH" : "MISMATCH", (unsigned long long)(eager.empty() ? 0 : eager.back()));
+    check(eager == lazyT, "LL_SIGNAL_LAZYNETS: per-tick world + signal state hash identical to the eager rebuild (80 ticks, stream in/out)");
+    check(lazyBuilds < eagerBuilds, "LL_SIGNAL_LAZYNETS: circuit-free column streaming skips the net rebuild");
+    {  // 2026-10-31 LL_SIGNAL_RELINK: topology reuse on area moves / border loads is bit-identical too.
+      uint64_t eb = 0, rb = 0, rl = 0;
+      const auto e2 = run(false, eb, false, true);
+      const auto r2 = run(true, rb, true, true, &rl);
+      std::printf("  relink nets: eager %llu builds, lazy+relink %llu (%llu relinks), trace %s\n", (unsigned long long)eb, (unsigned long long)rb,
+                  (unsigned long long)rl, e2 == r2 ? "MATCH" : "MISMATCH");
+      check(e2 == r2, "LL_SIGNAL_RELINK: per-tick world + signal hash identical to the eager rebuild (area walk, edits, stream in/out)");
+      check(rl > 0, "LL_SIGNAL_RELINK: area moves reuse the flood topology");
+      uint64_t eb3 = 0, rb3 = 0, rl3 = 0, dr3 = 0;
+      const auto e3 = run(false, eb3, false, true, nullptr, true);
+      const auto r3 = run(true, rb3, true, true, &rl3, true, true, &dr3);
+      std::printf("  edge relink: eager %llu builds, edge %llu (%llu relinks, %llu edge drops), trace %s\n", (unsigned long long)eb3,
+                  (unsigned long long)rb3, (unsigned long long)rl3, (unsigned long long)dr3, e3 == r3 ? "MATCH" : "MISMATCH");
+      check(e3 == r3, "LL_SIGNAL_EDGERELINK: per-tick world + signal hash identical to the eager rebuild (in-column net evicted)");
+      check(dr3 > 0, "LL_SIGNAL_EDGERELINK: evicting a column whose nets stay inside it drops them without a flood");
+    }
+  }
+
   // ---- POSTS (2026-10-25, JD): panel text in saves (PTXT payload) + save compatibility ----
   {
     namespace fs = std::filesystem;

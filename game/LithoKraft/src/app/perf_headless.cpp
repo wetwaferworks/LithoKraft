@@ -31,6 +31,7 @@
 #include "litholattice/core/time.h"
 #include "litholattice/render/block_materials.h"
 #include "litholattice/render/mesher.h"
+#include "litholattice/render/unified_mesher.h"
 #include "litholattice/sim/sim_thread.h"
 #include "litholattice/world/mesh_input.h"
 
@@ -102,7 +103,37 @@ class cPerfNullRenderer final : public IRenderer {
   void uploadEntityMesh(const std::vector<PackedVertex>&) override {}
   void uploadChunkMesh(const ChunkMesh& m) override {
     const int64_t k = packPos(m.cx, m.sy, m.cz);
-    if (m.verts.empty()) meshes_.erase(k); else meshes_[k] = m.verts.size() * sizeof(PackedVertex);
+    if (m.verts.empty()) { meshes_.erase(k); canon_.erase(k); return; }
+    meshes_[k] = m.verts.size() * sizeof(PackedVertex);
+    canon_[k] = CanonRef{m.cx, m.sy, m.cz, m.canonical};
+  }
+  /// M10 (Archie ruling 2): drawn skirt overhead with draw-side LOD rings (r1, r2) around
+  /// camera chunk (ccx, ccz): skirts kept only toward neighbours at another LOD.
+  struct SkirtDraw { uint64_t lodQuads = 0, skirtAll = 0, skirtDrawn = 0, lodChunks = 0, allQuads = 0; };
+  SkirtDraw skirtDraw(int ccx, int ccz, int r1, int r2) const {
+    SkirtDraw o;
+    auto lodAt = [&](int cx, int cz) { return selectCanonLod(std::max(std::abs(cx - ccx), std::abs(cz - ccz)), -1, r1, r2); };
+    static const int kD[6][3] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+    for (const auto& [k, c] : canon_) {
+      if (!c.mesh) continue;
+      const int lod = lodAt(c.cx, c.cz);
+      const CanonicalLod& L = c.mesh->lods[size_t(lod)];
+      uint64_t q = L.blend.count;
+      for (const auto& r : L.face) q += r.count;
+      o.allQuads += q;
+      if (lod == 0) continue;
+      int nbr[6];
+      for (int f = 0; f < 6; ++f) {
+        const int64_t nk = packPos(c.cx + kD[f][0], c.sy + kD[f][1], c.cz + kD[f][2]);
+        auto it = canon_.find(nk);
+        nbr[f] = it == canon_.end() ? -2 : it->second.mesh ? lodAt(it->second.cx, it->second.cz) : -1;
+      }
+      const uint8_t mask = canonSkirtMask(lod, nbr);
+      ++o.lodChunks; o.lodQuads += q; o.skirtAll += L.skirt.count;
+      for (uint32_t i = L.skirt.start; i < L.skirt.start + L.skirt.count; ++i)
+        if ((mask >> canon::unpackQuad(c.mesh->quads[i]).face) & 1u) ++o.skirtDrawn;
+    }
+    return o;
   }
   void clearChunkMeshes() override { meshes_.clear(); }
   void renderFrame(const FrameParams&) override {}
@@ -111,6 +142,8 @@ class cPerfNullRenderer final : public IRenderer {
  private:
   NullTextures tex_;
   std::unordered_map<int64_t, size_t> meshes_;
+  struct CanonRef { int cx = 0, sy = 0, cz = 0; std::shared_ptr<const CanonicalMesh> mesh; };
+  std::unordered_map<int64_t, CanonRef> canon_;
 };
 
 }  // namespace
@@ -315,6 +348,25 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
       std::snprintf(buf, sizeof buf, "%s\n    {\"minute\": %d, \"ram_delta_mb\": %.1f, \"loaded\": %zu, \"requested\": %zu, \"renderer_meshes\": %u}",
                     minute > 1 ? "," : "", minute, (double(ram) - double(ram0)) / 1048576.0, bs.loadedCount(), bs.requestedCount(), nr.stats().meshes);
       json += buf;
+    }
+    if (unifiedMesherEnabled()) {  // M10: drawn skirt overhead at the final camera, two ring sets
+      const int ccx = int(std::floor((16 * 16 - 32 + 32.f * std::fmod(float(10 * 3600 - 1) / 60.f, 60.f)) / 16.f)), ccz = 8;
+      json += "\n  ],\n  \"skirt_overhead\": [";
+      const int rings[2][2] = {{2, 4}, {3, 6}};
+      for (int i = 0; i < 2; ++i) {
+        const auto o = nr.skirtDraw(ccx, ccz, rings[i][0], rings[i][1]);
+        const double stored = o.lodQuads ? 100.0 * double(o.skirtAll) / double(o.lodQuads) : 0.0;
+        const double drawn = o.lodQuads ? 100.0 * double(o.skirtDrawn) / double(o.lodQuads) : 0.0;
+        const double frame = o.allQuads ? 100.0 * double(o.skirtDrawn) / double(o.allQuads) : 0.0;
+        std::printf("  skirts (rings %d,%d): L1/L2 chunks %llu, quads %llu, skirts stored %llu (%.1f%%), drawn %llu (%.1f%% of L1/L2, %.2f%% of frame)\n",
+                    rings[i][0], rings[i][1], (unsigned long long)o.lodChunks, (unsigned long long)o.lodQuads, (unsigned long long)o.skirtAll, stored,
+                    (unsigned long long)o.skirtDrawn, drawn, frame);
+        char b2[260];
+        std::snprintf(b2, sizeof b2, "%s\n    {\"ring1\": %d, \"ring2\": %d, \"lod_chunks\": %llu, \"lod_quads\": %llu, \"skirts_stored\": %llu, \"skirts_drawn\": %llu, \"drawn_pct\": %.2f, \"frame_pct\": %.2f}",
+                      i ? "," : "", rings[i][0], rings[i][1], (unsigned long long)o.lodChunks, (unsigned long long)o.lodQuads, (unsigned long long)o.skirtAll,
+                      (unsigned long long)o.skirtDrawn, drawn, frame);
+        json += b2;
+      }
     }
   }
   json += "\n  ],\n";

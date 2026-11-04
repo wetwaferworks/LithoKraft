@@ -1,12 +1,12 @@
 #!/bin/sh
 # build-thin.sh — the LithoKraft THIN web build (2026-10-20 rip-out).
 #
-# What changed vs the old web build (recorded in full in the specimen,
-# ~/workspace/emscripten-analysis/specimen/build-records/):
+# What changed vs the old web build (recorded in full in the specimen's
+# build records):
 #   The old link line (build-wasm2/CMakeCache.txt CMAKE_EXE_LINKER_FLAGS)
 #   carried -sPROXY_TO_PTHREAD=1, -sPTHREAD_POOL_SIZE=8,
 #   -sOFFSCREENCANVAS_SUPPORT=1 and five --preload-file mappings, and the
-#   pages loaded the generated Emscripten glue (LithoKraft.js, 438,525 B).
+#   pages loaded the generated vendor glue (LithoKraft.js, 438,525 B).
 #   That machinery wedged before first present on Android WebView
 #   155.0.8059.43 (diag: transfer attempts=0, engine live=0, t=4s..32s).
 #
@@ -37,10 +37,9 @@ WASMOPT=${WASMOPT:-$HOME/workspace/emsdk/upstream/bin/wasm-opt}
 # run): the script previously cd'ed to build-wasm2 root, where none of
 # its own relative paths resolve.
 cd "$BUILD/game/src/app"
-"$EMXX" -pthread -O3 -DNDEBUG -sUSE_PTHREADS=1 \
+"$EMXX" -pthread -O3 -DNDEBUG -msimd128 -sUSE_PTHREADS=1 \
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=536870912 -sTOTAL_STACK=8388608 \
-  -sMAX_WEBGL_VERSION=2 \
-  --js-library "$TREE/engine/src/render/gl33/lk_webio.js" \
+  -sMAX_WEBGL_VERSION=2 -sERROR_ON_UNDEFINED_SYMBOLS=0 -Wl,--export=malloc \
   CMakeFiles/lithokraft.dir/main.cpp.o \
   CMakeFiles/lithokraft.dir/scripts_dir.cpp.o \
   CMakeFiles/lithokraft.dir/selftest.cpp.o \
@@ -50,7 +49,7 @@ cd "$BUILD/game/src/app"
   CMakeFiles/lithokraft.dir/control_latency.cpp.o \
   CMakeFiles/lithokraft.dir/control_stream_test.cpp.o \
   CMakeFiles/lithokraft.dir/demo_record_test.cpp.o \
-  CMakeFiles/lithokraft.dir/vulkan_stub_emscripten.cpp.o \
+  CMakeFiles/lithokraft.dir/vulkan_stub_web.cpp.o \
   -o "$OUT/LithoKraft.js" -g \
   ../game/liblithokraft_game.a \
   ../../../src/audio/liblitholattice_audio_device.a \
@@ -95,19 +94,13 @@ cd "$BUILD/game/src/app"
 # comparison is the arbiter, not a bigger hammer.
 "$WASMOPT" "$OUT/LithoKraft.wasm" -o "$OUT/LithoKraft-thin.wasm" \
   --strip-dwarf --strip-producers \
+  --enable-simd \
   --enable-threads --enable-bulk-memory --enable-mutable-globals \
   --enable-sign-ext --enable-reference-types --enable-multivalue \
   --enable-nontrapping-float-to-int
 
 # Our own asset pack (deterministic; replaces --preload-file).
 python3 "$TREE/wasm/lkpack.py" "$TREE" "$OUT/LithoKraft.data"
-
-# The engine's EM_ASM body table for the thin loader: the toolchain
-# extracts those snippets (the engine's own C++ source text) into the
-# link's glue byproduct, keyed by address; lkasm.js carries them as
-# data for lkboot.js. Regenerated every build so the addresses always
-# match the binary just linked.
-python3 "$TREE/wasm/extract-asm.py" "$OUT/LithoKraft.js" "$TREE/wasm/full/lkasm.js"
 
 cp "$OUT/LithoKraft-thin.wasm" "$TREE/wasm/full/LithoKraft.wasm"
 cp "$OUT/LithoKraft.data" "$TREE/wasm/full/LithoKraft.data"

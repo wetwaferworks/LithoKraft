@@ -1,0 +1,76 @@
+﻿== running LithoKraft: 
+== cycle (toggle default=on)
+parked LithoKraft-0.0.1.59-b-packed12.exe; LithoKraft.exe is 0.0.1.44: True
+selftest: PASS=1344 FAIL=0 ALL SELFTESTS: OK
+hash cities=on run1 tickRadius=32 : cb32c824f8b3ea98
+hash cities=on run2 tickRadius=16 : cb32c824f8b3ea98
+hash cities=off run1 tickRadius=32 : e015e51cf1559089
+hash cities=off run2 tickRadius=16 : e015e51cf1559089
+hash r4 round=0 run1 : cb32c824f8b3ea98
+hash r4 round=0 run2 : cb32c824f8b3ea98
+hash r4 round=1 run1 : 966be55811fb23a7
+hash r4 round=1 run2 : 966be55811fb23a7
+shot 59b_bulbs_on: True errors=0 shell=
+shot 59b_bulbs_off: True errors=0 shell=
+shot 59b_night: True errors=0 shell=
+shot 59b_tex_closeup: True errors=0 shell=
+shot 59b_tex_oblique: True errors=0 shell=
+shot 59b_wafer_bloom: True errors=0 shell=
+shot 59b_horizon: True errors=0 shell=
+GATE PASS: LithoKraft-0.0.1.59-b-packed12.exe
+shortcuts already point at LithoKraft-0.0.1.58-a-blendcull.exe; nothing to do
+shortcut update exit 0
+== gate toggle OFF (LL_VK_PACKED12=0)
+selftest: PASS=1344 FAIL=0 ALL SELFTESTS: OK
+hash cities=on run1 tickRadius=32 : cb32c824f8b3ea98
+hash cities=on run2 tickRadius=16 : cb32c824f8b3ea98
+hash cities=off run1 tickRadius=32 : e015e51cf1559089
+hash cities=off run2 tickRadius=16 : e015e51cf1559089
+hash r4 round=0 run1 : cb32c824f8b3ea98
+hash r4 round=0 run2 : cb32c824f8b3ea98
+hash r4 round=1 run1 : 966be55811fb23a7
+hash r4 round=1 run2 : 966be55811fb23a7
+shot 59boff_bulbs_on: True errors=0 shell=
+shot 59boff_bulbs_off: True errors=0 shell=
+shot 59boff_night: True errors=0 shell=
+shot 59boff_tex_closeup: True errors=0 shell=
+shot 59boff_tex_oblique: True errors=0 shell=
+shot 59boff_wafer_bloom: True errors=0 shell=
+shot 59boff_horizon: True errors=0 shell=
+GATE PASS: LithoKraft-0.0.1.59-b-packed12.exe
+shortcuts already point at LithoKraft-0.0.1.58-a-blendcull.exe; nothing to do
+shortcut update exit 0
+== engine tests (render module)
+exit=0
+render: Packed12 vertex round trip (12-byte GPU chunk vertex)
+  [PASS] Packed12: exhaustive z 0..511 x layer 0..2047 round trip, 0 mismatches
+  [PASS] Packed12: GLSL decode formula on the packed bytes matches every field
+  [PASS] Packed12: every value of x, y, u, v, faceAo, value, mode round-trips
+  [PASS] Packed12: 2,000,000 random vertices round-trip
+  [PASS] Packed12: z 512 is reported and clamped to 511 (no wrap into the layer bits)
+  [PASS] Packed12: layer 65535 is reported and clamped to 32767 (z untouched)
+  [PASS] Packed12: batch packer (unaligned destination) matches the per-vertex packer
+  [PASS] Packed12: arena alignment 192 is whole 12- and 16-byte vertices and a cache line
+ENGINE TESTS OK
+== engine tests (all)
+exit=1 PASS=2676 FAIL=6
+  [FAIL] sandbox: test symlinks created
+  [FAIL] sandbox: symlink pointing outside the root rejected
+  [FAIL] sandbox: symlink to a prefix-sharing sibling rejected
+  [FAIL] sandbox: symlink loop rejected
+  [FAIL] sandboxed open: attacker swapped the file for a symlink
+  [FAIL] sandboxed open: attacker swapped the intermediate dir
+BENCH 58a_stream64 fps=70.5 avg=14.18 p99=39.27 gpu=3.29 meshMB=n/a arenaMB=1728+0 upB/f=2520992 errors=0 fmt=
+BENCH 59bon_stream64 fps=69.9 avg=14.34 p99=47.80 gpu=3.11 meshMB=1224.4 arenaMB=1247+0 upB/f=2463627 errors=0 fmt=[05:43:13.964] vulkan: chunk vertex format packed12 (12 bytes, arena alignment 192; LL_VK_PACKED12=0 to switch)
+BENCH 59boff_stream64 fps=69.1 avg=14.46 p99=49.17 gpu=2.29 meshMB=1648.2 arenaMB=1696+0 upB/f=2477919 errors=0 fmt=[05:43:36.108] vulkan: chunk vertex format packed16 (16 bytes, arena alignment 64; LL_VK_PACKED12=1 to switch)
+BENCH 58a_testworld fps=14.5 avg=69.11 p99=428.36 gpu=1.15 meshMB=n/a arenaMB=480+0 upB/f=1162351 errors=0 fmt=
+BENCH 59bon_testworld fps=12.9 avg=75.16 p99=668.34 gpu=0.84 meshMB=349.7 arenaMB=351+0 upB/f=1143646 errors=0 fmt=[05:44:19.824] vulkan: chunk vertex format packed12 (12 bytes, arena alignment 192; LL_VK_PACKED12=0 to switch)
+BENCH 59boff_testworld fps=13.5 avg=68.32 p99=316.86 gpu=1.02 meshMB=465.9 arenaMB=480+0 upB/f=1137499 errors=0 fmt=[05:44:41.171] vulkan: chunk vertex format packed16 (16 bytes, arena alignment 64; LL_VK_PACKED12=1 to switch)
+== toggle parse check (F59-1)
+LL_VK_PACKED12=off -> packed16 
+LL_VK_PACKED12=false -> packed16 
+LL_VK_PACKED12=1 -> packed12 
+LL_VK_PACKED12=on -> packed12 
+LL_VK_PACKED12=bogus -> packed12 [05:45:34.319] WARN vulkan: LL_VK_PACKED12='bogus' not understood (use 1/0); keeping the default (on)
+== exe check: LithoKraft.exe is 0.0.1.44: True; 0.0.1.59-b-packed12 SHA256 699C56526160461E31F96EF852D3B10872214CE8E097A75EEB1148A7D263C335
+VERIFY DONE 05:45

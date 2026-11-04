@@ -13,6 +13,7 @@
 #include <unistd.h>  // getpid: per-run unique temp dirs (G-M7, P2b-2)
 #endif
 #include "lithokraft/game/game_ui.h"
+#include "lithokraft/content/blocks.h"  // paletteBlocksGrouped: first palette slot (2026-10-31)
 #include "lithokraft/content/items.h"  // kItemFragment / kItemBashor / itemIconRef (P2b-1 HUD binding)
 #include "lithokraft/game/script_editor.h"
 #include "lithokraft/game/ui_script_bindings.h"
@@ -255,7 +256,9 @@ void testGameUi(Checker& check) {
   };
   if (inv) firstCell = findSlot(findSlot, *inv);
   if (firstCell) click(gui.root(), center(*firstCell), ui::kModShift);
-  check(gui.inventoryOpen() && picked == 1 && shift, "inventory: modal dialog; shift-click picks the block");
+  // 2026-10-31: the palette is family-grouped, so the first slot is paletteBlocksGrouped()[0], not block 1.
+  const int firstBlock = int(paletteBlocksGrouped().front());
+  check(gui.inventoryOpen() && picked == firstBlock && shift, "inventory: modal dialog; shift-click picks the block");
   // P2b-1 honesty: the dialog is the creative BLOCK PALETTE (it gives full
   // stacks into the real inventory hotbar), and it says so in its title.
   {

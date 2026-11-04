@@ -1,0 +1,18 @@
+batch b4 2026-10-15T11:11:11
+REL=0
+DBG=0
+build\Release handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+build-debug\Debug handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+stream 32 tps=32 min=31.9 fps=466.0 p50=2.0213 p99=3.4201 render=0.7908 update=0.8298 hitches=4 tick=0.6846/1.2059 mesh=4.5974
+stream 512 tps=512 min=511.6 fps=440.7 p50=2.1379 p99=3.7158 render=0.8038 update=0.9079 hitches=7 tick=0.5771/0.6260 mesh=4.9386
+orbit 32 tps=32 min=31.9 fps=42.7 p50=23.6710 p99=30.5436 render=21.9593 update=0.8741 hitches=0 tick=0.6434/0.7474 mesh=0.0000
+orbit 512 tps=512 min=511.4 fps=40.7 p50=24.9311 p99=31.1878 render=22.9761 update=0.9920 hitches=1 tick=0.5789/0.5961 mesh=0.0000
+ 6/48 Test  #6: engine_systerian .................***Failed    0.79 sec
+ 8/48 Test  #8: engine_core ......................***Failed  712.91 sec
+14/48 Test #14: engine_storage ...................***Failed    1.07 sec
+19/48 Test #19: engine_litho_formula .............***Failed    0.21 sec
+23/48 Test #23: engine_input .....................***Failed    3.66 sec
+40/48 Test #40: lithokraft_selftest ..............***Failed  701.58 sec
+88% tests passed, 6 tests failed out of 48
++ ... T -ne '1'){ & $ct --test-dir build-debug -C Debug --timeout 900 *> "$ ...
+DONE

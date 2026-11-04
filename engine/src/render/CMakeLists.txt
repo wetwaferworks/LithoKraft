@@ -19,20 +19,19 @@ add_custom_command(OUTPUT ${LITHOLATTICE_BUILTIN_SHADERS}
   DEPENDS ${LITHOLATTICE_SHADER_FILES} ${LithoLattice_SOURCE_DIR}/cmake/embed_text_files.cmake
   COMMENT "Embedding base shaders")
 
-add_library(litholattice_render STATIC mesher.cpp binary_greedy_mesher.cpp micro_mesher.cpp block_materials.cpp pbr_materials.cpp pbr_brdf.cpp pbr_quad_mesh.cpp overlay_geometry.cpp hud_ui_renderer.cpp software_renderer.cpp software_simd.cpp software_aa.cpp software_ascii.cpp ground_traces.cpp
-            gl33/gl_loader.cpp gl33/gl_program.cpp gl33/gl_texture_array.cpp gl33/gl33_renderer.cpp gl33/software_presenter.cpp gl33/software_presenter_webgl.cpp gl33/gl_web_shims.cpp
+add_library(litholattice_render STATIC mesher.cpp WorkerScratch.cpp MeshPipeline.cpp MesherSelector.cpp FallbackReasonStats.cpp unified_mesher.cpp binary_greedy_mesher.cpp micro_mesher.cpp block_materials.cpp pbr_materials.cpp pbr_brdf.cpp pbr_quad_mesh.cpp overlay_geometry.cpp hud_ui_renderer.cpp software_renderer.cpp SwDecodeCache.cpp SwCanonStore.cpp software_simd.cpp software_aa.cpp software_ascii.cpp ground_traces.cpp
+            gl33/gl_loader.cpp gl33/gl_program.cpp gl33/gl_texture_array.cpp gl33/TexelFreeList.cpp gl33/GlTboSlabPool.cpp gl33/GlTboSlabUploader.cpp gl33/gl33_renderer.cpp gl33/software_presenter.cpp gl33/software_presenter_webgl.cpp gl33/gl_web_shims.cpp
             ${LITHOLATTICE_BUILTIN_SHADERS})
 target_include_directories(litholattice_render PUBLIC include PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(litholattice_render PUBLIC litholattice_assets litholattice_world litholattice_ui litholattice_core litholattice_subdiv PRIVATE litholattice_systerian)  # world: read-only block data; ui: IUiRenderer; subdiv: micro-face meshing; systerian: ASCII pipeline glyph codec (software_ascii.cpp)
 litholattice_module_options(litholattice_render)
+# Render pipeline M2: DebugOpt runs the unified-mesher decode-equivalence check.
+target_compile_definitions(litholattice_render PRIVATE $<$<CONFIG:DebugOpt>:LL_DEBUGOPT_BUILD=1>)
 
 # Build 59 (web seam, design note Web-Seam-Design-2026-10-20): the
 # hand-written thin imports (gl33/lk_webio.js — plain verbs, target 0 =
-# canvas present target) join every executable that links the render
-# library. Emscripten only; native link lines are untouched.
-if(EMSCRIPTEN)
-  target_link_options(litholattice_render PUBLIC "--js-library" "${CMAKE_CURRENT_SOURCE_DIR}/gl33/lk_webio.js")
-endif()
+# canvas present target) are provided directly by the page layer
+# (lkboot.js) since the 2026-10-28 purge; no link-time library remains.
 
 # RND perf (2026-10-15, Cortana), reworked 1455 per Elfie R3§6: NO
 # translation unit is compiled with /arch:AVX2 or -mavx2 any more, so the
@@ -53,4 +52,18 @@ endif()
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64|amd64)$" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
   target_sources(litholattice_render PRIVATE software_simd_sse2.cpp software_simd_sse41.cpp)
   set_property(SOURCE software_simd.cpp APPEND PROPERTY COMPILE_DEFINITIONS LL_SW_SSE_TU=1)
+endif()
+# Phone-framerate ignition (2026-10-28 — Archie: optimization design;
+# Elfie: co-implementation; JD: direction + debugging): on the wasm
+# target the same SSE2/SSE4.1 kernel TUs join the build through
+# clang's SSE-to-WASM-SIMD translation. The kernels stay
+# bit-identical (same span4.inl, same op order); dispatch treats the
+# compile-time __wasm_simd128__ feature as the tier (software_simd.cpp).
+# Keyed off the target processor, never the EMSCRIPTEN variable
+# (JD's strict rule, 2026-10-28: no Emscripten, ever).
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(wasm32|wasm64)$")
+  target_sources(litholattice_render PRIVATE software_simd_sse2.cpp software_simd_sse41.cpp)
+  set_property(SOURCE software_simd.cpp APPEND PROPERTY COMPILE_DEFINITIONS LL_SW_SSE_TU=1)
+  set_property(SOURCE software_simd.cpp software_simd_sse2.cpp software_simd_sse41.cpp
+               APPEND PROPERTY COMPILE_OPTIONS -msimd128 -msse4.1)
 endif()

@@ -1,0 +1,7 @@
+pid=3536 consoleMaximized=no-console gameCentered=True gameForeground=True
+pid=16812 consoleMaximized=no-console gameCentered=True gameForeground=True
+pid=6616 consoleMaximized=no-console gameCentered=True gameForeground=True
+pid=7548 consoleMaximized=no-console gameCentered=True gameForeground=True
+pid=4404 consoleMaximized=no-console gameCentered=True gameForeground=True
+pid=8464 consoleMaximized=no-console gameCentered=True gameForeground=True
+pid=6760 consoleMaximized=no-console gameCentered=True gameForeground=True

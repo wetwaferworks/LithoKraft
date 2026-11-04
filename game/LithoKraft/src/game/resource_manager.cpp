@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include "lithokraft/game/resource_manager.h"
 #include "litholattice/render/hud_ui_renderer.h"
 #include <iterator>
@@ -44,6 +45,26 @@ std::optional<Image> cResourceMgr::bestItemIcon(const std::string& name) const {
   return best;
 }
 
+// 2026-10-31 (JD, CloudAtlas icons v3): largest textures/ui/icons/<name>.png across the active
+// packs and their sibling packs (pack_16..pack_256). LL_ICON_V3=0 restores the _item-first order.
+std::optional<Image> cResourceMgr::bestPlainIcon(const std::string& name) const {
+  std::optional<Image> best;
+  for (const auto& d : dirs_) {
+    std::vector<std::filesystem::path> roots{d};
+    std::error_code ec;
+    if (d.has_parent_path())
+      for (const auto& e : std::filesystem::directory_iterator(d.parent_path(), ec))
+        if (e.is_directory(ec) && e.path().filename().string().rfind("pack_", 0) == 0) roots.push_back(e.path());
+    for (const auto& root : roots) {
+      const auto f = root / "textures" / "ui" / "icons" / (name + ".png");
+      if (!std::filesystem::exists(f, ec)) continue;
+      std::string err;
+      if (auto img = loadTextureFileCached(f, &err); img && (!best || img->width() > best->width())) best = std::move(img);
+    }
+  }
+  return best;
+}
+
 void cResourceMgr::reload() {
   invalidateHudIconCache();
   cPackStack stack;
@@ -69,6 +90,8 @@ void cResourceMgr::reload() {
     // blocks without one (e.g. the Trace Bulb) keep their old icon / swatch fallback.
     // 2026-10-25 (JD, crisp icons): the highest-resolution _item.png shipped in ANY pack
     // (pack_128 normally) is kept at full size; the HUD fits it to the slot's pixel size.
+    static const bool v3 = [] { const char* e = std::getenv("LL_ICON_V3"); return !(e && e[0] == '0'); }();
+    if (v3) if (auto best = bestPlainIcon(iconName(BlockId(b)))) if (best->width() >= 32) { icons[b] = std::move(*best); continue; }
     if (auto best = bestItemIcon(iconName(BlockId(b)))) { icons[b] = std::move(*best); continue; }
     auto file = stack.find("textures/ui/icons/" + iconName(BlockId(b)) + ".png");
     if (auto img = file ? loadTextureFileCached(*file, &err) : std::nullopt) icons[b] = downsampleIcon(*img, kHudIconPx);  // decode cache (CREW TILE)

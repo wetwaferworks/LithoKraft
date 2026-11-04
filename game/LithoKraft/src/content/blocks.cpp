@@ -1,3 +1,5 @@
+#include "lithokraft/content/block_families.h"
+#include <algorithm>
 #include <cstdlib>
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/content/items.h"  // registerGameItems (items into the unified registry)
@@ -55,16 +57,21 @@ cBlockReg& mutableRegistry() {
   // worlds, saves and e015e51cf1559089 are untouched; the string id alias below covers name lookups.
   r.addWithStableId(def("lithokraft:repeator", "Repeator", kSolid | kCutsWire | kDirectional | kTransparent | kInteractive, S::Custom, "repeator", "repeator", R::Repeator, 0, 0, 45), litholattice::stableIdFor("block", "lithokraft:repeater"));
     r.add(def("lithokraft:thresholdor", "Thresholdor", kDir, S::Cube, "thresholdor", "thresholdor", R::Thresholdor, 0, 0, 45));
-    r.add(def("lithokraft:redirector", "Redirector", kDir | kInteractive, S::Cube, "redirector", "redirector", R::Redirector, 0, 0, 45));
+    // 2026-11-01 (JD): the Redirector is now the Multiplexor (id + name; old string id aliased below,
+    // stable id kept from "lithokraft:redirector" like the Repeator rename, so saves are untouched), and
+    // it has no click / use: only a Repeator on its side switches it. LL_MUX_RENAME=0 / LL_MUX_NOUSE=0: old.
+    r.addWithStableId(def([] { const char* e = std::getenv("LL_MUX_RENAME"); return !(e && e[0] == '0'); }() ? "lithokraft:multiplexor" : "lithokraft:redirector", [] { const char* e = std::getenv("LL_MUX_RENAME"); return !(e && e[0] == '0'); }() ? "Multiplexor" : "Redirector",
+            kDir | ([] { const char* e = std::getenv("LL_MUX_NOUSE"); return !(e && e[0] == '0'); }() ? decltype(kInteractive){} : kInteractive), S::Cube, "redirector", "redirector", R::Redirector, 0, 0, 45),
+                      litholattice::stableIdFor("block", "lithokraft:redirector"));
     r.add(def("lithokraft:pulsor", "Pulsor", kDir, S::Cube, "pulsor", "pulsor", R::Pulsor, 0, 0, 45));
     r.add(def("lithokraft:memor", "Memor", kDir, S::Cube, "memor", "memor", R::Memor, 0, 0, 45));
-    r.add(def("lithokraft:fast_latch", "Fast Latch", kDir, S::Cube, "fast_latch", "fast_latch", R::FastLatch, 0, 0, 45));
+    r.add(def("lithokraft:fast_latch", "Latchor", kDir, S::Cube, "fast_latch", "fast_latch", R::Latchor, 0, 0, 45));
     r.add(def("lithokraft:switch", "Switch", kSolid | kCutsWire | kInteractive | kAttachable, S::Cube, "switch", "switch", R::Switch, 0, 0, 45));
     r.add(def("lithokraft:button", "Button", kSolid | kCutsWire | kInteractive | kAttachable, S::Cube, "button", "button", R::cButton, 0, 0, 45));
     r.add(def("lithokraft:keyboard", "Keyboard", kDir | kInteractive, S::Cube, "keyboard", "keyboard", R::Keyboard, 0, 0, 45));
-    r.add(def("lithokraft:color_lamp_16", "Color Lamp 16", kComp, S::Cube, "color_lamp_16", "color_lamp", R::ColorLamp, 0, 16, 40));
-    r.add(def("lithokraft:color_lamp_32", "Color Lamp 32", kComp, S::Cube, "color_lamp_32", "color_lamp", R::ColorLamp, 0, 32, 40));
-    r.add(def("lithokraft:color_lamp_64", "Color Lamp 64", kComp, S::Cube, "color_lamp_64", "color_lamp", R::ColorLamp, 0, 64, 40));
+    r.add(def("lithokraft:color_lamp_16", "lamp16", kComp, S::Cube, "color_lamp_16", "color_lamp", R::ColorLamp, 0, 16, 40));
+    r.add(def("lithokraft:color_lamp_32", "lamp32", kComp, S::Cube, "color_lamp_32", "color_lamp", R::ColorLamp, 0, 32, 40));
+    r.add(def("lithokraft:color_lamp_64", "lamp64", kComp, S::Cube, "color_lamp_64", "color_lamp", R::ColorLamp, 0, 64, 40));
     r.add(def("lithokraft:silicon_slab", "Silicon Slab", kSolid, S::Slab, "silicon_slab", "", R::None, 0, 0, 35));
     r.add(def("lithokraft:stone_slab", "Stone Slab", kSolid, S::Slab, "stone_slab", "", R::None, 0, 0, 40));
     r.add(def("lithokraft:dirt_slab", "Dirt Slab", kSolid, S::Slab, "dirt_slab", "", R::None, 0, 0, 20));
@@ -89,7 +96,7 @@ cBlockReg& mutableRegistry() {
     // add the kLithographor extern at the end of blocks.h, and resolve it
     // there like the other constants.
     r.add(def("lithokraft:portor", "Portor", kDir | kInteractive, S::Cube, "portor", "portor", R::cPortor, 0, 0, 45));
-    r.add(def("lithokraft:fusor", "Fusor", kDir | kInteractive, S::Cube, "fusor", "fusor", R::cFusor, 0, 0, 45));
+    r.add(def("lithokraft:fusor", "Breakor",  /* PlayN (JD): renamed circuit breaker; id kept for saves */ kDir | kInteractive, S::Cube, "breakor" /* PlayO (JD): CloudAtlas Breakor art */, "fusor", R::cFusor, 0, 0, 45));
     // Wafer biome blocks (2026-10-11, procgen pass). Texture keys are the biome stub
     // textures (pack_64/32/16); CloudAtlas replaces with final art later.
     const auto kTipFlags = (kTerrain & ~kOpaque) | kShell;  // 1551 (JD): Ghostly by default; render.bulb_shell Solid re-opaques at mesh time
@@ -264,8 +271,11 @@ cBlockReg& mutableRegistry() {
   r.add(def("lithokraft:organic_post", "Organic Post", kSolid | kTransparent | kInteractive | kFacing8, S::Custom, "organic_post", "post", R::None, 0, 0, 45));
   r.add(def("lithokraft:virtual_wall_post", "Virtual Wall Post", kSolid | kTransparent | kInteractive | kDirectional, S::Custom, "virtual_wall_post", "wall_post", R::None, 0, 0, 45));
   r.add(def("lithokraft:organic_wall_post", "Organic Wall Post", kSolid | kTransparent | kInteractive | kDirectional, S::Custom, "organic_wall_post", "wall_post", R::None, 0, 0, 45));
+  r.add(def("lithokraft:randor", "Randor", kDir, S::Cube, "randor", "randor", R::Randor, 0, 0, 45));
+  r.add(def("lithokraft:fusor_sum", "Fusor", kDir, S::Cube, "fusor_sum" /* PlayO (JD): CloudAtlas Fusor art */, "fusor_sum", R::cFusorSum, 0, 0, 45));  // PlayN (JD): new adder, fresh id; placeholder tex (CloudAtlas art TODO)  // 2026-10-31 (JD): appended (stable ids)
     // Save migration: pre-rename ids remap to the -OR names (2026-10-10).
     r.addAlias("lithokraft:pulsar", "lithokraft:pulsor");
+    if ([] { const char* e = std::getenv("LL_MUX_RENAME"); return !(e && e[0] == '0'); }()) r.addAlias("lithokraft:redirector", "lithokraft:multiplexor");  // 2026-11-01 (JD): old saves
     // 2026-10-16 (JD): the Repeater is now the Repeator; old saves name the old id.
     r.addAlias("lithokraft:repeater", "lithokraft:repeator");
     r.addAlias("lithokraft:memory_cell", "lithokraft:memor");
@@ -334,10 +344,10 @@ const BlockId kStone            = resolveId(blockRegistry(), "lithokraft:stone")
 const BlockId kBlueTorch        = resolveId(blockRegistry(), "lithokraft:blue_torch");
 const BlockId kRepeator         = resolveId(blockRegistry(), "lithokraft:repeator");
 const BlockId kThresholdor      = resolveId(blockRegistry(), "lithokraft:thresholdor");
-const BlockId kRedirector       = resolveId(blockRegistry(), "lithokraft:redirector");
+const BlockId kRedirector       = resolveId(blockRegistry(), [] { const char* e = std::getenv("LL_MUX_RENAME"); return !(e && e[0] == '0'); }() ? "lithokraft:multiplexor" : "lithokraft:redirector");
 const BlockId kPulsor           = resolveId(blockRegistry(), "lithokraft:pulsor");
 const BlockId kMemor            = resolveId(blockRegistry(), "lithokraft:memor");
-const BlockId kFastLatch        = resolveId(blockRegistry(), "lithokraft:fast_latch");
+const BlockId kLatchor        = resolveId(blockRegistry(), "lithokraft:fast_latch");
 const BlockId kSwitch           = resolveId(blockRegistry(), "lithokraft:switch");
 const BlockId kButton           = resolveId(blockRegistry(), "lithokraft:button");
 const BlockId kKeyboard         = resolveId(blockRegistry(), "lithokraft:keyboard");
@@ -412,6 +422,34 @@ const BlockId kVirtualPost          = resolveId(blockRegistry(), "lithokraft:vir
 const BlockId kOrganicPost          = resolveId(blockRegistry(), "lithokraft:organic_post");
 const BlockId kVirtualWallPost      = resolveId(blockRegistry(), "lithokraft:virtual_wall_post");
 const BlockId kOrganicWallPost      = resolveId(blockRegistry(), "lithokraft:organic_wall_post");
+const BlockId kRandor               = resolveId(blockRegistry(), "lithokraft:randor");
+const BlockId kFusorSum            = resolveId(blockRegistry(), "lithokraft:fusor_sum");
+
+std::vector<BlockId> paletteBlocks(bool includeHidden) {  // 2026-10-31 (JD): registry-driven palette
+  std::vector<BlockId> out;
+  const auto& reg = blockRegistry();
+  for (size_t id = 1; id < reg.size(); ++id)
+    if (includeHidden || !isPaletteHidden(BlockId(id))) out.push_back(BlockId(id));
+  return out;
+}
+
+// 2026-10-31 (JD): family lookup now lives in cBlockFamilies (block_families.h/.cpp).
+int paletteFamily(BlockId b, int* rank) {
+  const cBlockFamilies& f = cBlockFamilies::get();
+  if (rank) *rank = f.rankOf(b);
+  return int(f.familyOf(b));
+}
+
+std::vector<BlockId> paletteBlocksGrouped() {  // 2026-10-31 (JD): enumerated by family (LL_PALETTE_GROUPS=0 = registry order)
+  static const bool off = [] { const char* e = std::getenv("LL_PALETTE_GROUPS"); return e && e[0] == '0'; }();
+  if (off) return paletteBlocks();
+  std::vector<BlockId> out;
+  const cBlockFamilies& fam = cBlockFamilies::get();
+  for (BlockFamily f : {BlockFamily::Trace, BlockFamily::Lamp, BlockFamily::Building, BlockFamily::Other})
+    for (BlockId b : fam.members(f))
+      if (!isPaletteHidden(b)) out.push_back(b);
+  return out;
+}
 const BlockId kFabor                = resolveId(blockRegistry(), "lithokraft:fabor");
 const BlockId kAutoFabor            = resolveId(blockRegistry(), "lithokraft:autofabor");
 const BlockId kVior                 = resolveId(blockRegistry(), "lithokraft:vior");

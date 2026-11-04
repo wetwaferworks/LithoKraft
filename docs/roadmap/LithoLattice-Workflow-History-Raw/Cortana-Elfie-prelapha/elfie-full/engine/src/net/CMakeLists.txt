@@ -1,0 +1,2 @@
+add_library(litholattice_net INTERFACE)
+target_include_directories(litholattice_net INTERFACE include)

@@ -155,6 +155,15 @@ class Inventory {
   ItemStack& slotAt(int flatIndex) { return *allSlots()[size_t(flatIndex)]; }
   const ItemStack& slotAt(int flatIndex) const { return *allSlots()[size_t(flatIndex)]; }
 
+  /// 2026-10-31 (JD): one-way assign for the legacy inventory screen: copies the stack at flat slot
+  /// `from` into hotbar slot `hot`. The source is never touched (no swap: the hotbar never flows back
+  /// into the list). False (nothing changes) when out of range or `from` is that hotbar slot itself.
+  bool assignToHotbar(int from, int hot) {
+    if (from < 0 || from >= kTotalSlots || hot < 0 || hot >= int(hotbar_.size()) || from == hot) return false;
+    hotbar_[size_t(hot)] = slotAt(from);
+    return true;
+  }
+
   /// Places a (possibly data-bearing) stack: merges onto an identical
   /// stack (sameIdentity) with room for the WHOLE stack, else takes the
   /// first empty carry slot. All-or-nothing: returns false and places

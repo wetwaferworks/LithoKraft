@@ -261,7 +261,7 @@ look-drag, buttons) appear automatically &mdash; force with
          '--bench-json', '/bench-software.json']
       : ['--renderer', 'software',
          '--seed', '20261019', '--stream-radius', RAD,
-         '--scripts', 'exe', '--mute'],
+         '--scripts', 'exe', '--mute', '--stub-models'],
     print: (s) => toLog(s),
     printErr: (s) => toLog('ERR: ' + s),
     onExit: (code) => { statusEl.textContent = 'run finished (exit ' + code + ') — bench summary in the log above'; },
@@ -298,7 +298,6 @@ look-drag, buttons) appear automatically &mdash; force with
   })(performance.now());
   diagStart();
 </script>
-<script src="lkasm.js"></script>
 <script src="lkboot.js"></script>
 <script src="touch.js"></script>
 <script>

@@ -119,7 +119,25 @@
   "crystal_leaves_bluedom_glow": "textures/blocks/crystal_leaves/crystal_leaves_bluedom_glow.png",
   "glass_etched_normal": "textures/masks/etched/glass_etched_normal.png",
   "red_trace_cross_etched_normal": "textures/masks/etched/red_trace_cross_etched_normal.png",
-  "wafer_ground_trace_etched_normal": "textures/masks/etched/wafer_ground_trace_etched_normal.png"
+  "wafer_ground_trace_etched_normal": "textures/masks/etched/wafer_ground_trace_etched_normal.png",
+  "breakor_top_closed_base": "textures/blocks/breakor/breakor_top_closed_base.png",
+  "breakor_top_closed_tintmask": "textures/blocks/breakor/breakor_top_closed_tintmask.png",
+  "breakor_top_tripped_base": "textures/blocks/breakor/breakor_top_tripped_base.png",
+  "breakor_top_tripped_tintmask": "textures/blocks/breakor/breakor_top_tripped_tintmask.png",
+  "breakor_front_closed_base": "textures/blocks/breakor/breakor_front_closed_base.png",
+  "breakor_front_closed_tintmask": "textures/blocks/breakor/breakor_front_closed_tintmask.png",
+  "breakor_back_closed_base": "textures/blocks/breakor/breakor_back_closed_base.png",
+  "breakor_back_closed_tintmask": "textures/blocks/breakor/breakor_back_closed_tintmask.png",
+  "breakor_side_closed_base": "textures/blocks/breakor/breakor_side_closed_base.png",
+  "breakor_side_closed_tintmask": "textures/blocks/breakor/breakor_side_closed_tintmask.png",
+  "fusor_sum_top_base": "textures/blocks/fusor_sum/fusor_sum_top_base.png",
+  "fusor_sum_top_tintmask": "textures/blocks/fusor_sum/fusor_sum_top_tintmask.png",
+  "fusor_sum_front_base": "textures/blocks/fusor_sum/fusor_sum_front_base.png",
+  "fusor_sum_front_tintmask": "textures/blocks/fusor_sum/fusor_sum_front_tintmask.png",
+  "fusor_sum_back_base": "textures/blocks/fusor_sum/fusor_sum_back_base.png",
+  "fusor_sum_back_tintmask": "textures/blocks/fusor_sum/fusor_sum_back_tintmask.png",
+  "fusor_sum_side_base": "textures/blocks/fusor_sum/fusor_sum_side_base.png",
+  "fusor_sum_side_tintmask": "textures/blocks/fusor_sum/fusor_sum_side_tintmask.png"
  },
  "animations": {},
  "palettes": {},
@@ -535,6 +553,37 @@
    },
    "masks": {
     "glow": "crystal_leaves_bluedom_glow"
+   }
+  },
+  "breakor": {
+   "faces": {
+    "front": "breakor_front_closed_base",
+    "back": "breakor_back_closed_base",
+    "side": "breakor_side_closed_base",
+    "top": "breakor_top_closed_base",
+    "bottom": "breakor_side_closed_base"
+   },
+   "masks": {
+    "tint:breakor_top_closed_base": "breakor_top_closed_tintmask",
+    "tint:breakor_top_tripped_base": "breakor_top_tripped_tintmask",
+    "tint:breakor_front_closed_base": "breakor_front_closed_tintmask",
+    "tint:breakor_back_closed_base": "breakor_back_closed_tintmask",
+    "tint:breakor_side_closed_base": "breakor_side_closed_tintmask"
+   }
+  },
+  "fusor_sum": {
+   "faces": {
+    "front": "fusor_sum_front_base",
+    "back": "fusor_sum_back_base",
+    "side": "fusor_sum_side_base",
+    "top": "fusor_sum_top_base",
+    "bottom": "fusor_sum_side_base"
+   },
+   "masks": {
+    "tint:fusor_sum_top_base": "fusor_sum_top_tintmask",
+    "tint:fusor_sum_front_base": "fusor_sum_front_tintmask",
+    "tint:fusor_sum_back_base": "fusor_sum_back_tintmask",
+    "tint:fusor_sum_side_base": "fusor_sum_side_tintmask"
    }
   }
  }

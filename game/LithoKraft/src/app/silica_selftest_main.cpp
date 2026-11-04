@@ -5,6 +5,7 @@
 // the registry is built with exactly the rows silica_registry.inc specifies, so
 // the snippets the coordinator appends to blocks.cpp/blocks.h are verified here
 // before they land.
+#include "litholattice/core/quiet_crt.h"
 #include <cstdio>
 #include <string>
 #include <string_view>
@@ -87,6 +88,7 @@ const IWorldSim::DirtyFn kNoDirty = [](int, int, int) {};
 }  // namespace
 
 int main() {
+  litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr, no dialog
   const cBlockReg reg = makeSilicaTestRegistry();
   const SilicaLightQuery kDay = [](int, int, int) { return uint8_t(64); };
   const SilicaLightQuery kDark = [](int, int, int) { return uint8_t(0); };

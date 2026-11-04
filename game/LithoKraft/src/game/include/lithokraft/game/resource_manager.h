@@ -55,7 +55,8 @@ class cResourceMgr {
   /// item registry, textures/ui/icons/<name>.png, box-filtered to 16 x 16),
   /// or nullptr when no pack has one / the id is not a registered item.
   /// Block-backed items (e.g. Chipor) resolve through icon(BlockId) instead.
-  std::optional<Image> bestItemIcon(const std::string& name) const;  ///< 2026-10-25: highest-res _item.png in any pack
+  std::optional<Image> bestItemIcon(const std::string& name) const;
+  std::optional<Image> bestPlainIcon(const std::string& name) const;  ///< 2026-10-31: highest-res <name>.png in any pack (icons v3)  ///< 2026-10-25: highest-res _item.png in any pack
   const Image* itemIcon(uint32_t itemId) const;
   /// World seed + generator JSON from the packs (worldgen/<dimension>.json, highest pack wins)
   /// for createDimensions() (dimensions.h).

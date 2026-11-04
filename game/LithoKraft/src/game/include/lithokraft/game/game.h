@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>  // Cortana 2026-10-15 2215
 #include <cstdint>
+#include <cstdlib>
 #include <cmath>
 #include <mutex>
 #include <optional>
@@ -22,6 +23,9 @@
 #include <unordered_map>
 #include <vector>
 #include "litholattice/core/threading.h"
+#include "litholattice/world/chunk_ingress.h"  // Thread Handshake P5
+#include "litholattice/world/neighbor_mesh.h"  // Thread Handshake P8
+#include "litholattice/world/chunk_swarm.h"    // Thread Handshake P6
 #include "lithokraft/game/sound_director.h"
 #include "lithokraft/game/player.h"
 #include "lithokraft/game/player_adapter.h"
@@ -31,6 +35,9 @@
 #include "litholattice/input/input_system.h"
 #include "lithokraft/game/actions.h"
 #include "lithokraft/game/world_save.h"
+#include "lithokraft/game/cAsyncSaver.h"
+#include "lithokraft/game/cWorldLoadSoak.h"
+#include "lithokraft/game/cTickStabilityMeter.h"  // 2026-10-31 (JD): Save World, tick-boundary snapshot + pool write
 #include "lithokraft/game/lithography.h"  // Cortana 2026-10-15 1900
 #include "lithokraft/game/camera_controller.h"  // cGameCameraController (engine camera system)
 #include "lithokraft/game/sprite_host.h"        // cSpriteHost (engine sprite system)
@@ -46,6 +53,8 @@
 #include "lithokraft/game/world_query.h"
 #include "lithokraft/game/bench_stream.h"
 #include "lithokraft/game/chunk_streamer.h"
+#include "lithokraft/game/L0NeighbourHold.h"  // fix (b) re-mesh churn
+#include "lithokraft/game/StreamFillTracker.h"  // --stream-bench
 #include "litholattice/core/time.h"
 #include "litholattice/platform/window.h"
 #include "litholattice/render/renderer.h"
@@ -61,6 +70,7 @@
 #include "litholattice/sim/sim_thread.h"
 #include "litholattice/world/dimension.h"
 #include "lithokraft/game/game_ui.h"
+#include "lithokraft/game/cWorldPicker.h"
 #include "lithokraft/game/script_editor.h"
 #include "lithokraft/game/settings.h"
 #include "lithokraft/game/ui_script_bindings.h"
@@ -86,16 +96,20 @@ struct GameConfig {
   bool euv = true;
   bool timingHandshake = true;   // SimConfig::timingHandshake at world load (standard; default ON since 2026-10-14)
   int handshakePhases = 4;       // phases per handshake cycle
+  int handshakeWorkers = 0;      // --handshake-workers: SimConfig::handshakeWorkerThreads (0 = authority auto)
   std::string scriptsDir;   // empty = no scripts
   bool pauseSim = true;     // the pause menu stops the sim (single-player); bench ignores it
   std::string benchScene = "default";  // "circuits" / "display": stress scenes built next to the spawn
   int sceneSize = 120;
   int sceneRows = 16;
+  bool worldPicker = false;  // 2026-10-30 (JD): menu Play opens the world picker (interactive launches; harness/tests keep direct Play)
+  std::string startSpawn;    // 2026-10-30: --spawn <name>: skip the menu and start at this named spawn
   bool testWorldExamples = false;  // 2026-10-24 (JD): playtest builds add the Examples section to the test world
   std::string pattern = "checkers";  // pattern-wall: checkers | circles  // wall-pixel: rows (1-16)
   bool capture = false;      // --capture (playtest 2026-10-16): F3 / controls / hint text off, for filming
   bool screenVertical = false;          // --screen-orient vertical: framebuffer as an upright wall                  // bench scene footprint (blocks per side)
   std::string saveDir;      // empty = no saving / loading (tests, --bench, --no-save)
+  bool worldFromFolder = false;  // 2026-10-31: loaded via Load World > folder (not the catalog world's own dir)
   double autosaveSeconds = 300.0;
   std::string version = "dev";  // LITHOKRAFT_VERSION, plumbed from main.cpp for the menu footer
   GameSettings settings;        // player preferences (main.cpp loads config/settings.json)
@@ -114,7 +128,10 @@ class Game {
   ~Game();
   /// Saves the active dimension and the player (F5, autosave, exit, dimension switch). `wait`
   /// blocks until it is on disk. No-op without a save directory.
-  bool saveWorld(const char* reason, bool wait);  // true when a save was actually written
+  /// 2026-10-31 (JD): wait=false (F5, menu, autosave, console) goes through cAsyncSaver - snapshot
+  /// on the tick thread at a tick boundary, write on a pool worker, nobody waits (LL_SAVE_ASYNC=0:
+  /// the old stop-the-sim save). wait=true (exit, world load) stays synchronous and on disk.
+  bool saveWorld(const char* reason, bool wait, bool allowAsync = true);  // true when a save was written / posted
   bool ok() const { return active_ != nullptr; }
 
   /// Reads this frame's actions (the app updated the cInputSystem first), turns them into sim
@@ -166,6 +183,16 @@ class Game {
   bool creativeMode() const { return true; }
   bool debugOverlayToggled() const { return showDebug_; }  ///< F3 state (ToggleDebug)
   size_t meshQueueDepth() const { return pendingOrder_.size() + meshBatches_.size(); }
+  /// Bench steady-state gate (JD 2026-10-30): true when every column in the stream footprint around
+  /// the player is resident, out of the L0 neighbour hold, and has its first-wave meshes back.
+  /// True when there is no player streamer. Game thread; O(radius^2).
+  bool streamSettled() const;
+  /// First unmet settle condition ("footprint", "l0-hold", ...), or nullptr when settled.
+  const char* streamUnsettledReason() const;
+  /// Columns in the stream footprint around the player (the radius the settle check covers).
+  size_t streamFootprintColumns() const;
+  /// --stream-bench: feed every footprint column to the tracker; true once all are streamed in.
+  bool sampleStreamFill(cStreamFillTracker& t, std::chrono::steady_clock::time_point now) const;
   /// Design B Stage 2: ring-spill accounting for the shutdown/bench log.
   uint64_t ringSpillEvents() const { return ringSpillEvents_; }
   size_t ringSpillMax() const { return ringSpillMax_; }
@@ -188,6 +215,22 @@ class Game {
   /// camera); Play hands control to the player instantly, no reload.
   void enterMenu();
   void enterPlay();
+  /// 2026-10-30 (JD): --spawn: enter play at a named spawn (tp mark), skipping the menu.
+  void startAt(const std::string& spawn);
+  /// 2026-10-30: the world picker chose another world: relaunch with these args after the exit save.
+  const std::vector<std::string>& worldSwitchArgs() const { return worldSwitchArgs_; }
+  /// 2026-10-31 (JD, Load World): an in-process world load. The picker / console sets it; the
+  /// app loop (main.cpp) sees it, destroys this Game (exit save on disk, sim + streamer + jobs
+  /// drained) and builds the next one on the same window, renderer, pool and resources.
+  struct WorldLoadRequest { std::vector<std::string> args; std::string folder, spawn, label; };
+  bool worldLoadRequested() const { return worldLoad_.has_value(); }
+  WorldLoadRequest takeWorldLoadRequest() { WorldLoadRequest r = std::move(*worldLoad_); worldLoad_.reset(); return r; }
+  /// Request a load of the world folder `folder` (an empty folder becomes a new world). Returns a status line.
+  std::string requestWorldLoadFolder(const std::string& folder, const std::string& spawn);
+  /// A catalog world id (default, testworld, flatlab, ...) or a world folder. Returns a status line.
+  std::string requestWorldLoad(const std::string& idOrFolder);
+  /// The most recent finished async save (profile: snapshot / write ms, bytes); nullopt before the first.
+  const std::optional<cAsyncSaver::Result>& lastAsyncSave() const { return lastAsyncSave_; }
   bool inMenu() const { return menuState_ == MenuState::cMenu; }
   const GameSettings& settings() const { return settings_; }
   /// Applies a display-mode change from the settings UI (main.cpp wires the window).
@@ -299,6 +342,7 @@ class Game {
   void handleToggles();
   void advanceWorldClock();  ///< Cortana 2026-10-16: world clock += sim ticks since the last call
   void handleHotbar();
+  static bool altWheelOn();  ///< 2026-10-31 (JD): Alt + wheel steps a 1..64 setting (LL_ALT_WHEEL=0 kill)
   /// This frame's movement intent as a locomotion input: move actions
   /// rotated by the player's yaw into world space (the ILocomotion
   /// contract), jump/sneak/sprint/crawl as held states.
@@ -370,7 +414,7 @@ class Game {
 
   /// Per-frame chunk streaming: request columns around the player and insert
   /// finished ones into the active dimension (sim stopped for the insert).
-  void pumpStreaming();
+  void pumpStreaming(float frameDtMs);
   void pumpSwLod();  ///< software far-LOD ring re-mesh (2026-10-25)
   int swLodLevel(int d) const;
   int swLodFor(int cx, int cz) const;
@@ -381,6 +425,8 @@ class Game {
   /// a column whose save cannot complete is NOT evicted. Clean,
   /// signal-free columns evict with no save (regenerable from the seed).
   void evictFarColumns();
+  /// Q12 (Gate 1): LL_FAR_DEMOTE=1 demotes clean far columns to an edge shell; promotes on approach.
+  void demoteFarColumns();
   /// Retires every sub-chunk mesh of a column being evicted: purges the
   /// pending classic/PBR upload queues, tombstones the upload sequence
   /// entries (cleared again if the column re-streams and re-inserts),
@@ -438,6 +484,7 @@ class Game {
   std::deque<ItemStack> placeRefunds_;
   void refundRejectedPlaces();
   int lastPlaceHit_[3] = {INT32_MIN, INT32_MIN, INT32_MIN};
+  int placeLockAxis_ = -1, placeLockPerp_ = 0, placeLockY_ = 0;  // 2026-10-31 (JD): held-place line lock
   int lastBridge_[3] = {INT32_MIN, INT32_MIN, INT32_MIN};
   IRenderer& renderer_;
   cResourceMgr& resources_;
@@ -495,6 +542,23 @@ class Game {
   Vec3 spawnPoint_{20.f, 92.f, 20.f};  ///< dimension spawn; `kill` respawns here
   /// 2026-10-25 (JD J3): named teleport targets for this dimension load (testarea, circuits, Examples pads).
   std::vector<std::pair<std::string, Vec3>> tpMarks_;
+  struct BenchBox { int x0, z0, x1, z1; };  // 2026-10-30 (JD): zigzag bench, placed Examples pads
+  std::vector<BenchBox> benchExamples_;
+  int benchFloorY_ = 0;
+  cWorldPicker worldPicker_;                  ///< 2026-10-30 (JD): menu Play -> world + spawn
+  std::string relaunchNotice_;   ///< 2026-10-31 (JD): "Loading <world>, restarting..." banner before the relaunch
+  int relaunchFrames_ = 0;       ///< frames left showing the notice; quit_ is set when it reaches 0
+  void beginRelaunch(const std::string& what);
+  std::vector<std::string> worldSwitchArgs_;  ///< non-empty: relaunch into another world on exit
+  std::optional<WorldLoadRequest> worldLoad_;  ///< 2026-10-31: in-process Load World request (main.cpp acts on it)
+  cAsyncSaver saver_;                          ///< 2026-10-31: Save World (lock-free async save)
+  cWorldLoadSoak soak_;                        ///< 2026-10-31: LL_WORLD_LOAD_SOAK test hook (default off)
+  std::optional<cAsyncSaver::Result> lastAsyncSave_;
+  void openWorldPicker();
+  void pickWorld(int world, const std::string& spawn);
+  void openWorldFolderDialog();
+  void pollWorldFolderDialog();  ///< 2026-10-31: lock-free poll of the off-thread folder dialog     ///< 2026-10-31 (JD): picker "Open world folder..."
+  PlayerMeta playerMetaForSave();   ///< 2026-10-31: the player.lat record of the current player
   std::vector<cWorldSave::TpMark> userTpMarks_;  ///< 2026-10-25 (JD): /tp set spots, every dimension; persisted in level.json
   std::string teleportCmd(const std::vector<std::string>& args);
   litholattice::cEntityMgr entities_{[this](uint32_t type) {
@@ -506,7 +570,12 @@ class Game {
         });
   }};  ///< item drops etc. (game thread)
 
-  cHandoffQueue<ChunkMesh> meshOut_;              // workers -> render thread
+  /// P5 Render Ingress byte weight: vertex payload + a fixed per-mesh overhead.
+  struct MeshIngressBytes {
+    template <class M>
+    size_t operator()(const M& m) const { return m.verts.size() * sizeof(m.verts[0]) + 256; }
+  };
+  litholattice::cIngress<ChunkMesh, MeshIngressBytes> meshOut_{1024};  // P5 Render Ingress: mesh workers -> main (MPSC ring, lossless overflow)
   std::unique_ptr<class WaferPulseCache> pulseCache_;  // wafer ground-pulse biome weights (null if no wafer)
   std::unordered_map<uint64_t, std::vector<ChunkMesh>> meshBatches_;  // Cortana 2026-10-15 1350: phase-boundary publish staging
   std::deque<int64_t> pendingOrder_;                    // sub-chunks waiting, oldest first
@@ -515,12 +584,20 @@ class Game {
   // PBR (BinaryQuad) path queues (phase 2, Worker 3): only used when the mesher option
   // selects BinaryQuad. The classic path above keeps serving every non-cube shape even
   // then (the binary mesher's scope is opaque cubes), so both queues drain each frame.
-  cHandoffQueue<litholattice::PbrChunkMesh> pbrMeshOut_;              // workers -> render thread
+  litholattice::cIngress<litholattice::PbrChunkMesh, MeshIngressBytes> pbrMeshOut_{1024};  // P5 Render Ingress (PBR): workers -> main
   std::deque<int64_t> pbrPendingOrder_;                             // sub-chunks waiting, oldest first
   std::unordered_map<int64_t, litholattice::PbrChunkMesh> pbrPendingMesh_;  // newest per sub-chunk
   std::unordered_map<int64_t, uint64_t> pbrMeshSeq_;  // latest uploaded PBR seq per sub-chunk
   bool swLodOn_ = false;
-  int swLodRing_[3] = {2, 4, 6};  // LL_SW_LOD_RINGS=a,b,c overrides
+  // JD ruling, 2026-10-28: the full-fidelity core is 32 chunks in
+  // every direction (Chebyshev, per swLodFor); LOD steps begin only
+  // beyond it, so any view distance <= 32 sees no LOD at all (at
+  // view 48: 32 full, steps in the outer ring only). The old
+  // {2, 4, 6} rings stepped detail down almost at the player's feet
+  // and broke immersion (his word: jarring). Rings 2/3 keep the old
+  // structure scaled x16 ({32, 64, 96}); JD named the 32, the rest
+  // is the same ladder stretched... retune here if he calls it.
+  int swLodRing_[3] = {32, 64, 96};  // LL_SW_LOD_RINGS=a,b,c overrides
   std::atomic<int> swLodPcx_{0}, swLodPcz_{0};
   std::mutex swLodMu_;
   std::unordered_map<uint64_t, int> swLodMeshed_;  // column key -> LOD level meshed
@@ -556,6 +633,69 @@ class Game {
   std::unique_ptr<cSimThread> sim_;               // owns active_->chunks while alive
   uint32_t epoch_ = 0;
   uint64_t initSeq_ = 0;
+  // ---- Thread Handshake P5: chunk handshake (see chunk_ingress.h) ----
+  litholattice::cSimPromotionBudget promoteBudget_;   ///< 4 promotions per sim tick, at the commit barrier
+  bool spawnSpiral_ = false;                          ///< initial spawn spiral still filling (ring-center bypass on)
+  litholattice::cBorderRing borderRing_;              ///< lazy border ring: neighbor columns to re-mesh
+  // P8 (Archie Q7): render-only MeshHash, logged at quiescence when LL_MESH_HASH=1.
+  litholattice::cMeshHashLedger meshLedger_;
+  bool meshHashOn_ = [] { const char* e = std::getenv("LL_MESH_HASH"); return e && *e == '1'; }();
+  std::atomic<int> meshInFlight_{0};                  ///< mesh jobs submitted, not yet pushed to Render Ingress
+  uint64_t meshHashLogged_ = 0;
+  void p8MeshHashCheck();
+  litholattice::cDeferredFreeQueue<litholattice::ChunkColumn> deferredFree_;  ///< evicted columns, freed outside the sim hold
+  int streamCx_ = 0, streamCz_ = 0;                    ///< centre of the last pumpStreaming request pass
+  bool streamCentreSet_ = false;
+  cL0NeighbourHold l0Hold_;                           ///< fix (b): first L0 mesh waits for edge neighbours
+  uint64_t streamPumps_ = 0;                          ///< deferred-free fence clock (pumpStreaming calls)
+  std::unordered_map<uint64_t, int> colMeshPending_;  ///< promoted column -> first-wave meshes not yet returned (MESH)
+  std::unordered_set<uint64_t> farPromoteAsked_;      ///< Q12: demoted columns already re-requested
+  uint64_t farDemoted_ = 0, farPromoted_ = 0;         ///< Q12 diagnostics
+  std::vector<uint64_t> stagedRenderCols_;            ///< columns whose first wave is back, awaiting upload (STAGED_RENDER)
+  uint64_t p5Promoted_ = 0, p5Bypassed_ = 0, p5BorderRemeshed_ = 0;  ///< diagnostics
+  void p5ResetChunkHandshake();
+  void p5NoteMeshArrived(int cx, int cz);
+  void p5AdvanceStagedRender();
+  // JD ruling t3366u: while the sim is paused the RENDER pipeline stops (no Render
+  // Ingress pops, no GPU uploads); generation, CPU meshing, Sim Ingress admission and
+  // residency continue. The ingress queues without dropping; past the cap, NEW mesh
+  // submissions are deferred as sub-chunk keys (backpressure) and resubmitted later.
+  static constexpr size_t kRenderIngressCapBytes = size_t(256) << 20;  ///< 256 MB queued while paused
+  // In-game pauses only: the launch menu (MenuPaused before Play) keeps rendering so its
+  // world backdrop still fills in behind the menu.
+  bool renderPaused() const {
+    return sim_ && paused_ && cfg_.pauseSim && !benchSet_ && menuState_ == MenuState::Playing;
+  }
+  size_t renderIngressBytes() const { return meshOut_.queuedBytes() + pbrMeshOut_.queuedBytes(); }
+  bool meshBackpressured() const { return renderPaused() && renderIngressBytes() >= kRenderIngressCapBytes; }
+  /// Game thread, under the sim hold: snapshot + submit, or defer the key under backpressure.
+  void submitMeshAt(int cx, int sy, int cz);
+  // ---- Thread Handshake P6: swarm and locality (game thread unless noted) ----
+  /// Snapshot one sub-chunk into a slab buffer (game thread; the map must be held).
+  std::shared_ptr<MeshInput> snapshotSlab(int cx, int sy, int cz, bool ownFresh = true);
+  /// Locality: snapshot every non-empty sub-chunk of a column (deferring keys under
+  /// backpressure) and mesh them all in ONE pool job, on one worker, in order.
+  void submitMeshColumn(int cx, int cz);
+  void startFirstMesh(int cx, int cz);  ///< fix (b): first L0 mesh of a promoted column
+  /// The mesh job body (any pool worker).
+  void meshOne(const std::shared_ptr<MeshInput>& in, const std::shared_ptr<const BlockMaterials>& mats, bool binary);
+  /// Title-screen pre-warm: wake every pool worker once (first-touch stacks and allocator
+  /// arenas), grow the snapshot slab to the radius-8 tier, request the radius-8 ring.
+  void prewarmSwarm();
+  litholattice::cSlab<MeshInput> meshSlab_{litholattice::kSlabRadius4Columns};  // radius-4 tier at boot
+  litholattice::cSlackHarvester slack_{0.25, 6, 2.0};
+  bool swarmPrewarmed_ = false;
+  uint64_t p6ColumnJobs_ = 0, p6SlackSlices_ = 0;
+  // Thread Handshake P7: the wafer reveal (render-only). Started on world load, paced by
+  // column readiness, clock frozen by renderPaused(), instant under --bench.
+  void pumpWaferReveal(float dt);
+  litholattice::cWaferRevealPacer reveal_;
+  litholattice::WaferRevealFrame revealFrame_;
+  bool revealPending_ = false, revealLoggedOnline_ = false, revealSky_ = false;
+  float skyFade_ = 1.f;  ///< sky brightness while the reveal runs: dark until SKYBOX_ONLINE, then fades in
+  std::deque<int64_t> deferredMeshOrder_;
+  std::unordered_set<int64_t> deferredMeshKeys_;
+  uint64_t renderPausedFrames_ = 0, meshDeferredTotal_ = 0;
   int totalSubs_ = 0, meshesReceived_ = 0;
   size_t chunkColumns_ = 0;
 
@@ -628,6 +768,7 @@ class Game {
   bool postTyping_ = false;    // 2026-10-25 Posts: the typing capture edits a post (not a Keyboard)
   double lastJumpTap_ = -1.0;  // double-tap Jump detection
   float fps_ = 0, frameAvgMs_ = 0, frameMaxMs_ = 0;
+  mutable cTickStabilityMeter tickMeter_;  ///< 2026-10-31 (JD): HUD tick stability readout
   float p99Ms_ = 0, updateMs_ = 0, gpuMs_ = -1.f;  ///< F56-4 perf readout
 };
 

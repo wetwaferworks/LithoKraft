@@ -1,0 +1,19 @@
+selftest: PASS=1344 FAIL=0 ALL SELFTESTS: OK
+hash cities=on run1 tickRadius=32 : cb32c824f8b3ea98
+hash cities=on run2 tickRadius=16 : cb32c824f8b3ea98
+hash cities=off run1 tickRadius=32 : e015e51cf1559089
+hash cities=off run2 tickRadius=16 : e015e51cf1559089
+hash r4 round=0 run1 : cb32c824f8b3ea98
+hash r4 round=0 run2 : cb32c824f8b3ea98
+hash r4 round=1 run1 : 966be55811fb23a7
+hash r4 round=1 run2 : 966be55811fb23a7
+shot 61fp0_bulbs_on: True errors=0 shell=
+shot 61fp0_bulbs_off: True errors=0 shell=
+shot 61fp0_night: True errors=0 shell=
+shot 61fp0_tex_closeup: True errors=0 shell=
+shot 61fp0_tex_oblique: True errors=0 shell=
+shot 61fp0_wafer_bloom: True errors=0 shell=
+shot 61fp0_horizon: True errors=0 shell=
+GATE PASS: LithoKraft-0.0.1.61.exe
+shortcuts already point at LithoKraft-0.0.1.59-b-packed12.exe; nothing to do
+shortcut update exit 0

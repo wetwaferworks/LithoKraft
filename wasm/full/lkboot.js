@@ -1,12 +1,14 @@
 // lkboot.js — the LithoKraft thin layer (hand-written, Wet Wafer Works).
 //
-// This file REPLACES the generated Emscripten glue (the old LithoKraft.js)
+// This file REPLACES the generated vendor glue (the old LithoKraft.js)
 // in everything the pages and the Android shell serve. JD's ruling
-// (2026-10-20): Emscripten is removed from the CEF layer completely — no
-// generated glue, no PROXY_TO_PTHREAD, no OffscreenCanvas transfer. What
-// remains of the toolchain is only the compiler: the WASM binary is still
-// produced by emcc (see wasm/build-thin.sh for the exact link line), and
-// this loader implements the binary's declared import surface itself:
+// (2026-10-20): the vendor runtime is removed from the CEF layer
+// completely — no generated glue, no PROXY_TO_PTHREAD, no
+// OffscreenCanvas transfer. What remains of the old toolchain is only
+// the compiler driver: the WASM binary is still produced by the stock
+// link line (see wasm/build-thin.sh; the toolchain itself is replaced
+// in stage 2 of the purge), and this loader implements the binary's
+// declared import surface itself:
 //
 //   - boot/instantiate + argv + the rAF main loop, on the browser MAIN
 //     thread (present = the page compositor, no canvas hand-off hop);
@@ -15,9 +17,10 @@
 //   - a pthread pool speaking a small postMessage protocol (this same
 //     file is the worker bootstrap — it detects its context);
 //   - the mailbox proxy protocol the binary's own code expects for
-//     main-thread services (syscalls, DOM, EM_ASM) from worker threads;
-//   - EM_ASM bodies re-built at runtime from the strings in the binary
-//     (they are OUR source, embedded by the compiler verbatim);
+//     main-thread services (syscalls, DOM) from worker threads;
+//   - the page services (input listeners, canvas, GL) as hand-written
+//     named imports — the address-keyed snippet mechanism that used to
+//     carry them was retired in stage 1 of the purge (2026-10-28);
 //   - a state-caching WebGL2 wrapper implementing the binary's imported
 //     GL functions with redundant state traffic removed (clause two);
 //   - lkio_present, our thin present verb, finally on the real path.
@@ -63,7 +66,6 @@ function lkNewContext(isWorker) {
     exited: false,
     exitCode: 0,
     mainLoop: null,        // {cb, arg} once the binary registers it
-    asmCache: new Map(),   // EM_ASM address -> compiled JS function
     strCache: new Map(),   // static C strings handed to the binary (GL etc.)
     currentProxiedCaller: 0,
     printBuffer: '',       // stdout line buffer (main ctx sink)
@@ -170,19 +172,6 @@ function lkUTF8ArrayToString(u8, ptr, len) {
   // Same shared-buffer rule as lkReadCStr: decode a private copy.
   return lkTextDecoder.decode(new Uint8Array(u8.subarray(ptr, ptr + len)));
 }
-// Emscripten-helper-shaped aliases used by EM_ASM bodies (our own code):
-function UTF8ToString(ptr) { return lkReadCStr(ptr); }
-function UTF8ArrayToString(u8, ptr, len) { return lkUTF8ArrayToString(u8, ptr, len); }
-function stringToUTF8(str, ptr, maxBytes) { return lkWriteCStr(ptr, str, maxBytes) + 1; }
-function stringToUTF8Array(str, u8, ptr, maxBytes) {
-  const bytes = lkTextEncoder.encode(str);
-  const n = Math.min(bytes.length, maxBytes - 1);
-  u8.set(bytes.subarray(0, n), ptr);
-  u8[ptr + n] = 0;
-  return n + 1;
-}
-function lengthBytesUTF8(str) { return lkLengthBytesUTF8(str); }
-
 // Static strings handed to the binary by pointer (GL strings and the
 // like): allocated once in wasm memory and cached by content.
 function lkStaticStr(str) {
@@ -201,11 +190,79 @@ function lkStaticStr(str) {
 // fd 1/2 land here (on the main thread — worker writes are proxied).
 // Line-buffered, mirroring the old runtime's behavior toward the page log.
 
-function lkEmit(line, isErr) {
-  if (LK.isWorker) return; // worker stdio is proxied to main; never direct
+function lkEmitRaw(line, isErr) {
   const m = (typeof Module !== 'undefined') ? Module : null;
   if (isErr) { if (m && m.printErr) m.printErr(line); else console.error(line); }
   else { if (m && m.print) m.print(line); else console.log(line); }
+}
+
+/* ---- quiet-dom mode (G2 A/B, 2026-10-28) ---------------------------
+ * G2 suspect #2: every log line the page prints lands in a DOM log
+ * element, and a steady stream of them can force layout reflow in the
+ * host — a host-side cost that lands at frame boundaries. Quiet mode
+ * is the A/B: log lines go ONLY into a fixed-size in-memory ring
+ * (preallocated, no per-line DOM writes), and the ring is dumped
+ * through the normal print path on exit, on pagehide, when the page
+ * hides (the phone's pause), and on demand via window.__lkDumpLogs.
+ * Enabled by the page arg --quiet-dom (Module.arguments) or the URL
+ * query ?quiet=1. Default behavior is unchanged when neither is set.
+ * The pages' setStatus channel is separate and stays live either way,
+ * so a boot failure still names itself on the status line in quiet
+ * mode; its log lines sit in the ring until a dump trigger fires. */
+const LK_LOG_RING_SIZE = 512;
+const LK_LOG_RING = new Array(LK_LOG_RING_SIZE);
+const LK_LOG_RING_ERR = new Uint8Array(LK_LOG_RING_SIZE);
+let lkLogRingHead = 0;   // next write slot
+let lkLogRingCount = 0;  // lines currently held (<= LK_LOG_RING_SIZE)
+let lkQuietDom = -1;     // -1 undecided, 0 off, 1 on (decided once)
+let lkQuietHooks = false;
+function lkQuietEnabled() {
+  if (lkQuietDom >= 0) return lkQuietDom === 1;
+  lkQuietDom = 0;
+  try {
+    const m = (typeof Module !== 'undefined') ? Module : null;
+    if (m && m.arguments && m.arguments.indexOf('--quiet-dom') >= 0) lkQuietDom = 1;
+    else if (typeof location !== 'undefined' && location.search &&
+             new URLSearchParams(location.search).get('quiet') === '1') lkQuietDom = 1;
+  } catch (e) { /* a hostile query string must never break logging */ }
+  if (lkQuietDom === 1 && !lkQuietHooks) {
+    lkQuietHooks = true;
+    if (typeof window !== 'undefined') {
+      window.__lkDumpLogs = () => lkDumpLogs('manual');
+      window.addEventListener('pagehide', () => lkDumpLogs('pagehide'));
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) lkDumpLogs('hidden');
+        });
+      }
+    }
+  }
+  return lkQuietDom === 1;
+}
+function lkDumpLogs(reason) {
+  if (!lkLogRingCount) return;
+  const n = lkLogRingCount;
+  lkEmitRaw('lkboot: quiet-dom dump (' + reason + '): ' + n + ' buffered line(s)', false);
+  const start = (lkLogRingHead - n + LK_LOG_RING_SIZE) % LK_LOG_RING_SIZE;
+  for (let i = 0; i < n; i++) {
+    const slot = (start + i) % LK_LOG_RING_SIZE;
+    lkEmitRaw(LK_LOG_RING[slot], !!LK_LOG_RING_ERR[slot]);
+    LK_LOG_RING[slot] = null;
+  }
+  lkLogRingHead = 0;
+  lkLogRingCount = 0;
+}
+
+function lkEmit(line, isErr) {
+  if (LK.isWorker) return; // worker stdio is proxied to main; never direct
+  if (lkQuietEnabled()) {
+    LK_LOG_RING[lkLogRingHead] = line;
+    LK_LOG_RING_ERR[lkLogRingHead] = isErr ? 1 : 0;
+    lkLogRingHead = (lkLogRingHead + 1) % LK_LOG_RING_SIZE;
+    if (lkLogRingCount < LK_LOG_RING_SIZE) lkLogRingCount++;
+    return;
+  }
+  lkEmitRaw(line, isErr);
 }
 function lkWriteSink(text, isErr) {
   const key = isErr ? 'printErrBuffer' : 'printBuffer';
@@ -753,6 +810,7 @@ function lkDoExit(code) {
     LK.exited = true;
     LK.exitCode = code | 0;
     lkFlushSink(false); lkFlushSink(true);
+    lkDumpLogs('exit'); // quiet-dom: the ring leaves with the program
     const m = (typeof Module !== 'undefined') ? Module : null;
     if (!LK.isWorker && m && m.onExit) { try { m.onExit(LK.exitCode); } catch (e) {} }
   }
@@ -780,108 +838,25 @@ function lkPageDriverStart() {
     if (LK.exited) { cancelAnimationFrame(lkRafId); lkRafId = 0; return; }
     if (LK.mainWorker && LK.mainLoopRemote && !LK.frameOutstanding) {
       LK.frameOutstanding = true;
-      LK.mainWorker.worker.postMessage({ cmd: 'lk-frame' });
+      // TB2 meter: this dispatch is the first page->worker message
+      // after the previous frame completed, so it carries that
+      // frame's flush deltas to the perf window (see lkTb2Pend*).
+      const tb2 = [lkTb2PendFd, lkTb2PendSync, lkTb2PendSnap];
+      lkTb2PendFd = 0; lkTb2PendSync = 0; lkTb2PendSnap = 0;
+      LK.mainWorker.worker.postMessage({ cmd: 'lk-frame', tb2 });
     }
   };
   lkRafId = requestAnimationFrame(step);
 }
 
-/* ============================ EM_ASM ================================= */
-// The binary carries our own EM_ASM bodies as strings (they are source
-// text from the engine, embedded verbatim by the compiler). The import
-// receives the string's address; we rebuild the function from the string
-// and call it. Helpers from the old runtime that the bodies legitimately
-// use (string codecs, heap views, the audio-object registry that
-// miniaudio's WebAudio code expects) are provided in the eval scope —
-// they are small utilities of ours, written here.
-
-const lkAudioObjects = [null, undefined];
-function emscriptenRegisterAudioObject(obj) {
-  for (let i = 1; i < lkAudioObjects.length; i++) if (lkAudioObjects[i] === undefined) { lkAudioObjects[i] = obj; return i; }
-  lkAudioObjects.push(obj);
-  return lkAudioObjects.length - 1;
-}
-function emscriptenGetAudioObject(id) { return lkAudioObjects[id]; }
-
-// Argument buffer layout (matches the binary's variadic packing):
-// 'i' -> i32 (4 bytes), 'p' -> u32 pointer (4 bytes), 'j' -> i64 (8,
-// 8-aligned), everything else -> f64 (8, 8-aligned).
-function lkReadAsmArgs(sigPtr, buf) {
-  const args = [];
-  const u8 = lkU8(), i32 = lkI32(), u32 = lkU32(), i64 = lkI64(), f64 = lkF64();
-  let ch;
-  while ((ch = u8[sigPtr++]) !== 0) {
-    const wide = ch !== 105 && ch !== 112;
-    if (wide && (buf % 8)) buf += 4;
-    if (ch === 112) args.push(u32[buf >> 2]);
-    else if (ch === 106) args.push(i64[buf >> 3]);
-    else if (ch === 105) args.push(i32[buf >> 2]);
-    else args.push(f64[buf >> 3]);
-    buf += wide ? 8 : 4;
-  }
-  return args;
-}
-
-// EM_ASM bodies are the engine's own C++ snippets, extracted by the
-// toolchain at link time into a table keyed by address (lkasm.js,
-// generated by extract-asm.py — the bodies never exist in wasm memory).
-// The table's factory binds the bodies to this context's environment:
-// the helper names they reference resolve through lkAsmEnv's getters,
-// so heap views stay live across memory growth.
-function lkAsmEnv() {
-  const env = {
-    UTF8ToString, UTF8ArrayToString, stringToUTF8, stringToUTF8Array,
-    lengthBytesUTF8, emscriptenGetAudioObject, emscriptenRegisterAudioObject,
-    Module: (typeof Module !== 'undefined' ? Module : {}),
-    out: lkOut, err: lkErr,
-  };
-  const views = {
-    wasmMemory: () => LK.memory,
-    wasmTable: () => (LK.exports ? LK.exports.__indirect_function_table : null),
-    HEAP8: lkI8, HEAPU8: lkU8, HEAP16: () => new Int16Array(LK.memory.buffer),
-    HEAPU16: lkU16, HEAP32: lkI32, HEAPU32: lkU32, HEAPF32: lkF32,
-    HEAPF64: lkF64, HEAP64: lkI64, HEAPU64: lkU64,
-  };
-  for (const k of Object.keys(views)) {
-    Object.defineProperty(env, k, { get: views[k], enumerable: true });
-  }
-  return env;
-}
-let LK_ASM_TABLE = null;
-function lkAsmTable() {
-  if (!LK_ASM_TABLE) {
-    if (typeof lkAsmConsts === 'function') LK_ASM_TABLE = lkAsmConsts(lkAsmEnv());
-    else { lkErr('lkboot: lkasm.js is not loaded — EM_ASM bodies unavailable'); LK_ASM_TABLE = {}; }
-  }
-  return LK_ASM_TABLE;
-}
-function lkAsmFunction(codeAddr) {
-  let fn = LK.asmCache.get(codeAddr);
-  if (fn) return fn;
-  fn = lkAsmTable()[codeAddr];
-  if (!fn) {
-    lkErr('lkboot: no EM_ASM body for address ' + codeAddr + ' (stale lkasm.js?)');
-    fn = function () { return 0; };
-  }
-  LK.asmCache.set(codeAddr, fn);
-  return fn;
-}
-
-function lkCoerceAsmReturn(v) {
-  if (v === undefined) return 0;
-  if (typeof v === 'bigint') return Number(v);
-  return v;
-}
-function lkAsmConstInt(code, sigPtr, argbuf) {
-  const args = lkReadAsmArgs(sigPtr, argbuf);
-  try {
-    return lkCoerceAsmReturn(lkAsmFunction(code)(...args));
-  } catch (e) {
-    if (lkIsUnwind(e) || e === LK_EXIT) throw e;
-    lkErr('lkboot: EM_ASM body at ' + code + ' threw: ' + (e && e.message || e));
-    return 0;
-  }
-}
+/* ==================== page services (named imports) ================= */
+// The page services the binary imports by name (input, canvas, GL,
+// frame loop) are implemented in this file as ordinary functions —
+// see the input section after the canvas helpers and the import table
+// in lkBuildImports. The address-keyed snippet mechanism that carried
+// them until 2026-10-28 is retired: no snippet table is loaded, and a
+// missing service now fails at instantiation instead of answering
+// with a cached stub.
 
 /* ==================== mailbox proxy protocol ========================= */
 // Contract the binary's compiled code depends on (studied from the old
@@ -890,8 +865,8 @@ function lkAsmConstInt(code, sigPtr, argbuf) {
 // 0n = Number follows), the binary's own export queues it into the main
 // thread's mailbox and notifies us; the main thread's binary code then
 // calls our _emscripten_receive_on_main_thread_js import, which executes
-// the target (an EM_ASM body by address, or a proxied library function
-// by index) and returns the value, or completes asynchronously through
+// the target (a proxied library function by index) and returns the
+// value, or completes asynchronously through
 // the binary's __emscripten_run_js_on_main_thread_done export.
 
 // Proxied-function indices, in the order the binary was linked against.
@@ -940,7 +915,7 @@ function lkStackSave() { return LK.exports.emscripten_stack_get_current(); }
 function lkStackAlloc(n) { return LK.exports._emscripten_stack_alloc(n); }
 function lkStackRestore(sp) { LK.exports._emscripten_stack_restore(sp); }
 
-function lkProxyToMainThread(funcIndex, emAsmAddr, proxyMode, ...callArgs) {
+function lkProxyToMainThread(funcIndex, proxyMode, ...callArgs) {
   const bufSize = 16 * callArgs.length;
   const sp = lkStackSave();
   const argsPtr = lkStackAlloc(bufSize);
@@ -950,12 +925,14 @@ function lkProxyToMainThread(funcIndex, emAsmAddr, proxyMode, ...callArgs) {
     if (typeof arg === 'bigint') { i64[b++] = 1n; i64[b++] = arg; }
     else { i64[b++] = 0n; f64[b++] = arg; }
   }
-  const rtn = LK.exports._emscripten_run_js_on_main_thread(funcIndex, emAsmAddr, bufSize, argsPtr, proxyMode);
+  // The binary export's second slot was the snippet-address channel;
+  // it is always 0 now (dispatch is by proxied index alone).
+  const rtn = LK.exports._emscripten_run_js_on_main_thread(funcIndex, 0, bufSize, argsPtr, proxyMode);
   lkStackRestore(sp);
   return rtn;
 }
 
-function lkReceiveOnMainThread(funcIndex, emAsmAddr, callingThread, bufSize, argsPtr, ctx, ctxArgs) {
+function lkReceiveOnMainThread(funcIndex, callingThread, bufSize, argsPtr, ctx, ctxArgs) {
   const args = [];
   const i64 = lkI64(), f64 = lkF64();
   let b = argsPtr >> 3;
@@ -970,8 +947,20 @@ function lkReceiveOnMainThread(funcIndex, emAsmAddr, callingThread, bufSize, arg
   // thread waits on the "main" struct (our main worker adopts it, so
   // its futex waits pump the queue) — so workers forward the call to
   // the page instead of executing it against their empty local state.
-  if (LK.isWorker) return lkReceiveForward(funcIndex, emAsmAddr, callingThread, args, ctx, ctxArgs);
-  const fn = emAsmAddr ? lkAsmFunction(emAsmAddr) : LK_PROXIED[funcIndex];
+  if (LK.isWorker) return lkReceiveForward(funcIndex, callingThread, args, ctx, ctxArgs);
+  const fn = LK_PROXIED[funcIndex];
+  if (typeof fn !== 'function') {
+    // A proxied index with no implementation is binary/page skew: name
+    // it loudly and answer undefined, never fall through silently.
+    lkErr('lkboot: no proxied service at index ' + funcIndex + ' — answered undefined');
+    if (ctx) {
+      Promise.resolve(undefined).then((v) => {
+        try { LK.exports._emscripten_run_js_on_main_thread_done(ctx, ctxArgs, v); } catch (e) {}
+      });
+      return undefined;
+    }
+    return undefined;
+  }
   LK.currentProxiedCaller = callingThread;
   let rtn;
   try { rtn = fn(...args); }
@@ -1000,15 +989,15 @@ function lkReceiveOnMainThread(funcIndex, emAsmAddr, callingThread, bufSize, arg
 // page writes the result there and notifies — the worker's own
 // message loop is blocked inside the pump, so the reply cannot ride
 // postMessage. One call in flight at a time (CAS on the state word).
-function lkReceiveForward(funcIndex, emAsmAddr, callingThread, args, ctx, ctxArgs) {
+function lkReceiveForward(funcIndex, callingThread, args, ctx, ctxArgs) {
   if (ctx) {
-    self.postMessage({ cmd: 'lk-rpc', funcIndex, emAsmAddr, callingThread, args, ctx, ctxArgs, sync: false });
+    self.postMessage({ cmd: 'lk-rpc', funcIndex, callingThread, args, ctx, ctxArgs, sync: false });
     return undefined;
   }
   if (!LK.rpcOff) return 0;
   const { i32, f64, u64 } = lkRpcViews();
   while (Atomics.compareExchange(i32, 0, 0, 1) !== 0) Atomics.wait(i32, 0, 1);
-  self.postMessage({ cmd: 'lk-rpc', funcIndex, emAsmAddr, callingThread, args, ctx: 0, ctxArgs: 0, sync: true });
+  self.postMessage({ cmd: 'lk-rpc', funcIndex, callingThread, args, ctx: 0, ctxArgs: 0, sync: true });
   while (Atomics.load(i32, 0) === 1) Atomics.wait(i32, 0, 1);
   const tag = i32[2];
   let rtn;
@@ -1071,9 +1060,11 @@ function lkNotifyMailbox(targetThread, currThreadId) {
 }
 
 /* ============================ pthreads =============================== */
-// Main-thread side: a lazy worker pool. Each worker runs THIS file,
-// receives the compiled module + shared memory once ('lk-load'), then
-// one 'lk-run' message per thread it hosts. Workers are recycled.
+// Main-thread side: a worker pool, pre-warmed at boot to the
+// provisioned census (Build86l) and grown lazily past it. Each
+// worker runs THIS file, receives the compiled module + shared
+// memory once ('lk-load'), then one 'lk-run' message per thread
+// it hosts. Workers are recycled.
 
 // Thread pool cap (build 78, 2026-10-21): sized from MEASURED engine
 // thread demand, not a guess. The workstation interactive probe peaked
@@ -1082,7 +1073,96 @@ function lkNotifyMailbox(targetThread, currThreadId) {
 // during world load. The most demanding per-core model consistent with
 // both points wants 16 at 8 cores, so the cap is 16 + 50% headroom.
 // Still a hard, bounded cap: an uncapped pool is a fork bomb.
-const LK_POOL_MAX_WORKERS = 24;
+// S5 (2026-10-28, Archie's ruling): on hosts with <= 8 cores the old
+// headroom model overshoots — Build86c's boot hit a pthread high-water
+// of 15 on the 8-core phone, thrashing across its big.LITTLE clusters.
+// Small hosts now cap at hardwareConcurrency - 2 (6 on that phone,
+// floored at 2); larger hosts keep 24. The effective cap is logged at
+// boot in the host-dispatch line and in every pool high-water line.
+const LK_HW_CONCURRENCY = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 0;
+// S5 (Archie ruling, 2026-10-28): on phone-class hosts (hw <= 8)
+// the pool cap is hw-2 (= 6 on the 8-core target phone) to stop
+// big.LITTLE context-switch thrash at boot. The floor of 6 and the
+// hw<=4 exemption are load-bearing: the pool also serves required
+// engine threads, pthread_create past the cap returns EAGAIN, and
+// the engine treats that as fatal (proven on a 2-core headless
+// host, where cap=2 aborted the main worker at world load).
+const LK_POOL_MAX_WORKERS = (LK_HW_CONCURRENCY > 4 && LK_HW_CONCURRENCY <= 8)
+  ? Math.max(6, LK_HW_CONCURRENCY - 2)
+  : 24;
+
+// Thread provisioning (JD directive, Build86l, 2026-10-28): "lock on
+// to the threads that we can use." The S5 stamp put the concurrency
+// cap at the ENGINE layer (the cJobPool, sized min(6, hw-2) at
+// creation); this page layer's job is provisioning, and it was
+// under-provisioned: pool workers were constructed lazily at
+// pthread_create time, so normal engine threads (input drain, job
+// pool, sim, Timing Handshake phases, one lazy subsystem thread)
+// crossed the old cap line at grant 6, printed the ERR banner, and
+// the lazy grant ~5 s into play constructed a Worker on the play
+// path (Build86k log: grant 13 in the same second as a 250.9 ms
+// frame). MEASURED CENSUS (device logs, Build86e/j/k, target
+// phone): 13 concurrent pool workers, stable across runs. The page
+// now pre-warms idle workers to the provisioned census at boot, so
+// grants draw from warm workers and Worker construction leaves the
+// play path. Provision = census + headroom on phone-class hosts
+// (hw >= 8: 16); mid hosts scale (hw + 8); small hosts (hw <= 4)
+// keep the old lazy behaviour — the 2-core headless host proved
+// fragile there, and pre-warming a pile of workers on 2 cores buys
+// nothing. The soft cap itself is unchanged (S5 Option A): past
+// the provision we still spawn, never refuse; the warning now
+// fires at the provisioned census instead of at 6, so it means
+// "past the measured census" again.
+const LK_POOL_PROVISION = LK_HW_CONCURRENCY <= 4 ? 0
+  : (LK_HW_CONCURRENCY >= 8 ? 16 : LK_HW_CONCURRENCY + 8);
+const LK_POOL_WARN_AT = LK_POOL_PROVISION > 0 ? LK_POOL_PROVISION : LK_POOL_MAX_WORKERS;
+const LK_POOL_LABEL = LK_POOL_PROVISION > 0
+  ? 'provision ' + LK_POOL_PROVISION
+  : 'cap ' + LK_POOL_MAX_WORKERS;
+
+// Construct one pool worker and post its 'lk-load'. Returns the
+// pool record, or null on construction failure (callers log; the
+// spawn path turns it into EAGAIN, the warm path just stops).
+function lkNewPoolWorker() {
+  let worker;
+  try {
+    worker = new Worker(LK_BOOT_URL);
+  } catch (e) {
+    return null;
+  }
+  const rec = { worker, pthread_ptr: 0 };
+  worker.onmessage = (e) => lkOnWorkerMessage(e, rec);
+  worker.onerror = (e) => lkErr('lkboot: pthread worker error: ' + (e.message || e));
+  worker.postMessage({ cmd: 'lk-load', module: LK.module, memory: LK.memory, glRing: LK.glRing, rpc: LK.rpcOff, role: 'pool' });
+  return rec;
+}
+
+// Pre-warm the pool to the provisioned census. Runs at boot, after
+// the module/memory/ring exist and before the page driver starts;
+// warmed workers instantiate in parallel while the engine boots,
+// and grants that arrive early simply queue their 'lk-run' behind
+// the worker's instantiate, exactly as a fresh spawn would.
+function lkWarmPool() {
+  if (LK_POOL_PROVISION <= 0) return;
+  if (typeof Worker === 'undefined') return;
+  if (!LK.pool) LK.pool = { byPtr: new Map(), idle: [] };
+  if (!LK.poolStats) LK.poolStats = { creates: 0, highWater: 0 };
+  let warmed = 0;
+  while (LK.pool.byPtr.size + LK.pool.idle.length < LK_POOL_PROVISION) {
+    const rec = lkNewPoolWorker();
+    if (!rec) {
+      lkErr('lkboot: thread pool: pre-warm stopped at ' + warmed +
+            ' idle workers (Worker construction failed); the pool will spawn on demand instead');
+      break;
+    }
+    LK.pool.idle.push(rec);
+    warmed++;
+  }
+  if (warmed > 0) {
+    lkOut('lkboot: thread pool: pre-warmed ' + warmed + ' idle workers (' +
+          LK_POOL_LABEL + '; measured engine census 13 concurrent on the target phone)');
+  }
+}
 
 // HOST DISPATCH (topology reorder, JD's direction, 2026-10-21). The
 // host surface — this page — is the ONLY worker authority in the
@@ -1112,37 +1192,43 @@ function lkSpawnThread(pthread_ptr, startRoutine, arg) {
   if (!LK.poolStats) LK.poolStats = { creates: 0, highWater: 0 };
   let rec = LK.pool.idle.pop();
   if (!rec) {
-    if (LK.pool.byPtr.size + LK.pool.idle.length >= LK_POOL_MAX_WORKERS) {
+    if (LK.pool.byPtr.size + LK.pool.idle.length >= LK_POOL_WARN_AT) {
+      // SOFT CAP (integrator fix, Build86e, 2026-10-28; threshold
+      // moved to the provisioned census, Build86l): the ceiling is
+      // a provisioning target, never a refusal. Device evidence
+      // (Build86d on the target phone): boot spawns past 6
+      // required workers, the engine's main thread treats a
+      // refused pthread_create as fatal (abort in startMain), and
+      // the run dies before world load. So past the provision we
+      // spawn anyway and say so once; the high-water line keeps
+      // the true peak visible. EAGAIN remains only for real
+      // Worker construction failure, below.
       if (!LK.poolCapWarned) {
         LK.poolCapWarned = true;
-        lkErr('lkboot: pthread pool cap (' + LK_POOL_MAX_WORKERS +
-              ' workers) reached; pthread_create returns EAGAIN');
+        lkErr('lkboot: pthread pool provision (' + LK_POOL_WARN_AT +
+              ' workers) exceeded; spawning past it (soft cap: required engine threads are never refused)');
       }
-      return 6; // EAGAIN: retryable by contract, never a hang or a trap
     }
-    let worker;
-    try {
-      worker = new Worker(LK_BOOT_URL);
-    } catch (e) {
-      lkErr('lkboot: worker construction failed: ' + (e && e.message || e) +
-            '; pthread_create returns EAGAIN');
+    rec = lkNewPoolWorker();
+    if (!rec) {
+      lkErr('lkboot: worker construction failed; pthread_create returns EAGAIN');
       return 6; // EAGAIN, not a throw across the import boundary
     }
-    rec = { worker, pthread_ptr: 0 };
-    worker.onmessage = (e) => lkOnWorkerMessage(e, rec);
-    worker.onerror = (e) => lkErr('lkboot: pthread worker error: ' + (e.message || e));
-    worker.postMessage({ cmd: 'lk-load', module: LK.module, memory: LK.memory, glRing: LK.glRing, rpc: LK.rpcOff, role: 'pool' });
   }
   rec.pthread_ptr = pthread_ptr;
   LK.pool.byPtr.set(pthread_ptr, rec);
   LK.poolStats.creates++;
   {
-    const live = LK.pool.byPtr.size + LK.pool.idle.length;
+    // High-water counts workers actually hosting threads. Idle
+    // pre-warmed workers are provision, not concurrency (Build86l:
+    // counting them made the first grant report the whole
+    // provision as a "high-water").
+    const live = LK.pool.byPtr.size;
     if (live > LK.poolStats.highWater) {
       LK.poolStats.highWater = live;
       lkOut('lkboot: thread pool: ' + LK.poolStats.creates +
             ' pthread_create grants, high-water ' + live +
-            ' concurrent workers (cap ' + LK_POOL_MAX_WORKERS + ')');
+            ' concurrent workers (' + LK_POOL_LABEL + ')');
     }
   }
   rec.worker.postMessage({ cmd: 'lk-run', start_routine: startRoutine, arg, pthread_ptr });
@@ -1217,9 +1303,13 @@ function lkOnWorkerMessage(e, rec) {
   } else if (d.cmd === 'lk-mainloop') {
     LK.mainLoopRemote = d.on !== false;
     if (LK.mainLoopRemote) lkPageDriverStart();
+  } else if (d.cmd === 'lk-perf') {
+    // G2 census summary from the main worker (built worker-side by
+    // lkPerfEmit); the page is the log's home, so it prints verbatim.
+    if (typeof d.line === 'string') lkOut(d.line);
   } else if (d.cmd === 'lk-frame-done') {
     LK.frameOutstanding = false;
-    lkGLFlushPending();  // build 80: the completed frame executes whole, in this task
+    lkGLFlushPending('fd');  // build 80: the completed frame executes whole, in this task
     lkGLDrain();
   } else if (d.cmd === 'lk-main-done') {
     LK.mainLoopRemote = false;
@@ -1230,6 +1320,7 @@ function lkOnWorkerMessage(e, rec) {
       LK.exited = true;
       LK.exitCode = d.exitCode | 0;
       lkFlushSink(false); lkFlushSink(true);
+      lkDumpLogs('exit'); // quiet-dom: the ring leaves with the program
       const m = (typeof Module !== 'undefined') ? Module : null;
       if (m && m.onExit) { try { m.onExit(LK.exitCode); } catch (e) {} }
     }
@@ -1238,10 +1329,11 @@ function lkOnWorkerMessage(e, rec) {
     // the state lives. Sync calls answer through the shared RPC slot;
     // async calls reply to the sending worker, which completes the
     // queued call through its own instance's done export.
-    const fn = d.emAsmAddr ? lkAsmFunction(d.emAsmAddr) : LK_PROXIED[d.funcIndex];
+    const fn = LK_PROXIED[d.funcIndex];
+    if (typeof fn !== 'function') lkErr('lkboot: forwarded service has no implementation at index ' + d.funcIndex);
     LK.currentProxiedCaller = d.callingThread || 0;
     let out;
-    try { out = fn(...d.args); } catch (err) { lkErr('lkboot: forwarded service threw: ' + (err && err.message || err)); out = undefined; }
+    try { out = fn ? fn(...d.args) : undefined; } catch (err) { lkErr('lkboot: forwarded service threw: ' + (err && err.message || err)); out = undefined; }
     LK.currentProxiedCaller = 0;
     if (d.sync) {
       const { i32, f64, u64 } = lkRpcViews();
@@ -1339,8 +1431,266 @@ LK_PROXIED[27] = (target, wPtr, hPtr) => lkGetCanvasSize(target, wPtr, hPtr);
 LK_PROXIED[28] = (target, useAdjusted) => lkRequestPointerLock(target, useAdjusted);
 LK_PROXIED[29] = (target, w, h) => lkSetCanvasSize(target, w, h);
 
+/* ===================== page input services (purge stage 1) ===================
+ * The DOM input listeners, the shared-memory ring writer and the legacy
+ * string queue used to reach the page as address-keyed script snippets
+ * served from a generated snippet table. They are hand-written page
+ * code now — this section is their home. The wire protocols are
+ * unchanged byte for byte: the __lkEmit ring record layout, the Atomics
+ * publish ordering, the drop counter, and the legacy queue's
+ * pipe-delimited lines with the sz| geometry header. The C++ side
+ * (window_web.cpp) calls them through the lk_input_* named imports,
+ * which execute here on the page main thread via the mailbox
+ * (LK_PROXIED 38-45), exactly like the canvas-size services at 26-29.
+ * One sanctioned behavior change (finding B3): the drain checks the fit
+ * BEFORE clearing the queue, so an oversized frame's records retry on
+ * the next drain instead of vanishing. */
+
+function lkInputInstall() {
+  if (window.__lkInputInstalled) return;
+  window.__lkInputInstalled = 1;
+  window.__lkQ = [];
+  window.__lkCaptureWanted = 0;
+  var Q = window.__lkQ;
+  var cv = document.getElementById("canvas");
+  var enc = encodeURIComponent;
+  window.__lkEmit = function(type, flags, i1, f1, f2, f3, f4, s1, s2) {
+    if (!window.__lkRingOn) return false;
+    try {
+      var b = LK.memory.buffer;
+      var v = window.__lkRingView;
+      if (!v || v.buffer !== b) {
+        v = new Int32Array(b, window.__lkRingBase, window.__lkRingWords);
+        window.__lkRingView = v;
+      }
+      if (type !== 5) {
+        var cv2 = document.getElementById("canvas");
+        if (cv2) {
+          var rc = cv2.getBoundingClientRect();
+          var hv = new Float32Array(b, window.__lkRingBase + 16, 2);
+          hv[0] = rc.width;
+          hv[1] = rc.height;
+          v[6] = cv2.width | 0;
+          v[7] = cv2.height | 0;
+        }
+      }
+      if (type === 0) return true;
+      var cap = window.__lkRingCap;
+      var w = Atomics.load(v, 1);
+      var r = Atomics.load(v, 2);
+      if (w - r >= cap) {
+        Atomics.add(v, 3, 1);
+        return true;
+      }
+      var base = 8 + (w % cap) * 20;
+      v[base + 1] = flags | 0;
+      v[base + 2] = i1 | 0;
+      v[base + 3] = 0;
+      var fv = new Float32Array(b, window.__lkRingBase + (base + 4) * 4, 4);
+      fv[0] = f1;
+      fv[1] = f2;
+      fv[2] = f3;
+      fv[3] = f4;
+      var u8 = new Uint8Array(b, window.__lkRingBase + (base + 8) * 4, 32);
+      u8.fill(0);
+      var te = window.__lkTE || (window.__lkTE = new TextEncoder);
+      if (s1) {
+        var e1 = te.encode(s1);
+        for (var i = 0; i < e1.length && i < 15; i++) u8[i] = e1[i];
+      }
+      if (s2) {
+        var e2 = te.encode(s2);
+        for (var j = 0; j < e2.length && j < 15; j++) u8[16 + j] = e2[j];
+      }
+      if (!window.__lkTsF) {
+        var ab = new ArrayBuffer(8);
+        window.__lkTsF = new Float64Array(ab);
+        window.__lkTsU = new Uint32Array(ab);
+      }
+      window.__lkTsF[0] = performance.now();
+      v[base + 16] = window.__lkTsU[0] | 0;
+      v[base + 17] = window.__lkTsU[1] | 0;
+      v[base + 18] = 0;
+      v[base + 19] = 0;
+      Atomics.store(v, base + 0, type);
+      Atomics.store(v, 1, w + 1);
+      return true;
+    } catch (err) {
+      window.__lkRingOn = 0;
+      return false;
+    }
+  };
+  document.addEventListener("keydown", function(e) {
+    if (!window.__lkEmit(1, (e.repeat ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0), 0, 0, 0, 0, 0, e.code, e.key || "")) {
+      Q.push("kd|" + enc(e.code) + "|" + enc(e.key || "") + "|" + (e.repeat ? 1 : 0) + "|" + (e.ctrlKey ? 1 : 0) + "|" + (e.metaKey ? 1 : 0));
+    }
+    if (document.pointerLockElement || e.code === "Space" || e.code === "Tab" || e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight" || e.code === "PageUp" || e.code === "PageDown") e.preventDefault();
+  });
+  document.addEventListener("keyup", function(e) {
+    if (!window.__lkEmit(2, 0, 0, 0, 0, 0, 0, e.code, e.key || "")) {
+      Q.push("ku|" + enc(e.code) + "|" + enc(e.key || ""));
+    }
+  });
+  if (cv) {
+    cv.addEventListener("mousedown", function(e) {
+      if (window.__lkCaptureWanted && !window.__lkTouchPrimary && !document.pointerLockElement) {
+        var sinceExit = performance.now() - (window.__lkLockExitMs || -1e9);
+        if (sinceExit > 1250) {
+          try {
+            var pr = cv.requestPointerLock();
+            if (pr && typeof pr.catch === "function") pr.catch(function() {});
+          } catch (_) {}
+        }
+      }
+      if (!window.__lkEmit(3, 0, e.button, e.offsetX, e.offsetY, 0, 0, null, null)) {
+        Q.push("md|" + e.button + "|" + e.offsetX + "|" + e.offsetY);
+      }
+      e.preventDefault();
+    });
+    cv.addEventListener("mouseup", function(e) {
+      if (!window.__lkEmit(4, 0, e.button, e.offsetX, e.offsetY, 0, 0, null, null)) {
+        Q.push("mu|" + e.button + "|" + e.offsetX + "|" + e.offsetY);
+      }
+    });
+    cv.addEventListener("mousemove", function(e) {
+      if (!window.__lkEmit(5, 0, 0, e.offsetX, e.offsetY, e.movementX, e.movementY, null, null)) {
+        Q.push("mm|" + e.offsetX + "|" + e.offsetY + "|" + e.movementX + "|" + e.movementY);
+      }
+    });
+    cv.addEventListener("wheel", function(e) {
+      if (!window.__lkEmit(6, 0, e.deltaMode, e.deltaY, 0, 0, 0, null, null)) {
+        Q.push("wh|" + e.deltaY + "|" + e.deltaMode);
+      }
+      e.preventDefault();
+    }, {
+      passive: false
+    });
+  }
+  document.addEventListener("pointerlockchange", function() {
+    if (!document.pointerLockElement) window.__lkLockExitMs = performance.now();
+    if (!window.__lkEmit(7, document.pointerLockElement ? 1 : 0, 0, 0, 0, 0, 0, null, null)) {
+      Q.push("plc|" + (document.pointerLockElement ? 1 : 0));
+    }
+  });
+  document.addEventListener("pointerlockerror", function() {
+    if (!window.__lkEmit(8, 0, 0, 0, 0, 0, 0, null, null)) {
+      Q.push("ple");
+    }
+  });
+  window.addEventListener("focus", function() {
+    if (!window.__lkEmit(9, 0, 0, 0, 0, 0, 0, null, null)) {
+      Q.push("fo");
+    }
+  });
+  window.addEventListener("blur", function() {
+    if (!window.__lkEmit(10, 0, 0, 0, 0, 0, 0, null, null)) {
+      Q.push("bl");
+    }
+  });
+  window.addEventListener("resize", function() {
+    window.__lkEmit(0, 0, 0, 0, 0, 0, 0, null, null);
+  });
+}
+
+// Publish the shared-memory input ring to the installed listeners.
+// Returns 1 when the ring is live, 0 when the page has no shared
+// memory — the one and only failure cause (window_web.cpp's log line
+// says so now, instead of guessing at page plumbing).
+function lkInputRingPublish(base, cap, words) {
+  try {
+    if (typeof SharedArrayBuffer === "undefined" || typeof Atomics === "undefined") return 0;
+    if (!(LK.memory && LK.memory.buffer instanceof SharedArrayBuffer)) return 0;
+    window.__lkRingBase = base;
+    window.__lkRingCap = cap;
+    window.__lkRingWords = words;
+    window.__lkRingOn = 1;
+    return 1;
+  } catch (e) {
+    lkErr('input: ring publish failed: ' + ((e && e.message) || e));
+    return 0;
+  }
+}
+
+// Drain the legacy string queue into wasm memory at buf (cap bytes
+// including the NUL): byte count on success, 0 queue state included in
+// the sz| header either way, -1 when the pending records do not fit —
+// with the queue left intact for the next drain (B3).
+var lkDrainOversizeDropped = 0;
+function lkInputDrainQueue(buf, cap) {
+  var q = window.__lkQ || [];
+  var cv = document.getElementById("canvas");
+  var cssW = 0;
+  var cssH = 0;
+  var fbW = 0;
+  var fbH = 0;
+  if (cv) {
+    var r = cv.getBoundingClientRect();
+    cssW = r.width;
+    cssH = r.height;
+    fbW = cv.width;
+    fbH = cv.height;
+  }
+  var nl = String.fromCharCode(10);
+  var header = "sz|" + cssW + "|" + cssH + "|" + fbW + "|" + fbH;
+  // Drain what fits (second review F3): emit the header plus whole
+  // records up to the cap and keep the rest queued for the next call.
+  // A record that cannot fit even alone behind the header is dropped
+  // and counted, so the queue can never wedge the drain shut. (Queue
+  // lines are ASCII by construction: numbers and encodeURIComponent
+  // output, so string length is byte length; the encoded-size check
+  // below is the hard stop if that ever stops being true.)
+  var parts = [header];
+  var size = header.length;
+  var take = 0;
+  while (take < q.length) {
+    var recLen = q[take].length + 1; // + the newline separator
+    if (size + recLen + 1 > cap) { // + the NUL terminator
+      if (take > 0) break;
+      lkDrainOversizeDropped++;
+      if (lkDrainOversizeDropped === 1 || lkDrainOversizeDropped % 60 === 0)
+        lkErr('input: dropped oversize legacy record (' + q[take].length +
+              ' bytes, cap ' + cap + '); total dropped ' + lkDrainOversizeDropped);
+      take++; // drop it and keep draining what follows
+      continue;
+    }
+    parts.push(q[take]);
+    size += recLen;
+    take++;
+  }
+  var bytes = lkTextEncoder.encode(parts.join(nl));
+  if (bytes.length + 1 > cap) return -1; // hard stop; queue left intact
+  q.splice(0, take);
+  var u8 = lkU8();
+  u8.set(bytes, buf);
+  u8[buf + bytes.length] = 0;
+  return bytes.length;
+}
+function lkInputDebugFlag() {
+  return (window.LK_DEBUG_INPUT || new URLSearchParams(location.search).has("debuginput")) ? 1 : 0;
+}
+function lkPageAaMode() {
+  const v = new URLSearchParams(location.search).get("aa");
+  return v === "on" ? 1 : v === "4" ? 4 : 0;
+}
+function lkWindowSetTitle(ptr) { document.title = lkReadCStr(ptr); }
+function lkInputSetCaptureWanted(on) { window.__lkCaptureWanted = on; }
+function lkPresentThinOk() {
+  return new URLSearchParams(location.search).get("lkthin") === "off" ? 0 : 1;
+}
+
+LK_PROXIED[38] = () => lkInputInstall();
+LK_PROXIED[39] = (base, cap, words) => lkInputRingPublish(base, cap, words);
+
+LK_PROXIED[40] = (buf, cap) => lkInputDrainQueue(buf, cap);
+LK_PROXIED[41] = () => lkInputDebugFlag();
+LK_PROXIED[42] = () => lkPageAaMode();
+LK_PROXIED[43] = (ptr) => lkWindowSetTitle(ptr);
+LK_PROXIED[44] = (on) => lkInputSetCaptureWanted(on);
+LK_PROXIED[45] = () => lkPresentThinOk();
+
 /* ===================== WebGL2 wrapper (clause two) =================== */
-// The binary imports ~270 GL entry points. We implement them ourselves
+// The binary imports 69 GL entry points under our own lk_gl* names.
+// We implement them ourselves
 // on top of ONE WebGL2 context per canvas, with:
 //
 //   - handle registries (the binary speaks in integer GL names; the
@@ -1449,7 +1799,7 @@ function lkCacheMapChanged(map, key, value) {
 
 const LK_GL = {}; // import name -> implementation (filled below)
 
-function lkDefGL(name, fn) { LK_GL['emscripten_gl' + name] = fn; }
+function lkDefGL(name, fn) { LK_GL['lk_gl' + name] = fn; }
 function lkNoCtx(defaultValue) { return defaultValue; }
 
 // --- object creation / deletion ---
@@ -1517,9 +1867,9 @@ lkDefGL('DeleteVertexArrays', lkDelete('vao', (gl, o) => gl.deleteVertexArray(o)
   if (rec.cache.vao === name) { rec.cache.vao = 0; rec.cache.attribEnabled.clear(); }
   rec.attribs.delete(name);
 }));
-lkDefGL('DeleteVertexArraysOES', LK_GL['emscripten_glDeleteVertexArrays']);
+lkDefGL('DeleteVertexArraysOES', LK_GL['lk_glDeleteVertexArrays']);
 lkDefGL('IsVertexArray', lkIs('vao'));
-lkDefGL('IsVertexArrayOES', LK_GL['emscripten_glIsVertexArray']);
+lkDefGL('IsVertexArrayOES', LK_GL['lk_glIsVertexArray']);
 lkDefGL('CreateProgram', lkCreate('program', (gl) => gl.createProgram()));
 lkDefGL('DeleteProgram', lkDelete('program', (gl, o) => gl.deleteProgram(o), (rec, name) => {
   if (rec.cache.program === name) rec.cache.program = 0;
@@ -1535,11 +1885,11 @@ lkDefGL('CreateShader', (type) => {
 lkDefGL('DeleteShader', lkDelete('shader', (gl, o) => gl.deleteShader(o)));
 lkDefGL('IsShader', lkIs('shader'));
 lkDefGL('GenQueries', lkGen('query', (gl) => gl.createQuery()));
-lkDefGL('GenQueriesEXT', LK_GL['emscripten_glGenQueries']);
+lkDefGL('GenQueriesEXT', LK_GL['lk_glGenQueries']);
 lkDefGL('DeleteQueries', lkDelete('query', (gl, o) => gl.deleteQuery(o)));
-lkDefGL('DeleteQueriesEXT', LK_GL['emscripten_glDeleteQueries']);
+lkDefGL('DeleteQueriesEXT', LK_GL['lk_glDeleteQueries']);
 lkDefGL('IsQuery', lkIs('query'));
-lkDefGL('IsQueryEXT', LK_GL['emscripten_glIsQuery']);
+lkDefGL('IsQueryEXT', LK_GL['lk_glIsQuery']);
 lkDefGL('GenSamplers', lkGen('sampler', (gl) => gl.createSampler()));
 lkDefGL('DeleteSamplers', lkDelete('sampler', (gl, o) => gl.deleteSampler(o), (rec, name) => {
   for (const [k, v] of rec.cache.samplerBind) if (v === name) rec.cache.samplerBind.delete(k);
@@ -1566,6 +1916,20 @@ function lkBufBindKey(rec, target) {
 }
 lkDefGL('BindBuffer', (target, name) => {
   const rec = lkGLOrWarn(); if (!rec) return;
+  // H4 (G3 arena conviction, 2026-10-28): ELEMENT_ARRAY_BUFFER binds are
+  // NEVER cache-suppressed. The H3 keying fixed one desync, but a repeated
+  // EBO bind on the one long-lived arena VAO could still be eaten by the
+  // cache after any page-side state divergence, leaving the arena VAO with
+  // NO element buffer latched while its attribs (uncached pointer calls)
+  // latched fine: draws issued, payloads byte-correct, zero pixels, no GL
+  // error. The page-side VAO audit read it directly:
+  // ELEMENT_ARRAY_BUFFER_BINDING = null at the first chunk draws. EBO binds
+  // are per-upload, not per-draw, so always executing them is cheap.
+  if (target === 0x8893) {
+    rec.cache.bufBind.set(lkBufBindKey(rec, target), name);
+    rec.gl.bindBuffer(target, name ? lkRegGet(rec, 'buffer', name) : null);
+    return;
+  }
   if (lkCacheMapChanged(rec.cache.bufBind, lkBufBindKey(rec, target), name))
     rec.gl.bindBuffer(target, name ? lkRegGet(rec, 'buffer', name) : null);
 });
@@ -1599,7 +1963,7 @@ lkDefGL('BindVertexArray', (name) => {
     rec.cache.attribEnabled.clear();
   }
 });
-lkDefGL('BindVertexArrayOES', LK_GL['emscripten_glBindVertexArray']);
+lkDefGL('BindVertexArrayOES', LK_GL['lk_glBindVertexArray']);
 lkDefGL('UseProgram', (name) => {
   const rec = lkGLOrWarn(); if (!rec) return;
   if (lkCacheChanged(rec, 'program', name))
@@ -1811,14 +2175,15 @@ function lkTexView(ptr, w, h, d, format, type) {
 // --- buffers ---
 lkDefGL('BufferData', (target, size, ptr, usage) => {
   const rec = lkGLOrWarn(); if (!rec) return;
-  if (ptr) rec.gl.bufferData(target, new Uint8Array(LK.memory.buffer, ptr, size), usage);
+  if (ptr && typeof ptr === 'object') rec.gl.bufferData(target, ptr.__lksnap, usage); // TB2 snapshot
+  else if (ptr) rec.gl.bufferData(target, new Uint8Array(LK.memory.buffer, ptr, size), usage);
   else rec.gl.bufferData(target, size, usage);
   const bound = rec.cache.bufBind.get(lkBufBindKey(rec, target));
   if (bound) rec.bufMeta.set(bound, { size, usage });
 });
 lkDefGL('BufferSubData', (target, offset, size, ptr) => {
   const rec = lkGLOrWarn(); if (!rec) return;
-  rec.gl.bufferSubData(target, offset, new Uint8Array(LK.memory.buffer, ptr, size));
+  rec.gl.bufferSubData(target, offset, (ptr && typeof ptr === 'object') ? ptr.__lksnap : new Uint8Array(LK.memory.buffer, ptr, size)); // TB2 snapshot
 });
 lkDefGL('CopyBufferSubData', (rt, wt, ro, wo, size) => {
   const rec = lkGLOrWarn(); if (!rec) return;
@@ -1955,8 +2320,26 @@ lkDefGL('DrawBuffers', (n, ptr) => {
   for (let i = 0; i < n; i++) arr.push(i32[(ptr >> 2) + i]);
   rec.gl.drawBuffers(arr);
 });
-lkDefGL('DrawBuffersEXT', LK_GL['emscripten_glDrawBuffers']);
-lkDefGL('DrawBuffersWEBGL', LK_GL['emscripten_glDrawBuffers']);
+lkDefGL('DrawBuffersEXT', LK_GL['lk_glDrawBuffers']);
+lkDefGL('DrawBuffersWEBGL', LK_GL['lk_glDrawBuffers']);
+
+// Census gap (purge stage 1, 2026-10-28): the loader's X-macro lists two
+// names the page has no WebGL2 function for. glProcAddress answers null
+// for them, so the loader fixups install the C++ shims and these imports
+// exist only to satisfy the link; they must never be called. If one ever
+// is, it logs once and refuses loudly instead of no-opping silently.
+function lkGLGapStub(gapName) {
+  let logged = false;
+  return function () {
+    if (!logged) {
+      logged = true;
+      lkErr('lkboot: lk_gl' + gapName + ' called — no WebGL2 equivalent exists; the loader shim should have intercepted this name');
+    }
+    return 0;
+  };
+}
+lkDefGL('TexBuffer', lkGLGapStub('TexBuffer'));
+lkDefGL('DrawElementsBaseVertex', lkGLGapStub('DrawElementsBaseVertex'));
 lkDefGL('InvalidateFramebuffer', (target, n, ptr) => {
   const rec = lkGLOrWarn(); if (!rec || !rec.gl.invalidateFramebuffer) return;
   const arr = []; const i32 = lkI32();
@@ -2194,12 +2577,12 @@ for (const [uname, [kind, n, view]] of Object.entries(LK_U_VECS)) {
     const rec = lkGLOrWarn(); if (!rec) return;
     const entry = lkLocEntry(rec, locId); if (!entry) return;
     const Ctor = view === 'F32' ? Float32Array : view === 'I32' ? Int32Array : Uint32Array;
-    const arr = new Ctor(LK.memory.buffer, ptr, count * n);
+    const arr = (ptr && typeof ptr === 'object') ? ptr.__lksnap : new Ctor(LK.memory.buffer, ptr, count * n); // TB2 snapshot
     // M1: the dedup key must cover the WHOLE array — a 16-element
     // prefix key suppressed real updates for arrays differing past
     // element 16 (e.g. light arrays). FNV-1a over the raw u32 words
     // of the full array + its length.
-    const words = new Uint32Array(LK.memory.buffer, ptr, count * n);
+    const words = (ptr && typeof ptr === 'object') ? new Uint32Array(ptr.__lksnap.buffer, ptr.__lksnap.byteOffset, count * n) : new Uint32Array(LK.memory.buffer, ptr, count * n); // TB2 snapshot
     let hsh = 0x811c9dc5;
     for (let i = 0; i < words.length; i++) { hsh ^= words[i]; hsh = Math.imul(hsh, 0x01000193); }
     const key = kind + 'v:' + words.length + ':' + (hsh >>> 0).toString(36);
@@ -2216,7 +2599,7 @@ for (const [uname, [cols, rows]] of Object.entries(LK_U_MATS)) {
   lkDefGL(uname, (locId, count, transpose, ptr) => {
     const rec = lkGLOrWarn(); if (!rec) return;
     const entry = lkLocEntry(rec, locId); if (!entry) return;
-    const arr = new Float32Array(LK.memory.buffer, ptr, count * cols * rows);
+    const arr = (ptr && typeof ptr === 'object') ? ptr.__lksnap : new Float32Array(LK.memory.buffer, ptr, count * cols * rows); // TB2 snapshot
     rec.gl['uniformMatrix' + label + 'fv'](entry.loc, !!transpose, arr);
   });
 }
@@ -2456,7 +2839,7 @@ lkDefGL('GetQueryiv', (target, pname, ptr) => {
   const v = rec.gl.getQuery(target, pname);
   lkI32()[ptr >> 2] = v && typeof v === 'object' ? lkRegName(rec, 'query', v) : (v | 0);
 });
-lkDefGL('GetQueryivEXT', LK_GL['emscripten_glGetQueryiv']);
+lkDefGL('GetQueryivEXT', LK_GL['lk_glGetQueryiv']);
 function lkQueryObject(name, kind) {
   lkDefGL(name, (q, pname, ptr) => {
     const rec = lkGLOrWarn(); if (!rec) return;
@@ -2646,6 +3029,78 @@ lkDefGL('PolygonModeWEBGL', (face, mode) => {
 // draw the fullscreen triangle in ONE host crossing. Returns 0 on
 // success, the GL error code if the upload failed (nothing drawn), or
 // -1 when the verb cannot run (caller falls back to the classic path).
+// Phase 2 mega-draw, page side (2026-10-28): the renderer batches every
+// classic chunk mesh into ONE call; the counts/offsets travel the GL ring
+// as reserved chunk records and the draws execute here, on the page, so a
+// thousand draws cost a handful of bridge crossings. Executor semantics,
+// corrected 2026-10-28 (audit: runs/MegaExecutor-Audit-2026-10-28.md):
+// WEBGL_multi_draw_instanced (ANGLE_multi_draw) restarts instance
+// fetching at 0 for EVERY sub-draw... there is no cumulative instance
+// indexing and no base-instance parameter, so the extension cannot
+// express this batch (its per-draw channel is gl_DrawID, a redesign for
+// another day; the old header comment here claimed the opposite and the
+// extension call was also malformed, 6 arguments into a 9-slot IDL, and
+// would have thrown). The executor is therefore the re-pointing loop in
+// lkMegaDrawExec on every stack: exactly the loop-of-draws semantics,
+// with each record carrying its base so sub-draw i of a record reads
+// instance record base + i. (The first cut dropped the base, so every
+// record re-read records 0..119: mesh k sampled instance record
+// k mod 120, the Build86j completion glitch.)
+function lkMegaExt() {  // kept for a future gl_DrawID redesign; the executor deliberately does not use it
+  const rec = lkCtx(); if (!rec) return null;
+  if (rec._megaExt === undefined) {
+    try { rec._megaExt = rec.gl.getExtension('WEBGL_multi_draw_instanced') || null; }
+    catch (e) { rec._megaExt = null; }
+  }
+  return rec._megaExt;
+}
+function lkMegaDrawExec(mode, counts, offsets, base) {
+  const rec = lkCtx(); if (!rec) return -1;
+  const gl = rec.gl;
+  const n = counts.length; if (!n) return 0;
+  const baseIdx = base | 0;
+  // The executor (see the header above for why the multi-draw extension
+  // is not used): the renderer's instance attribs (locations 4..8, one
+  // interleaved buffer) are re-pointed at instance record base + i for
+  // sub-draw i, drawn with one instance, and restored afterwards; every
+  // call is page-local. The attrib layout is the renderer's fixed
+  // contract (bindArenaAttribs: sizes 3,4,4,4,4 floats at byte offsets
+  // 0,12,28,44,60, stride 76) — hardcoded here because this stack's
+  // getVertexAttribOffset query returns 0 for every attrib (measured
+  // 2026-10-28), so the offsets cannot be read back.
+  const A0 = 4, A1 = 8;
+  const LAYOUT_OFF = [0, 12, 28, 44, 60];
+  const saved = [];
+  let recordStride = 0;
+  for (let a = A0; a <= A1; a++) {
+    saved.push({
+      buffer: gl.getVertexAttrib(a, gl.VERTEX_ATTRIB_ARRAY_BUFFER_BINDING),
+      size: gl.getVertexAttrib(a, gl.VERTEX_ATTRIB_ARRAY_SIZE),
+      type: gl.getVertexAttrib(a, gl.VERTEX_ATTRIB_ARRAY_TYPE),
+      normalized: gl.getVertexAttrib(a, gl.VERTEX_ATTRIB_ARRAY_NORMALIZED),
+      stride: gl.getVertexAttrib(a, gl.VERTEX_ATTRIB_ARRAY_STRIDE),
+      offset: LAYOUT_OFF[a - A0],
+    });
+    if (a === A0) recordStride = saved[0].stride;
+  }
+  if (!recordStride) return -1;
+  const arrayBuffer = gl.getParameter(gl.ARRAY_BUFFER_BINDING);
+  gl.bindBuffer(gl.ARRAY_BUFFER, saved[0].buffer);
+  for (let i = 0; i < n; i++) {
+    for (let a = A0; a <= A1; a++) {
+      const s = saved[a - A0];
+      gl.vertexAttribPointer(a, s.size, s.type, s.normalized, s.stride, s.offset + (baseIdx + i) * recordStride);
+    }
+    gl.drawElementsInstanced(mode, counts[i], gl.UNSIGNED_INT, offsets[i], 1);
+  }
+  for (let a = A0; a <= A1; a++) {
+    const s = saved[a - A0];
+    gl.vertexAttribPointer(a, s.size, s.type, s.normalized, s.stride, s.offset);
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, arrayBuffer);
+  return 0;
+}
+
 function lkioPresent(target, tex, prog, vao, namePtr, ptr, w, h, fbW, fbH, internalFormat, format, fresh) {
   if (target !== 0) return -1;
   const rec = lkCtx();
@@ -2656,11 +3111,11 @@ function lkioPresent(target, tex, prog, vao, namePtr, ptr, w, h, fbW, fbH, inter
     const progObj = lkRegGet(rec, 'program', prog);
     const vaoObj = lkRegGet(rec, 'vao', vao);
     if (!texObj || !progObj || !vaoObj) return -1;
-    LK_GL['emscripten_glViewport'](0, 0, fbW, fbH);
-    LK_GL['emscripten_glDisable'](0x0B71); // DEPTH_TEST
-    LK_GL['emscripten_glDisable'](0x0BE2); // BLEND
-    LK_GL['emscripten_glActiveTexture'](0x84C0); // TEXTURE0
-    LK_GL['emscripten_glBindTexture'](0x0DE1, tex); // TEXTURE_2D
+    LK_GL['lk_glViewport'](0, 0, fbW, fbH);
+    LK_GL['lk_glDisable'](0x0B71); // DEPTH_TEST
+    LK_GL['lk_glDisable'](0x0BE2); // BLEND
+    LK_GL['lk_glActiveTexture'](0x84C0); // TEXTURE0
+    LK_GL['lk_glBindTexture'](0x0DE1, tex); // TEXTURE_2D
     // L6: clamp the upload view to what actually remains in memory —
     // the unclamped constructor throws RangeError on a short buffer,
     // which used to surface here as an unexplained -1.
@@ -2675,7 +3130,7 @@ function lkioPresent(target, tex, prog, vao, namePtr, ptr, w, h, fbW, fbH, inter
     else gl.texSubImage2D(0x0DE1, 0, 0, 0, w, h, format, 0x1401, data);
     const err = gl.getError();
     if (err !== 0) return err;
-    LK_GL['emscripten_glUseProgram'](prog);
+    LK_GL['lk_glUseProgram'](prog);
     // Cache the sampler location per (program, name): this ran a
     // getUniformLocation on EVERY present (L6).
     if (!rec.presentLocs) rec.presentLocs = new Map();
@@ -2686,11 +3141,11 @@ function lkioPresent(target, tex, prog, vao, namePtr, ptr, w, h, fbW, fbH, inter
       rec.presentLocs.set(locKey, loc);
     }
     if (loc) gl.uniform1i(loc, 0);
-    LK_GL['emscripten_glBindVertexArray'](vao);
+    LK_GL['lk_glBindVertexArray'](vao);
     gl.drawArrays(0x0004, 0, 3); // TRIANGLES
-    LK_GL['emscripten_glBindVertexArray'](0);
-    LK_GL['emscripten_glUseProgram'](0);
-    LK_GL['emscripten_glBindTexture'](0x0DE1, 0);
+    LK_GL['lk_glBindVertexArray'](0);
+    LK_GL['lk_glUseProgram'](0);
+    LK_GL['lk_glBindTexture'](0x0DE1, 0);
     return 0;
   } catch (e) {
     return -1;
@@ -2745,6 +3200,8 @@ const LK_GLRES_CTX_GET_CURRENT = LK_GL_NAMES.length + 2;  // () -> handle (sync)
 const LK_GLRES_CTX_DESTROY = LK_GL_NAMES.length + 3;      // (handle) (async)
 const LK_GLRES_CTX_ENABLE_EXT = LK_GL_NAMES.length + 4;   // (handle, namePtr) -> bool (sync)
 const LK_GLRES_LKIO_PRESENT = LK_GL_NAMES.length + 5;     // lkio_present args (sync)
+const LK_GLRES_LK_MEGA_PROBE = LK_GL_NAMES.length + 6;    // () -> 1 when core drawElementsInstanced exists (sync)
+const LK_GLRES_LK_MEGA_CHUNK = LK_GL_NAMES.length + 7;    // (mode, base, count0, offset0, ...) up to 120 draws per record (async)
 
 // --- H1: the sync/async classification -------------------------------
 // A call must execute BEFORE its caller continues if it returns a
@@ -2809,10 +3266,10 @@ const LK_GL_POINTER_READERS = new Set([
   'DrawBuffers', 'DrawBuffersEXT', 'DrawBuffersWEBGL',
   'InvalidateFramebuffer', 'InvalidateSubFramebuffer',
   'TransformFeedbackVaryings', 'ProgramBinary',
-].map((s) => 'emscripten_gl' + s));
+].map((s) => 'lk_gl' + s));
 // Value-returning families (the result travels back through the sync
 // reply slot; pointer semantics are covered by the set above).
-const LK_GL_SYNC_RE = /^(emscripten_gl)(Create|Gen|Get|Is|Check|Fence|ClientWait|ReadPixels)/;
+const LK_GL_SYNC_RE = /^(lk_gl)(Create|Gen|Get|Is|Check|Fence|ClientWait|ReadPixels)/;
 function lkGLIsSync(name) {
   return LK_GL_POINTER_READERS.has(name) || LK_GL_SYNC_RE.test(name);
 }
@@ -2826,8 +3283,11 @@ function lkGLClassAudit() {
     const stale = [...LK_GL_POINTER_READERS].filter((n) => !(n in LK_GL));
     if (stale.length) lkErr('lkboot: GL class audit: pointer-reader set names unimplemented calls: ' + stale.join(', '));
     if (!LK.module) return;
+    // The two lk_gl* context services are import-table entries, not
+    // LK_GL calls; they are excluded from the GL census by name.
     const imported = WebAssembly.Module.imports(LK.module)
-      .map((i) => i.name).filter((n) => n.startsWith('emscripten_gl'));
+      .map((i) => i.name).filter((n) => n.startsWith('lk_gl') &&
+        n !== 'lk_gl_create_context' && n !== 'lk_gl_make_current');
     const unimplemented = imported.filter((n) => !(n in LK_GL));
     if (unimplemented.length) lkErr('lkboot: GL class audit: binary imports GL calls with no implementation: ' + unimplemented.join(', '));
     const syncCount = imported.filter((n) => lkGLIsSync(n)).length;
@@ -2837,6 +3297,71 @@ function lkGLClassAudit() {
   } catch (e) {
     lkErr('lkboot: GL class audit failed: ' + (e && e.message || e));
   }
+}
+
+// --- G2: per-import call census (2026-10-28) -------------------------
+// JD's doctrine: counts convict. Every named GL import call bumps one
+// slot of a fixed-size window counter, indexed by its position in
+// LK_GL_NAMES — one integer increment in the ring-write path, no
+// allocation, no string work. Sync/async tagging reuses the H1
+// classifier, precomputed once into LK_GL_IS_SYNC. The window is read
+// and reset once per second by lkPerfEmit (worker side, from the
+// frame driver); lkboot's own reserved ring verbs (context create /
+// make-current / present, indices >= LK_GL_NAMES.length) are host
+// plumbing, not imports, and are not counted. Counters are per
+// context: the main worker's window is the one emitted, and the
+// play-loop GL traffic originates on its render thread.
+const LK_GL_CALL_WIN = new Uint32Array(LK_GL_NAMES.length);
+const LK_GL_IS_SYNC = LK_GL_NAMES.map((n) => lkGLIsSync(n) ? 1 : 0);
+
+// Frame-boundary host cost (same window, main worker only):
+//   wall_us = time between successive frame-callback starts,
+//   wasm_us = time inside the frame callback itself,
+//   host_us = wall - the previous frame's wasm (drain, message
+//             transit, rAF/compositor wait, host GC — everything the
+//             host did between one frame's end and the next's start).
+let lkPerfPrevStartMs = 0;
+let lkPerfPrevExecUs = 0;
+let lkPerfWinStartMs = 0;
+let lkPerfWinFrames = 0;
+let lkPerfWinWallUs = 0;
+let lkPerfWinExecUs = 0;
+let lkPerfWinHostUs = 0;
+
+function lkPerfEmit(nowMs) {
+  const frames = lkPerfWinFrames;
+  const avg = (sum) => frames ? Math.round(sum / frames) : 0;
+  let syncTotal = 0, asyncTotal = 0;
+  const syncIdx = [];
+  for (let i = 0; i < LK_GL_NAMES.length; i++) {
+    const c = LK_GL_CALL_WIN[i];
+    if (!c) continue;
+    if (LK_GL_IS_SYNC[i]) { syncTotal += c; syncIdx.push(i); }
+    else asyncTotal += c;
+  }
+  syncIdx.sort((a, b) => LK_GL_CALL_WIN[b] - LK_GL_CALL_WIN[a]);
+  const top = syncIdx.slice(0, 5)
+    .map((i) => LK_GL_NAMES[i].slice(13) + ' x' + LK_GL_CALL_WIN[i]).join(', ');
+  // The summary leaves on the worker message channel (the page logs
+  // it verbatim): worker stdio is proxied syscalls, not this layer's
+  // own voice, and a postMessage per second is not a hot path.
+  self.postMessage({ cmd: 'lk-perf', line:
+    'lkboot: perf 1s: frames=' + frames +
+    ' wall_us=' + avg(lkPerfWinWallUs) +
+    ' wasm_us=' + avg(lkPerfWinExecUs) +
+    ' host_us=' + avg(lkPerfWinHostUs) +
+    ' | gl/s sync=' + syncTotal + ' async=' + asyncTotal +
+    ' | top sync: ' + (top || 'none') +
+    ' | flush fd=' + lkTb2WinFd + ' sync=' + lkTb2WinSync + ' snap=' + lkTb2WinSnap });
+  LK_GL_CALL_WIN.fill(0);
+  lkPerfWinFrames = 0;
+  lkPerfWinWallUs = 0;
+  lkPerfWinExecUs = 0;
+  lkPerfWinHostUs = 0;
+  lkTb2WinFd = 0;
+  lkTb2WinSync = 0;
+  lkTb2WinSnap = 0;
+  lkPerfWinStartMs = nowMs;
 }
 
 let lkGLStubCache = null;
@@ -2852,6 +3377,7 @@ function lkGLStubs() {
 }
 
 function lkGLStreamCall(funcIdx, sync, args) {
+  if (funcIdx < LK_GL_NAMES.length) LK_GL_CALL_WIN[funcIdx]++; // G2 census
   const ring = LK.glRing;
   if (!ring) return 0;
   const i32 = lkI32(), u32 = lkU32(), f64 = lkF64();
@@ -2973,6 +3499,16 @@ function lkGLExecute(funcIdx, args) {
     try { return rec.gl.getExtension(name) ? 1 : 0; } catch (e) { return 0; }
   }
   if (funcIdx === LK_GLRES_LKIO_PRESENT) return lkioPresent(...args);
+  if (funcIdx === LK_GLRES_LK_MEGA_PROBE) { const rec = lkCtx(); return (rec && typeof rec.gl.drawElementsInstanced === 'function') ? 1 : 0; }
+  if (funcIdx === LK_GLRES_LK_MEGA_CHUNK) {
+    // Record payload: [mode, base, count0, offset0, count1, offset1, ...]
+    // where base is this record's first instance-record index in the
+    // frame (records after the first start past 0; see lkMegaDrawExec).
+    const n = (args.length - 2) >> 1;
+    const counts = new Int32Array(n), offsets = new Int32Array(n);
+    for (let i = 0; i < n; i++) { counts[i] = args[2 + 2 * i]; offsets[i] = args[3 + 2 * i]; }
+    return lkMegaDrawExec(args[0], counts, offsets, args[1]);
+  }
   const fn = LK_GL[LK_GL_NAMES[funcIdx]];
   if (!fn) return 0;
   return fn(...args);
@@ -3043,8 +3579,43 @@ function lkGLDrain() {
       lkPendingGL.push([funcIdx, args]);
       continue;
     }
+    // TB2 (restored 2026-10-28; the 2026-10-23 flicker fix): a sync
+    // record whose pointer payload can be snapshotted is copied at
+    // decode, replied to immediately, and — while a frame is in
+    // flight — held with the frame instead of forcing a mid-frame
+    // flush. The flush-per-sync fragmentation was the flicker: every
+    // pointer-reading call (Uniform*fv at per-mesh frequency,
+    // BufferData, Gen*) used to shatter the held frame into
+    // thousands of fragments the compositor painted between.
+    let lkTb2Snapped = false;
+    if (isSync) {
+      // Guard mirrors the execute below (review 2026-10-28, lanes B+C):
+      // a snap-copy throw must degrade to in-place execution, never abort
+      // the drain with the sync reply unposted and the GL lock held.
+      try { lkTb2Snapped = lkTb2SnapCopy(funcIdx, args); }
+      catch (e) { lkErr('lkboot: TB2 snapshot failed (' + e + '); executing in place'); lkTb2Snapped = false; }
+    }
+    if (lkTb2Snapped && LK.frameOutstanding) {
+      // Reply NOW (void result): value slot first, then doneSeq —
+      // the producer unblocks with its data safe in the snapshot;
+      // the record itself executes whole, in stream order, at
+      // frame-done.
+      Atomics.store(u32, HB + 4, 0);
+      f64[(ring.base + 24) >> 3] = 0;
+      Atomics.store(u32, HB + 3, seq);
+      Atomics.notify(i32, HB + 3);
+      lkTb2PendSnap++;
+      lkPendingGL.push([funcIdx, args]);
+      continue;
+    }
+    // TB2: snapped but NO frame in flight — fall through and execute
+    // in place, in decode order (the copy makes this safe). Holding
+    // here was the v1 bug: async neighbours (BindVertexArray)
+    // execute directly when no frame is outstanding, so a held
+    // BufferData landed under the WRONG VAO and its
+    // ELEMENT_ARRAY_BUFFER data was lost (the invisible world).
     let result = 0;
-    if (isSync && lkPendingGL.length) lkGLFlushPending();  // stream order at sync points
+    if (isSync && lkPendingGL.length && !lkTb2GenGate(funcIdx)) lkGLFlushPending('sync');  // stream order at sync points; TB2: Gen/Create are pure producers — execute in place, frame stays whole
     try { result = lkGLExecute(funcIdx, args); } catch (e) {
       lkErr('lkboot: GL stream call ' + (LK_GL_NAMES[funcIdx] || funcIdx) + ' threw: ' + (e && e.message || e));
     }
@@ -3068,12 +3639,79 @@ function lkGLDrain() {
 }
 let lkGLExecSeq = 0;
 
+/* ================= TB2 SNAPSHOT FIX (restored 2026-10-28) =================
+ * The 2026-10-23 flicker fix, restored onto the current driver (it
+ * never landed in this tree's copy). Per the fix-point review:
+ * (1) Create/Gen records are pure producers — execute in place
+ * WITHOUT flushing the pending frame. (2) Pointer-reader records
+ * that are snapshot-able (Uniform vector/matrix families,
+ * BufferData, BufferSubData) have their pointed data COPIED at
+ * decode; the sync reply posts immediately and the record is held
+ * as pure values, executing whole at frame-done. (3) True readers
+ * (the Get family, Is, Check, Fence, ClientWait, ReadPixels) keep
+ * flush-then-execute. (4) THE FRAME GATE: snapshot records are
+ * held only while a frame is outstanding; with no frame in flight
+ * they execute in place from the copy (see the drain comment —
+ * held-then-flushed execution under a later VAO state was the
+ * TB2 v1 invisible-world bug). */
+// Gen/Create gate, matched on the short import name (the 13-char
+// prefix stripped by length, the same slice the G2 top-sync display
+// uses): every Gen* / Create* entry point is a pure producer here —
+// it allocates a name and writes it back, nothing reads GL state.
+const LK_TB2_GEN_RE = /^(Create|Gen)/;
+function lkTb2GenGate(funcIdx) {
+  return LK_TB2_GEN_RE.test((LK_GL_NAMES[funcIdx] || '').slice(13));
+}
+function lkTb2SnapCopy(funcIdx, args) {
+  const name = LK_GL_NAMES[funcIdx]; if (!name) return false;
+  const short = name.slice(13); // strip the import prefix (see above)
+  const vec = LK_U_VECS[short];
+  if (vec) {
+    const n = vec[1], view = vec[2], count = args[1], ptr = args[2];
+    if (!ptr || typeof ptr !== 'number') return false;
+    const Ctor = view === 'F32' ? Float32Array : view === 'I32' ? Int32Array : Uint32Array;
+    args[2] = { __lksnap: new Ctor(LK.memory.buffer, ptr, count * n).slice() };
+    return true;
+  }
+  const mat = LK_U_MATS[short];
+  if (mat) {
+    const count = args[1], ptr = args[3];
+    if (!ptr || typeof ptr !== 'number') return false;
+    args[3] = { __lksnap: new Float32Array(LK.memory.buffer, ptr, count * mat[0] * mat[1]).slice() };
+    return true;
+  }
+  if (short === 'BufferData') {
+    const size = args[1], ptr = args[2];
+    if (!ptr) return true; // zero-init form: args are already pure values
+    args[2] = { __lksnap: new Uint8Array(LK.memory.buffer, ptr, size).slice() };
+    return true;
+  }
+  if (short === 'BufferSubData') {
+    const size = args[2], ptr = args[3];
+    if (!ptr) return true;
+    args[3] = { __lksnap: new Uint8Array(LK.memory.buffer, ptr, size).slice() };
+    return true;
+  }
+  return false;
+}
+// TB2 validation meter: page side accumulates flush events by
+// trigger (frame-done vs sync-forced) and held snapshots, posting
+// the deltas with each lk-frame dispatch (the first page->worker
+// message after the previous frame completed, so the deltas are
+// never more than a frame stale); the main worker folds them into
+// lkTb2Win* and lkPerfEmit prints + resets them on the perf line.
+let lkTb2PendFd = 0, lkTb2PendSync = 0, lkTb2PendSnap = 0;
+let lkTb2WinFd = 0, lkTb2WinSync = 0, lkTb2WinSnap = 0;
+
 // Build 80: async GL records of the in-flight engine frame, decoded
 // and held by lkGLDrain until the frame completes (see the page
 // driver comment). Executed in stream order by lkGLFlushPending.
 let lkPendingGL = [];
-function lkGLFlushPending() {
+function lkGLFlushPending(trigger) {
   if (!lkPendingGL.length) return;
+  // TB2 meter: only a flush that actually executes records counts,
+  // against the trigger that caused it.
+  if (trigger === 'sync') lkTb2PendSync++; else lkTb2PendFd++;
   const pend = lkPendingGL;
   lkPendingGL = [];
   for (const [funcIdx, args] of pend) {
@@ -3123,7 +3761,7 @@ function lkWebGLCreateContext(canvas, attrsPtr) {
   const rec = lkNewContextRecord(handle, gl, canvas);
   st.contexts.set(handle, rec);
   // M6: creating a context must NOT make it current (GL semantics;
-  // Emscripten's contract too). Callers use make-current explicitly —
+  // the GL contract too). Callers use make-current explicitly —
   // the old set-on-create hid a whole class of wrong-context bugs.
   return handle;
 }
@@ -3157,7 +3795,7 @@ function lkBuildImports() {
   const imp = {
     // ---- proxied services: direct on main, via mailbox in workers ----
     _proc_exit: LK.isWorker
-      ? (code) => lkProxyToMainThread(0, 0, 1, code)
+      ? (code) => lkProxyToMainThread(0, 1, code)
       : (code) => LK_SYS_MAIN.proc_exit(code),
   };
   const proxiedNames = [
@@ -3171,17 +3809,23 @@ function lkBuildImports() {
     ['__syscall_poll_nonblocking', 18], ['__syscall_readlinkat', 19], ['__syscall_renameat', 20],
     ['__syscall_rmdir', 21], ['__syscall_stat64', 22], ['__syscall_symlinkat', 23],
     ['__syscall_truncate64', 24], ['__syscall_unlinkat', 25],
-    ['emscripten_exit_pointerlock', 26], ['emscripten_get_canvas_element_size', 27],
-    ['emscripten_request_pointerlock', 28], ['emscripten_set_canvas_element_size', 29],
+    ['lk_input_install', 38], ['lk_input_ring_publish', 39], ['lk_input_drain_queue', 40],
+    ['lk_input_debug_flag', 41], ['lk_page_aa_mode', 42], ['lk_window_set_title', 43],
+    ['lk_input_set_capture_wanted', 44], ['lk_present_thin_ok', 45],
     ['environ_get', 30], ['environ_sizes_get', 31],
     ['fd_close', 32], ['fd_fdstat_get', 33], ['fd_read', 34],
     ['fd_seek', 35], ['fd_sync', 36], ['fd_write', 37],
   ];
   for (const [name, idx] of proxiedNames) {
     if (LK.isWorker) {
-      imp[name] = (...args) => lkProxyToMainThread(idx, 0, 1, ...args);
+      imp[name] = (...args) => lkProxyToMainThread(idx, 1, ...args);
     } else {
-      imp[name] = (...args) => LK_PROXIED[idx](...args);
+      imp[name] = (...args) => {
+        const fn = LK_PROXIED[idx];
+        if (typeof fn !== 'function')
+          throw new Error('lkboot: no LK_PROXIED[' + idx + '] registered for ' + name);
+        return fn(...args);
+      };
     }
   }
   // Topology reorder (2026-10-21): in a worker, pthread_create is a
@@ -3220,6 +3864,7 @@ function lkBuildImports() {
     // ---- time ----
     emscripten_date_now: () => Date.now(),
     _emscripten_date_now: () => Date.now(),
+    lk_now_ms: () => lkNowMs(),
     emscripten_get_now: () => lkNowMs(),
     _emscripten_get_now: () => lkNowMs(),
     _emscripten_get_now_is_monotonic: () => 1,
@@ -3303,27 +3948,19 @@ function lkBuildImports() {
     },
 
     // ---- exceptions / setjmp bookkeeping ----
-    __cxa_find_pointer_type: () => 0,
-    __cxa_can_catch: () => 1,
     _setThrew: (thrownPtr, thrownValue) => {
       LK.exports.setThrew(thrownPtr, thrownValue);
     },
     _Unwind_RaiseException: () => { throw new Error('lkboot: _Unwind_RaiseException (C++ throw)'); },
     __cxa_call_unterminate: () => { throw new Error('lkboot: terminate'); },
-    _ZSt18uncaught_exceptionv: () => 0,
-    __cxa_uncaught_exceptions: () => 0,
-    _emscripten_cxa_new_delete: () => {},
     __resumeException: (ptr) => { throw new Error('lkboot: C++ exception resumed'); },
-    _invoke_cleanup: (ptr) => {},
     _emscripten_throw_longjmp: () => { throw new Error('lkboot: longjmp'); },
     _emscripten_longjmp: (env, value) => { throw new Error('lkboot: longjmp (unsupported path)'); },
     __throw_exception_with_stack_trace: (ptr) => { throw new Error('lkboot: C++ throw'); },
     __handle_stack_overflow: () => { throw new Error('lkboot: stack overflow'); },
-    _emscripten_check_blocking_allowed: () => {},
     _emscripten_runtime_thread_is_main_thread: () => (LK.isWorker ? 0 : 1),
     _emscripten_thread_is_main_runtime_thread: () => (LK.isWorker ? 0 : 1),
     _emscripten_thread_is_browser_thread: () => 1,
-    _emscripten_system: () => -1,
 
     // ---- pthread glue (binary-internal expectations) ----
     _emscripten_thread_cleanup: (pthread_ptr) => {
@@ -3333,8 +3970,10 @@ function lkBuildImports() {
     },
     _emscripten_thread_mailbox_await: (pthread_ptr) => lkMailboxAwait(pthread_ptr),
     _emscripten_notify_mailbox_postmessage: (target, current) => lkNotifyMailbox(target, current),
-    _emscripten_receive_on_main_thread_js: (funcIndex, emAsmAddr, callingThread, bufSize, args, ctx, ctxArgs) =>
-      lkReceiveOnMainThread(funcIndex, emAsmAddr, callingThread, bufSize, args, ctx, ctxArgs),
+    // The ABI's second parameter was the snippet-address channel; the
+    // binary passes 0 there now and dispatch is by index alone.
+    _emscripten_receive_on_main_thread_js: (funcIndex, _addrSlot, callingThread, bufSize, args, ctx, ctxArgs) =>
+      lkReceiveOnMainThread(funcIndex, callingThread, bufSize, args, ctx, ctxArgs),
     _emscripten_init_main_thread_js: (tb) => {
       LK.mainThreadPtr = tb; // the main worker's thread_init reuses this struct
       let canBlock = true;
@@ -3345,154 +3984,71 @@ function lkBuildImports() {
       LK.exports._emscripten_tls_init();
     },
     _emscripten_thread_exit_proxied: (code) => {
-      if (LK.isWorker) return lkProxyToMainThread(0, 0, 1, code);
+      if (LK.isWorker) return lkProxyToMainThread(0, 1, code);
       return lkDoExit(code);
     },
     _emscripten_thread_set_strongref: () => {},
     __emscripten_thread_exit: (code) => { throw LK_UNWIND; },
     _emscripten_yield: () => {},
 
-    // ---- EM_ASM ----
-    emscripten_asm_const_int: (code, sigPtr, argbuf) => lkAsmConstInt(code, sigPtr, argbuf),
-    emscripten_asm_const_int_sync_on_main_thread: (code, sigPtr, argbuf) => {
-      if (LK.isWorker) {
-        const args = lkReadAsmArgs(sigPtr, argbuf);
-        return lkProxyToMainThread(0, code, 1, ...args);
-      }
-      return lkAsmConstInt(code, sigPtr, argbuf);
-    },
-    emscripten_asm_const_ptr: (code, sigPtr, argbuf) => lkAsmConstInt(code, sigPtr, argbuf),
-    emscripten_asm_const_async_on_main_thread: (code, sigPtr, argbuf) => {
-      if (LK.isWorker) {
-        const args = lkReadAsmArgs(sigPtr, argbuf);
-        return lkProxyToMainThread(0, code, 3, ...args);
-      }
-      return lkAsmConstInt(code, sigPtr, argbuf);
-    },
-
     // ---- main loop ----
     // Registered by the MAIN WORKER (engine main lives there): record
     // the callback locally and tell the page to start asking for frames.
     // main() then unwinds exactly as the binary expects.
-    emscripten_set_main_loop_arg: (cb, arg, fps, simulateInfiniteLoop) => {
+    // The same frame-loop registration under our own name (app/main.cpp).
+    lk_frame_loop_set: (cb, arg, fps, simulateInfiniteLoop) => {
       LK.mainLoop = { cb, arg };
       if (LK.isWorker) self.postMessage({ cmd: 'lk-mainloop', on: true });
       if (simulateInfiniteLoop) throw LK_UNWIND;
     },
-    _emscripten_set_main_loop_arg: (cb, arg, fps, simulateInfiniteLoop) =>
-      imp.emscripten_set_main_loop_arg(cb, arg, fps, simulateInfiniteLoop),
-    emscripten_cancel_main_loop: () => {
+    lk_frame_loop_cancel: () => {
       LK.mainLoop = null;
       if (LK.isWorker) self.postMessage({ cmd: 'lk-mainloop', on: false });
     },
     emscripten_exit_with_live_runtime: () => { throw LK_UNWIND; },
     exit_with_live_runtime: () => { throw LK_UNWIND; },
-    emscripten_request_animation_frame_loop: () => 0,
-    _emscripten_request_animation_frame_loop: () => 0,
-    emscripten_vibrate: () => 0,
 
-    // ---- html5 events: the engine uses its own EM_ASM DOM listeners
-    // and the LKIO ring; these registrations accept-and-ignore because
-    // callback delivery through this channel is provably dead in the
-    // binary's configuration (drain-fix run evidence). ----
-    emscripten_set_keydown_callback_on_thread: () => -1,
-    emscripten_set_keyup_callback_on_thread: () => -1,
-    emscripten_set_keypress_callback_on_thread: () => -1,
-    emscripten_set_mousedown_callback_on_thread: () => -1,
-    emscripten_set_mouseup_callback_on_thread: () => -1,
-    emscripten_set_mousemove_callback_on_thread: () => -1,
-    emscripten_set_mouseenter_callback_on_thread: () => -1,
-    emscripten_set_mouseleave_callback_on_thread: () => -1,
-    emscripten_set_wheel_callback_on_thread: () => -1,
-    emscripten_set_click_callback_on_thread: () => -1,
-    emscripten_set_dblclick_callback_on_thread: () => -1,
-    emscripten_set_touchstart_callback_on_thread: () => -1,
-    emscripten_set_touchend_callback_on_thread: () => -1,
-    emscripten_set_touchmove_callback_on_thread: () => -1,
-    emscripten_set_touchcancel_callback_on_thread: () => -1,
-    emscripten_set_resize_callback_on_thread: () => -1,
-    emscripten_set_visibilitychange_callback_on_thread: () => -1,
-    emscripten_set_fullscreenchange_callback_on_thread: () => -1,
-    emscripten_set_pointerlockchange_callback_on_thread: () => -1,
-    emscripten_set_focus_callback_on_thread: () => -1,
-    emscripten_set_blur_callback_on_thread: () => -1,
-    emscripten_set_gamepadconnected_callback_on_thread: () => -1,
-    emscripten_set_gamepaddisconnected_callback_on_thread: () => -1,
-    emscripten_set_scroll_callback_on_thread: () => -1,
+    // ---- html5 events: NONE. The engine installs its own DOM
+    // listeners (lkInputInstall) and reads input through the ring and
+    // the legacy queue. The vendor callback-registration family used
+    // to sit here as accept-and-ignore stubs; the second review (F2)
+    // removed them, so a stray future import of any of those names
+    // fails loudly at instantiation instead of silently swallowing
+    // events. ----
 
     // ---- canvas / window ----
     // In a worker these forward through the GL command stream to the
     // page (the context lives there); on the page they run directly.
-    emscripten_webgl_create_context: (targetPtr, attrsPtr) => {
-      if (LK.isWorker) return lkGLStreamCall(LK_GLRES_CTX_CREATE, true, [targetPtr, attrsPtr]);
-      const canvas = lkFindCanvas(targetPtr);
+    // The same services under our own names (lk_web.h). The canvas is
+    // unambiguous here (target 0), so the create path passes 0 and the
+    // page resolves its canvas exactly as the target-string form did.
+    lk_gl_create_context: (attrsPtr) => {
+      if (LK.isWorker) return lkGLStreamCall(LK_GLRES_CTX_CREATE, true, [0, attrsPtr]);
+      const canvas = lkFindCanvas(0);
       return canvas ? lkWebGLCreateContext(canvas, attrsPtr) : 0;
     },
-    _emscripten_webgl_create_context: (targetPtr, attrsPtr) => {
-      if (LK.isWorker) return lkGLStreamCall(LK_GLRES_CTX_CREATE, true, [targetPtr, attrsPtr]);
-      const canvas = lkFindCanvas(targetPtr);
-      return canvas ? lkWebGLCreateContext(canvas, attrsPtr) : 0;
-    },
-    emscripten_webgl_make_context_current: (handle) => {
+    lk_gl_make_current: (handle) => {
       if (LK.isWorker) return lkGLStreamCall(LK_GLRES_CTX_MAKE_CURRENT, true, [handle]);
       return lkGLMakeCurrent(handle);
     },
-    emscripten_webgl_get_current_context: () => {
-      if (LK.isWorker) return lkGLStreamCall(LK_GLRES_CTX_GET_CURRENT, true, []);
-      const rec = lkCtx();
-      return rec ? rec.handle : 0;
+    lk_canvas_set_size: (w, h) => {
+      if (LK.isWorker) return lkProxyToMainThread(29, 1, 0, w, h);
+      return lkSetCanvasSize(0, w, h);
     },
-    emscripten_webgl_destroy_context: (handle) => {
-      if (LK.isWorker) { lkGLStreamCall(LK_GLRES_CTX_DESTROY, false, [handle]); return 0; }
-      lkGLDestroyContext(handle);
-      return 0;
+    lk_canvas_get_size: (wPtr, hPtr) => {
+      if (LK.isWorker) return lkProxyToMainThread(27, 1, 0, wPtr, hPtr);
+      return lkGetCanvasSize(0, wPtr, hPtr);
     },
-    emscripten_webgl_enable_extension: (ctxHandle, namePtr) => {
-      if (LK.isWorker) return lkGLStreamCall(LK_GLRES_CTX_ENABLE_EXT, true, [ctxHandle, namePtr]);
-      const rec = lkCtx(); if (!rec) return 0;
-      let name = lkReadCStr(namePtr);
-      if (name.startsWith('GL_')) name = name.slice(3);
-      try { return rec.gl.getExtension(name) ? 1 : 0; } catch (e) { return 0; }
+    lk_pointer_lock_request: () => {
+      if (LK.isWorker) return lkProxyToMainThread(28, 1, 0, 0);
+      return lkRequestPointerLock(0, 0);
     },
-    _emscripten_get_device_pixel_ratio: () =>
-      (typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1),
-    emscripten_get_device_pixel_ratio: () =>
-      (typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1),
-    _emscripten_get_window_inner_size: (wPtr, hPtr) => {
-      lkI32()[wPtr >> 2] = (typeof innerWidth !== 'undefined' ? innerWidth : 0) | 0;
-      lkI32()[hPtr >> 2] = (typeof innerHeight !== 'undefined' ? innerHeight : 0) | 0;
+    lk_pointer_lock_exit: () => {
+      if (LK.isWorker) return lkProxyToMainThread(26, 1);
+      return lkExitPointerLock();
     },
-    _get_canvas_size: () => {},
-    emscripten_get_screen_size: (wPtr, hPtr) => {
-      lkI32()[wPtr >> 2] = (typeof screen !== 'undefined' ? screen.width : 0) | 0;
-      lkI32()[hPtr >> 2] = (typeof screen !== 'undefined' ? screen.height : 0) | 0;
-    },
-    emscripten_get_element_css_size: (targetPtr, wPtr, hPtr) => {
-      const el = lkFindCanvas(targetPtr);
-      if (!el) return -1;
-      const rect = el.getBoundingClientRect();
-      lkF64()[wPtr >> 3] = rect.width;
-      lkF64()[hPtr >> 3] = rect.height;
-      return 0;
-    },
-    emscripten_set_element_css_size: (targetPtr, w, h) => {
-      const el = lkFindCanvas(targetPtr);
-      if (el) { el.style.width = w + 'px'; el.style.height = h + 'px'; }
-      return 0;
-    },
-    _emscripten_set_offscreencanvas_size_on_thread: () => -1,
-    _emscripten_webgl_do_create_context: (targetPtr, attrsPtr) => {
-      if (LK.isWorker) return lkGLStreamCall(LK_GLRES_CTX_CREATE, true, [targetPtr, attrsPtr]);
-      const canvas = lkFindCanvas(targetPtr);
-      return canvas ? lkWebGLCreateContext(canvas, attrsPtr) : 0;
-    },
-    emscripten_get_num_gamepads: () => 0,
-    emscripten_sample_gamepad_data: () => -1,
-    emscripten_get_gamepad_status: () => -1,
-    emscripten_get_preloaded_image_data_from_FILE: () => -1,
-    emscripten_run_script_string: () => 0,
-    emscripten_set_immediate: () => 0,
-    emscripten_clear_immediate: () => {},
+    lk_host_is_node: () => (typeof process === 'object' && typeof process.versions === 'object' &&
+      typeof process.versions.node === 'string') ? 1 : 0,
   });
 
   // The GL import surface: on the page, the real wrapper (LK_GL) — the
@@ -3500,10 +4056,40 @@ function lkBuildImports() {
   // serialize each call into the command ring for the page to execute.
   const glSource = LK.isWorker ? lkGLStubs() : LK_GL;
   for (const [name, fn] of Object.entries(glSource)) imp[name] = fn;
-  imp['emscripten_glGetString'] = glSource['emscripten_glGetString'];
+  imp['lk_glGetString'] = glSource['lk_glGetString'];
   imp['lkio_present'] = LK.isWorker
     ? (...args) => lkGLStreamCall(LK_GLRES_LKIO_PRESENT, true, args)
     : lkioPresent;
+  // Phase 2 mega-draw verbs (gl33_renderer.cpp), implemented 2026-10-28:
+  // the probe is a sync reserved op answered by the page (1 when the
+  // live context has core drawElementsInstanced, i.e. WebGL2, which is
+  // all the executor needs); the draw snapshots its two int arrays out
+  // of wasm memory in the worker and ships them as chunk records of at
+  // most 120 draws (the ring's 255-slot record cap), each record
+  // carrying its base instance index, which the page executes in stream
+  // order like any other GL work.
+  imp['lk_mega_probe'] = () => LK.isWorker
+    ? lkGLStreamCall(LK_GLRES_LK_MEGA_PROBE, true, [])
+    : ((() => { const rec = lkCtx(); return (rec && typeof rec.gl.drawElementsInstanced === 'function') ? 1 : 0; })());
+  imp['lk_mega_draw'] = (mode, countsPtr, offsetsPtr, drawCount) => {
+    if (!LK.isWorker) {
+      const mem = lkI32();
+      return lkMegaDrawExec(mode,
+        mem.slice(countsPtr >> 2, (countsPtr >> 2) + drawCount),
+        mem.slice(offsetsPtr >> 2, (offsetsPtr >> 2) + drawCount));
+    }
+    const mem = lkI32();
+    const CH = 120;
+    for (let base = 0; base < drawCount; base += CH) {
+      const n = Math.min(CH, drawCount - base);
+      const args = [mode, base];
+      for (let i = 0; i < n; i++) {
+        args.push(mem[(countsPtr >> 2) + base + i], mem[(offsetsPtr >> 2) + base + i]);
+      }
+      lkGLStreamCall(LK_GLRES_LK_MEGA_CHUNK, false, args);
+    }
+    return 0;
+  };
   imp['_tzset_js'] = imp['__tzset_js'];
   return imp;
 }
@@ -3646,8 +4232,8 @@ async function lkBootMain() {
           'without cross-origin isolation that memory cannot be posted to a worker, and threads cannot be ' +
           'fabricated on the host thread. Serve this page from a cross-origin-isolated origin to run the game.');
   } else {
-    lkOut('lkboot: host dispatch: the page provisions all workers (main + pool, cap ' +
-          LK_POOL_MAX_WORKERS + '); engine thread requests arrive on the dispatch channel.');
+    lkOut('lkboot: host dispatch: the page provisions all workers (main + pool, ' +
+          LK_POOL_LABEL + '); engine thread requests arrive on the dispatch channel.');
   }
   try {
     LK.memory = new WebAssembly.Memory({ initial: 8192, maximum: 32768, shared: true });
@@ -3711,6 +4297,7 @@ async function lkBootMain() {
   lkBootStage('spawn main worker');
   // Engine main runs on the main worker; this thread only serves.
   lkSpawnMainWorker(argc, argv);
+  lkWarmPool();
   lkPageDriverStart();
   lkBootStage('running');
 }
@@ -3757,6 +4344,16 @@ function lkWorkerMain() {
   const runFrame = () => {
     if (!LK.mainLoop) { self.postMessage({ cmd: 'lk-frame-done' }); return; }
     const { cb, arg } = LK.mainLoop;
+    // G2 frame-boundary timing: wall vs wasm vs host (see lkPerfEmit).
+    const t0 = performance.now();
+    if (lkPerfWinStartMs === 0) lkPerfWinStartMs = t0;
+    if (lkPerfPrevStartMs > 0) {
+      const wallUs = (t0 - lkPerfPrevStartMs) * 1000;
+      lkPerfWinWallUs += wallUs;
+      lkPerfWinHostUs += Math.max(0, wallUs - lkPerfPrevExecUs);
+      lkPerfWinFrames++;
+    }
+    lkPerfPrevStartMs = t0;
     try {
       LK.exports.__indirect_function_table.get(cb)(arg);
     } catch (e) {
@@ -3771,6 +4368,9 @@ function lkWorkerMain() {
         self.postMessage({ cmd: 'lk-crashed', pthread_ptr: 0, error: 'frame: ' + (e && e.message || e) });
       }
     }
+    lkPerfPrevExecUs = (performance.now() - t0) * 1000;
+    lkPerfWinExecUs += lkPerfPrevExecUs;
+    if (t0 - lkPerfWinStartMs >= 1000) lkPerfEmit(t0);
     self.postMessage({ cmd: 'lk-frame-done' });
   };
   const startThread = (d) => {
@@ -3840,6 +4440,11 @@ function lkWorkerMain() {
       if (!loaded) pendingMain = d;
       else startMain(d);
     } else if (d.cmd === 'lk-frame') {
+      if (d.tb2) { // TB2 meter deltas from the page (see lkTb2Pend*)
+        lkTb2WinFd += d.tb2[0] | 0;
+        lkTb2WinSync += d.tb2[1] | 0;
+        lkTb2WinSnap += d.tb2[2] | 0;
+      }
       runFrame();
     } else if (d.cmd === 'lk-rpc-done') {
       // The page executed a forwarded async service; complete the
@@ -3854,10 +4459,7 @@ function lkWorkerMain() {
 /* ============================ entry ================================== */
 
 if (LK_IS_WORKER) {
-  // Workers run this file alone; the EM_ASM table sits beside it.
-  if (typeof lkAsmConsts !== 'function') {
-    try { importScripts(new URL('lkasm.js', self.location.href).href); } catch (e) {}
-  }
+  // Workers run this file alone; every service is implemented in it.
   lkWorkerMain();
 } else if (typeof document !== 'undefined') {
   lkBootMain().catch((e) => {

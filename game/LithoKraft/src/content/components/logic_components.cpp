@@ -2,32 +2,58 @@
 #include <algorithm>
 #include <format>
 #include "components.h"
+#include "latchor.h"
+#include "fusor_sum.h"  // PlayN (JD)
+#include "randor.h"  // 2026-10-31 (JD): Randor  // 2026-10-31: cLatchor (was cFastLatch)
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215
 #include "lithokraft/content/signal.h"
+#include "lithokraft/content/pulse_rules.h"  // 2026-11-01 PlayK
 
 namespace lithokraft::components {
 namespace {
 
-/// Back in -> front out, one-way. Re-boosts any input to a full 64 after a 4 / 8 / 16 / 32 tick delay (2026-10-24 JD; was 2 / 4 / 8 / 16).
+/// Back in -> front out, one-way. Re-boosts any input to a full 64 after a 2 / 4 / 8 / 16 / 32 / 64 tick delay
+/// (2026-11-01 PlayM JD; was 4 / 8 / 16 / 32, before that 2 / 4 / 8 / 16).
 /// Cortana 2026-10-15 2215 (JD D4): was 1..8; encoding + lazy legacy migration in content/repeator.h.
 class cRepeator final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), idx = repeator::delayIndex(st), delay = repeator::kDelays[idx];
-    // 32-bit delay line: history = bits 0-7, timer = bits 8-15, historyHi = bits 16-31 (bit i = input i ticks ago).
-    uint32_t line = uint32_t(m.history) | (uint32_t(m.timer) << 8) | (uint32_t(m.historyHi) << 16);
-    line = (line << 1) | (in.back(f) > 0 ? 1u : 0u);
-    m.history = uint8_t(line & 0xFF);
-    m.timer = uint8_t((line >> 8) & 0xFF);
-    m.historyHi = uint16_t(line >> 16);
+    uint64_t line = loadLine(m);  // bit i = input i ticks ago
+    line = (line << 1) | ((in.back(f) > 0 || in.switchIn > 0) ? 1u : 0u);  // 2026-10-31: Switch direct
+    storeLine(m, line);
     const int out = ((line >> (delay - 1)) & 1) ? kMaxSignal : 0;
-    return {out, 0, repeator::encode(out, f, idx, out > 0)};
+    const int bch = in.ch[size_t(dirBack(f))] ? in.ch[size_t(dirBack(f))] : in.chainCh;  // 1 red, 2 blue, 0 none (keeps the last colour)
+    const int col = bch ? bch : repeator::colourOf(st);  // 3 = purple (Switch-fed, passed down the chain)
+    return {out, 0, repeator::withColour(repeator::encode(out, f, idx, out > 0), col)};
   }
-  std::optional<CellState> use(CellState st, ComponentMemory&) const override {  // cycle 2 -> 4 -> 8 -> 16
-    return repeator::encode(stValue(st), stFacing(st), (repeator::delayIndex(st) + 1) & 3, stOn(st));
+  std::optional<CellState> use(CellState st, ComponentMemory& m) const override {  // cycle 2 -> 4 -> ... -> 64 -> 2
+    // 2026-10-31 JD double-pulse fix: the line still holds bits that already passed the OLD
+    // tap; read at a longer tap they would fire a second time. Keep only bits still in flight
+    // (below the old tap) and, when the tap shrinks, emit any in-flight bits past the new tap next tick.
+    const int idx = repeator::delayIndex(st), nidx = repeator::nextSetting(idx);
+    const int oldD = repeator::kDelays[idx], newD = repeator::kDelays[nidx];
+    uint64_t line = loadLine(m);
+    line &= lowMask(oldD - 1);
+    if (newD < oldD) { const uint64_t keep = lowMask(newD - 1); if (line & ~keep) line = (line & keep) | (uint64_t(1) << (newD - 2)); }
+    storeLine(m, line);
+    return repeator::withColour(repeator::encode(stValue(st), stFacing(st), nidx, stOn(st)), repeator::colourOf(st));
   }
   std::string describe(const BlockDef& d, CellState s) const override {
-    return std::format("{} | delay {} ticks (button {}/4) | out {} | facing {}", d.name, repeator::delayTicks(s), repeator::delayIndex(s) + 1, stValue(s), facingName(stFacing(s)));
+    return std::format("{} | delay {} ticks (setting {}/{}) | out {} | facing {}", d.name, repeator::delayTicks(s), repeator::delayIndex(s) + 1,
+                       repeator::kSettings, stValue(s), facingName(stFacing(s)));
+  }
+
+ private:
+  static uint64_t lowMask(int bits) { return bits >= 64 ? ~uint64_t(0) : ((uint64_t(1) << bits) - 1u); }
+  // 64-bit delay line in the saved ComponentMemory bytes (see repeator.h).
+  static uint64_t loadLine(const ComponentMemory& m) {
+    return uint64_t(m.history) | (uint64_t(m.timer) << 8) | (uint64_t(m.historyHi) << 16) | (uint64_t(m.prevIn) << 32) |
+           (uint64_t(m.prevSide) << 40) | (uint64_t(m.prevClk) << 48) | (uint64_t(uint8_t(m.channel ^ 1u)) << 56);  // channel defaults to 1 (and old saves hold 1): stored XOR 1 so 1 = empty
+  }
+  static void storeLine(ComponentMemory& m, uint64_t line) {
+    m.history = uint8_t(line); m.timer = uint8_t(line >> 8); m.historyHi = uint16_t(line >> 16);
+    m.prevIn = uint8_t(line >> 32); m.prevSide = uint8_t(line >> 40); m.prevClk = uint8_t(line >> 48); m.channel = uint8_t(uint8_t(line >> 56) ^ 1u);
   }
 };
 
@@ -158,8 +184,23 @@ class cRedirector final : public cCompBehavior {
   // drives nothing, so a pixel's unused colour has nowhere to leak through the colourless output.
   static constexpr CellState kRedOff = 1u << 13, kBlueOff = 1u << 14;
   static CellState keep(CellState st) { return CellState(st & (kRedOff | kBlueOff)); }
+  // 2026-11-01 (JD): Multiplexor: no use / wire-use control (Repeator side only). LL_MUX_NOUSE=0: old.
+  static bool muxNoUse() { static const bool v = [] { const char* e = std::getenv("LL_MUX_NOUSE"); return !(e && e[0] == '0'); }(); return v; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory&) const override {
     const int f = stFacing(st);
+    // 2026-10-31 (JD mux): a Repeator feeding the left or right side selects the colour, level-held:
+    // Repeator off = red mode (red inputs pass), on = blue mode (blue inputs pass). Plain Trace or any
+    // other component on a side never switches it. Output is colourless out the front, as in linked.
+    if (in.muxSides != 0) {
+      int red = 0, blue = 0;
+      for (int d = 0; d < 4; ++d) {
+        if (d == f || (in.muxSides & (1u << d))) continue;
+        if (in.ch[d] == 1 || in.ch[d] == 0) red = std::max(red, in.side[d]);
+        if (in.ch[d] == 2 || in.ch[d] == 0) blue = std::max(blue, in.side[d]);
+      }
+      const int out = std::min(in.muxOn ? blue : red, kMaxSignal);
+      return {out, 0, CellState(makeState(out, f, stAux(st), out > 0) | keep(st))};
+    }
     if (!split(st)) {
       const int out = std::min(std::max({in.back(f), in.left(f), in.right(f), in.top}), kMaxSignal);  // SW-H2 clamp
       return {out, 0, makeState(out, f, stAux(st), out > 0)};
@@ -184,10 +225,12 @@ class cRedirector final : public cCompBehavior {
     return std::max(dir == stFacing(st) ? int(m.out) : 0, dir == blueFront(st) ? int(m.out2) : 0);
   }
   std::optional<CellState> use(CellState st, ComponentMemory&) const override {
+    if (muxNoUse()) return std::nullopt;
     return CellState(makeState(stValue(st), (stFacing(st) + 1) & 3, stAux(st), stOn(st)) | keep(st));
   }
   // Using an adjacent Trace cycles that colour's lane: N -> E -> S -> W -> off -> N.
   std::optional<CellState> useChannel(CellState st, int channel) const override {
+    if (muxNoUse()) return std::nullopt;
     int f = stFacing(st), bf = split(st) ? blueFront(st) : stFacing(st);
     CellState off = split(st) ? keep(st) : 0;
     auto step = [&](int& front, CellState bit) {
@@ -213,11 +256,27 @@ class cPulsor final : public cCompBehavior {
  public:
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), data = std::min(in.back(f), kMaxSignal), clock = std::max(in.left(f), in.right(f));  // SW-H2: data is passed through as the pulse strength
-    const bool fire = clock > 0 && m.prevClk == 0 && data > 0;
+    // 2026-11-01 (JD): relay mode. With no clock on either side, a rising edge on the back (any strength,
+    // 1 included) is ARMED (prevSide = its value) and re-emitted NEXT tick as a one-tick pulse of the same
+    // value (no hold). The output comes from memory, so the same-tick settle cannot cascade a chain in one
+    // tick: each Pulsor adds exactly one tick (1, 2, 3 ...). prevIn = last back value; bit 7 = this tick
+    // was a relay fire (data <= 64 never sets it). Clocked mode unchanged (fires on the edge tick).
+    const bool edge = clock == 0 && m.prevClk == 0 && data > 0 && (m.prevIn & 127) == 0;
+    const int pending = m.prevSide <= kMaxSignal ? int(m.prevSide) : 0;
+    m.prevSide = uint8_t(edge ? data : 0);
+    const bool clockFire = clock > 0 && m.prevClk == 0 && data > 0;
+    const bool relay = !clockFire && pending > 0;
+    const bool fire = clockFire || relay;
     m.prevClk = uint8_t(clock);
+    const bool lastRelay = (m.prevIn & 128) != 0;
+    m.prevIn = uint8_t(data | (relay ? 128 : 0));
     m.timer = fire ? kPulsorAnimTicks : (m.timer ? m.timer - 1 : 0);
-    const int out = fire ? data : 0;
-    ComponentStep step{out, 0, makeState(out, f, std::min<int>(m.timer, 7), m.timer > 0), fire};
+    // 2026-11-01 (JD, PlayK): fires on one tick, stays high for cPulseRules::holdTicks() ticks
+    // (default 4) so it can hold a Multiplexor open for an exact window. The held value is the
+    // published m.out; the countdown is the saved anim timer, so the save format is unchanged.
+    const bool held = !fire && !lastRelay && m.out > 0 && m.timer > kPulsorAnimTicks - lithokraft::cPulseRules::holdTicks();
+    const int out = fire ? (relay ? pending : data) : (held ? int(m.out) : 0);
+    ComponentStep step{out, 0, makeState(out, f, std::min<int>(m.timer, 7), m.timer > 0), out > 0};
     if (fire) step.sound = SoundCue::PulsorFire;
     return step;
   }
@@ -269,11 +328,12 @@ class cCatchor final : public cCompBehavior {
     const int match = stValue(st);
     if ((aux & 3) == 3)
       for (int d = 0; d < 4; ++d)
-        if (in.ch[d] == 1 || in.ch[d] == 2) { f = (d + 2) & 3; aux = in.ch[d] == 2 ? 4 : 0; break; }
+        if (in.ch[d] == 1 || in.ch[d] == 2 || ((in.repSides >> d) & 1)) { f = (d + 2) & 3; aux = in.ch[d] == 2 ? 4 : 0; break; }
     int v = 0;
     if ((aux & 3) != 3) {
       const int inDir = (f + 2) & 3;
-      if (in.ch[inDir] == ((aux & 4) ? 2 : 1)) v = std::min(in.side[inDir], kMaxSignal);  // SW-H2 clamp
+      // 2026-11-01 (JD, PlayK): a Repeator whose front faces the input side feeds it directly (any colour).
+      if (in.ch[inDir] == ((aux & 4) ? 2 : 1) || ((in.repSides >> inDir) & 1)) v = std::min(in.side[inDir], kMaxSignal);  // SW-H2 clamp
     }
     const bool hit = match > 0 && v == match;
     const bool fire = hit && !m.prevIn;
@@ -304,22 +364,6 @@ class cCatchor final : public cCompBehavior {
                        facingName((stFacing(s) + 2) & 3), kOut[stAux(s) & 3], facingName(outDir(s)));
   }
 };
-/// T flip-flop: each rising edge at the back toggles; the front outputs 64 while on.
-class cFastLatch final : public cCompBehavior {
- public:
-  ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
-    const int f = stFacing(st);
-    const bool high = in.back(f) > 0;
-    const bool on = (high && !m.prevIn) ? !stOn(st) : stOn(st);
-    m.prevIn = high;
-    const int out = on ? kMaxSignal : 0;
-    return {out, 0, makeState(out, f, 0, on)};
-  }
-  std::string describe(const BlockDef& d, CellState s) const override {
-    return std::format("{} | {} | facing {}", d.name, stOn(s) ? "ON" : "off", facingName(stFacing(s)));
-  }
-};
-
 }  // namespace
 
 
@@ -480,14 +524,19 @@ class cPortor final : public cCompBehavior {
 class cFusor final : public cCompBehavior {
  public:
   bool quiescent(CellState s, const ComponentMemory& m) const override {
-    return (stAux(s) & 1) != 0;  // tripped = quiescent (no output)
+    return (stAux(s) & 1) != 0 && !m.prevSide;  // tripped = quiescent, unless a reset Repeator is on (edge tracking)
   }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int threshold = stValue(st) > 0 ? stValue(st) : 64;
-    const bool tripped = (stAux(st) & 1) != 0;
-    int v = 0;
-    for (int d = 0; d < 4; ++d)
-      if (in.ch[d] == 1 || in.ch[d] == 2) { v = std::min(in.side[d], kMaxSignal); break; }  // SW-H2: v is passed through unless tripped
+    bool tripped = (stAux(st) & 1) != 0;
+    // 2026-10-31 (JD auto-reset): input comes from the BACK only (any colour); the left / right sides
+    // are reset-only. A Repeator feeding a side resets a tripped fuse on its rising edge (off -> on),
+    // like use. Plain Trace on a side does nothing (the sim only reports Repeators in muxSides).
+    const int f = stFacing(st);
+    const bool rst = in.muxSides != 0 && in.muxOn;
+    if (rst && !m.prevSide) tripped = false;
+    m.prevSide = rst ? 1 : 0;
+    const int v = std::min(in.back(f), kMaxSignal);  // SW-H2: v is passed through unless tripped
     bool newTripped = tripped;
     if (!tripped && v > threshold) newTripped = true;  // overload! trip
     const int out = newTripped ? 0 : v;  // pass through unless tripped
@@ -495,7 +544,7 @@ class cFusor final : public cCompBehavior {
     return {out, 0, makeState(stValue(st), stFacing(st), aux, false)};
   }
   int emitToward(int dir, CellState st, const ComponentMemory& m) const override {
-    return ((stAux(st) & 1) == 0) ? m.out : 0;
+    return ((stAux(st) & 1) == 0 && dir == stFacing(st)) ? m.out : 0;  // 2026-10-31: front only
   }
   std::optional<CellState> use(CellState st, ComponentMemory&) const override {
     // Reset the fuse (untrip)
@@ -524,10 +573,12 @@ void registerLogic(const Registrar& add) {
   add("signal_receivor", std::make_unique<cSignalReceivor>());
   add("dish", std::make_unique<cDish>());
   add("overclockor", std::make_unique<cOverclockor>());
-  add("fast_latch", std::make_unique<cFastLatch>());
+  add("fast_latch", std::make_unique<cLatchor>());  // block id kept for saves
   add("portor", std::make_unique<cPortor>());
   add("fusor", std::make_unique<cFusor>());
-  add("timer_buffer", std::make_unique<cTimerBuffer>());  // 2026-10-25 roadmap 7
+  add("timer_buffer", std::make_unique<cTimerBuffer>());
+  add("fusor_sum", std::make_unique<cFusorSum>());  // PlayN (JD)
+  add("randor", std::make_unique<cRandor>());  // 2026-10-31 (JD): random range block  // 2026-10-25 roadmap 7
 }
 
 }  // namespace lithokraft::components

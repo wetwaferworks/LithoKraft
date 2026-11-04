@@ -1,5 +1,6 @@
 // lithokraft_chipor_selftest: headless Chipor viewport tests (no window, no GL context).
 // Workstream 4 (JD-locked 2026-10-11). Exit code = failure count. LF line endings.
+#include "litholattice/core/quiet_crt.h"
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -50,6 +51,7 @@ size_t meshViewportDirect(litholattice::BlockId above, std::string_view modelNam
 }  // namespace
 
 int main() {
+  litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr, no dialog
   using namespace lithokraft;
   using namespace litholattice;
   const cBlockReg& reg = blockRegistry();

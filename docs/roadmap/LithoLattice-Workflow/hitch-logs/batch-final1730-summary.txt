@@ -1,0 +1,20 @@
+batch final1730 2026-10-15T17:20:51
+REL=0
+DBG=0
+build\Release handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+build-debug\Debug mesh-verify: checked 0 mismatches 0 skipped 0
+build-debug\Debug handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+stream 32 tps=32 min=31.9 fps=439.8 p50=2.2167 p99=3.2115 render=1.2881 update=0.1328 hitches=0 tick=0.6778/0.7446 mesh=0.2684
+stream 512 tps=512 min=511.9 fps=423.8 p50=2.2476 p99=3.7956 render=1.3061 update=0.2022 hitches=1 tick=0.5446/0.6129 mesh=0.3051
+orbit 32 tps=31.9 min=31.9 fps=48.8 p50=20.4330 p99=25.4111 render=19.3827 update=0.1707 hitches=1 tick=0.5618/0.6489 mesh=0.0000
+orbit 512 tps=512 min=511.9 fps=45.0 p50=22.1228 p99=27.9617 render=20.9545 update=0.2542 hitches=1 tick=0.5055/0.5217 mesh=0.0000
+walk 32 tps=32 min=31.9 fps=47.2 p50=21.2646 p99=30.4290 render=20.0465 update=0.1793 hitches=1 tick=0.5615/0.6215 mesh=0.0000
+walk 512 tps=512 min=511.8 fps=45.5 p50=21.9392 p99=31.4758 render=20.8235 update=0.2174 hitches=0 tick=0.4468/0.4783 mesh=0.0000
+stream 512 rt8 tps=512 min=511.9 fps=417.4 p50=2.2843 p99=3.7594 render=1.3267 update=0.2154 hitches=1 tick=0.5458/0.5815 mesh=0.2688
+orbit 512 rt8 tps=512 min=511.7 fps=46.2 p50=21.5489 p99=26.1039 render=20.4437 update=0.2291 hitches=0 tick=0.4604/0.4828 mesh=0.0000
+walk 512 rt8 tps=512 min=511.7 fps=45.6 p50=22.0913 p99=31.0194 render=20.7606 update=0.2310 hitches=0 tick=0.4510/0.5523 mesh=0.0000
+ 6/48 Test  #6: engine_systerian .................***Failed    1.44 sec
+14/48 Test #14: engine_storage ...................***Failed    1.07 sec
+96% tests passed, 2 tests failed out of 48
++ ... T -ne '1'){ & $ct --test-dir build-debug -C Debug --timeout 900 *> "$ ...
+DONE

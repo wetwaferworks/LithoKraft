@@ -10,6 +10,7 @@
 //
 // Exit code = number of failed checks. ctest entry: authored_models_selftest.
 
+#include "litholattice/core/quiet_crt.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -81,6 +82,7 @@ constexpr size_t kMaxLeaves = 64u * 64u * 64u / 4;
 }  // namespace
 
 int main() {
+  litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr, no dialog
   const fs::path modelsDir(LITHOKRAFT_MODELS_SRC_DIR);
   const fs::path tmp = fs::temp_directory_path() / "lthm_authored_selftest";
   std::error_code ec;

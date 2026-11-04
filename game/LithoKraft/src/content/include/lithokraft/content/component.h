@@ -29,7 +29,7 @@ struct ComponentMemory {
   uint8_t prevIn = 0, prevSide = 0, prevClk = 0;  ///< edge detectors
   uint8_t history = 0;         ///< repeator delay line (bit i = input i ticks ago)
   uint8_t timer = 0;           ///< button press / pulsor animation countdown
-  uint16_t historyHi = 0;      ///< repeator delay line bits 16..31 (2026-10-24 JD: delays 4/8/16/32; SGNL v3)
+  uint16_t historyHi = 0;      ///< repeator delay line bits 16..31 (2026-10-24 JD: delays 4/8/16/32; SGNL v3). PlayM: bits 32..63 live in prevIn/prevSide/prevClk/channel (64-tick delay)
   std::deque<std::pair<uint8_t, uint8_t>> keys;  ///< keyboard: queued (front, control) pulses
   uint8_t channel = 1;         ///< radio channel for the transmittor / receivor (1..64; 0 = the Daemon, reserved)
   bool jammer = false;         ///< cOverclockor: jammer item installed (v1: toggled by use; item UI later)
@@ -43,6 +43,12 @@ struct ComponentInputs {
   std::array<uint8_t, 4> ch{}; ///< colour channel of the wire / torch on each side (0 = none / component)
   int radioIn = 0;            ///< wireless signal on this cell's channel (receivors only)
   uint8_t radioCol = 0;       ///< colour of the received wireless signal (1 red, 2 blue)
+  uint8_t muxSides = 0;       ///< 2026-10-31: Redirector only, bit d = a Repeator's front faces our side d
+  bool muxOn = false;         ///< 2026-10-31: any of those Repeators is on (level-held select)
+  uint8_t switchIn = 0;       ///< 2026-10-31: Repeator only, 64 when a lit Switch / Button sits behind its back port
+  uint64_t rng = 0;           ///< 2026-10-31: Randor only, splitmix64 roll seed (world seed + cell + tick)
+  uint8_t repSides = 0;       ///< 2026-11-01 PlayK: Catchor only, bit d = a Repeator's front faces our side d (LL_REP_LINK)
+  uint8_t chainCh = 0;        ///< 2026-10-31: colour of a Repeator directly behind a Repeator (1 red, 2 blue)
   /// 2026-10-25 (JD roadmap 7, comparator-clock port): the "container level" of each horizontal
   /// neighbour (cCompBehavior::readLevel, or the wafer count of an Input Buffer), -1 = nothing
   /// readable there. Filled only for Thresholdors (the comparator reads what sits behind it).

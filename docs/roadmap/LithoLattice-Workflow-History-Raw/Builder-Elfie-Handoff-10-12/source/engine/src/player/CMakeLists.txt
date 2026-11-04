@@ -1,0 +1,2 @@
+add_library(litholattice_player INTERFACE)
+target_include_directories(litholattice_player INTERFACE include)

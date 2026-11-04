@@ -4,6 +4,7 @@
 // tier-1 rule, .lthm models on disk, and the acceptance check: a fresh
 // spawn inventory can hold every lore tool, with the Fragment granted as
 // the first-tick starting item. Exit code = failure count. LF endings.
+#include "litholattice/core/quiet_crt.h"
 #include <cstdio>
 #include <string>
 #include <unordered_set>
@@ -22,6 +23,7 @@ void check(bool ok, const std::string& name) {
 }  // namespace
 
 int main() {
+  litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr, no dialog
   using namespace lithokraft;
   using lithokraft::ItemDef;  // the engine also has litholattice::ItemDef (block.h)
 

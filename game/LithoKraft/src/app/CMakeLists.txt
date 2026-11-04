@@ -1,7 +1,7 @@
 # Dev builds (default) load scripts from the source tree so F10 edits stay in the repo; shipping
 # builds use the scripts/ copied next to the exe. --scripts source|exe|<dir> overrides at run time.
 option(LITHOKRAFT_DEV_BUILD "Scripts (and the F10 editor) use the source tree's scripts/" ON)
-add_executable(lithokraft main.cpp scripts_dir.cpp selftest.cpp perf_headless.cpp noise_preview.cpp handshake_test.cpp control_latency.cpp control_stream_test.cpp demo_record_test.cpp)
+add_executable(lithokraft main.cpp BenchSampleGate.cpp scripts_dir.cpp selftest.cpp perf_headless.cpp noise_preview.cpp handshake_test.cpp control_latency.cpp control_stream_test.cpp demo_record_test.cpp)
 # Exe icon (Windows): lithokraft.rc embeds LithoKraft/assets/icons/lithokraft.ico.
 set(LITHOKRAFT_ICO ${LithoKraft_SOURCE_DIR}/assets/icons/lithokraft.ico)
 if(WIN32 AND EXISTS ${LITHOKRAFT_ICO})
@@ -18,7 +18,26 @@ target_link_libraries(lithokraft PRIVATE lithokraft_game litholattice_audio_devi
 if(NOT EMSCRIPTEN)
   target_link_libraries(lithokraft PRIVATE litholattice_render_vk)
 else()
-  target_sources(lithokraft PRIVATE vulkan_stub_emscripten.cpp)
+  target_sources(lithokraft PRIVATE vulkan_stub_web.cpp)
+  # Purge stage 1 (2026-10-28): the page-layer imports (lk_web.h, the
+  # lk_gl* table, the lk_webio verbs) are declared in C++ with import
+  # annotations and provided at instantiation by lkboot.js — no JS
+  # library registers them, so the driver's glue symbol checker must
+  # not error on them. A genuinely missing import still fails loudly:
+  # lkboot refuses instantiation, and the build's import census gate
+  # verifies the exact set. (This driver flag retires with the
+  # toolchain in stage 2; stock wasm-ld has no such checker.)
+  target_link_options(lithokraft PRIVATE "-sERROR_ON_UNDEFINED_SYMBOLS=0")
+  # malloc stays an export: lkboot allocates its static strings and
+  # boot structures through it. Nothing in the (retired) JS libraries
+  # references it any more, so the driver no longer exports it by
+  # default (gate (d) evidence, 2026-10-28). The export goes straight
+  # to wasm-ld on purpose: in this configuration the driver's own
+  # EXPORTED_FUNCTIONS route collapses the module's import surface
+  # (measured: 142 imports -> 14, the program DCE'd around the listed
+  # names), while --export=malloc is surgical (142 imports, malloc
+  # exported).
+  target_link_options(lithokraft PRIVATE "-Wl,--export=malloc")
   # The render_vk target (and with it its PUBLIC include dir) is not built
   # here, but main.cpp/selftest.cpp still #include its header for the factory
   # declarations the stub implements. Lend the target the include path only.
@@ -48,6 +67,10 @@ add_custom_command(TARGET lithokraft POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${LithoKraft_SOURCE_DIR}/scripts $<TARGET_FILE_DIR:lithokraft>/scripts)
 # ctest -C <config>: the full headless self-test suite (engine modules + game), exit code = failures.
 add_test(NAME lithokraft_selftest COMMAND lithokraft --selftest WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+# The --selftest run includes litholattice's assets suite, which writes the fixed path
+# %TEMP%\litholattice-selftest-assets. engine_assets writes the same path, so under ctest -j the two
+# raced (Debug 2026-10-29: both failed together; each passes alone). Share the engine's lock.
+set_tests_properties(lithokraft_selftest PROPERTIES RESOURCE_LOCK litho_tempdir)
 # Screenshot self-test: headless (no window / GL context), its own ctest entry.
 add_executable(lithokraft_screenshot_selftest screenshot_selftest_main.cpp)
 target_link_libraries(lithokraft_screenshot_selftest PRIVATE lithokraft_game)

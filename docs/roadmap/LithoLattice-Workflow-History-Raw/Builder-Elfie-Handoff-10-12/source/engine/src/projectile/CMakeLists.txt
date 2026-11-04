@@ -1,0 +1,2 @@
+add_library(litholattice_projectile INTERFACE)
+target_include_directories(litholattice_projectile INTERFACE include)

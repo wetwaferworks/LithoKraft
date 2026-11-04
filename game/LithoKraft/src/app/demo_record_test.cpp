@@ -12,11 +12,13 @@
 //                       in legacy and handshake modes.
 //   runDemoDump() / runDemoVerify() — the --demo-dump / --demo-verify
 //                       analysis CLI (wired in main.cpp).
+#include "litholattice/procgen/silicon_cities.h"
 #include "demo_record_test.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <thread>
@@ -451,8 +453,14 @@ void testSimThreadProofs() {
   check(recorded.steppedAll && recorded.stoppedCleanly, "demo-proof: recorded session stepped all 2048 ticks and stopped cleanly");
   check(recorded.finishOk && recorded.eventsRecorded == script.size(),
         "demo-proof: recorder finished and captured every scripted event");
-  check(recorded.hash == 0x5041cf1795c33a8cULL,
-        "demo-proof: recorded hash matches the control crew's scripted hash 5041cf1795c33a8c");
+  // Gate pin (JD 2026-10-29): the recorded session must reproduce the scenario gate hash for the
+  // active cities mode. Replaces the stale absolute 5041cf1795c33a8c. --cities off -> 43693d018d046b25;
+  // on / wafer.json default (on) -> 24c52df2be14789c. Record/replay identity is still checked below.
+  const bool citiesOff = litholattice::procgen::siliconCitiesOverride() == 0;
+  const uint64_t gateHash = citiesOff ? 0x43693d018d046b25ULL : 0x24c52df2be14789cULL;
+  check(recorded.hash == gateHash,
+        citiesOff ? "demo-proof: recorded hash matches the cities-off gate hash 43693d018d046b25"
+                  : "demo-proof: recorded hash matches the cities-on gate hash 24c52df2be14789c");
   check(recorded.stats.applied == script.size() && recorded.stats.dropped == 0 && recorded.stats.orderViolations == 0,
         "demo-proof: recorded session applied every event exactly once, none dropped/misordered");
   const std::vector<uint8_t> recBytes = rec.bytes();
@@ -488,8 +496,11 @@ void testSimThreadProofs() {
   // REPLAY (handshake, 2 workers): cross-mode bit-identity.
   cDemoPlayer playerHs;
   const bool loadedHs = playerHs.loadFile("./demo_record_proof.lldemo");
-  const DrivenResult replayHs = driveDemo(2048, true, 2, nullptr, &playerHs, nullptr, nullptr);
-  std::printf("  replay (handshake, 2 workers): hash=%016llx applied=%llu\n", (unsigned long long)replayHs.hash,
+  // P0 thread gate (2026-10-29): LL_GATE_WORKERS=N forces the replay worker count (1..64); default 2.
+  int gateWorkers = 2;
+  if (const char* gw = std::getenv("LL_GATE_WORKERS")) { const int n = std::atoi(gw); if (n >= 1 && n <= 64) gateWorkers = n; }
+  const DrivenResult replayHs = driveDemo(2048, true, gateWorkers, nullptr, &playerHs, nullptr, nullptr);
+  std::printf("  replay (handshake, %d workers): hash=%016llx applied=%llu\n", gateWorkers, (unsigned long long)replayHs.hash,
               (unsigned long long)replayHs.stats.applied);
   check(loadedHs && replayHs.submitOk && replayHs.hash == trailerHash,
         "demo-proof: handshake replay (2 workers) is bit-identical to the recorded legacy session");

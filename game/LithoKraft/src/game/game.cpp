@@ -1,3 +1,7 @@
+#include "litholattice/core/hitch_capture.h"  // LL_HITCH_CAPTURE
+#include "lithokraft/content/chunk_coord_text.h"
+#include "lithokraft/content/randor_rng.h"  // 2026-10-31 (JD): Randor world seed
+#include "litholattice/core/work_trace.h"  // duplicate-work trace
 #include <string_view>
 #include "litholattice/script/script_generic.h"
 #include <thread>
@@ -6,6 +10,11 @@
 #include <unordered_set>  // Cortana 2026-10-15 1455
 // Cortana 2026-10-15 0825/0935/1020: CHUNK-STALL, ALT-TAB, GAME-H1
 #include "lithokraft/game/game.h"
+#include "lithokraft/game/exit_watchdog.h"
+#include "lithokraft/game/cFolderPicker.h"        // 2026-10-31 (JD): Load World folder dialog
+#include "lithokraft/game/cWorldConfigBuilder.h"  // 2026-10-31 (JD): Load World in-process
+#include "lithokraft/game/ChunkMapPresence.h"
+#include "lithokraft/game/FrameDumpHub.h"  // showcase --frame-dump
 #include "litholattice/core/threeway.h"  // LL_THREEWAY (Proposed by JD; co-implemented by JD and Cortana)
 #include "litholattice/mods/mod_interface.h"  // kPerm* for the script sandbox
 #include "litholattice/mods/mod_permissions.h"  // permissionBitForName (mcp grant/revoke)
@@ -37,6 +46,8 @@
 #include "lithokraft/content/signal_world.h"
 #include "lithokraft/content/circuit_scene.h"
 #include "lithokraft/content/test_world.h"  // playtest 2026-10-16: --test-world
+#include "lithokraft/content/cBoltLabWorld.h"
+#include "lithokraft/game/cWorldCatalog.h"  // 2026-10-30 (JD): --bolt-lab
 #include "lithokraft/game/dimensions.h"
 #include "ui_input_bridge.h"
 #include "litholattice/ui/text_edit.h"
@@ -73,6 +84,23 @@ int effectiveStreamRadius(const lithokraft::GameConfig& c) {
 }  // namespace
 
 #include <cstdlib>
+#include "litholattice/core/lf_job_queue.h"     // 2026-11-01 LL_LF_UPLOAD
+#include "lithokraft/game/stall_timer.h"         // 2026-11-01 LL_STALL_TIMING
+// 2026-11-01 (JD LL_LF_UPLOAD=1 + LL_LF_JOBS=1, default off): mesh / upload-prep jobs on the
+// lock-free queue (no pool mutex; with LL_LF_COWTABLE=1 the column table takes no mutex either).
+template <class Pool, class F>
+static void submitMeshJob(Pool& pool, F&& f) {
+  static const bool lf = [] { const char* e = std::getenv("LL_LF_UPLOAD"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
+  if (lf && litholattice::cLfJobQueue::enabled()) litholattice::cLfJobQueue::shared().submit(std::forward<F>(f));
+  else pool.submit(std::forward<F>(f));
+}
+static const char* lfIoTag() {
+  static const char* t = [] {
+    const char* s = std::getenv("LL_LF_SAVE"); const char* l = std::getenv("LL_LF_LOAD");
+    return (!(s && s[0] == '0') || !(l && l[0] == '0')) ? "lock-free io" : "old io";  // PlayL: default ON
+  }();
+  return t;
+}
 static int llP2PerfOff() { static const int v = [] { const char* e = std::getenv("LL_P2_PERF_OFF"); return e ? int(std::strtol(e, nullptr, 0)) : 0; }(); return v; }  // Cortana 2026-10-16 1520: A/B perf switch (render/display only)
 
 namespace lithokraft {
@@ -158,9 +186,11 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
     : cfg_(cfg),
       ui_({[this](int slot) { hot_ = slot; }, [this](BlockId b, bool shift) { pickInventoryBlock(b, shift); },
            [this] { setInventoryOpen(false); }, [this] { if (menuState_ == MenuState::Playing) setPaused(false); },
-           [this] { quit_ = true; }, [this] { enterPlay(); }, [this] { enterMenu(); },
+           [this] { quit_ = true; }, [this] { if (cfg_.worldPicker) openWorldPicker(); else enterPlay(); }, [this] { enterMenu(); },
            [this] { ui_.openSettings(settings_); }, [this](const GameSettings& s) { onSettingsChanged(s); },
-           [this](int i) { pickCarrySlot(i); }}),
+           [this](int i) { pickCarrySlot(i); },
+           [this] { saveWorld("menu", false); },  // 2026-10-31 (JD): pause menu Save world
+           [this] { openWorldPicker(); }}),        // 2026-10-31 (JD): pause menu Load world
       uiScripts_(scripts_, ui_.root()),
       renderer_(renderer), resources_(resources), sound_(audio), pool_(pool),
       registry_(createDimensions(resources.worldgen(cfg.seed))),
@@ -207,6 +237,25 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
   litholattice::console::registerConsoleScriptBindings();
   debugConsole_ = std::make_unique<litholattice::console::cDebugConsole>(consoleRegistry_);
   debugConsole_->attach(ui_.root());
+  {  // 2026-10-31 (JD, Load World): world_load <world id | folder>
+    std::string werr;
+    consoleRegistry_.registerCommand(
+        "world_load", "world_load <world id | folder> - load a catalog world (default, testworld, flatlab, ...) or any world folder, in-process",
+        [this](litholattice::console::cConsoleReg& r, const litholattice::console::ConsoleArgs& a) {
+          const auto& cat = cWorldCatalog::instance().entries();
+          if (a.size() < 2) {
+            std::string ids;
+            for (const auto& e : cat) ids += " " + e.id;
+            r.print("usage: world_load <world id | folder>; worlds:" + ids);
+            return;
+          }
+          std::string arg = a[1];
+          for (size_t i = 2; i < a.size(); ++i) arg += " " + a[i];
+          r.print(requestWorldLoad(arg));
+        },
+        &werr);
+    if (!werr.empty()) logError("world_load: command registration failed: %s", werr.c_str());
+  }
   if (!cfg_.settingsPath.empty()) {
     // exec/saveArchived sandbox: the console may only touch .lth scripts (and
     // legacy .cfg files) next to the settings file (the player's config dir).
@@ -741,72 +790,9 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
   if (const char* r = std::getenv("LL_SW_LOD_RINGS")) std::sscanf(r, "%d,%d,%d", &swLodRing_[0], &swLodRing_[1], &swLodRing_[2]);
   if (swLodOn_) logInfo("software far LOD: rings %d/%d/%d chunks (LL_SW_LOD=0 off)", swLodRing_[0], swLodRing_[1], swLodRing_[2]);
   submitMesh_ = [this](std::shared_ptr<MeshInput> in) {
-    pool_.submit([this, in, mats = resources_.materials(), binary = useBinaryMesher_] {
-      if (binary) {
-        // BinaryQuad path (Worker 1's gap closed here): the per-voxel material bytes
-        // ride the snapshot; extractMaterial16 de-pads them to the dense 16^3 layout
-        // binaryMeshSubChunk's contract expects (MeshInput::mat is 18^3 padded).
-        // The column palette rode the snapshot too, so bytes resolve to compact
-        // registry IDs in the expansion below.
-        std::vector<BinaryQuad> quads;
-        uint8_t mat16[16 * 16 * 16];
-        extractMaterial16(*in, mat16);
-        binaryMeshSubChunk(*in, MeshContext{blockRegistry(), *mats, &blockAppearance()}, mat16, quads);
-        // Transparent companion (fix 2026-10-11): non-opaque cubes (glass, water)
-        // merge into the same quad stream; the PBR shader resolves alpha per
-        // material (correct for the screen-door/refraction tiers).
-        binaryMeshSubChunkTransparent(*in, MeshContext{blockRegistry(), *mats, &blockAppearance()}, mat16, quads);
-        PbrChunkMesh pm;
-        pm.cx = in->cx; pm.sy = in->sy; pm.cz = in->cz; pm.epoch = in->epoch; pm.seq = in->seq;
-        // Coarse light levels: the flood fill is not wired yet (same gap as the
-        // software path's unwired setPbrContext). sky = full like the classic path's
-        // unlit brightness, so the PBR path doesn't render black; block = 0.
-        expandBinaryQuadsToPbr(quads, in->matPalette, in->matPaletteSize, 0, litholattice::kMaxLight, pm.verts);
-        pbrMeshOut_.push(std::move(pm));  // empty verts = remove (backend erases)
-        // The binary mesher only covers opaque cubes; every other shape still needs
-        // the classic mesher (drawn by the classic program) - coexistence, not cutover.
-      }
-      // Wafer ground pulse (JD 2026-10-11): the column's weight-blended pulse
-      // params bake into the mesh at mesh time (biome weights are
-      // worldgen-static, so this costs nothing per frame). Only the Wafer
-      // pulses; other dimensions leave the mesh params zeroed.
-      litholattice::MeshContext ctx{blockRegistry(), *mats, &blockAppearance()};
-      ctx.greedy = renderer_.prefersGreedyMeshes();  // Cortana 2026-10-15 1705: greedy meshing [GAME] (software backend only)
-      ctx.pulseParams = [this](int cx, int cz, float p0[4], float p1[4]) {
-        if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->params(cx, cz, p0, p1);
-      };
-      // Wafer ground traces (JD 2026-10-11; landed 2026-10-13, P1-RENDER H1):
-      // same biome weight vector as the pulse, blended by the same cache;
-      // the mesher bakes the result into ChunkMesh::traceP0/traceP1.
-      ctx.traceParams = [this](int cx, int cz, float t0[4], float t1[4]) {
-        if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->traceParams(cx, cz, t0, t1);
-      };
-      // 2026-10-25 (box, triangle diet; software path only, Vulkan untouched): far sub-chunks mesh
-      // from a 2x/4x downsampled snapshot (bench-stream lodInput) and drop near-detail quads.
-      const int lod = swLodOn_ ? swLodFor(in->cx, in->cz) : 0;
-      if (swLodOn_) { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_[ChunkKey::make(in->cx, in->cz)] = lod; }
-      const int lf = lod == 0 ? 1 : lod == 1 ? 1 : lod == 2 ? 2 : 4;
-      const std::shared_ptr<MeshInput> src = lf > 1 ? farLodMeshInput(*in, lf) : in;
-      ChunkMesh cm = meshSubChunk(*src, ctx);
-      cm.lodScale = uint8_t(lf);  // software renderer: >= 4x flat shade / thin-face cull
-      if (lf > 1)
-        for (PackedVertex& v : cm.verts) { v.x = uint16_t(v.x * lf); v.y = uint16_t(v.y * lf); v.z = uint16_t(v.z * lf); }
-      if (lod >= 1) {
-        auto& vs = cm.verts;
-        size_t w = 0;
-        for (size_t q = 0; q + 3 < vs.size(); q += 4)
-          if (!(vs[q].mode & kShadeLodNear)) { if (w != q) for (int k = 0; k < 4; ++k) vs[w + size_t(k)] = vs[q + size_t(k)]; w += 4; }
-        vs.resize(w);
-      }
-      // Cortana 2026-10-25 (box, upload pass; JD-approved): pack + copy into GPU memory here on the
-      // worker (backends with a direct-upload arena: Vulkan ReBAR/host, or a worker-staged device-only
-      // block); the main thread then only publishes the handle. Off unless LL_ASYNC_CHUNK_UPLOAD=1.
-      if (asyncChunkUploadOn() && !cm.verts.empty()) {
-        auto h = std::make_shared<PreparedChunkMeshHandle>();
-        if (renderer_.prepareChunkMeshAsync(cm, h->mesh)) { h->owner = &renderer_; cm.prepared = std::move(h); }
-      }
-      meshOut_.push(std::move(cm));
-    });
+    ++meshInFlight_;  // P8 quiescence
+    litholattice::workTrace("submit", in->cx, in->sy, in->cz, in->seq);  // duplicate-work trace (LL_WORK_TRACE)
+    submitMeshJob(pool_, [this, in, mats = resources_.materials(), binary = useBinaryMesher_] { meshOne(in, mats, binary); });
   };
   std::optional<PlayerMeta> savedPlayer;
   if (!cfg_.saveDir.empty()) {
@@ -967,7 +953,7 @@ void Game::initScripts() {
 
 void Game::setBenchPath(const std::string& path) {
   benchPath_ = path;
-  if ((path == "stream" || path == "soak" || path == "sprint") && active_ && active_->generator)
+  if ((path == "stream" || path == "soak" || path == "sprint" || path == "showcase") && active_ && active_->generator)
     stream_ = std::make_unique<cBenchStreamer>(renderer_, pool_, active_->generator, cfg_.worldChunks, active_->belowWorldFill, std::max(1, cfg_.streamRadius));
 }
 
@@ -1021,6 +1007,33 @@ void Game::setBenchCamera(float t) {
     benchCam_ = player_.pos;
     return;
   }
+  if (benchPath_ == "zigzag") {
+    // 2026-10-30 (JD): deterministic boustrophedon over EVERY placed Examples pad, at a JD-like
+    // sprint-fly speed (LL_ZIGZAG_SPEED blocks/s, default 20), 24 m above the floor, rows 24
+    // blocks apart along x, alternating direction; loops. Same path every run (time-driven).
+    static const float speed = [] { const char* e = std::getenv("LL_ZIGZAG_SPEED"); const float v = e ? float(std::atof(e)) : 20.f; return v > 0.f ? v : 20.f; }();
+    if (benchExamples_.empty()) { benchPath_ = "live"; logError("bench zigzag: no Examples pads (use --test-world-examples); falling back to live"); return; }
+    int x0 = benchExamples_[0].x0, x1 = benchExamples_[0].x1, z0 = benchExamples_[0].z0, z1 = benchExamples_[0].z1;
+    for (const BenchBox& b : benchExamples_) { x0 = std::min(x0, b.x0); x1 = std::max(x1, b.x1); z0 = std::min(z0, b.z0); z1 = std::max(z1, b.z1); }
+    const float ax = float(x0 - 8), bx = float(x1 + 8), az = float(z0 - 8), bz = float(z1 + 8), row = 24.f;
+    const int rows = std::max(1, int(std::ceil((bz - az) / row)) + 1);
+    const float len = bx - ax, legs = float(rows) * len + float(rows - 1) * row;
+    static bool logged = false;
+    if (!logged) { logged = true; logInfo("bench zigzag: %d pads, x %.0f..%.0f z %.0f..%.0f, %d rows, %.0f blocks/loop at %.1f b/s (%.1f s)", int(benchExamples_.size()), ax, bx, az, bz, rows, legs, speed, legs / speed); }
+    float d = std::fmod(t * speed, 2.f * legs);
+    if (d > legs) d = 2.f * legs - d;  // ping-pong so the loop stays continuous
+    int r = 0;
+    while (r < rows - 1 && d > len + row) { d -= len + row; ++r; }
+    const bool fwd = (r % 2) == 0;
+    float x, z = az + float(r) * row;
+    if (d <= len) x = fwd ? ax + d : bx - d;
+    else { x = fwd ? bx : ax; z += d - len; }
+    player_.pos = {x, float(benchFloorY_) + 24.f, std::min(z, bz)};
+    player_.yaw = d <= len ? (fwd ? 0.f : 3.14159f) : 1.5708f; player_.pitch = -0.6f;
+    locoPlace(sim_, locomotion_, player_.pos);
+    benchCam_ = player_.pos;
+    return;
+  }
   if (benchPath_ == "still" || benchPath_ == "live") {
     // 2026-10-25 (Archie perf plan): "live" = a held, JD-like play view (testworld looking down
     // the rows to the horizon, ~350-600k tris) with the in-play HUD up, so bench numbers match
@@ -1053,6 +1066,21 @@ void Game::setBenchCamera(float t) {
     if (!loggedPose) { loggedPose = true; logInfo("bench %s pose: %.2f,%.2f,%.2f,%.4f,%.4f%s", benchPath_.c_str(), player_.pos.x, player_.pos.y, player_.pos.z, player_.yaw, player_.pitch, poseOverride ? " (LL_BENCH_POSE)" : ""); }
     locoPlace(sim_, locomotion_, player_.pos);
     benchCam_ = player_.pos;
+    // 2026-11-01 (JD placement lag, measure only): LL_BENCH_PLACE=<block name> alternates place / break at the
+    // look target every LL_BENCH_PLACE_EVERY frames (default 30) so LL_TICK_PROFILE can time each edit.
+    if (const char* bp = std::getenv("LL_BENCH_PLACE"); bp && *bp) {
+      static int pf = 0, np = 0; static BlockId pb = BlockId(-1);
+      static const int every = [] { const char* e = std::getenv("LL_BENCH_PLACE_EVERY"); return e ? std::max(2, std::atoi(e)) : 30; }();
+      if (pb == BlockId(-1)) {
+        pb = kAir;
+        if (const auto f = blockRegistry().findById(bp)) pb = *f;
+        logInfo("bench place: '%s' -> block %d, every %d frames", bp, int(pb), every);
+      }
+      if (pb != kAir && ++pf % every == 0) {
+        if ((np++ & 1) == 0) { EditCmd pc{EditCmd::Kind::Place, pb, 0}; sim_->edit(pc); }
+        else sim_->edit({EditCmd::Kind::Break});
+      }
+    }
     return;
   }
   // Phase 4 torture paths (Direction JD, research Elfie, implementation Cortana). Camera only; sim untouched.
@@ -1069,6 +1097,14 @@ void Game::setBenchCamera(float t) {
     player_.pos = {benchCenter_.x + 60.f * t, benchCenter_.y + 30.f, benchCenter_.z};
     player_.yaw = 0.f; player_.pitch = -0.25f;
     locoPlace(sim_, locomotion_, player_.pos);
+    benchCam_ = player_.pos;
+    return;
+  }
+  if (benchPath_ == "showcase") {  // --showcase wafer (JD 2026-10-30): side-on, slow +x pan, new columns stream in on the right
+    static const float kSpeed = [] { const char* e = std::getenv("LL_SHOWCASE_SPEED"); return e ? float(std::atof(e)) : 10.f; }();
+    const float startX = float(cfg_.worldChunks * 16), zc = float(cfg_.worldChunks * 8);
+    player_.pos = {startX - 24.f + kSpeed * t, benchCenter_.y + 70.f, zc + 110.f};
+    player_.yaw = -1.5708f; player_.pitch = -0.55f;  // look toward -z: +x is screen-right
     benchCam_ = player_.pos;
     return;
   }
@@ -1099,9 +1135,12 @@ void Game::setBenchCamera(float t) {
 }
 
 Game::~Game() {
+  logInfo("exit: game teardown (paused=%d)", int(paused_));
   stream_.reset();
   streamer_.reset();  // waits out in-flight generation jobs (they may touch save_)
+  logInfo("exit: streamer joined");
   saveWorld("exit", true);
+  cExitWatchdog::noteSaved();  // 2026-10-31 close-hang: the watchdog (final exit only) counts from here
   // Persist archived cvars (the settings bridge) to config.lth.
   if (!cfg_.settingsPath.empty()) {
     const std::filesystem::path cfg(cfg_.settingsPath);
@@ -1111,6 +1150,7 @@ Game::~Game() {
   aiHost_.unbindWorld();  // cWalkCache references active_->chunks; drop before the registry dies (B6)
   sim_.reset();
   pool_.waitIdle();  // mesh jobs reference meshOut_
+  if (litholattice::cLfJobQueue::enabled()) litholattice::cLfJobQueue::shared().waitIdle();  // LL_LF_UPLOAD jobs capture this
 }
 
 // 2026-10-25 (JD J3): teleport <x y z> (absolute or ~relative) | <name>. Names: spawn, then the marks of
@@ -1195,6 +1235,7 @@ void Game::loadActive() {
   if (cfg_.benchScene != "default") {  // bench scenes: load and tick the whole scene
     cfg_.worldChunks = std::max(cfg_.worldChunks, cfg_.sceneSize / 16 + 12);
     if (cfg_.testWorldExamples) cfg_.worldChunks = std::max(cfg_.worldChunks, 36);  // 2026-10-24: room for the Examples grid
+    if (cfg_.dimension == "flatlab") cfg_.worldChunks = std::max(cfg_.worldChunks, 56);  // 2026-10-30 (JD): Flat Lab fits every Examples slot (x/z up to ~800)
     cfg_.tickRadius = std::max(cfg_.tickRadius, cfg_.sceneSize / 32 + 4);
   }
   // 2026-10-26 (JD streaming hitches): the in-play background cap (main.cpp) is lifted for the
@@ -1325,6 +1366,7 @@ void Game::loadActive() {
           sceneLevers.push_back({lx, ly, lz});
           logInfo("test world examples: %s lever (%d,%d,%d) OFF, group %d", e.label.c_str(), lx, ly, lz, group);
         }
+        if (e.placed) { benchExamples_.push_back({e.x0, e.z0, e.x1, e.z1}); benchFloorY_ = floorY; }  // 2026-10-30 zigzag bench
         if (e.placed) {  // J3: /tp <label>, standing just north of the pad, mid-width
           std::string key;
           for (char ch : e.label) key += std::isalnum(static_cast<unsigned char>(ch)) ? char(std::tolower(static_cast<unsigned char>(ch))) : '-';
@@ -1367,6 +1409,20 @@ void Game::loadActive() {
       }
     }
     roms.push_back(tw.screen);
+  } else if (cfg_.benchScene == "boltlab") {
+    // 2026-10-30 (JD): Bolt PCHIE Lab -- staged stations, one per test scenario, on the Flat Lab plain.
+    const int sx = int(std::floor(sp.x)), sz = int(std::floor(sp.z));
+    const int floorY = active_->chunks.surfaceY(sx, sz);
+    const cBoltLabWorld::Layout bl = cBoltLabWorld().build(active_->chunks, sx, floorY, sz);
+    sp.x = bl.spawnX; sp.z = bl.spawnZ; sp.y = float(floorY + 1); sp.yaw = 0.f; sp.pitch = -0.32f;
+    tpMarks_.push_back({"lab", Vec3{sp.x, sp.y, sp.z}});
+    for (const cBoltLabWorld::Station& s : bl.stations) {
+      std::string key;
+      for (char ch : s.id) key += char(std::tolower(static_cast<unsigned char>(ch)));
+      tpMarks_.push_back({key, Vec3{s.spawnX, float(floorY + 1), s.spawnZ}});
+      logInfo("bolt lab: station %-4s %-8s x %d..%d z %d..%d  (/tp %s)", s.id.c_str(), s.name.c_str(), s.x0, s.x1, s.z0, s.z1, key.c_str());
+    }
+    logInfo("bolt lab: %zu stations, %d blocks, floor y=%d, spawn (%.1f, %.1f)", bl.stations.size(), bl.placed, floorY, double(sp.x), double(sp.z));
   } else if (cfg_.benchScene == "framebuffer" && !cfg_.screenVertical) {
     const int cx = int(sp.x), cz = int(sp.z) + 8, n = cfg_.sceneSize;
     const int sy = active_->chunks.surfaceY(cx, cz) + 1;
@@ -1389,6 +1445,10 @@ void Game::loadActive() {
     const int n = std::clamp(cfg_.sceneSize & ~1, 16, 64), cx = int(sp.x), cz = int(sp.z) + 30;
     fb_ = buildPatternWall(active_->chunks, cx - n / 2, active_->chunks.surfaceY(cx, cz) + 1, cz, n, cfg_.pattern);
     logInfo("bench scene: pattern-wall (%s), %d x %d pixels, %d blocks", cfg_.pattern.c_str(), fb_.width, fb_.width, fb_.blocks);
+  } else if (cfg_.benchScene == "facings") {  // 2026-10-31 (JD): readout overlay facing check
+    const int cx = int(sp.x), cz = int(sp.z) + 6;
+    const int placed = buildFacingsScene(active_->chunks, cx, active_->chunks.surfaceY(cx, cz) + 1, cz);
+    logInfo("bench scene: facings at (%d, %d), %d blocks", cx, cz, placed);
   } else if (cfg_.benchScene == "redirector") {
     const int cx = int(sp.x), cz = int(sp.z) + 6, n = std::max(4, cfg_.sceneSize / 2);
     const int placed = buildRedirectorScene(active_->chunks, cx - n, active_->chunks.surfaceY(cx, cz) + 1, cz, n);
@@ -1412,7 +1472,11 @@ void Game::loadActive() {
     tpMarks_.push_back({cfg_.benchScene, Vec3{float(cx) + 0.5f, float(sy), float(cz - 2) + 0.5f}});  // J3: /tp circuits
   }
   std::vector<uint8_t> signalState;
-  const int restored = save_ ? save_->loadDimension(active_->id, active_->chunks, signalState) : 0;
+  int restored = 0;
+  {
+    cStallTimer stall("world load (loadDimension)", lfIoTag());  // LL_STALL_TIMING
+    restored = save_ ? save_->loadDimension(active_->id, active_->chunks, signalState) : 0;
+  }
   if (restored < 0)
     logError("save: '%s' load REFUSED (fail closed, see above); the world on disk is untouched and saves will refuse until the name table is repaired",
              active_->id.c_str());
@@ -1430,7 +1494,9 @@ void Game::loadActive() {
       (void)pri;
       const auto& col = active_->chunks.columns().at(k);
       for (int sy = 0; sy < kSubChunks; ++sy)
-        if (col->subs[sy]) { ++totalSubs_; submitMesh_(snapshotForMeshing(active_->chunks, blockRegistry(), col->cx, sy, col->cz, epoch_, ++initSeq_, active_->belowWorldFill)); }
+        if (col->subs[sy]) ++totalSubs_;
+      submitMeshColumn(col->cx, col->cz);  // P6: pre-bake meshes column-at-a-time on one worker
+      col->state.setStage(litholattice::ChunkStage::Active);  // P5: the pre-bake is loaded before the sim starts
     }
   }
   player_.pos = {sp.x, sp.y, sp.z}; player_.yaw = sp.yaw; player_.pitch = sp.pitch;
@@ -1497,9 +1563,21 @@ void Game::loadActive() {
   sc.domains.push_back({"EUV", kMaxDomainHz, cfg_.euv});  // lithographed EUV-tier chips (stub)
   sc.timingHandshake = cfg_.timingHandshake;
   sc.handshakePhasesPerCycle = cfg_.handshakePhases;
+  sc.handshakeWorkerThreads = cfg_.handshakeWorkers;  // --handshake-workers (0 = authority auto; G2 suspect-3 A/B knob, 2026-10-28)
+#if defined(__wasm__)
+  // Q1 trim (Archie exec summary, 2026-10-28, via JD): on the web/phone
+  // layer the pull-worker pool defaults to 2 instead of the authority
+  // auto (min(4, hw-1) = 4 on the target phone)... fewer futex/barrier
+  // wakeups spread across the efficiency cores. An explicit
+  // --handshake-workers still wins; desktop keeps the authority auto.
+  if (sc.handshakeWorkerThreads == 0) sc.handshakeWorkerThreads = 2;
+#endif
   if (sc.timingHandshake) logInfo("timing handshake: ON (phases/cycle %d; applies at this world load)", sc.handshakePhasesPerCycle);
+  if (sc.timingHandshake && sc.handshakeWorkerThreads > 0)
+    logInfo("timing handshake: pull-worker pool at %d workers", sc.handshakeWorkerThreads);
   placeRefunds_.clear();  // receipts belong to the sim that is replaced here
   clockSynced_ = false;   // 2026-10-16: a new sim's worldTick must not be diffed against the old one's
+  lithokraft::randor::worldSeed().store(uint64_t(cfg_.seed), std::memory_order_relaxed);  // 2026-10-31 (JD): Randor rolls
   auto worldSim = std::make_unique<cSignalWorldSim>();
   for (PatternRomScreen& r : roms) worldSim->addPatternRom(std::move(r));  // before the sim thread owns it
   if (tortureLever[1] >= 0) {
@@ -1617,6 +1695,7 @@ void Game::loadActive() {
   // [0, worldChunks)^2 square at the origin; the streamer generates/loads the
   // columns around the player from here on (see chunk_streamer.h).
   streamer_.reset();
+  p5ResetChunkHandshake();            // P5: new streamer, new spawn spiral
   projectiles_.clear();               // projectiles belong to the old dimension
   projectiles_.clearRequestedChunks();  // the new streamer has seen no requests
   if (active_->generator && cfg_.streaming) {  // JD 2026-10-16: streaming toggle
@@ -1626,6 +1705,7 @@ void Game::loadActive() {
     streamer_ = std::make_unique<cChunkStreamer>(pool_, active_->generator, save_.get(), active_->id,
                                                 effectiveStreamRadius(cfg_) /* fix3: sim area always inside stream */, initial);
     streamer_->setDiamond(cfg_.diamondStreamArea);  // diamond stream footprint (JD 2026-10-23)
+    spawnSpiral_ = true;  // P5: ring-center bypass until the footprint first fills
   }
   // cAiWorld host (B6): bind to THIS dimension's live map + registry +
   // pool while the game thread still owns the map (before sim start).
@@ -1641,7 +1721,11 @@ bool Game::switchDimension(const std::string& id) {
   litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
   Dimension* next = registry_.find(id);
   if (!next || next == active_) return false;
-  saveWorld("dimension switch", false);
+  // 2026-10-31 (JD, Save World): async snapshot at the next tick boundary; wait (bounded) only
+  // until the tick thread has copied the world out, then the old dimension may unload while the
+  // pool worker writes. A boundary that never comes (frozen handshake) falls back to the sync save.
+  if (saveWorld("dimension switch", false) && !saver_.settleSnapshot(sim_.get(), 2000))
+    saveWorld("dimension switch", false, /*allowAsync=*/false);
   // P0a carry (P2b-2): a poisoned stop (handshake workers outstanding)
   // ABORTS the switch — destroying the cSimThread / unloading the old
   // dimension under a still-running worker is the C2 use-after-free.
@@ -1653,6 +1737,7 @@ bool Game::switchDimension(const std::string& id) {
     return false;
   }
   streamer_.reset();            // its jobs reference the old dimension's generator/save id
+  p5ResetChunkHandshake();
   sim_.reset();                 // stop ticking; main thread owns the old chunks again
   aiHost_.unbindWorld();        // its cWalkCache references the old dimension's chunks (B6)
   sound_.stopAll();
@@ -1664,6 +1749,7 @@ bool Game::switchDimension(const std::string& id) {
   ringSpill_.clear();
   if (!renderer_.enqueueClearChunkMeshes()) spillRingUpload(2, {}, {});
   pendingOrder_.clear(); pendingMesh_.clear(); meshSeq_.clear();  // in-flight jobs are dropped by the epoch check
+  deferredMeshOrder_.clear(); deferredMeshKeys_.clear();  // t3366u deferred keys belong to the old dimension
   mcpSenses_.clearMeshes();  // vision cache follows the GL renderer's clearChunkMeshes() above
   pbrPendingOrder_.clear(); pbrPendingMesh_.clear(); pbrMeshSeq_.clear();  // same for the PBR queue
   if (emissiveProvider_) emissiveProvider_->clear();  // new dimension: rescan
@@ -1677,8 +1763,26 @@ bool Game::switchDimension(const std::string& id) {
   return true;
 }
 
-bool Game::saveWorld(const char* reason, bool wait) {
+bool Game::saveWorld(const char* reason, bool wait, bool allowAsync) {
   if (!save_ || !sim_ || !active_) return false;
+  cStallTimer stall(wait ? "world save (saveWorld, wait)" : "world save (saveWorld)", lfIoTag());  // LL_STALL_TIMING
+  // 2026-10-31 (JD, Save World): lock-free path. The tick thread snapshots at a tick boundary,
+  // a pool worker writes; the sim is never stopped and this frame returns at once.
+  if (!wait && allowAsync && cAsyncSaver::enabled() && sim_->running()) {
+    if (saver_.busy()) {
+      logInfo("save (%s): the previous save is still being written; skipped", reason);
+      return false;
+    }
+    advanceWorldClock();
+    save_->setWorldClock(worldClock_.tick, worldClock_.time);
+    if (saver_.begin(*sim_, *save_, active_->chunks, static_cast<cSignalWorldSim&>(sim_->simulation()).signal(), active_->id,
+                     playerMetaForSave(), reason, [this](std::function<void()> job) { pool_.submit(std::move(job)); })) {
+      lastSave_ = Clock::now();
+      logInfo("save (%s): '%s' snapshot posted to the tick thread (sim keeps running; written on the pool)", reason, active_->id.c_str());
+      return true;
+    }
+  }
+  saver_.drain(sim_.get());  // a synchronous save follows (never overlaps) an async one
   const auto t0 = Clock::now();
   // P0a carry (P2b-2): cSimThread::stop() returns false when handshake pull
   // workers are still outstanding (poisoned). The snapshot would not be
@@ -1704,6 +1808,19 @@ bool Game::saveWorld(const char* reason, bool wait) {
     logError("save (%s) FAILED: '%s': %s", reason, active_->id.c_str(), save_->lastSaveError().c_str());
     return false;
   }
+  PlayerMeta m = playerMetaForSave();
+  std::string err;
+  if (!save_->writePlayer(m, &err)) {
+    logError("save (%s) FAILED: player: %s", reason, err.c_str());
+    return false;
+  }
+  lastSave_ = Clock::now();
+  logInfo("save (%s): '%s' %zu changed / component columns, sim paused %.2f ms%s", reason, active_->id.c_str(), n, pauseMs,
+          wait ? ", on disk" : ", encoding + writing on the I/O thread");
+  return true;
+}
+
+PlayerMeta Game::playerMetaForSave() {
   PlayerMeta m{player_.pos, player_.yaw, player_.pitch, active_->id, hot_};
   // P2b-1: the inventory is the store that persists (v4 inventory block).
   // The legacy hotbar field is DERIVED from its hotbar stacks — the block
@@ -1717,15 +1834,7 @@ bool Game::saveWorld(const char* reason, bool wait) {
   m.vitals = playerAdapter_.vitalsForSave();  // IPlayer integration: vital values by name (v3 player.lat)
   m.prayerDay = prayer_.prayerDay;  // Cortana 2026-10-16: v7 mealtime prayer block
   m.prayerWindows = prayer_.windows;
-  std::string err;
-  if (!save_->writePlayer(m, &err)) {
-    logError("save (%s) FAILED: player: %s", reason, err.c_str());
-    return false;
-  }
-  lastSave_ = Clock::now();
-  logInfo("save (%s): '%s' %zu changed / component columns, sim paused %.2f ms%s", reason, active_->id.c_str(), n, pauseMs,
-          wait ? ", on disk" : ", encoding + writing on the I/O thread");
-  return true;
+  return m;
 }
 
 // 2026-10-25 (JD hitch, fix 1): the frame thread does not wait out a sim tick on the
@@ -1859,15 +1968,307 @@ void Game::pumpSwLod() {
     const ChunkColumn* c = active_->chunks.column(cx, cz);
     if (!c) { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_.erase(ChunkKey::make(cx, cz)); continue; }
     { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_[ChunkKey::make(cx, cz)] = swLodFor(cx, cz); }
-    for (int sy = 0; sy < kSubChunks; ++sy)
-      if (c->subs[sy])
-        submitMesh_(snapshotForMeshing(active_->chunks, blockRegistry(), cx, sy, cz, epoch_, ++initSeq_, active_->belowWorldFill));
+    submitMeshColumn(cx, cz);  // P6 locality
   }
 }
 
-void Game::pumpStreaming() {
+// ---- Thread Handshake P5: chunk handshake bookkeeping (game thread) ----
+void Game::p5ResetChunkHandshake() {
+  promoteBudget_ = {};
+  spawnSpiral_ = false;
+  borderRing_.clear();
+  l0Hold_.clear();      // fix (b)
+  meshLedger_.clear();  // P8
+  meshHashLogged_ = 0;
+  colMeshPending_.clear();
+  stagedRenderCols_.clear();
+  revealPending_ = true;  // P7: the next frame starts the wafer reveal around the spawn column
+}
+
+void Game::p5NoteMeshArrived(int cx, int cz) {
+  const uint64_t key = ChunkKey::make(cx, cz);
+  const auto it = colMeshPending_.find(key);
+  if (it == colMeshPending_.end() || --it->second > 0) return;
+  colMeshPending_.erase(it);
+  // Only the game thread inserts/erases columns, so this lookup is safe while the sim runs.
+  if (active_)
+    if (const ChunkColumn* c = active_->chunks.column(cx, cz))
+      if (c->state.advance(litholattice::ChunkStage::Mesh, litholattice::ChunkStage::StagedRender)) stagedRenderCols_.push_back(key);
+}
+
+void Game::p5AdvanceStagedRender() {
+  if (stagedRenderCols_.empty() || !active_) return;
+  std::erase_if(stagedRenderCols_, [&](uint64_t key) {
+    const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
+    const ChunkColumn* c = active_->chunks.column(cx, cz);
+    if (!c) return true;
+    for (int sy = 0; sy < kSubChunks; ++sy)
+      if (pendingMesh_.count(packPos(cx, sy, cz))) return false;  // still waiting for the render pop
+    c->state.advance(litholattice::ChunkStage::StagedRender, litholattice::ChunkStage::Active);
+    return true;
+  });
+}
+
+// Thread Handshake P7: wafer reveal. Default on in every dimension (JD 2026-10-31); LL_WAFER_REVEAL=0
+// disables it; LL_V_ETCH sets rings/s (inf/0 = instant).
+// Backends without the reveal (GL / software) skip it entirely, sky included.
+void Game::pumpWaferReveal(float dt) {
+  if (revealPending_ && active_) {
+    revealPending_ = false;
+    reveal_.stop();
+    revealSky_ = false;
+    skyFade_ = 1.f;
+    renderer_.setWaferReveal(litholattice::WaferRevealFrame{});
+    const char* env = std::getenv("LL_WAFER_REVEAL");
+    const int mode = env ? std::atoi(env) : -1;
+    if (renderer_.supportsWaferReveal() && mode != 0) {  // JD 2026-10-31: default load-in in every dimension
+      litholattice::cWaferRevealPacer::Config c;
+      if (const char* v = std::getenv("LL_V_ETCH")) c.vEtch = std::strtof(v, nullptr);
+      if (benchSet_) c.vEtch = std::numeric_limits<float>::infinity();  // --bench: v_etch infinite
+      c.maxRing = std::clamp(int(cfg_.worldChunks), c.pedestalRings, litholattice::kRevealHalf);
+      const float px = benchSet_ ? benchCam_.x : player_.pos.x, pz = benchSet_ ? benchCam_.z : player_.pos.z;
+      reveal_.begin(int(std::floor(px / 16)), int(std::floor(pz / 16)), c);
+      revealSky_ = true;
+      skyFade_ = 0.f;
+      revealLoggedOnline_ = false;
+      logInfo("wafer reveal: origin column %d,%d, v_etch %g rings/s, %d rings", int(std::floor(px / 16)),
+              int(std::floor(pz / 16)), double(c.vEtch), c.maxRing);
+    }
+  }
+  if (!reveal_.active()) return;
+  const float step = renderPaused() ? 0.f : dt;  // JD pause rule: the reveal clock is render pipeline
+  reveal_.advance(step, [&](int cx, int cz) {
+    if (colMeshPending_.count(ChunkKey::make(cx, cz))) return false;
+    const ChunkColumn* c = active_->chunks.column(cx, cz);  // game thread: safe while the sim runs
+    return c && c->state.stage() == litholattice::ChunkStage::Active;
+  });
+  if (reveal_.skyboxOnline()) {
+    if (!revealLoggedOnline_) {
+      revealLoggedOnline_ = true;
+      logInfo("SKYBOX_ONLINE: wafer reveal complete at t=%.2fs", double(reveal_.now()));
+    }
+    skyFade_ = benchSet_ ? 1.f : std::min(1.f, skyFade_ + step);  // 1 s fade-in
+    if (skyFade_ >= 1.f) { reveal_.stop(); revealSky_ = false; }
+  }
+  reveal_.fill(revealFrame_);
+  renderer_.setWaferReveal(revealFrame_);
+}
+
+// ---- Thread Handshake P6: swarm and locality ----
+void Game::meshOne(const std::shared_ptr<MeshInput>& in, const std::shared_ptr<const BlockMaterials>& mats, bool binary) {
+  litholattice::workTrace("mesh", in->cx, in->sy, in->cz, in->seq);  // duplicate-work trace (LL_WORK_TRACE)
+  const bool hc = litholattice::cHitchCapture::enabled();  // LL_HITCH_CAPTURE (default off)
+  const uint64_t hc0 = hc ? litholattice::cHitchCapture::nowNs() : 0;
+  if (in->pin) litholattice::gatherPinned(*in);
+  const uint64_t hc1 = hc ? litholattice::cHitchCapture::nowNs() : 0;  // render pipeline M5: the worker builds its own 18^3 slab
+  if (binary) {
+    // BinaryQuad path (Worker 1's gap closed here): the per-voxel material bytes
+    // ride the snapshot; extractMaterial16 de-pads them to the dense 16^3 layout
+    // binaryMeshSubChunk's contract expects (MeshInput::mat is 18^3 padded).
+    // The column palette rode the snapshot too, so bytes resolve to compact
+    // registry IDs in the expansion below.
+    std::vector<BinaryQuad> quads;
+    uint8_t mat16[16 * 16 * 16];
+    extractMaterial16(*in, mat16);
+    binaryMeshSubChunk(*in, MeshContext{blockRegistry(), *mats, &blockAppearance()}, mat16, quads);
+    // Transparent companion (fix 2026-10-11): non-opaque cubes (glass, water)
+    // merge into the same quad stream; the PBR shader resolves alpha per
+    // material (correct for the screen-door/refraction tiers).
+    binaryMeshSubChunkTransparent(*in, MeshContext{blockRegistry(), *mats, &blockAppearance()}, mat16, quads);
+    PbrChunkMesh pm;
+    pm.cx = in->cx; pm.sy = in->sy; pm.cz = in->cz; pm.epoch = in->epoch; pm.seq = in->seq;
+    // Coarse light levels: the flood fill is not wired yet (same gap as the
+    // software path's unwired setPbrContext). sky = full like the classic path's
+    // unlit brightness, so the PBR path doesn't render black; block = 0.
+    expandBinaryQuadsToPbr(quads, in->matPalette, in->matPaletteSize, 0, litholattice::kMaxLight, pm.verts);
+    pbrMeshOut_.push(std::move(pm));  // empty verts = remove (backend erases)
+    // The binary mesher only covers opaque cubes; every other shape still needs
+    // the classic mesher (drawn by the classic program) - coexistence, not cutover.
+  }
+  // Wafer ground pulse (JD 2026-10-11): the column's weight-blended pulse
+  // params bake into the mesh at mesh time (biome weights are
+  // worldgen-static, so this costs nothing per frame). Only the Wafer
+  // pulses; other dimensions leave the mesh params zeroed.
+  litholattice::MeshContext ctx{blockRegistry(), *mats, &blockAppearance()};
+  ctx.greedy = renderer_.prefersGreedyMeshes();  // Cortana 2026-10-15 1705: greedy meshing [GAME] (software backend only)
+  ctx.pulseParams = [this](int cx, int cz, float p0[4], float p1[4]) {
+    if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->params(cx, cz, p0, p1);
+  };
+  // Wafer ground traces (JD 2026-10-11; landed 2026-10-13, P1-RENDER H1):
+  // same biome weight vector as the pulse, blended by the same cache;
+  // the mesher bakes the result into ChunkMesh::traceP0/traceP1.
+  ctx.traceParams = [this](int cx, int cz, float t0[4], float t1[4]) {
+    if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->traceParams(cx, cz, t0, t1);
+  };
+  // 2026-10-25 (box, triangle diet; software path only, Vulkan untouched): far sub-chunks mesh
+  // from a 2x/4x downsampled snapshot (bench-stream lodInput) and drop near-detail quads.
+  const int lod = swLodOn_ ? swLodFor(in->cx, in->cz) : 0;
+  if (swLodOn_) { std::lock_guard<std::mutex> lk(swLodMu_); swLodMeshed_[ChunkKey::make(in->cx, in->cz)] = lod; }
+  const int lf = lod == 0 ? 1 : lod == 1 ? 1 : lod == 2 ? 2 : 4;
+  const std::shared_ptr<MeshInput> src = lf > 1 ? farLodMeshInput(*in, lf) : in;
+  ChunkMesh cm = meshSubChunk(*src, ctx);
+  const uint64_t hc2 = hc ? litholattice::cHitchCapture::nowNs() : 0;
+  cm.lodScale = uint8_t(lf);  // software renderer: >= 4x flat shade / thin-face cull
+  if (lf > 1)
+    for (PackedVertex& v : cm.verts) { v.x = uint16_t(v.x * lf); v.y = uint16_t(v.y * lf); v.z = uint16_t(v.z * lf); }
+  if (lod >= 1) {
+    auto& vs = cm.verts;
+    size_t w = 0;
+    for (size_t q = 0; q + 3 < vs.size(); q += 4)
+      if (!(vs[q].mode & kShadeLodNear)) { if (w != q) for (int k = 0; k < 4; ++k) vs[w + size_t(k)] = vs[q + size_t(k)]; w += 4; }
+    vs.resize(w);
+  }
+  // Cortana 2026-10-25 (box, upload pass; JD-approved): pack + copy into GPU memory here on the
+  // worker (backends with a direct-upload arena: Vulkan ReBAR/host, or a worker-staged device-only
+  // block); the main thread then only publishes the handle. Off unless LL_ASYNC_CHUNK_UPLOAD=1.
+  if (asyncChunkUploadOn() && !cm.verts.empty()) {
+    auto h = std::make_shared<PreparedChunkMeshHandle>();
+    if (renderer_.prepareChunkMeshAsync(cm, h->mesh)) { h->owner = &renderer_; cm.prepared = std::move(h); }
+  }
+  if (hc) {  // gather = slab build, mesh = mesher (incl. binary path), vertex = LOD scale/cull + async pack/copy
+    const uint64_t hc3 = litholattice::cHitchCapture::nowNs();
+    litholattice::cHitchCapture::add(litholattice::cHitchCapture::kGather, hc1 - hc0);
+    litholattice::cHitchCapture::add(litholattice::cHitchCapture::kMesh, hc2 - hc1);
+    litholattice::cHitchCapture::add(litholattice::cHitchCapture::kVertex, hc3 - hc2);
+    litholattice::cHitchCapture::addJob(hc3 - hc0);
+  }
+  meshOut_.push(std::move(cm));
+}
+
+std::shared_ptr<MeshInput> Game::snapshotSlab(int cx, int sy, int cz, bool ownFresh) {
+  std::shared_ptr<MeshInput> in = meshSlab_.acquire();
+  in->text.clear();
+  // M5: pinned CoW columns (worker gathers). Republish this sub and its vertical neighbors, or
+  // nothing when submitMeshColumn already republished the whole column.
+  const uint64_t own = ownFresh ? ((uint64_t(7) << sy) >> 1) : 0;
+  litholattice::pinForMeshingInto(active_->chunks, blockRegistry(), cx, sy, cz, epoch_, ++initSeq_, active_->belowWorldFill, *in,
+                                  litholattice::MeshEdge::Clamp, own);  // P8 (Archie Q3): clamp-to-edge, not air
+  in->batch = 0; in->batchSize = 0;  // recycled buffer: not part of a sim publish batch
+  return in;
+}
+
+void Game::submitMeshColumn(int cx, int cz) {
+  const ChunkColumn* c = active_->chunks.column(cx, cz);
+  if (!c || c->edgeShell) return;  // Q12: a demoted column keeps its meshes
+  std::vector<std::shared_ptr<MeshInput>> batch;
+  batch.reserve(kSubChunks);
+  if (litholattice::cowColumnsEnabled()) active_->chunks.cowTable().publish(active_->chunks, blockRegistry(), cx, cz, ~uint64_t(0));  // M5
+  for (int sy = 0; sy < kSubChunks; ++sy) {
+    if (!c->subs[sy]) continue;
+    if (meshBackpressured()) { submitMeshAt(cx, sy, cz); continue; }  // defers the key (t3366u)
+    batch.push_back(snapshotSlab(cx, sy, cz, /*ownFresh=*/false));
+  }
+  if (batch.empty()) return;
+  ++p6ColumnJobs_;
+  meshInFlight_ += int(batch.size());  // P8 quiescence
+  if (meshHashOn_) meshLedger_.noteMeshedBorder(ChunkKey::make(cx, cz), litholattice::ChunkStateWord::borderGen(c->state.load()));
+  submitMeshJob(pool_, [this, batch = std::move(batch), mats = resources_.materials(), binary = useBinaryMesher_] {
+    for (const auto& in : batch) meshOne(in, mats, binary);
+  });
+}
+
+void Game::prewarmSwarm() {
+  if (swarmPrewarmed_) return;
+  swarmPrewarmed_ = true;
+  const auto t0 = std::chrono::steady_clock::now();
+  meshSlab_.reserve(litholattice::kSlabRadius8Columns);
+  const unsigned n = std::max(1u, std::thread::hardware_concurrency());
+  for (unsigned i = 0; i < n; ++i)
+    pool_.submitBackground([] {
+      volatile uint8_t stack[128 * 1024];  // first-touch the worker stack
+      for (size_t k = 0; k < sizeof stack; k += 4096) stack[k] = uint8_t(k);
+      std::vector<uint8_t> warm(256 * 1024, 1);  // and its allocator arena
+      (void)warm;
+    });
+  if (streamer_ && active_) {
+    const int scx = int(std::floor(player_.pos.x / 16)), scz = int(std::floor(player_.pos.z / 16));
+    streamer_->updateAround(scx, scz, 8);
+  }
+  const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  logInfo("swarm: title pre-warm - slab %zu snapshot buffers (radius-8 tier), %u worker wakes, radius-8 ring requested (%.2f ms)",
+          meshSlab_.idle(), n, ms);
+}
+
+// Fix (b): a promoted column's first L0 mesh (immediately, or when its neighbour hold releases).
+// Any neighbour BorderGen bumps taken while held are folded into this one mesh.
+void Game::startFirstMesh(int cx, int cz) {
+  const ChunkColumn* c = active_->chunks.column(cx, cz);
+  if (!c) return;
+  (void)c->state.takeDirty(litholattice::kChunkDirtyNeighbor);
+  for (int sy = 0; sy < kSubChunks; ++sy)
+    if (c->subs[sy]) c->state.bumpMeshGen();
+  submitMeshColumn(cx, cz);  // P6 locality: one job per column
+}
+
+void Game::submitMeshAt(int cx, int sy, int cz) {
+  if (const ChunkColumn* dc = active_->chunks.column(cx, cz); dc && dc->edgeShell) return;  // Q12
+  if (meshBackpressured()) {  // t3366u: paused + Render Ingress at cap -> defer the key, never drop
+    const int64_t k = packPos(cx, sy, cz);
+    if (deferredMeshKeys_.insert(k).second) { deferredMeshOrder_.push_back(k); ++meshDeferredTotal_; }
+    return;
+  }
+  auto in = snapshotSlab(cx, sy, cz);
+  ++meshInFlight_;  // P8 quiescence
+  submitMeshJob(pool_, [this, in, mats = resources_.materials(), binary = useBinaryMesher_] { meshOne(in, mats, binary); });
+}
+
+bool Game::streamSettled() const { return streamUnsettledReason() == nullptr; }
+
+const char* Game::streamUnsettledReason() const {
+  // Only the columns inside the stream footprint count: frontier columns beyond it (camera load
+  // requests, eviction hysteresis) keep trickling through the L0 hold and the mesh queue forever.
+  if (!streamer_ || !active_) return nullptr;
+  if (!streamCentreSet_) return "footprint";  // no stream pump yet
+  const int pcx = streamCx_, pcz = streamCz_;  // the last pump's centre (the bench camera moves the player mid-frame)
+  const int r = effectiveStreamRadius(cfg_);
+  for (int dz = -r; dz <= r; ++dz)
+    for (int dx = -r; dx <= r; ++dx) {
+      const int dist = cfg_.diamondStreamArea ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz));
+      if (dist > r) continue;
+      if (!active_->chunks.column(pcx + dx, pcz + dz)) return "footprint";
+      const uint64_t key = ChunkKey::make(pcx + dx, pcz + dz);
+      if (l0Hold_.isHeld(key)) return "l0-hold";
+      if (colMeshPending_.count(key)) return "first-wave-pending";
+    }
+  return nullptr;
+}
+
+size_t Game::streamFootprintColumns() const {
+  const int r = effectiveStreamRadius(cfg_);
+  size_t n = 0;
+  for (int dz = -r; dz <= r; ++dz)
+    for (int dx = -r; dx <= r; ++dx)
+      if ((cfg_.diamondStreamArea ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz))) <= r) ++n;
+  return n;
+}
+
+bool Game::sampleStreamFill(cStreamFillTracker& t, std::chrono::steady_clock::time_point now) const {
+  if (!streamer_ || !active_ || !streamCentreSet_) return false;
+  const int pcx = streamCx_, pcz = streamCz_, r = effectiveStreamRadius(cfg_);
+  bool all = true;
+  for (int dz = -r; dz <= r; ++dz)
+    for (int dx = -r; dx <= r; ++dx) {
+      const int dist = cfg_.diamondStreamArea ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz));
+      if (dist > r) continue;
+      const uint64_t key = ChunkKey::make(pcx + dx, pcz + dz);
+      t.noteWanted(key, now);
+      const ChunkColumn* c = active_->chunks.column(pcx + dx, pcz + dz);
+      const bool ready = c && c->state.stage() >= litholattice::ChunkStage::StagedRender && !l0Hold_.isHeld(key) && !colMeshPending_.count(key);
+      if (ready) t.noteReady(key, now);
+      else all = false;
+    }
+  return all;
+}
+
+void Game::pumpStreaming(float frameDtMs) {
+  // P5 deferred free queue: evicted columns die here, two pumps after their
+  // eviction and OUTSIDE the sim hold, a few per pump (never a free burst).
+  ++streamPumps_;
+  constexpr size_t kDeferredFreesPerPump = 4;
+  deferredFree_.collect(streamPumps_, kDeferredFreesPerPump);
   if (!streamer_ || !sim_ || !active_) return;
   const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
+  streamCx_ = pcx; streamCz_ = pcz; streamCentreSet_ = true;  // bench settle gate reads the pump's centre
   litholattice::setFoliageFocus(pcx, pcz);  // 2026-10-18 (Crew Canopy, F-B): sparse-leaf distance origin
   {  // 2026-10-25 stutter pass: above 90% mesh-pool fill, stop admitting far columns (shrink the
      // admission radius a step per 250 ms, floor 8) instead of evicting and re-streaming; grow back
@@ -1887,13 +2288,67 @@ void Game::pumpStreaming() {
     }
     streamer_->setAdmitRadius(ar);
   }
+  {  // Frame-aware streaming budget (2026-10-28 — Archie: optimization
+     // design; Elfie: co-implementation; JD: direction + debugging):
+     // pace NEW column requests by frame health so the streaming fill
+     // stops fighting the frame it is filling for. EMA of the frame
+     // time; Archie's grant table: starving (>40 ms) 1, cruising
+     // (30..40) 2, settling (25..30) 4, headroom (<25) 6 per frame.
+    static float emaMs = 16.7f;
+    emaMs += (frameDtMs - emaMs) * 0.1f;
+    const int grant = emaMs > 40.0f ? 1 : emaMs >= 30.0f ? 2 : emaMs >= 25.0f ? 4 : 6;
+    static int lastGrant = -1;
+    if (grant != lastGrant) {
+      lastGrant = grant;
+      logInfo("stream: frame-aware budget: frame ema %.1f ms -> %d new columns/frame", double(emaMs), grant);
+    }
+    streamer_->setRequestBudget(grant);
+  }
+  {  // S4 emergency floor (2026-10-28, Archie ruling): a sprint-flying
+     // player at a starving grant (1/frame) can outrun the world edge.
+     // When any footprint column within 2 chunks of the player (same
+     // metric as the stream footprint) is not resident, floor the DATA /
+     // COLLISION generation admissions at 4/frame; render-mesh
+     // compilation stays on its existing throttles (bounded insertion +
+     // mesh submission are untouched by the floor — see chunk_streamer.h).
+    bool edgeNear = false;
+    for (int dz = -2; dz <= 2 && !edgeNear; ++dz)
+      for (int dx = -2; dx <= 2; ++dx) {
+        const int dist = cfg_.diamondStreamArea ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz));
+        if (dist > 2) continue;
+        if (!active_->chunks.column(pcx + dx, pcz + dz)) { edgeNear = true; break; }
+      }
+    static bool floorOn = false;  // game thread only
+    if (edgeNear != floorOn) {
+      floorOn = edgeNear;
+      logInfo("stream: emergency floor %s (unloaded edge within 2 chunks of the player): data/collision admissions floored at 4/frame",
+              edgeNear ? "ON" : "off");
+    }
+    streamer_->setRequestBudgetFloor(edgeNear ? 4 : -1);
+  }
   streamer_->update(pcx, pcz);
   // CAM-2 (P2c): non-player cameras (third/follow/free view camera, MCP
   // pilot cameras) request columns around their own centres within their
   // chunk-radius budget — AFTER the player's update, so they only spend
   // in-flight capacity the player did not use (player priority, same cap).
   for (const auto& req : camera_.chunkLoadRequests()) streamer_->updateAround(req.cx, req.cz, req.radiusChunks);
-  if (!streamer_->hasReady()) { evictFarColumns(); return; }
+  if (spawnSpiral_) {  // P5: the spawn spiral ends the first time the stream footprint is fully resident
+    const int r = effectiveStreamRadius(cfg_);
+    bool full = true;
+    for (int dz = -r; dz <= r && full; ++dz)
+      for (int dx = -r; dx <= r; ++dx) {
+        const int dist = cfg_.diamondStreamArea ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz));
+        if (dist > r) continue;
+        if (!active_->chunks.column(pcx + dx, pcz + dz)) { full = false; break; }
+      }
+    if (full) {
+      spawnSpiral_ = false;
+      logInfo("stream: spawn spiral complete (%llu promoted, %llu by ring-center bypass); bypass off",
+              (unsigned long long)p5Promoted_, (unsigned long long)p5Bypassed_);
+    }
+  }
+  const bool deferredMeshReady = !deferredMeshOrder_.empty() && !meshBackpressured();
+  if (!streamer_->hasReady() && borderRing_.empty() && !deferredMeshReady && l0Hold_.empty()) { evictFarColumns(); return; }
   // P0a carry (P2b-2): the ready queue is drained only under the
   // between-ticks hold — never under a still-running worker, and (build
   // 80) never under a stopped sim either: a refused hold defers the whole
@@ -1923,17 +2378,44 @@ void Game::pumpStreaming() {
   // rest stay staged in the streamer and land over the next pumps, each
   // fully generated/loaded before handoff (snapshot-then-insert, as
   // before). 4/pump drains a full 32-column burst in 8 frames.
-  constexpr size_t kStreamInsertBudget = 4;
-  std::vector<StreamedColumn> fresh = streamer_->takeReadyUpTo(kStreamInsertBudget);
-  if (fresh.empty()) return;  // hold released by the lock's destructor
+  //
+  // Thread Handshake P5 (Archie ruling, R7): the bound is now the sim pop
+  // budget - 4 promotions per sim tick stepped, spent here at the commit
+  // barrier (this hold is taken between ticks, after the tick committed),
+  // banked to 16. Ring-center columns bypass it during the initial spawn
+  // spiral only. Counted in sim ticks, never wall clock.
+  const int grant = promoteBudget_.open(sim_->stats().worldTick);  // world ticks: ticksStepped() only counts paused single-steps
+  size_t bypassed = 0;
+  std::vector<StreamedColumn> fresh = streamer_->takeReadyPromote(size_t(grant), pcx, pcz, spawnSpiral_, &bypassed);
+  promoteBudget_.spend(int(fresh.size() - bypassed));
+  p5Bypassed_ += bypassed;
   cSignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   size_t added = 0;
   for (auto& sc : fresh) {
     std::unique_ptr<ChunkColumn> col = std::move(sc.column);
-    if (!col || active_->chunks.column(col->cx, col->cz)) continue;
+    if (!col) continue;
+    if (const ChunkColumn* rc = active_->chunks.column(col->cx, col->cz)) {
+      if (!rc->edgeShell) continue;  // resident: keep it
+      // Q12 promote: replace the demoted shell in place. Its meshes are NOT retired; the fresh
+      // first wave swaps over them (old mesh stays visible until then).
+      farPromoteAsked_.erase(ChunkKey::make(col->cx, col->cz));
+      ++farPromoted_;
+    }
     const int cx = col->cx, cz = col->cz;
     const bool fromDisk = sc.fromDisk;
+    col->state.setSimTicket(uint16_t(sim_->ticksStepped()));  // P5: the commit barrier it was promoted at
     active_->chunks.insert(std::move(col));
+    ++p5Promoted_;
+    // P5 lazy border ring: the resident neighbors' edges changed. Bump their
+    // BorderGen (raises NEIGHBOR_DIRTY) and queue them; they re-mesh lazily
+    // below, a few per pump, under this same hold.
+    // P8 (Archie Q4): all 8 Moore neighbors (4 edge + 4 corner); corner apron cells
+    // were clamped to edge while this column was missing, so they re-mesh too.
+    for (const auto& d : litholattice::kMoore8)
+      if (const ChunkColumn* n = active_->chunks.column(cx + d[0], cz + d[1])) {
+        n->state.bumpBorderGen();
+        borderRing_.note(ChunkKey::make(cx + d[0], cz + d[1]));
+      }
     // A2/B-M1: a re-streamed column may carry meshSeq tombstones from its
     // eviction (retireColumnMeshes). Clear them so the fresh snapshots
     // submitted below are not mistaken for stale meshes and dropped.
@@ -1956,13 +2438,65 @@ void Game::pumpStreaming() {
         logError("save: streamed column %d,%d signal state unreadable (components restart idle)", cx, cz);
     }
     const ChunkColumn* c = active_->chunks.column(cx, cz);
+    c->state.setStage(litholattice::ChunkStage::Mesh);  // P5: STAGED_SIM -> MESH
+    int submitted = 0;
     for (int sy = 0; sy < kSubChunks; ++sy)
       if (c->subs[sy]) {
         ++totalSubs_;
-        submitMesh_(snapshotForMeshing(active_->chunks, blockRegistry(), cx, sy, cz, epoch_, ++initSeq_,
-                                       active_->belowWorldFill));
+        ++submitted;
       }
+    if (submitted) {
+      colMeshPending_[ChunkKey::make(cx, cz)] = submitted;
+      // Fix (b): the first L0 mesh waits for the 8 Moore neighbours (or the hold's expiry).
+      if (l0Hold_.enabled() && !cL0NeighbourHold::neighboursPresent(cChunkMapPresence(active_->chunks), cx, cz))
+        l0Hold_.hold(ChunkKey::make(cx, cz), sim_->stats().worldTick);  // world ticks: ticksStepped() only counts paused single-steps
+      else
+        startFirstMesh(cx, cz);
+    } else {
+      c->state.setStage(litholattice::ChunkStage::Active);  // all air: nothing to mesh
+    }
   }
+  if (!l0Hold_.empty()) {  // fix (b): release held columns whose neighbours arrived / hold expired
+    std::vector<uint64_t> ready;
+    l0Hold_.setMaxTicks(cL0NeighbourHold::maxTicksFor(sim_->stats().targetTps));  // 2 s of ticks at the live rate
+    l0Hold_.collectReady(cChunkMapPresence(active_->chunks), sim_->stats().worldTick, ready);  // (under the between-ticks hold)
+    for (uint64_t key : ready) startFirstMesh(int(int32_t(key >> 32)), int(int32_t(key & 0xffffffffu)));
+  }
+  {  // P5 lazy border ring: re-mesh at most kBorderColsPerPump neighbor columns whose
+     // BorderGen moved (coalesced: a column queued by several new neighbors re-meshes once).
+    constexpr size_t kBorderColsPerPump = 2;
+    // P6 slack harvesting: spare frame time (vs a 60 Hz budget) buys extra border
+    // columns, priced by the measured cost of a column re-mesh submit.
+    const int extra = borderRing_.empty() ? 0 : slack_.grant(1000.0 / 60.0, double(frameDtMs));
+    p6SlackSlices_ += uint64_t(extra);
+    std::vector<uint64_t> border;
+    borderRing_.popUpTo(kBorderColsPerPump + size_t(extra), border);
+    for (uint64_t key : border) {
+      const int bx = int(int32_t(key >> 32)), bz = int(int32_t(key & 0xffffffffu));
+      const ChunkColumn* c = active_->chunks.column(bx, bz);
+      if (!c || l0Hold_.isHeld(key)) continue;  // fix (b): a held column meshes once, at release
+      if (!c->state.takeDirty(litholattice::kChunkDirtyNeighbor)) continue;
+      const auto s0 = std::chrono::steady_clock::now();
+      for (int sy = 0; sy < kSubChunks; ++sy)
+        if (c->subs[sy]) c->state.bumpMeshGen();
+      submitMeshColumn(bx, bz);
+      slack_.noteSlice(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - s0).count());
+      ++p5BorderRemeshed_;
+    }
+  }
+  {  // t3366u backpressure release: resubmit deferred sub-chunks (fresh snapshots), bounded per pump
+    constexpr int kDeferredMeshPerPump = 64;
+    for (int n = 0; n < kDeferredMeshPerPump && !deferredMeshOrder_.empty() && !meshBackpressured(); ++n) {
+      const int64_t k = deferredMeshOrder_.front();
+      deferredMeshOrder_.pop_front();
+      deferredMeshKeys_.erase(k);
+      int x, y, z;
+      unpackPos(k, x, y, z);
+      if (const ChunkColumn* c = active_->chunks.column(x, z); c && c->subs[y])
+        submitMeshAt(x, y, z);
+    }
+  }
+  if (fresh.empty()) return;  // hold released by the lock's destructor
   chunkColumns_ = active_->chunks.columns().size();
   if (simHold.owns_lock()) simHold.unlock();  // release before evictFarColumns (it takes its own hold)
   g_colsAdded += added;
@@ -2000,6 +2534,7 @@ void Game::retireColumnMeshes(int cx, int cz) {
     // insertion loop in pumpStreaming).
     meshSeq_[key] = UINT64_MAX;
     pbrMeshSeq_[key] = UINT64_MAX;
+    meshLedger_.erase(key);  // P8 MeshHash: retired with its column
     if (hadClassic) {
       ChunkMesh empty;
       empty.cx = cx; empty.sy = sy; empty.cz = cz; empty.epoch = epoch_;
@@ -2019,6 +2554,7 @@ void Game::retireColumnMeshes(int cx, int cz) {
 
 void Game::evictFarColumns() {
   if (!streamer_ || !sim_ || !active_) return;
+  demoteFarColumns();  // Q12 (LL_FAR_DEMOTE, default off)
   const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
   std::vector<uint64_t> residentKeys;
   residentKeys.reserve(active_->chunks.columns().size());
@@ -2079,6 +2615,7 @@ void Game::evictFarColumns() {
           logWarn("stream: column %d,%d is dirty/signal-bearing but no save directory is configured; NOT evicted (logged once per column)", cx, cz);
         continue;
       }
+      if (saver_.busy()) continue;  // 2026-10-31: an async save is committing (one committer); evict next pass
       // saveColumns exports the column's SGNL state from the live sim
       // inside the call — strictly BEFORE the unscan below.
       advanceWorldClock();  // Cortana 2026-10-16 review fix: level.json carries the current clock
@@ -2091,14 +2628,94 @@ void Game::evictFarColumns() {
     }
     signal.unscanColumn(cx, cz);       // drop sim indexes (ghost-component guard)
     retireColumnMeshes(cx, cz);        // meshes die with their column
-    active_->chunks.erase(cx, cz);     // free the voxel data
+    // P5 deferred free: unlink now, free the voxel data two pumps later outside the hold.
+    deferredFree_.retire(active_->chunks.extract(cx, cz), streamPumps_ + 2);
+    borderRing_.forget(key);
+    l0Hold_.forget(key);            // fix (b)
+    meshLedger_.forgetColumn(key);  // P8
+    colMeshPending_.erase(key);
+    std::erase(stagedRenderCols_, key);
     streamer_->forgetColumn(cx, cz);   // re-streamable later
+    farPromoteAsked_.erase(key);       // Q12
     ++evicted;
   }
   chunkColumns_ = active_->chunks.columns().size();
   if (simHold.owns_lock()) simHold.unlock();
   g_colsEvicted += evicted;
   if (evicted) logInfo("stream: evicted %zu far columns around chunk (%d, %d); %zu loaded", evicted, pcx, pcz, chunkColumns_);
+}
+
+// Q12 (Gate 1, 2026-10-31): far-column demote. Clean, signal-free, fully meshed columns beyond
+// R = max(LL_FAR_DEMOTE_RADIUS (9), tickRadius + 3) free their sub-chunks and keep a 1-cell edge
+// shell (neighbour mesh aprons stay exact); their meshes stay up. At d <= R - 2 the column is
+// re-requested (disk if saved, else worldgen) and the fresh one replaces the shell in place.
+// Known limit (JD 12:14): light stops at the ring. LL_FAR_LOD=1 also builds the Voxy-#1 LOD.
+void Game::demoteFarColumns() {
+  static const bool on = [] { const char* e = std::getenv("LL_FAR_DEMOTE"); return !(e && e[0] == '0'); }();  // default on (JD 2026-10-31); =0 kill switch
+  if (!on || !streamer_ || !sim_ || !active_ || !litholattice::cowColumnsEnabled()) return;
+  static const bool withLod = [] { const char* e = std::getenv("LL_FAR_LOD"); return !(e && e[0] == '0'); }();  // default on (JD 2026-10-31); =0 kill switch
+  static const int envR = [] { const char* e = std::getenv("LL_FAR_DEMOTE_RADIUS"); const int v = e ? std::atoi(e) : 9; return v > 0 ? v : 9; }();
+  const int R = std::max(envR, cfg_.tickRadius + 3);
+  static bool told = false;  // game thread only
+  if (!told) {
+    told = true;
+    logInfo("far-demote: on (radius %d, lod %s); known limit: light stops at the 1-cell edge shell of demoted columns", R, withLod ? "on" : "off");
+  }
+  constexpr size_t kDemoteBudgetPerPump = 8;
+  const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
+  auto dist = [&](int cx, int cz) {
+    const int dx = std::abs(cx - pcx), dz = std::abs(cz - pcz);
+    return cfg_.diamondStreamArea ? dx + dz : std::max(dx, dz);
+  };
+  auto eligible = [&](uint64_t key, const ChunkColumn& c) {
+    if (c.edgeShell || c.dirty || !c.cellText.empty()) return false;
+    const uint64_t w = c.state.load();
+    if (litholattice::ChunkStateWord::stageOf(w) != litholattice::ChunkStage::Active || litholattice::ChunkStateWord::dirtyBits(w)) return false;
+    if (colMeshPending_.count(key) || l0Hold_.isHeld(key) || std::find(stagedRenderCols_.begin(), stagedRenderCols_.end(), key) != stagedRenderCols_.end())
+      return false;
+    for (const auto& d : litholattice::kMoore8)
+      if (!active_->chunks.column(c.cx + d[0], c.cz + d[1])) return false;
+    return true;
+  };
+  std::vector<uint64_t> picks;
+  for (const auto& [k, cp] : active_->chunks.columns()) {
+    const ChunkColumn& c = *cp;
+    const int d = dist(c.cx, c.cz);
+    if (c.edgeShell) {
+      if (d <= R - 2 && farPromoteAsked_.insert(k).second) streamer_->forgetColumn(c.cx, c.cz);  // promote
+      continue;
+    }
+    if (d > R && picks.size() < kDemoteBudgetPerPump && eligible(k, c)) picks.push_back(k);
+  }
+  if (picks.empty()) return;
+  std::unique_lock<std::recursive_mutex> simHold;  // same between-ticks hold as eviction
+  static int demoteSkips = 0;
+  bool busy = false;
+  if (!frameHold(*sim_, simHold, demoteSkips, busy, /*allowBlock=*/false)) return;  // retry next pump
+  cSignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
+  size_t n = 0;
+  for (uint64_t key : picks) {
+    const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
+    const ChunkColumn* c = active_->chunks.column(cx, cz);
+    if (!c || !eligible(key, *c) || signal.hasIndexedCells(cx, cz)) continue;
+    std::unique_ptr<ChunkColumn> body = active_->chunks.demote(cx, cz, withLod);
+    if (!body) continue;
+    deferredFree_.retire(std::move(body), streamPumps_ + 2);  // P5: freed outside the hold
+    borderRing_.forget(key);
+    ++n;
+  }
+  if (simHold.owns_lock()) simHold.unlock();
+  farDemoted_ += n;
+  static uint64_t lastLog = 0;
+  if (n && farDemoted_ - lastLog >= 64) {
+    lastLog = farDemoted_;
+    size_t resident = 0, bytes = 0;
+    for (const auto& [k, cp] : active_->chunks.columns())
+      if (cp->edgeShell) { ++resident; bytes += cp->edgeShell->bytes(); }
+    logInfo("far-demote: %llu demoted, %llu promoted, %zu resident shells (%.2f MB), %llu refused writes",
+            (unsigned long long)farDemoted_, (unsigned long long)farPromoted_, resident, bytes / 1048576.0,
+            (unsigned long long)litholattice::cColumnEdgeShell::refusedWrites());
+  }
 }
 
 int Game::surfaceYAt(int x, int z) {
@@ -2182,8 +2799,29 @@ void Game::handleToggles() {
   if (input_.pressed(Action::ToggleDebug)) showDebug_ = !showDebug_ && !cfg_.capture;  // capture: F3 stays off
   if (input_.pressed(Action::Inventory)) setInventoryOpen(!inventoryOpen_);
   if (input_.pressed(Action::ReloadResources)) reloadResources();
+  if (soak_.active() && !inMenu() && pauseState_ == PauseState::Playing && !worldLoad_) {  // 2026-10-31: LL_WORLD_LOAD_SOAK test hook
+    const std::string step = soak_.tick();
+    if (!step.empty()) {
+      logInfo("soak: step '%s' | %s | dim=%s", step.c_str(), cWorldLoadSoak::processStats().c_str(), active_ ? active_->id.c_str() : "-");
+      if (step == "save") saveWorld("soak", false);
+      else if (step == "quit") quit_ = true;
+      else logInfo("soak: %s", requestWorldLoad(step).c_str());
+    }
+  }
+  if (auto r = saver_.poll()) {  // 2026-10-31 (JD, Save World): the async save landed
+    if (r->ok)
+      logInfo("save (%s): '%s' %zu columns on disk | tick-thread snapshot %.2f ms (%.1f MB copied; boundary after %.1f ms) | "
+              "pool write %.1f ms | region files %.1f MB | total %.1f ms | sim never stopped",
+              r->reason.c_str(), r->dim.c_str(), r->columns, r->snapshotMs, double(r->bytesCopied) / 1048576.0, r->queueMs,
+              r->commitMs, double(r->bytesOnDisk) / 1048576.0, r->totalMs);
+    else logError("save (%s) FAILED: '%s': %s", r->reason.c_str(), r->dim.c_str(), r->error.c_str());
+    lastAsyncSave_ = std::move(r);
+  }
   if (input_.pressed(Action::SaveWorld)) saveWorld("F5", false);
-  if (save_ && cfg_.autosaveSeconds > 0 && secondsBetween(lastSave_, Clock::now()) > cfg_.autosaveSeconds) saveWorld("autosave", false);
+  // 2026-10-31: LL_AUTOSAVE_SECONDS=N overrides the autosave interval (profiling / testing; 0 = off).
+  static const double kAutosaveEnv = [] { const char* e = std::getenv("LL_AUTOSAVE_SECONDS"); return e ? std::atof(e) : -1.0; }();
+  const double autosaveS = kAutosaveEnv >= 0 ? kAutosaveEnv : double(cfg_.autosaveSeconds);
+  if (save_ && autosaveS > 0 && !saver_.busy() && secondsBetween(lastSave_, Clock::now()) > autosaveS) saveWorld("autosave", false);
   if (input_.pressed(Action::ScriptEditor)) {
     if (editor_) editor_->toggle();
     else logInfo("script editor: no scripts folder");
@@ -2314,11 +2952,17 @@ std::string Game::toggleFly(const std::string& arg) {
   return std::string("fly: ") + (fly ? "on (locomotion mode: fly)" : "off (locomotion mode: walk)");
 }
 
+// 2026-10-31 (JD): Alt + wheel adjusts a component's 1..64 setting. LL_ALT_WHEEL=0 kill.
+bool Game::altWheelOn() {
+  static const bool on = [] { const char* e = std::getenv("LL_ALT_WHEEL"); return !(e && e[0] == '0'); }();
+  return on;
+}
+
 void Game::handleHotbar() {
   for (int i = 0; i < kHotbarSize && i < kHotbarKeySlots; ++i)
     if (input_.pressed(hotbarAction(i))) hot_ = i;
   // In third/follow the wheel zooms the camera instead of cycling slots.
-  const int steps = camera_.consumesWheel()
+  const int steps = (camera_.consumesWheel() || (altWheelOn() && input_.held(Action::Secondary)))  // Alt + wheel = setting
                         ? 0
                         : int(input_.pressed(Action::HotbarNext)) - int(input_.pressed(Action::HotbarPrev));
   hot_ = ((hot_ + steps) % kHotbarSize + kHotbarSize) % kHotbarSize;
@@ -2412,6 +3056,18 @@ void Game::onFocusChanged(bool focused) {
     pausedByFocus_ = true;
     captured_ = false;  // Cortana 2026-10-15 1213: the OS freed the cursor; the resume click recaptures  // a click in the world (not on the dialog) resumes
   }
+  // 2026-10-31 (JD: after alt-tab + maximize the mouse was not recaptured): a pause that focus
+  // loss opened is undone when focus returns - back to play, cursor recaptured (main.cpp applies
+  // the grab). A pause the player opened (Esc) stays. Also un-sticks the post-load focus blip.
+  if (focused && pausedByFocus_) {
+    pausedByFocus_ = false;
+    if (menuState_ == MenuState::Playing && pauseState_ == PauseState::MenuPaused && !inventoryOpen_ && !editorOpen()) {
+      ui_.closePause();
+      setPaused(false);
+      captured_ = true;
+      logInfo("focus: back - resumed play, cursor recaptured");
+    }
+  }
 }
 
 // Launch menu: the world stays loaded, the sim pauses, the cursor is freed and the camera
@@ -2437,6 +3093,7 @@ void Game::enterMenu() {
   captured_ = false;
   ui_.openMenu(cfg_.version);
   logInfo("menu: launch menu (dimension '%s' loaded, sim paused)", active_->id.c_str());
+  prewarmSwarm();  // P6: the title screen is idle time - warm the swarm for Play
 }
 
 // Play: unpause and hand control to the player instantly (no reload).
@@ -2444,6 +3101,10 @@ void Game::enterPlay() {
   if (menuState_ == MenuState::Playing) return;
   menuState_ = MenuState::Playing;
   ui_.closeMenu();
+  // S6 (2026-10-28): on this exact transition frame, zero the sim's
+  // accumulated wall-clock time debt — RESOURCE_LOAD / menu time must
+  // not land as a catch-up burst + dropped-tick spike in play.
+  if (sim_) sim_->resetTimeDebt();
   // Restore the pre-dolly player transform (see enterMenu): the cinematic
   // overwrites player_.pos every menu frame, which used to defeat save/restore.
   if (menuSnapshotValid_) {
@@ -2451,6 +3112,89 @@ void Game::enterPlay() {
   }
   setPaused(false);
   logInfo("menu: play - creative/testing");
+}
+
+// 2026-10-30 (JD): menu Play -> the world picker (worlds + named spawns).
+void Game::openWorldPicker() {
+  std::vector<std::string> spawns{"spawn"};
+  for (const auto& m : tpMarks_) spawns.push_back(m.first);
+  const int cur = cWorldCatalog::instance().indexFor(cfg_.benchScene, cfg_.dimension, cfg_.testWorldExamples);
+  worldPicker_.open(ui_.root(), std::max(1.f, ui_.root().theme().scale()), cur, std::move(spawns),
+                    [this](int w, const std::string& s) { pickWorld(w, s); }, [this] { openWorldFolderDialog(); });
+  logInfo("menu: world picker open (current world %d)", cur);
+}
+
+void Game::pickWorld(int world, const std::string& spawn) {
+  const auto& cat = cWorldCatalog::instance();
+  if (world == cat.indexFor(cfg_.benchScene, cfg_.dimension, cfg_.testWorldExamples) && !cfg_.worldFromFolder) {
+    if (spawn.empty()) enterPlay();
+    else startAt(spawn);
+    return;
+  }
+  worldSwitchArgs_ = cat.entries()[size_t(world)].args;
+  if (!spawn.empty() && spawn != "spawn") { worldSwitchArgs_.push_back("--spawn"); worldSwitchArgs_.push_back(spawn); }
+  if (cWorldConfigBuilder::inProcess()) {  // 2026-10-31 (JD, Load World): no relaunch
+    worldLoad_ = WorldLoadRequest{worldSwitchArgs_, "", spawn, cat.entries()[size_t(world)].id};
+    worldSwitchArgs_.clear();
+    logInfo("menu: world picker -> %s (spawn '%s'): loading in-process after the exit save", cat.entries()[size_t(world)].id.c_str(), spawn.c_str());
+    return;
+  }
+  logInfo("menu: world picker -> %s (spawn '%s'): relaunching after the exit save", cat.entries()[size_t(world)].id.c_str(), spawn.c_str());
+  beginRelaunch(cat.entries()[size_t(world)].title);
+}
+
+// 2026-10-31 (JD): visible feedback before the relaunch: the banner shows for a few frames, then quit_.
+void Game::beginRelaunch(const std::string& what) {
+  relaunchNotice_ = "Loading " + what + ", restarting...";
+  relaunchFrames_ = 3;
+}
+
+void Game::openWorldFolderDialog() {
+  std::string start;
+  if (!cfg_.saveDir.empty()) start = std::filesystem::path(cfg_.saveDir).parent_path().string();
+  // 2026-10-31 (JD: hang): the OS dialog runs on its own thread; update() polls the result.
+  if (!cFolderPicker::start("Open a LithoKraft world folder", start)) logInfo("menu: world folder: dialog already open");
+}
+
+void Game::pollWorldFolderDialog() {
+  bool chose = false;
+  std::string folder;
+  if (!cFolderPicker::poll(chose, folder)) return;
+  if (!chose) { logInfo("menu: world folder: cancelled"); return; }
+  logInfo("menu: %s", requestWorldLoadFolder(folder, "").c_str());
+}
+
+std::string Game::requestWorldLoad(const std::string& arg) {
+  const auto& cat = cWorldCatalog::instance().entries();
+  for (size_t i = 0; i < cat.size(); ++i)
+    if (cat[i].id == arg) {
+      pickWorld(int(i), "spawn");
+      return worldLoad_ || quit_ ? "world_load: loading '" + arg + "'" : "world_load: '" + arg + "' is the loaded world";
+    }
+  return requestWorldLoadFolder(arg, "");
+}
+
+std::string Game::requestWorldLoadFolder(const std::string& folder, const std::string& spawn) {
+  std::error_code ec;
+  if (folder.empty() || !std::filesystem::is_directory(folder, ec)) return "world_load: not a folder: '" + folder + "'";
+  if (!cWorldConfigBuilder::inProcess()) {
+    worldSwitchArgs_ = {"--save-dir", folder};
+    logInfo("world relaunch: requested folder '%s'", folder.c_str());
+    beginRelaunch(folder);
+    return "world_load: relaunching into '" + folder + "' (LL_WORLD_RELAUNCH=1)";
+  }
+  WorldLoadRequest r;
+  r.folder = folder;
+  r.label = folder;
+  if (!spawn.empty()) r.args = {"--spawn", spawn};
+  worldLoad_ = std::move(r);
+  return "world_load: loading '" + folder + "' (" +
+         (cWorldConfigBuilder::looksLikeWorld(folder) ? std::string("saved world") : std::string("no world there yet: a new world is created")) + ")";
+}
+
+void Game::startAt(const std::string& spawn) {
+  enterPlay();
+  logInfo("%s", teleportCmd({spawn}).c_str());
 }
 
 void Game::applyMenuCamera() {
@@ -2612,12 +3356,11 @@ void Game::setInventoryOpen(bool open) {
 // inventory hotbar — the selected slot (shift: the first free slot, else
 // the selected slot). The palette writes the same inventory the HUD reads
 // and player.lat persists (P2b-1); there is no second store to write to.
-// Playtest 2026-10-16: the inventory dialog's carry grid; swap carry slot i (allSlots order,
+// Playtest 2026-10-16: the inventory dialog's carry grid; (2026-10-31 JD: now a one-way copy, was: swap) carry slot i (allSlots order,
 // 0..41) with the selected hotbar slot, then refresh the grid.
 void Game::pickCarrySlot(int i) {
   if (i < 0 || i >= kCarrySlots) return;
-  auto slots = player_.inventory.allSlots();
-  if (i != hot_) std::swap(*slots[size_t(i)], *slots[size_t(hot_)]);
+  player_.inventory.assignToHotbar(i, hot_);  // 2026-10-31 (JD): one-way copy into the hotbar, never a swap
   ui_.refreshCarry(carrySnapshot());
 }
 
@@ -2742,8 +3485,21 @@ void Game::handleWorldActions() {
   const int curTarget[3] = {st.hx, st.hy, st.hz};
   const bool newTarget = curTarget[0] != lastPlaceHit_[0] || curTarget[1] != lastPlaceHit_[1] ||
                          curTarget[2] != lastPlaceHit_[2];
+  // 2026-10-31 (JD): held place fills each NEW target cell at once (strafing a Trace line skipped
+  // cells: the 200 ms repeat was longer than the time to cross a cell). Same cell still never repeats.
+  // Kill: LL_PLACE_NEWCELL=0 restores the 200 ms gate.
+  static const bool kPlaceNewCell = [] { const char* e = std::getenv("LL_PLACE_NEWCELL"); return !(e && e[0] == '0'); }();
+  // 2026-10-31 (JD): the new-cell path only while moving (horizontal movement input); standing still
+  // it chained onto the block just placed. Still = one place per click + the 200 ms hold repeat.
+  const bool placeMoving = input_.value(Action::MoveForward) != 0.f || input_.value(Action::MoveBack) != 0.f ||
+                           input_.value(Action::MoveLeft) != 0.f || input_.value(Action::MoveRight) != 0.f;
+  // 2026-10-31 (JD): a moving held-place run locks onto ONE line: the first placement captures the
+  // dominant movement axis plus the perpendicular coordinate and Y of the target; later new-cell
+  // placements only step along that axis. Released when Place is released or motion stops.
+  if (!input_.held(Action::Place) || !placeMoving) placeLockAxis_ = -1;
   const bool placeNow = input_.pressed(Action::Place) ||
-                        (input_.held(Action::Place) && nowT - lastPlaceT_ >= std::chrono::milliseconds(200));
+                        (input_.held(Action::Place) && ((kPlaceNewCell && newTarget && placeMoving) ||
+                                                        nowT - lastPlaceT_ >= std::chrono::milliseconds(200)));
   auto consumeOne = [&] {
     if (testWorld()) return;  // playtest 2026-10-16: infinite placement in the test world
     ItemStack& s = player_.inventory.hotbar()[size_t(hot_)];
@@ -2760,6 +3516,16 @@ void Game::handleWorldActions() {
     // Alt + right click on a post = write (the secondary action, as on every component)
     postViewOpen_ = true; postViewX_ = st.hx; postViewY_ = st.hy; postViewZ_ = st.hz;
     beginPostEdit(st.hx, st.hy, st.hz);
+  } else if (altWheelOn() && altUse && input_.held(Action::Secondary) &&
+             (input_.pressed(Action::HotbarNext) || input_.pressed(Action::HotbarPrev))) {
+    // 2026-10-31 (JD): Alt + wheel steps the component's 1..64 setting (up = +1, down = -1 via
+    // 63 wrapping steps); handleHotbar() leaves the hotbar alone while Alt is held.
+    const int up = int(input_.pressed(Action::HotbarPrev)) - int(input_.pressed(Action::HotbarNext));  // wheel up = HotbarPrev
+    if (up != 0) {
+      EditCmd c{EditCmd::Kind::Command};
+      c.command = SimCommand{kCmdAltUse, st.hx, st.hy, st.hz, up > 0 ? 1 : 63, 0};
+      sim_->edit(c);
+    }
   } else if (input_.pressed(Action::Use) && altUse) {  // Alt + right click: the component's secondary setting
     EditCmd c{EditCmd::Kind::Command};
     c.command = SimCommand{kCmdAltUse, st.hx, st.hy, st.hz, 0, 0};
@@ -2802,7 +3568,20 @@ void Game::handleWorldActions() {
     const Vec3 fw = player_.forward();
     const int facing = foliage::facingFromLook(fw.x, fw.z);
     const bool repeat = !input_.pressed(Action::Place);
-    if (inReach && (!repeat || newTarget)) {
+    bool onLine = true;
+    if (kPlaceNewCell && placeMoving && inReach) {
+      if (placeLockAxis_ < 0) {
+        const double mf = double(input_.value(Action::MoveForward)) - double(input_.value(Action::MoveBack));
+        const double ms = double(input_.value(Action::MoveRight)) - double(input_.value(Action::MoveLeft));
+        const double dx = fw.x * mf - fw.z * ms, dz = fw.z * mf + fw.x * ms;
+        placeLockAxis_ = std::fabs(dx) >= std::fabs(dz) ? 0 : 2;
+        placeLockPerp_ = placeLockAxis_ == 0 ? curTarget[2] : curTarget[0];
+        placeLockY_ = curTarget[1];
+      } else if (repeat) {
+        onLine = curTarget[1] == placeLockY_ && (placeLockAxis_ == 0 ? curTarget[2] : curTarget[0]) == placeLockPerp_;
+      }
+    }
+    if (inReach && (!repeat || newTarget) && onLine) {
       // 2026-10-25 Posts: kFacing8 blocks take the yaw snapped to 45 degrees (octant 0..7).
       const int placeFacing = reg.has(selBlock, kFacing8) ? facing8FromLook(fw.x, fw.z) : facing;
       EditCmd pc{EditCmd::Kind::Place, selBlock, uint8_t(placeFacing)};
@@ -2922,8 +3701,9 @@ std::string Game::requestScreenshot(const ScreenshotRequest& req) {
 
 void Game::debugShowUi(const std::string& view) {
   litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
-  if (view == "menu" || view == "settings") enterMenu();
+  if (view == "menu" || view == "settings" || view == "worlds") enterMenu();
   if (view == "settings") ui_.openSettings(settings_);
+  if (view == "worlds") openWorldPicker();  // 2026-10-30: shot of the world picker
   if (view == "pause") ui_.openPause();
   // hud: the bench boots in MenuState::cMenu with no menu UI open, which hides the HUD; show the
   // in-play HUD (hotbar, crosshair) plus the F3 overlay for the shot. Bench-only, never saved.
@@ -2939,6 +3719,17 @@ void Game::requestUiShot(const std::string& path) {
 }
 
 void Game::capturePendingScreenshot() {
+  // --frame-dump (showcase video, JD 2026-10-30): with a sink installed, every frame is
+  // grabbed (re-armed each frame) and handed to it as top-first RGB24.
+  cFrameDumpHub& hub = cFrameDumpHub::instance();
+  if (IFrameSink* sink = hub.sink()) {
+    if (hub.armed() && !pendingShot_) {
+      static std::vector<uint8_t> rgb;
+      int w = 0, h = 0;
+      if (renderer_.grabFramebuffer(rgb, w, h)) sink->onFrame(rgb, w, h);
+    }
+    if (!pendingShot_) { renderer_.requestGrab(); hub.setArmed(true); }
+  }
   if (!pendingShot_) return;
   const PendingShot ps = std::move(*pendingShot_);
   pendingShot_.reset();
@@ -2994,6 +3785,8 @@ bool frameSplitEnv() { static const bool on = [] { const char* e = std::getenv("
 const char* const kSplitNames[10] = {"head", "loco", "deceit", "cam", "pumpStream", "actions", "uploadMeshes", "benchStream", "sounds+ents", "ui"};
 }  // namespace
 void Game::update(float dt, int width, int height) {
+  pollWorldFolderDialog();  // 2026-10-31 (JD): non-blocking Open world folder result
+  if (relaunchFrames_ > 0 && --relaunchFrames_ == 0) quit_ = true;  // notice shown, now relaunch
   if (litholattice::f3trace::on()) f3t::endFrame();  // LL_TRACE_F3
   g_split.mark = Clock::now();
   // lithoscript `wait` pump: script time follows the sim's world-tick
@@ -3324,7 +4117,7 @@ void Game::update(float dt, int width, int height) {
   sim_->setRay({eyePos.x, eyePos.y, eyePos.z, f.x, f.y, f.z});
   g_split.lap(3);  // [C53-1]
   pumpSwLod();
-  pumpStreaming();  // generate/load columns around the player; insert finished ones
+  pumpStreaming(dt * 1000.0f);  // generate/load columns around the player; insert finished ones
   g_split.lap(4);
   if (playing && !clickUsed) handleWorldActions();
   g_split.lap(5);
@@ -3352,6 +4145,7 @@ void Game::update(float dt, int width, int height) {
     if (emissiveProvider_->needsRefresh(fcx, fcz)) emissiveProvider_->refresh(active_->chunks, fcx, fcz);
   }
   uploadMeshes();
+  pumpWaferReveal(dt);  // Thread Handshake P7
   g_split.lap(6);  // [C53-1] (includes the PBR/emissive lines just above)
   if (stream_) stream_->setFarLod(settings_.vkFarLod);  // [C54-1]
   // Phase 4 (JD-approved 6:30): follow the bench camera; player_.pos was just reset from the locomotion body.
@@ -3487,6 +4281,11 @@ static std::atomic<uint64_t> g_uploadsPublished{0};
 uint64_t asyncChunkUploadsPublished() { return g_uploadsPublished.load(std::memory_order_relaxed); }
 
 void Game::uploadMeshes() {
+  // JD ruling t3366u: a paused sim stops the render pipeline - no Render Ingress pops,
+  // no spill retries, no GPU uploads. Meshes keep queueing (lossless, see
+  // kRenderIngressCapBytes); on unpause the normal N/K budget below drains them, so
+  // the catch-up is spread over frames (no single-frame spike).
+  if (renderPaused()) { ++renderPausedFrames_; return; }
   // Design B Stage 2: retry spilled uploads first — they are the oldest
   // staged entries, and order across the spill/ring boundary is what keeps
   // a tombstone behind the uploads it precedes. Stops at the first refusal
@@ -3512,10 +4311,12 @@ void Game::uploadMeshes() {
   auto land = [this](ChunkMesh& m) -> bool {
     if (m.epoch != epoch_) return false;  // from an unloaded dimension
     uint64_t& seq = meshSeq_[packPos(m.cx, m.sy, m.cz)];
-    if (seq != 0 && seq >= m.seq) return false;  // a newer mesh already landed
+    if (seq != 0 && seq >= m.seq) { litholattice::workTrace("drop", m.cx, m.sy, m.cz, m.seq); return false; }  // a newer mesh already landed
+    litholattice::workTrace("land", m.cx, m.sy, m.cz, m.seq);  // duplicate-work trace (LL_WORK_TRACE)
     if (seq == 0) ++meshesReceived_;
     seq = m.seq;
     uploadBytes_ += m.verts.size() * sizeof(PackedVertex);
+    if (meshHashOn_) meshLedger_.note(packPos(m.cx, m.sy, m.cz), litholattice::meshBytesHash(m.verts.data(), m.verts.size() * sizeof(PackedVertex)));
     mcpSenses_.noteMesh(m);  // vision cache copy, before the move into the GL renderer
     // Design B Stage 2: staged on the ring path (applied by the executor at
     // the frame seal), immediate on every other path. A full ring spills
@@ -3530,6 +4331,9 @@ void Game::uploadMeshes() {
     return true;
   };
   { std::vector<ChunkMesh> fresh; meshOut_.drainInto(fresh);
+    meshInFlight_ -= int(fresh.size());  // P8 quiescence: one ChunkMesh per submitted snapshot
+    if (!colMeshPending_.empty())
+      for (const auto& m : fresh) p5NoteMeshArrived(m.cx, m.cz);  // P5: MESH -> STAGED_RENDER bookkeeping
     for (auto& m : fresh) {
       if (m.batch != 0 && m.batchSize > 1 && m.batchSize <= kAtomicBatchMax) {
         const uint64_t id = m.batch;
@@ -3552,7 +4356,10 @@ void Game::uploadMeshes() {
   constexpr double kUploadMsBudget = 1.5;           // main-thread commit time per frame
   constexpr size_t kUploadBytesBudget = 3u << 20;   // bytes per frame
   constexpr int kUploadFloor = 16;                  // always commit this many (time cap applies past it)
-  size_t bytes = 0;
+  // P5 render pop N/K: at most N sub-chunks or K bytes per frame (the first always pops).
+  litholattice::RenderPopBudget pop;
+  pop.maxItems = kUploadBudget;
+  pop.maxBytes = kUploadBytesBudget;
   int uploads = 0;
   {  // nearest-first: re-sort only when the player changes chunk or the queue grew past the last sort
     static int64_t sortedAt = INT64_MIN;
@@ -3567,18 +4374,19 @@ void Game::uploadMeshes() {
     sortedSize = pendingOrder_.size();
   }
   const auto tUploads = Clock::now();  // the cap measures commits, not the sort
-  for (; !pendingOrder_.empty() && uploads < kUploadBudget;) {
+  for (; !pendingOrder_.empty() && uploads < pop.maxItems;) {
     if (uploads >= kUploadFloor && msBetween(tUploads, Clock::now()) > kUploadMsBudget) { g_uploadsCapped += pendingOrder_.size(); break; }
     const int64_t k = pendingOrder_.front();
     auto node = pendingMesh_.find(k);
     if (node == pendingMesh_.end()) { pendingOrder_.pop_front(); continue; }
     const size_t mb = node->second.verts.size() * sizeof(PackedVertex);
-    if (uploads > 0 && bytes + mb > kUploadBytesBudget) break;  // rest next frame
+    if (!pop.admit(mb)) break;  // rest next frame
     ChunkMesh m = std::move(node->second);
     pendingMesh_.erase(node); pendingOrder_.pop_front();
-    bytes += mb;
-    if (land(m)) ++uploads;
+    pop.bytes += mb;
+    if (land(m)) { ++uploads; ++pop.items; }
   }
+  p5AdvanceStagedRender();  // P5: STAGED_RENDER -> ACTIVE once nothing of the column waits
   // Stale staged batches (dimension switch dropped their epoch) never complete.
   for (auto it = meshBatches_.begin(); it != meshBatches_.end();)
     it = (!it->second.empty() && it->second.front().epoch != epoch_) ? meshBatches_.erase(it) : std::next(it);
@@ -3591,16 +4399,16 @@ void Game::uploadMeshes() {
       if (it == pbrPendingMesh_.end()) { pbrPendingOrder_.push_back(k); pbrPendingMesh_.emplace(k, std::move(m)); }
       else if (m.epoch != it->second.epoch || m.seq > it->second.seq) it->second = std::move(m);
     } }
-  for (; !pbrPendingOrder_.empty() && uploads < kUploadBudget;) {
+  for (; !pbrPendingOrder_.empty() && uploads < pop.maxItems;) {
     if (uploads >= kUploadFloor && msBetween(tUploads, Clock::now()) > kUploadMsBudget) break;
     const int64_t k = pbrPendingOrder_.front();
     auto node = pbrPendingMesh_.find(k);
     if (node == pbrPendingMesh_.end()) { pbrPendingOrder_.pop_front(); continue; }
     const size_t mb = node->second.verts.size() * sizeof(PbrQuadVertex);
-    if (uploads > 0 && bytes + mb > kUploadBytesBudget) break;  // rest next frame
+    if (!pop.admit(mb)) break;  // rest next frame
     PbrChunkMesh m = std::move(node->second);
     pbrPendingMesh_.erase(node); pbrPendingOrder_.pop_front();
-    bytes += mb;
+    pop.bytes += mb;
     if (m.epoch != epoch_) continue;  // from an unloaded dimension
     uint64_t& seq = pbrMeshSeq_[packPos(m.cx, m.sy, m.cz)];
     if (seq != 0 && seq >= m.seq) continue;  // a newer mesh already landed
@@ -3608,8 +4416,26 @@ void Game::uploadMeshes() {
     uploadBytes_ += m.verts.size() * sizeof(PbrQuadVertex);
     // Design B Stage 2: same staging/spill discipline as the classic path.
     if (!renderer_.enqueuePbrChunkMesh(std::move(m))) spillRingUpload(1, {}, std::move(m));
-    ++uploads;
+    ++uploads; ++pop.items;
   }
+  p8MeshHashCheck();
+}
+
+// P8 (Archie Q7): render-only MeshHash gate. Never part of the world/anchor hashes.
+// Asserted only at quiescence: nothing in flight or pending, no border ring, and
+// every meshed column was meshed against its current BorderGen (MeshGen == BorderGen).
+void Game::p8MeshHashCheck() {
+  if (!meshHashOn_ || !active_ || meshLedger_.size() == 0) return;
+  if (!borderRing_.empty() || !deferredMeshKeys_.empty() || !pendingOrder_.empty() || !ringSpill_.empty()) return;
+  const bool q = meshLedger_.quiescent(size_t(std::max(0, meshInFlight_.load())), [this](uint64_t key) -> int {
+    const ChunkColumn* c = active_->chunks.column(int(int32_t(key >> 32)), int(int32_t(key & 0xffffffffu)));
+    return c ? int(litholattice::ChunkStateWord::borderGen(c->state.load())) : -1;
+  });
+  if (!q) return;
+  const uint64_t h = meshLedger_.combined();
+  if (h == meshHashLogged_) return;
+  meshHashLogged_ = h;
+  logInfo("meshhash: %016llx subs=%zu (quiescent, MeshGen == BorderGen)", (unsigned long long)h, meshLedger_.size());
 }
 
 FrameParams Game::frameParams(int width, int height) const {
@@ -3633,6 +4459,7 @@ FrameParams Game::frameParams(int width, int height) const {
       if (std::sscanf(e, "%f,%f,%f", &c[0], &c[1], &c[2]) == 3) p.sky = Vec3{c[0], c[1], c[2]};
     }
   }
+  if (revealSky_) p.sky = Vec3{p.sky.x * skyFade_, p.sky.y * skyFade_, p.sky.z * skyFade_};  // P7: dark until SKYBOX_ONLINE
   p.fogEnd = 16.f * float(cfg_.worldChunks) * 1.1f;
   const SimStats& st = sim_->stats();
   p.highlight = st.inReach; p.hx = st.hx; p.hy = st.hy; p.hz = st.hz;
@@ -3659,7 +4486,11 @@ FrameParams Game::frameParams(int width, int height) const {
   // packets), independent live toggle (render.ground_traces, default on).
   p.groundTraceOn = settings_.groundTraces;
   p.groundTraceTimeSec = p.groundPulseTimeSec;
-  if (settings_.floorPulse == 1) p.groundPulseTimeSec *= 0.35f;  // Slow: about a third of Normal speed (traces keep their clock)
+  if (settings_.floorPulse == 1) p.groundPulseTimeSec *= 0.35f;
+  if (benchPath_ == "showcase") {  // --showcase: every visual effect on (render-only, settings untouched)
+    p.groundPulseOn = true; p.groundTraceOn = true; p.leafTwinkle = 2; p.vkFx = 127;
+    p.groundPulseTimeSec = p.groundTraceTimeSec;
+  }  // Slow: about a third of Normal speed (traces keep their clock)
   ui_.paint(p.hud, *resources_.materials(), [this](BlockId b) { return resources_.icon(b); },
             [this](uint32_t itemId) { return resources_.itemIcon(itemId); });
   // PBR analytic lights for the chunk_pbr uniforms (phase 2, Worker 3): K-nearest
@@ -3813,7 +4644,7 @@ HudModel Game::hudModel() const {
   }
   if (showDebug_ && !pinned) {      // F3
     const SimStats& st = sim_->stats();
-    char l[8][160];
+    char l[9][160];
     std::snprintf(l[0], sizeof l[0], "FPS %.0f  frame %.2f ms (max %.1f)", fps_, frameAvgMs_, frameMaxMs_);
     std::snprintf(l[1], sizeof l[1], "TPS %.1f / %d  tick %.3f ms (max %.3f)  day %u %s", st.tps, st.targetTps, st.tickMs,
                   st.tickMaxMs, unsigned(worldclock::dayOf(worldClock_.time)), worldclock::hhmm(worldClock_.time).c_str());
@@ -3844,6 +4675,9 @@ HudModel Game::hudModel() const {
     }
     std::snprintf(l[6], sizeof l[6], "renderer: %s", rendererInfo().c_str());  // 2026-10-16 (JD)
     std::snprintf(l[7], sizeof l[7], "%s", releaseInfo().c_str());
+    std::snprintf(l[8], sizeof l[8], "%s", lithokraft::cChunkCoordText::line(int(std::floor(double(player_.pos.x))), int(std::floor(double(player_.pos.y))),
+                  int(std::floor(double(player_.pos.z))), st.hit, st.hx, st.hy, st.hz).c_str());  // 2026-10-31 (JD): chunk seam aid
+    std::rotate(std::begin(l) + 5, std::begin(l) + 8, std::end(l));  // order: ..., look, chunk, health/XYZ, renderer, release
     m.debugLines.assign(std::begin(l), std::end(l));
   } else if (settings_.fpsCounter && !cfg_.capture && !pinned) {  // F56-4 (Proposed by JD; co-implemented by JD and Cortana): perf readout
     char l[200], gpu[24] = "n/a";
@@ -3851,11 +4685,19 @@ HudModel Game::hudModel() const {
     std::snprintf(l, sizeof l, "FPS %.0f  avg %.2f ms  p99 %.2f ms  update %.2f ms  GPU %s", fps_, frameAvgMs_, p99Ms_, updateMs_, gpu);
     m.debugLines = {std::string(l)};
   }
+  {  // 2026-10-31 (JD): tick stability readout (LL_HUD_TICKS=0 hides it)
+    static const bool kHudTicks = [] { const char* e = std::getenv("LL_HUD_TICKS"); return !(e && e[0] == '0'); }();
+    const SimStats& ts = sim_->stats();
+    tickMeter_.sample(ts.worldTick, ts.droppedTicks, ts.targetTps, std::chrono::steady_clock::now());
+    if (kHudTicks && !pinned && !cfg_.capture) { m.tickLine = tickMeter_.line(); m.tickLevel = int(tickMeter_.level()); }
+  }
   if (postViewOpen_ || (typing_ && postTyping_)) {  // 2026-10-25 (JD): Post viewer overlay
     const SimStats& vs = sim_->stats();
     if (vs.hit && post::isPost(vs.hitBlock)) m.postViewLines = post::viewLines(vs.hitText, typing_ && postTyping_);
   }
-  if (typing_ && postTyping_)
+  if (!relaunchNotice_.empty())
+    m.bannerLines = {relaunchNotice_};
+  else if (typing_ && postTyping_)
     m.bannerLines = {"POST - type up to 256 characters, Enter = new line, Backspace deletes, Esc ends", "> " + typed_ + "_"};
   else if (typing_)
     m.bannerLines = {"KEYBOARD CAPTURE - type A-Z 0-9 symbols (SIXBIT), Enter = 1, Backspace = 2, Esc ends", "> " + typed_ + "_"};
@@ -3869,9 +4711,9 @@ std::string Game::perfLine(double fps, double frameAvgMs, double frameMaxMs) con
   const SimStats& st = sim_->stats();
   char buf[320];
   std::snprintf(buf, sizeof buf,
-                "perf fps=%.0f frame=%.2f/%.1fms tps=%.1f/%d tick=%.3f/%.3fms budget=%.2f%% dropped=%llu chunks=%zu meshes=%d/%d dim=%s",
+                "perf fps=%.0f frame=%.2f/%.1fms tps=%.1f/%d tick=%.3f/%.3fms budget=%.2f%% dropped=%llu ticks/f=%u chunks=%zu meshes=%d/%d dim=%s",
                 fps, frameAvgMs, frameMaxMs, st.tps, st.targetTps, st.tickMs, st.tickMaxMs, st.budgetPct,
-                (unsigned long long)st.droppedTicks, chunkColumns_, meshesReceived_, totalSubs_,
+                (unsigned long long)st.droppedTicks, st.ticksLastPass, chunkColumns_, meshesReceived_, totalSubs_,
                 active_->id.c_str());
   return buf;
 }

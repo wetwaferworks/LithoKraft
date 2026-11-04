@@ -81,7 +81,11 @@ inline int variantAt(int wx, int wy, int wz) {
 /// 0 front-left (x<8, z<8), 1 front-right, 2 back-right, 3 back-left.
 /// Swappable: assets/models/repeator/repeator_<i>.lthm (one per active button) override the
 /// placeholder when present. Shared, built once; the facing is applied with rotated(q, facing).
+/// PlayM: six delay settings (0..5 = 2..64 ticks), assets/models/repeator/repeator_d{ticks}.lthm.
+inline constexpr int kRepeatorStates = 6;
 const Mesh& repeatorMesh(int activeIndex);
+/// Load problems of the shipped repeator models (empty = all six loaded from assets).
+std::string repeatorModelLoadErrors();
 std::vector<model::Model> buildRepeatorModel(int activeIndex);
 /// Authored-quadrant button index for a top-face point (lx, lz in 0..1 cell-local) of a
 /// Repeator facing `facing` (inverse of the mesh rotation).

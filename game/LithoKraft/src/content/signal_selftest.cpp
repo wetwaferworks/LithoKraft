@@ -1,7 +1,18 @@
 // Headless checks of every signal block's logic (run by --selftest).
+#include "lithokraft/content/trace_conn.h"  // 2026-11-01 PlayL
+#include "litholattice/storage/storage.h"  // 2026-11-01 PlayL: column codec roundtrip
+#include "lithokraft/content/pulse_rules.h"  // 2026-11-01 PlayK
+#include <cstdlib>
+#include <algorithm>
+#include "lithokraft/content/randor_rng.h"  // Randor selftest
 #include <chrono>
+#include <format>
+#include "lithokraft/content/foliage.h"
+#include <string>
+#include <vector>
 #include <cstdio>
 #include "lithokraft/content/component.h"
+#include "lithokraft/content/compiled_comp_table.h"
 #include "lithokraft/content/signal.h"
 #include "lithokraft/content/appearance.h"
 #include "lithokraft/content/blocks.h"
@@ -140,7 +151,7 @@ int runSignalSelfTest() {
   put(0, y, 40, kSwitch); put(1, y, 40, kRedTrace); putF(2, y, 40, kRepeator, E); put(3, y, 40, kRedTrace);
   // Cortana 2026-10-15 2215 [GAME] (JD D4): delays are 2/4/8/16; a fresh (legacy-encoded) repeator
   // reads as delay 1 -> nearest 2. One click -> 4; three more wrap 8, 16 and back to 2.
-  check(repeator::delayTicks(w.getState(2, y, 38)) == 4, "fresh repeator = button 1 = delay 4 (legacy 1 migrates to button 1)");
+  check(repeator::delayTicks(w.getState(2, y, 38)) == 4 && repeator::delayIndex(w.getState(2, y, 38)) == 1, "fresh repeator = setting 2/6 = delay 4 (legacy 1 migrates to 4 ticks)");
   sim.use(w, 2, y, 38, none);  // 2 -> 4
   check(repeator::delayTicks(w.getState(2, y, 38)) == 8 && (w.getState(2, y, 38) & repeator::kNewEncoding),
         "right-click cycles repeator delay (4 -> 8), new encoding");
@@ -148,16 +159,16 @@ int runSignalSelfTest() {
        // exactly one button is pressed (3 raised + the slab = 4 pick boxes) and the sim delay matches.
       const int rx = 90, rz = 62;
       putF(rx, y, rz, kRepeator, 1); run(1);  // the sim registers the component on its next tick
-      bool ok = repeator::delayIndex(w.getState(rx, y, rz)) == 0 && repeator::delayTicks(w.getState(rx, y, rz)) == 4;
-      static constexpr int kWant[5] = {1, 2, 3, 0, 1};
-      for (int k = 0; k < 5; ++k) {
+      bool ok = repeator::delayIndex(w.getState(rx, y, rz)) == 1 && repeator::delayTicks(w.getState(rx, y, rz)) == 4;
+      static constexpr int kWant[7] = {2, 3, 4, 5, 0, 1, 2};  // PlayM: 8, 16, 32, 64, 2, 4, 8
+      for (int k = 0; k < 7; ++k) {
         sim.use(w, rx, y, rz, none);
         const CellState s = w.getState(rx, y, rz);
         litholattice::PickBox pb[8];
         const int n = pickShapeBoxes(w, blockRegistry(), rx, y, rz, kRepeator, pb, 8);
-        ok = ok && repeator::delayIndex(s) == kWant[k] && repeator::delayTicks(s) == repeator::kDelays[kWant[k]] && n == 4;
+        ok = ok && repeator::delayIndex(s) == kWant[k] && repeator::delayTicks(s) == repeator::kDelays[kWant[k]] && n == 1 + (repeator::kSettings - 1 - kWant[k]);  // slab + raised (pressed = setting + 1)
       }
-      check(ok, "REPEATOR: new = button 1 (4 ticks); right click cycles 1->2->3->4->1 (4/8/16/32); one button pressed; sim delay matches");
+      check(ok, "REPEATOR: new = 4 ticks; right click cycles 4->8->16->32->64->2->4 (six settings); pressed buttons = setting number (CloudAtlas six-button art); sim delay matches");
     }
   sim.use(w, 0, y, 38, none); sim.use(w, 0, y, 40, none);
   int t4 = -1, t1 = -1;
@@ -185,7 +196,31 @@ int runSignalSelfTest() {
     for (int d = 1; d <= 8; ++d) mig = mig && repeator::delayTicks(makeState(0, 1, uint8_t(d - 1))) == want[d - 1];
     check(mig, "legacy repeator delays 1-8 migrate to buttons 1-3 (4/8/16 ticks)");
   }
+  {  // 2026-10-31 (JD t3680u): a blue-fed Repeator chain is blue end to end; a red one stays red.
+    const int cz = 26;  // rows 25-29 at x <= 10 are free (z 160 was outside the test area)
+    put(0, y, cz, kSwitch); for (int x = 1; x <= 3; ++x) put(x, y, cz, kBlueTrace);
+    for (int x = 4; x <= 7; ++x) putF(x, y, cz, kRepeator, E);
+    put(8, y, cz, kBlueTrace);
+    put(0, y, cz + 2, kSwitch); for (int x = 1; x <= 3; ++x) put(x, y, cz + 2, kRedTrace);
+    for (int x = 4; x <= 7; ++x) putF(x, y, cz + 2, kRepeator, E);
+    put(8, y, cz + 2, kRedTrace);
+    sim.use(w, 0, y, cz, none); sim.use(w, 0, y, cz + 2, none);
+    run(80);
+    bool blue = true, red = true;
+    for (int x = 4; x <= 7; ++x) { blue = blue && repeator::isBlue(w.getState(x, y, cz)); red = red && !repeator::isBlue(w.getState(x, y, cz + 2)); }
+    check(blue && red && val(8, y, cz) > 0, "REPEATOR chain colour: blue Trace -> 4 Repeators all blue (red chain stays red), output reaches the end");
+    sim.use(w, 0, y, cz, none);
+    run(80);
+    bool kept = true;
+    for (int x = 4; x <= 7; ++x) kept = kept && repeator::isBlue(w.getState(x, y, cz));
+    check(kept, "REPEATOR chain colour: a depowered blue chain keeps its colour (no red flash)");
+  }
 
+  // PlayM (2026-11-01): sections H..tone drive wires by injecting raw values (setW, no driver). A same-tick
+  // settle re-floods an undriven wire to 0 within the tick, so these component-logic checks run with the
+  // settle off (pre-PlayM timing); same-tick behaviour has its own SAME TICK tests further down.
+  const bool keepSameTick = sim.sameTick();
+  sim.setSameTick(false);
   // H) Thresholdor: back = input, left = LOW, right = HIGH; output = input strength.
   putF(10, y, 46, kThresholdor, E); put(9, y, 46, kRedTrace); put(10, y, 45, kRedTrace); put(10, y, 47, kRedTrace);
   put(11, y, 46, kRedTrace);
@@ -247,6 +282,100 @@ int runSignalSelfTest() {
   check(val(20, y, 46) == 25 && val(21, y, 46) == 25, "redirector: side input 25 comes out the front");
   setW(21, y, 46, 30); run(1);
   check(val(20, y, 46) == 0, "redirector ignores signal arriving at its front");
+  {  // 2026-10-31 (JD mux): red at the back, blue on one side, a clocked Repeator on the other side.
+    // Level-held: Repeator off = red passes, on = blue passes. Only a Repeator switches the mode.
+    int RN = 0;  // facing that points from z+1 back to z (toward the Redirector)
+    for (int d = 0; d < 4; ++d) if (kDirX[d] == 0 && kDirZ[d] == -1) RN = d;
+    putF(72, y, 12, kRedirector, E); put(73, y, 12, kRedTrace);                       // out the front
+    put(66, y, 12, kSwitch); for (int x = 67; x <= 71; ++x) put(x, y, 12, kRedTrace);  // red, back
+    put(72, y, 9, kSwitch); put(72, y, 10, kBlueTrace); put(72, y, 11, kBlueTrace);   // blue, side
+    put(72, y, 16, kSwitch); put(72, y, 15, kRedTrace); put(72, y, 14, kRedTrace);    // clock source
+    putF(72, y, 13, kRepeator, RN);                                                    // select, side
+    sim.use(w, 66, y, 12, none); sim.use(w, 72, y, 9, none);
+    run(20);
+    const int redIn = val(71, y, 12), blueIn = val(72, y, 11);
+    const bool distinct = redIn > 0 && blueIn > 0 && redIn != blueIn;
+    check(distinct && val(72, y, 12) == redIn && val(73, y, 12) > 0, "REDIRECTOR mux: select Repeator off -> red passes out the front");
+    bool alt = distinct;
+    for (int half = 0; half < 6; ++half) {  // clock: toggle every 24 ticks (Repeator delay 4)
+      sim.use(w, 72, y, 16, none);
+      run(24);
+      const int want = (half & 1) == 0 ? blueIn : redIn;
+      alt = alt && val(72, y, 12) == want && val(73, y, 12) > 0;
+    }
+    check(alt, "REDIRECTOR mux: clocked side Repeator alternates blue / red every half-cycle (level-held)");
+    // Negative: a raw Trace on the side (powered) does not switch the mode; linked behaviour stays.
+    put(72, y, 13, kRedTrace); sim.use(w, 72, y, 16, none);
+    run(20);
+    const int sideIn = val(72, y, 13);
+    check(sideIn > 0 && val(72, y, 12) == std::max(std::max(redIn, blueIn), sideIn), "REDIRECTOR mux: a powered raw Trace on the side does not switch the mode");
+  }
+
+  {  // 2026-10-31 (JD): a Switch directly behind a Repeator powers it; the chain turns purple.
+    put(60, y - 1, 20, kWaferSilicon);
+    w.set(60, y, 20, kSwitch); w.setState(60, y, 20, withAttach(makeState(0, E), 1)); sim.onBlockChanged(60, y, 20, kSwitch);
+    putF(61, y, 20, kRepeator, E); putF(62, y, 20, kRepeator, E); put(63, y, 20, kRedTrace);
+    run(4);
+    sim.use(w, 60, y, 20, none);
+    run(40);
+    check(val(63, y, 20) > 0 && stOn(w.getState(62, y, 20)), "REPEATOR: an attached Switch right behind the back port powers it directly");
+    check(repeator::colourOf(w.getState(61, y, 20)) == 3 && repeator::colourOf(w.getState(62, y, 20)) == 3,
+          "REPEATOR: Switch-fed Repeator is purple and passes purple down the chain");
+  }
+  {  // 2026-11-01 (JD): direct comp->comp, no Trace. Attached Switch -> Repeator -> Thresholdor -> lamp.
+    put(60, y - 1, 62, kWaferSilicon); put(62, y - 1, 62, kWaferSilicon);
+    w.set(60, y, 62, kSwitch); w.setState(60, y, 62, withAttach(makeState(0, E), 1)); sim.onBlockChanged(60, y, 62, kSwitch);
+    putF(61, y, 62, kRepeator, E); putF(62, y, 62, kThresholdor, E); put(63, y, 62, kLamp);
+    // Attached Switch beside a non-Repeator component (Thresholdor) -> lamp.
+    put(70, y - 1, 62, kWaferSilicon);
+    w.set(70, y, 62, kSwitch); w.setState(70, y, 62, withAttach(makeState(0, E), 1)); sim.onBlockChanged(70, y, 62, kSwitch);
+    putF(71, y, 62, kThresholdor, E); put(72, y, 62, kLamp);
+    run(4); sim.use(w, 60, y, 62, none); sim.use(w, 70, y, 62, none); run(40);
+    std::printf("  [info] direct: sw on %d rep on %d thr st %u on %d lamp %u | sw2 on %d thr2 st %u lamp2 %u\n", int(stOn(w.getState(60, y, 62))), int(stOn(w.getState(61, y, 62))), unsigned(w.getState(62, y, 62)), int(stOn(w.getState(62, y, 62))), unsigned(w.getState(63, y, 62)), int(stOn(w.getState(70, y, 62))), unsigned(w.getState(71, y, 62)), unsigned(w.getState(72, y, 62)));
+    check(w.getState(63, y, 62) == 1, "DIRECT: Switch -> Repeator -> Thresholdor -> lamp lights with no Trace");
+    check(w.getState(72, y, 62) == 1, "DIRECT: an attached Switch powers an adjacent Thresholdor directly");
+    // Pulsor -> Repeator face to face: caught and dropped.
+    put(60, y, 58, kSwitch); put(61, y, 58, kRedTrace); putF(62, y, 58, kPulsor, E); put(62, y, 57, kBlueTrace); put(62, y, 56, kSwitch);
+    putF(63, y, 58, kRepeator, E); put(64, y, 58, kRedTrace);
+    sim.use(w, 60, y, 58, none); run(2); int mx = 0;
+    for (int i = 0; i < 12; ++i) { sim.use(w, 62, y, 56, none); run(3); mx = std::max(mx, val(64, y, 58)); }
+    if (cPulseRules::repeatorLinks()) check(mx > 0, "REP LINK: a Pulsor fires straight into the back of an adjacent Repeator");
+    else check(mx == 0, "DIRECT: a Pulsor pulse into an adjacent component is caught and dropped");
+  }
+  {  // 2026-11-01 (JD, PlayK): Switch -> Repeator -> Catchor (match 64) -> Repeator -> Trace, no Trace into the Catchor.
+    put(60, y - 1, 25, kWaferSilicon);
+    w.set(60, y, 25, kSwitch); w.setState(60, y, 25, withAttach(makeState(0, E), 1)); sim.onBlockChanged(60, y, 25, kSwitch);
+    putF(61, y, 25, kRepeator, E);
+    w.set(62, y, 25, kCatchor); w.setState(62, y, 25, makeState(64, E, 3, false)); sim.onBlockChanged(62, y, 25, kCatchor);
+    putF(63, y, 25, kRepeator, E); put(64, y, 25, kRedTrace);
+    run(4); sim.use(w, 60, y, 25, none); int mx = 0;
+    for (int i = 0; i < 40; ++i) { run(1); mx = std::max(mx, val(64, y, 25)); }
+    std::printf("  [info] replink catchor: st %u out-trace max %d\n", unsigned(w.getState(62, y, 25)), mx);
+    if (cPulseRules::repeatorLinks()) check(mx > 0, "REP LINK: a Repeator feeds a Catchor directly and the Catchor passes its catch to a Repeator");
+    else check(mx == 0, "REP LINK off: a Repeator does not feed a Catchor");
+  }
+  {  // 2026-10-31 (JD): Fusor auto-reset. Input = back; a Repeator on a side resets on its rising edge.
+    int RN = 0;
+    for (int d = 0; d < 4; ++d) if (kDirX[d] == 0 && kDirZ[d] == -1) RN = d;
+    auto fuse = [&](int fx) {
+      w.set(fx, y, 20, kFusor); w.setState(fx, y, 20, makeState(10, E)); sim.onBlockChanged(fx, y, 20, kFusor);
+      put(fx - 4, y, 20, kSwitch); for (int x = fx - 3; x < fx; ++x) put(x, y, 20, kRedTrace);  // back input ~62
+      put(fx + 1, y, 20, kRedTrace);                                                           // output
+      put(fx, y, 23, kSwitch); put(fx, y, 22, kRedTrace);                                       // side source
+    };
+    fuse(70); putF(70, y, 21, kRepeator, RN);
+    fuse(78); put(78, y, 21, kRedTrace);                                                       // negative: raw Trace
+    sim.use(w, 66, y, 20, none); sim.use(w, 74, y, 20, none);
+    run(6);
+    const bool trip = (stAux(w.getState(70, y, 20)) & 1) && (stAux(w.getState(78, y, 20)) & 1) && val(71, y, 20) == 0;
+    check(trip, "FUSOR: back input 62 over threshold 10 trips it and the output drops to 0");
+    sim.use(w, 66, y, 20, none); sim.use(w, 74, y, 20, none);  // input off
+    run(4);
+    sim.use(w, 70, y, 23, none); sim.use(w, 78, y, 23, none);  // side sources on
+    run(30);
+    check(!(stAux(w.getState(70, y, 20)) & 1), "FUSOR: a Repeator on the side resets it on its rising edge");
+    check((stAux(w.getState(78, y, 20)) & 1) != 0, "FUSOR: a powered raw Trace on the side does not reset it");
+  }
 
   // J) Memory cell: back = write, sides = clear, front = stored value.
   putF(30, y, 46, kMemor, E); put(29, y, 46, kRedTrace); put(30, y, 45, kRedTrace); put(31, y, 46, kBlueTrace);
@@ -266,28 +395,91 @@ int runSignalSelfTest() {
   setW(1, y, 50, 23); setW(2, y, 49, 10); run(1);
   check(val(3, y, 50) == 23 && val(40, y, 50) == 23 && stOn(w.getState(2, y, 50)), "pulsar: clock edge fires data 23 down 38 wires without decay");
   run(1);
-  check(val(41, y, 50) == 23 && val(20, y, 50) == 0, "pulse lasts 1 tick and the memory cell stored 23");
+  {  // 2026-11-01 (JD, PlayK): the pulse fires on one tick and stays high cPulseRules::holdTicks() ticks (default 4).
+    const int hold = cPulseRules::holdTicks();
+    bool highOk = val(41, y, 50) == 23;
+    for (int t = 2; t <= hold; ++t) { highOk = highOk && val(20, y, 50) == 23; run(1); }
+    std::printf("  [info] pulsor hold %d: after hold val %d\n", hold, val(20, y, 50));
+    check(highOk && val(20, y, 50) == 0, "PULSOR HOLD: pulse stays high for exactly the hold window, then drops; memory cell stored 23");
+  }
+  {  // K2 (JD 2026-10-31): Pulsor reach caps at 64 Trace blocks; block 65+ never lights.
+    // Test-setup fix (2026-10-31): z=80 put block 64 (66,80) outside the sim's 100-block tick scope
+    // around (0,0); z=32 keeps the whole run (to x=72) in scope with free rows on both sides.
+    putF(2, y, 32, kPulsor, E); put(1, y, 32, kRedTrace); put(2, y, 31, kBlueTrace);
+    for (int x = 3; x <= 72; ++x) put(x, y, 32, kRedTrace);
+    setW(1, y, 32, 23); setW(2, y, 31, 10); run(1);
+    check(val(3, y, 32) == 23 && val(66, y, 32) == 23, "PULSOR RANGE: blocks 1 and 64 of the run carry the pulse");
+    check(val(67, y, 32) == 0 && val(72, y, 32) == 0, "PULSOR RANGE: block 65 (and beyond) never lights");
+    run(2);
+  }
+  {  // K3 (JD 2026-10-31; z=54/53: the test map is chunks 0..3, z<64, so z=70/90 had no blocks): a Pulsor pulse floods Trace only; a Thresholdor in the line is a component that
+     // takes it as normal input on its own tick (diagnostic trace printed per tick).
+    putF(2, y, 54, kPulsor, E); put(1, y, 54, kRedTrace); put(2, y, 53, kBlueTrace);
+    for (int x = 3; x <= 10; ++x) put(x, y, 54, kRedTrace);
+    putF(11, y, 54, kThresholdor, E);
+    for (int x = 12; x <= 20; ++x) put(x, y, 54, kRedTrace);
+    setW(1, y, 54, 23); setW(2, y, 53, 10);
+    int frontAt0 = -1, backAt0 = -1;
+    for (int t = 0; t < 5; ++t) {
+      run(1);
+      std::printf("  [K3] tick %d: data=%d clk=%d pul=0x%x wire3=%d wire10=%d thr=%d wire12=%d wire20=%d\n", t, val(1, y, 54), val(2, y, 53), unsigned(w.getState(2, y, 54)), val(3, y, 54), val(10, y, 54), val(11, y, 54), val(12, y, 54), val(20, y, 54));
+      if (t == 0) { backAt0 = val(10, y, 54); frontAt0 = val(12, y, 54); }
+    }
+    check(backAt0 == 23, "PULSOR: the pulse reaches the Thresholdor's back wire");
+    check(frontAt0 == 0, "PULSOR: the pulse never floods through a Thresholdor (front wire dark on the pulse tick)");
+  }
   // Hold the clock high with a switch on the right side: one pulse on the edge, then nothing.
   w.set(2, y, 51, kSwitch); w.setState(2, y, 51, 0); sim.onBlockChanged(2, y, 51, kSwitch);
   run(2);
   sim.use(w, 2, y, 51, none);
   int pulses = 0;
   for (int i = 0; i < 6; ++i) { setW(1, y, 50, 9); run(1); pulses += val(20, y, 50) == 9; }
-  check(pulses == 1, "pulsar: clock held high fires once (rising edge only), carrying the new data (9)");
+  check(pulses == cPulseRules::holdTicks(), "pulsar: clock held high fires once (rising edge only), carrying the new data (9) for the hold window");
   sim.use(w, 2, y, 51, none); run(2);
   sim.use(w, 2, y, 51, none);
   pulses = 0;
   for (int i = 0; i < 4; ++i) { setW(1, y, 50, 12); run(1); pulses += val(20, y, 50) == 12; }
-  check(pulses == 1, "pulsar: next rising clock edge fires again (12)");
+  check(pulses == cPulseRules::holdTicks(), "pulsar: next rising clock edge fires again (12) for the hold window");
 
   // L) Fast latch: each rising edge at the back toggles the front (binary 64).
-  putF(50, y, 46, kFastLatch, E); put(49, y, 46, kRedTrace); put(51, y, 46, kRedTrace);
-  setW(49, y, 46, 10); run(1);
-  const bool l1 = stOn(w.getState(50, y, 46)) && val(51, y, 46) == 64;
-  setW(49, y, 46, 10); run(1); run(1);
-  const bool l2 = stOn(w.getState(50, y, 46));
-  setW(49, y, 46, 5); run(1);
-  check(l1 && l2 && !stOn(w.getState(50, y, 46)) && val(51, y, 46) == 0, "fast latch toggles on a pulse, holds, toggles off on the next");
+  putF(50, y, 46, kLatchor, E); put(49, y, 46, kRedTrace); put(51, y, 46, kRedTrace);
+  // 2026-10-31 (JD): set to 44, the Latchor fires only on a tick whose input is exactly 44.
+  w.setState(50, y, 46, makeState(44, E, 0, false));
+  bool lOk = true;
+  for (int in : {10, 43, 44, 45, 64, 1, 44, 0}) {
+    setW(49, y, 46, in); run(1);
+    const int out = val(51, y, 46);
+    if (out != (in == 44 ? 44 : 0)) { lOk = false; std::printf("  [L] in %d -> out %d\n", in, out); }
+  }
+  check(lOk, "latchor set to 44: only an input of exactly 44 fires (44, that tick); 10/43/45/64/1 give nothing");
+
+  // 2026-11-01 (JD soft power, LL_SOFT_POWER=0 off): a lit Trace soft-powers the solid block it touches;
+  // that block lights an attached lamp but never drives Trace on its other faces.
+  {
+    static const bool soft = [] { const char* e = std::getenv("LL_SOFT_POWER"); return !(e && e[0] == '0'); }();
+    put(90, y, 60, kSwitch); put(91, y, 60, kRedTrace); put(92, y, 60, kWaferSilicon); put(93, y, 60, kLamp);
+    put(92, y, 61, kBlueTrace);  // touches only the soft-powered block
+    sim.use(w, 90, y, 60, none); run(3);
+    if (soft) {
+      std::printf("  [info] soft: wire91 %d lamp93 st %u silicon solid/opaque/powerable %d%d%d\n", val(91, y, 60), unsigned(w.getState(93, y, 60)), int(blockRegistry().has(kWaferSilicon, kSolid)), int(blockRegistry().has(kWaferSilicon, kOpaque)), int(blockRegistry().has(kWaferSilicon, kPowerable)));
+      check(w.getState(93, y, 60) == 1, "soft power: Trace-touched block lights the lamp beside it");
+      check(val(92, y, 61) == 0, "soft power: a soft-powered block never drives Trace");
+      sim.use(w, 90, y, 60, none); run(3);
+      check(w.getState(93, y, 60) == 0, "soft power: lamp goes dark when the Trace goes dark");
+      // Memor front output soft-powers the block in front (z 63 row: free in this world, floor x<96 z<64).
+      put(90, y, 63, kRedTrace); putF(91, y, 63, kMemor, E); put(92, y, 63, kWaferSilicon); put(93, y, 63, kLamp);
+      const bool memDark = w.getState(93, y, 63) == 0;
+      setW(90, y, 63, 17); run(3);
+      // PlayM (JD 12:40, option A): with LL_HARD_ANY=0 only a Repeator powers the block it faces, so the lamp stays dark.
+      if (cPulseRules::hardAnyComponent()) check(memDark && w.getState(93, y, 63) == 1, "soft power: Memor output (17) soft-powers the block in front; lamp beside it lights");
+      else check(memDark && w.getState(93, y, 63) == 0, "soft power off for components (LL_HARD_ANY=0): Memor front block unpowered; lamp beside it stays dark");
+      // 2026-11-01 PlayL (JD, LL_HARD_ANY): a Memor output facing the block HARD-powers it, so Trace on top lights.
+      put(92, y + 1, 63, kRedTrace); run(3);
+      std::printf("  [info] hard memor: block-top trace %d\n", val(92, y + 1, 63));
+      if (cPulseRules::hardAnyComponent()) check(val(92, y + 1, 63) == 17, "HARD power: Memor (17) -> block -> Trace on the block lights at strength 17");
+      else check(val(92, y + 1, 63) == 0, "HARD power off (LL_HARD_ANY=0): Memor front block stays soft, Trace on it stays dark");
+    }
+  }
 
   // M) Switch and button.
   put(60, y, 46, kSwitch); put(61, y, 46, kRedTrace); put(59, y, 46, kBlueTrace);
@@ -334,7 +526,8 @@ int runSignalSelfTest() {
     sim.takeSounds(ev);  // everything since the start: the pulsor tests fired with data 23, 9 and 12
     int fired = 0;
     for (const SoundEvent& e : ev) fired += e.cue == SoundCue::PulsorFire && (e.value == 23 || e.value == 9 || e.value == 12);
-    check(fired == 3, "pulsar: every fire reports a PulsorFire sound cue carrying its data strength");
+    // 2026-10-31: + the K2 range Pulsor (data 23), now inside the tick scope -> 4 fires; + the K3 Pulsor (23) on the map at z=54 -> 5.
+    check(fired == 5, "pulsar: every fire reports a PulsorFire sound cue carrying its data strength");
     ev.clear();
     putF(41, y, 60, kToneBlock, E); put(40, y, 60, kRedTrace); put(42, y, 60, kRedTrace);
     for (int i = 0; i < 3; ++i) { setW(40, y, 60, 34); run(1); }
@@ -345,6 +538,24 @@ int runSignalSelfTest() {
     sim.takeSounds(ev);
     check(on && ev.size() == 1 && ev[0].value == 0 && val(41, y, 60) == 0,
           "tone block: s=34 -> one Tone cue (A4), held without repeats; 0 -> silent cue; output stays 0");
+  }
+  sim.setSameTick(keepSameTick);  // PlayM: settle back on after the injected-wire sections
+  {  // 2026-11-01 (Archie list): compiled in-range component table - only components inside the tick area
+     // are in the table, and nothing out of range or non-component is ever dispatched.
+    ChunkMap tw;
+    tw.setRegistry(&blockRegistry());
+    for (int cx = 0; cx < 4; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = 0; tw.insert(std::move(col)); }
+    tw.set(2, y, 2, kLatchor); tw.set(50, y, 2, kLatchor); tw.set(3, y, 2, kRedTrace); tw.set(4, y, 2, kWaferSilicon);
+    cSignalSim ts;
+    ts.scan(tw);
+    for (int i = 0; i < 8; ++i) ts.tick(tw, 0, 0, 1, [](int, int, int) {});
+    const size_t inRange = ts.compTableSize(); const uint64_t rebuilds = ts.compTableRebuilds();
+    std::printf("  [comp table] in-range %zu, rebuilds %llu, out-of-range dispatches %llu (sim total %llu)\n", inRange,
+                (unsigned long long)rebuilds, (unsigned long long)ts.compOutOfRangeDispatches(), (unsigned long long)sim.compOutOfRangeDispatches());
+    const char* e = std::getenv("LL_COMP_TABLE");
+    if (!(e && e[0] == '0'))
+      check(inRange == 1 && rebuilds <= 2 && ts.compOutOfRangeDispatches() == 0 && sim.compOutOfRangeDispatches() == 0,
+            "comp table: only the in-range component is listed (1 of 2), no per-tick rebuild, zero out-of-range dispatches");
   }
   std::printf("%s (%d failure%s)\n", fails ? "SELFTEST FAILED" : "SELFTEST OK", fails, fails == 1 ? "" : "s");
   {  // Attachables: a switch on top of a block powers the block (lamp beside it) and the dust
@@ -380,7 +591,7 @@ int runSignalSelfTest() {
     run(4);
     check(off && val(42, y, 62) == 64 && val(40, y, 62) == 64, "attached switch powers red and blue Trace on its own sides (64)");
   }
-  {  // 2026-10-24 (JD 5:57 PM): an on switch also powers Trace on its 4 same-level diagonals.
+  {  // 2026-10-31 (JD): a switch no longer powers Trace on its diagonals (was 2026-10-24 5:57 PM).
     for (int x = 44; x <= 45; ++x) for (int z = 61; z <= 62; ++z) put(x, y - 1, z, kWaferSilicon);
     w.set(44, y, 62, kSwitch); w.setState(44, y, 62, withAttach(0, 1)); sim.onBlockChanged(44, y, 62, kSwitch);
     put(45, y, 61, kRedTrace);
@@ -388,7 +599,7 @@ int runSignalSelfTest() {
     const bool off = val(45, y, 61) == 0;
     sim.use(w, 44, y, 62, none);
     run(4);
-    check(off && val(45, y, 61) == 64, "attached switch powers a diagonal (same level) Trace (64)");
+    check(off && val(45, y, 61) == 0, "attached switch does NOT power a diagonal Trace (orthogonal only, JD 2026-10-31)");
   }
   {  // 2026-10-24 lever: on each of the 6 faces (floor / ceiling in all 4 facings) the switch keeps
      // its attach face and facing through ticks and toggles and powers its support (lamp beside it).
@@ -450,8 +661,255 @@ int runSignalSelfTest() {
     std::printf("  display scene: lamp lit %d / 800 ticks, %d flashes\n", litTicks, edges);
     check(edges >= 8, "display scene: ring clock runs and the bank fires its stored colour repeatedly");
   }
+  {  // 2026-11-01 PlayL (JD regression): a Repeator ring clock that runs THROUGH a hard-powered block
+     // (Repeator -> silicon -> Repeator back) keeps running; the lamp tap keeps flashing.
+    ChunkMap cw;
+    cw.setRegistry(&blockRegistry());
+    for (int cz = 0; cz < 2; ++cz)
+      for (int cx = 0; cx < 2; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; cw.insert(std::move(col)); }
+    for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x) cw.set(x, y - 1, z, kWaferSilicon);
+    buildRingClock(cw, 2, y, 2, 0);
+    cw.set(2 + 4 + 2, y, 2 + 1, kWaferSilicon);  // ring trace after the east Repeator -> a solid block
+    cSignalSim cs;
+    cs.scan(cw);
+    int rises = 0; bool prev = false;
+    for (int i = 0; i < 800; ++i) {
+      cs.tick(cw, 0, 0, 100, [](int, int, int) {});
+      const bool on = cw.getState(2 + 4, y, 2 + 1 + 4) == 1;
+      if (on && !prev) ++rises;
+      prev = on;
+    }
+    std::printf("  [info] repeator clock through block: lamp rises %d / 800 ticks\n", rises);
+    check(rises >= 4, "REGRESSION: Repeator clock through a hard-powered block keeps running (lamp tap flashes)");
+  }
+  {  // 2026-11-01 PlayL (JD): hard power carries STRENGTH; the strongest hard source on a block wins.
+    ChunkMap cw;
+    cw.setRegistry(&blockRegistry());
+    for (int cz = 0; cz < 2; ++cz)
+      for (int cx = 0; cx < 2; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; cw.insert(std::move(col)); }
+    for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x) cw.set(x, y - 1, z, kWaferSilicon);
+    // Memor A (stores 9) faces E into the block at (6, 4); Memor B (stores 21) faces W into it from (7, 4).
+    cw.set(5, y, 4, kMemor); cw.setState(5, y, 4, makeState(9, 1));
+    cw.set(7, y, 4, kMemor); cw.setState(7, y, 4, makeState(21, 3));
+    cw.set(6, y, 4, kWaferSilicon);
+    cw.set(6, y + 1, 4, kRedTrace);  // Trace on top of the block
+    cSignalSim cs;
+    cs.scan(cw);
+    for (int i = 0; i < 6; ++i) cs.tick(cw, 0, 0, 100, [](int, int, int) {});
+    const int v = stValue(cw.getState(6, y + 1, 4));
+    std::printf("  [info] hard strength: block-top trace %d (expect 21)\n", v);
+    if (cPulseRules::hardAnyComponent()) check(v == 21, "HARD power strength: two Memors (9, 21) into one block; Trace on it carries 21 (strongest wins)");
+  }
+  // ---- 2026-11-01 PlayL (JD 7:45 / 7:48): same-tick soft power; Trace connection states ----
+  auto plWorld = [&](ChunkMap& cw) {
+    cw.setRegistry(&blockRegistry());
+    for (int cz = 0; cz < 2; ++cz)
+      for (int cx = 0; cx < 2; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; cw.insert(std::move(col)); }
+    for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x) cw.set(x, y - 1, z, kWaferSilicon);
+  };
+  const cSignalSim::DirtyFn plNone = [](int, int, int) {};
+  {  // the lamp on a soft-powered block lights on the SAME tick as the Trace (no one-tick soft lag), and goes dark with it
+    ChunkMap cw; plWorld(cw);
+    cw.set(2, y, 8, kSwitch); cw.set(3, y, 8, kRedTrace); cw.set(4, y, 8, kWaferSilicon); cw.set(5, y, 8, kLamp);
+    cSignalSim cs; cs.scan(cw);
+    for (int i = 0; i < 3; ++i) cs.tick(cw, 0, 0, 100, plNone);
+    cs.use(cw, 2, y, 8, plNone);
+    int traceT = -1, lampT = -1;
+    for (int i = 0; i < 8; ++i) {
+      cs.tick(cw, 0, 0, 100, plNone);
+      if (traceT < 0 && stValue(cw.getState(3, y, 8)) > 0) traceT = i;
+      if (lampT < 0 && cw.getState(5, y, 8) == 1) lampT = i;
+    }
+    cs.use(cw, 2, y, 8, plNone);
+    int traceOff = -1, lampOff = -1;
+    for (int i = 0; i < 8; ++i) {
+      cs.tick(cw, 0, 0, 100, plNone);
+      if (traceOff < 0 && stValue(cw.getState(3, y, 8)) == 0) traceOff = i;
+      if (lampOff < 0 && cw.getState(5, y, 8) == 0) lampOff = i;
+    }
+    std::printf("  [info] same-tick soft: trace on t%d lamp on t%d; trace off t%d lamp off t%d\n", traceT, lampT, traceOff, lampOff);
+    check(traceT >= 0 && lampT == traceT, "SAME TICK: Trace -> soft block -> lamp lights on the tick the Trace lights");
+    check(traceOff >= 0 && lampOff == traceOff, "SAME TICK: the soft lamp goes dark on the tick the Trace goes dark");
+  }
+  {  // same tick, hard: switch -> Trace -> Memor -> block; Trace on the block and the block's lamp share one tick
+    ChunkMap cw; plWorld(cw);
+    cw.set(1, y, 11, kSwitch); cw.set(2, y, 11, kRedTrace); cw.set(3, y, 11, kMemor); cw.setState(3, y, 11, makeState(0, 1));
+    cw.set(4, y, 11, kWaferSilicon); cw.set(4, y + 1, 11, kRedTrace); cw.set(5, y, 11, kLamp);
+    cSignalSim cs; cs.scan(cw);
+    for (int i = 0; i < 3; ++i) cs.tick(cw, 0, 0, 100, plNone);
+    cs.use(cw, 1, y, 11, plNone);
+    int topT = -1, lampT = -1;
+    for (int i = 0; i < 8; ++i) {
+      cs.tick(cw, 0, 0, 100, plNone);
+      if (topT < 0 && stValue(cw.getState(4, y + 1, 11)) > 0) topT = i;
+      if (lampT < 0 && cw.getState(5, y, 11) == 1) lampT = i;
+    }
+    std::printf("  [info] same-tick hard: block-top trace t%d (%d) lamp t%d\n", topT, stValue(cw.getState(4, y + 1, 11)), lampT);
+    if (cPulseRules::hardAnyComponent()) check(topT >= 0 && lampT == topT, "SAME TICK: hard block -> its Trace and its lamp update on the same tick");
+  }
+  {  // connection states: Alt-use cycles auto -> 1 .. 63 -> auto (64 states); 63 steps = one step back; strength bits kept
+    ChunkMap cw; plWorld(cw);
+    cw.set(3, y, 12, kRedTrace); cw.setState(3, y, 12, makeState(5));
+    cSignalSim cs; cs.scan(cw);
+    bool seq = cTraceConn::index(cw.getState(3, y, 12)) == 0;
+    for (int i = 1; i <= 64; ++i) {
+      cs.use(cw, 3, y, 12, plNone, true);
+      seq = seq && cTraceConn::index(cw.getState(3, y, 12)) == (i % 64) && stValue(cw.getState(3, y, 12)) == 5;
+    }
+    cs.use(cw, 3, y, 12, plNone, true); cs.use(cw, 3, y, 12, plNone, true);  // -> 2
+    for (int i = 0; i < 63; ++i) cs.use(cw, 3, y, 12, plNone, true);          // 63 steps = back one -> 1
+    const bool back = cTraceConn::index(cw.getState(3, y, 12)) == 1;
+    if (cTraceConn::enabled()) check(seq && back, "TRACE CONN: Alt-use cycles auto,1..63,auto (64 states); 63 steps = one back; strength kept");
+    // save / load: the state lives in the cell and survives the column codec roundtrip
+    cs.use(cw, 3, y, 12, plNone, true); cs.use(cw, 3, y, 12, plNone, true);  // -> 3 (+X, -X)
+    storage::cPayloadReg codec; codec.setRegistry(&blockRegistry());
+    std::string err;
+    const auto rec = codec.encode(*cw.column(0, 0));
+    const auto back2 = codec.decode(rec, &err);
+    const CellState rs = back2 ? back2->subs[size_t(y >> 4)]->state[size_t(SubChunk::index(3, y & 15, 12))] : CellState(0);
+    std::printf("  [info] trace conn roundtrip: before %d after %d (err '%s')\n", cTraceConn::index(cw.getState(3, y, 12)), cTraceConn::index(rs), err.c_str());
+    if (cTraceConn::enabled()) check(back2 && cTraceConn::index(rs) == 3 && rs == cw.getState(3, y, 12), "TRACE CONN: connection state saves and loads with the world (column codec roundtrip)");
+  }
+  if (cTraceConn::enabled()) {  // a disconnected side neither soft-powers its block nor links wire / components
+    ChunkMap cw; plWorld(cw);
+    // row z 14: switch -> Trace (connects -X only) -> block -> lamp: Trace lights, block NOT soft-powered.
+    cw.set(2, y, 14, kSwitch); cw.set(3, y, 14, kRedTrace); cw.set(4, y, 14, kWaferSilicon); cw.set(5, y, 14, kLamp);
+    cw.setState(3, y, 14, cTraceConn::withIndex(0, 1 << 1));
+    // row z 2: switch -> Trace A (auto) -> Trace B (connects +X only: not toward A) -> Trace C
+    cw.set(2, y, 2, kSwitch); cw.set(3, y, 2, kRedTrace); cw.set(4, y, 2, kRedTrace); cw.set(5, y, 2, kRedTrace);
+    cw.setState(4, y, 2, cTraceConn::withIndex(0, 1 << 0));
+    // row z 5: switch -> Trace D (connects +X only: not toward the switch) -> Memor input never sees it
+    cw.set(2, y, 5, kSwitch); cw.set(3, y, 5, kRedTrace); cw.setState(3, y, 5, cTraceConn::withIndex(0, 1 << 0));
+    cSignalSim cs; cs.scan(cw);
+    cs.use(cw, 2, y, 14, plNone); cs.use(cw, 2, y, 2, plNone); cs.use(cw, 2, y, 5, plNone);
+    for (int i = 0; i < 6; ++i) cs.tick(cw, 0, 0, 100, plNone);
+    std::printf("  [info] trace conn: z14 trace %d lamp %u | z2 A %d B %d C %d | z5 D %d\n", stValue(cw.getState(3, y, 14)), unsigned(cw.getState(5, y, 14)),
+                stValue(cw.getState(3, y, 2)), stValue(cw.getState(4, y, 2)), stValue(cw.getState(5, y, 2)), stValue(cw.getState(3, y, 5)));
+    check(stValue(cw.getState(3, y, 14)) > 0 && cw.getState(5, y, 14) == 0, "TRACE CONN: a disconnected side does not soft-power its block (lamp stays dark)");
+    check(stValue(cw.getState(3, y, 2)) > 0 && stValue(cw.getState(4, y, 2)) == 0 && stValue(cw.getState(5, y, 2)) == 0, "TRACE CONN: a disconnected side does not link Trace");
+    check(stValue(cw.getState(3, y, 5)) == 0, "TRACE CONN: a disconnected side does not link a component (switch)");
+    // back to auto (63 more steps from index 2 on the z14 Trace = 1; one more = auto... cycle to 0): the lamp lights
+    while (cTraceConn::index(cw.getState(3, y, 14)) != 0) cs.use(cw, 3, y, 14, plNone, true);
+    for (int i = 0; i < 6; ++i) cs.tick(cw, 0, 0, 100, plNone);
+    check(cw.getState(5, y, 14) == 1, "TRACE CONN: auto again -> the block is soft-powered, lamp lights");
+    // PlayN (JD 13:06): a custom state whose side points at a solid block soft-powers that block. -X (switch) + +X
+    // (block) = mask 0b11: the Trace stays linked to the switch and soft-powers the block at +X; lamp lights.
+    while (cTraceConn::index(cw.getState(3, y, 14)) != 3) cs.use(cw, 3, y, 14, plNone, true);
+    for (int i = 0; i < 6; ++i) cs.tick(cw, 0, 0, 100, plNone);
+    check(stValue(cw.getState(3, y, 14)) > 0 && cw.getState(5, y, 14) == 1, "TRACE CONN: a custom side toward a solid block soft-powers it (lamp lights)");
+    // and -X only again (mask 0b10): block side off -> soft power drops, lamp dark.
+    while (cTraceConn::index(cw.getState(3, y, 14)) != 2) cs.use(cw, 3, y, 14, plNone, true);
+    for (int i = 0; i < 6; ++i) cs.tick(cw, 0, 0, 100, plNone);
+    check(stValue(cw.getState(3, y, 14)) > 0 && cw.getState(5, y, 14) == 0, "TRACE CONN: turning the block side off again un-powers the block (lamp dark)");
+  }
+  {  // PlayN (JD 13:13): a component's LEFT / RIGHT side input reads a solid block's soft power with strength.
+     // Row: switch(4) -> Trace(5) = 64 -> Thresholdor(6, E, subtract) -> Trace(7). Side block at (6, z+sd), soft-
+     // powered by a Trace run switch(3) -> (4..6, z+2sd) = 62 at (6, z+2sd). Subtract: 64 - 62 = 2 on the front Trace.
+    auto sideTest = [&](int z, int sd) {
+      ChunkMap cw; plWorld(cw);
+      cw.set(4, y, z, kSwitch); cw.set(5, y, z, kRedTrace); cw.set(6, y, z, kThresholdor); cw.setState(6, y, z, makeState(0, 1)); cw.set(7, y, z, kRedTrace);
+      cw.set(6, y, z + sd, kWaferSilicon);
+      cw.set(3, y, z + 2 * sd, kSwitch); for (int x = 4; x <= 6; ++x) cw.set(x, y, z + 2 * sd, kRedTrace);
+      cSignalSim cs; cs.scan(cw);
+      cs.use(cw, 6, y, z, plNone);  // subtract mode
+      cs.use(cw, 4, y, z, plNone); cs.use(cw, 3, y, z + 2 * sd, plNone);
+      for (int i = 0; i < 8; ++i) cs.tick(cw, 0, 0, 100, plNone);
+      const int sp = stValue(cw.getState(6, y, z + 2 * sd)), out = stValue(cw.getState(7, y, z));  // block soft = its Trace
+      std::printf("  [info] side block (sd %d): side trace %d thr out %d\n", sd, sp, out);
+      return sp > 0 && sp < 64 && out == 64 - sp;
+    };
+    check(sideTest(12, -1), "SIDE BLOCK: Thresholdor subtract reads a soft-powered block on its left side with strength (64 - 62 = 2)");
+    check(sideTest(3, 1), "SIDE BLOCK: Thresholdor subtract reads a soft-powered block on its right side with strength (64 - 62 = 2)");
+  }
+  // ---- 2026-11-01 PlayM (JD): same-tick components (components read THIS tick's wire values) ----
+  {  // switch -> Trace -> Memor -> Trace -> Memor -> Trace -> lamp: every Trace and the lamp light on ONE tick
+    ChunkMap cw; plWorld(cw);
+    cw.set(1, y, 3, kSwitch); cw.set(2, y, 3, kRedTrace);
+    cw.set(3, y, 3, kMemor); cw.setState(3, y, 3, makeState(0, 1)); cw.set(4, y, 3, kRedTrace);
+    cw.set(5, y, 3, kMemor); cw.setState(5, y, 3, makeState(0, 1)); cw.set(6, y, 3, kRedTrace); cw.set(7, y, 3, kLamp);
+    auto runChain = [&](ChunkMap& m, std::vector<int>& onT, std::vector<uint64_t>& trace) {
+      cSignalSim cs; cs.scan(m);
+      for (int i = 0; i < 3; ++i) cs.tick(m, 0, 0, 100, plNone);
+      cs.use(m, 1, y, 3, plNone);
+      onT.assign(4, -1);
+      for (int i = 0; i < 10; ++i) {
+        cs.tick(m, 0, 0, 100, plNone);
+        const int v[4] = {stValue(m.getState(2, y, 3)), stValue(m.getState(4, y, 3)), stValue(m.getState(6, y, 3)), int(m.getState(7, y, 3) == 1)};
+        uint64_t hsh = 1469598103934665603ull;
+        for (int x = 1; x <= 7; ++x) hsh = (hsh ^ m.getState(x, y, 3)) * 1099511628211ull;
+        trace.push_back(hsh);
+        for (int j = 0; j < 4; ++j) if (onT[size_t(j)] < 0 && v[j] > 0) onT[size_t(j)] = i;
+      }
+      return cs.settleIterations();
+    };
+    std::vector<int> a, b; std::vector<uint64_t> ta, tb;
+    ChunkMap cw2; plWorld(cw2);
+    for (int x = 1; x <= 7; ++x) { cw2.set(x, y, 3, cw.get(x, y, 3)); cw2.setState(x, y, 3, cw.getState(x, y, 3)); }
+    const uint64_t it = runChain(cw, a, ta);
+    runChain(cw2, b, tb);
+    std::printf("  [info] same-tick comps: trace2 t%d trace4 t%d trace6 t%d lamp t%d (settle iters %llu)\n", a[0], a[1], a[2], a[3], (unsigned long long)it);
+    static const bool same = [] { const char* e = std::getenv("LL_SAME_TICK"); return !(e && e[0] == '0'); }();
+    if (same) check(a[0] >= 0 && a[1] == a[0] && a[2] == a[0] && a[3] == a[0], "SAME TICK: switch -> Trace -> Memor -> Trace -> Memor -> Trace -> lamp all update on ONE tick");
+    else check(a[0] >= 0 && a[3] > a[0], "SAME TICK off (LL_SAME_TICK=0): chain takes one tick per component");
+    check(a == b && ta == tb, "SAME TICK: deterministic (two sims, identical per-tick state hashes)");
+  }
+  {  // intended delay kept: a fresh Repeator (delay 4) still delays; lag input -> output stays its delay
+    ChunkMap cw; plWorld(cw);
+    cw.set(1, y, 6, kSwitch); cw.set(2, y, 6, kRedTrace); cw.set(3, y, 6, kRepeator); cw.setState(3, y, 6, makeState(0, 1));
+    cw.set(4, y, 6, kBlueTrace); cw.set(5, y, 6, kLamp);
+    cSignalSim cs; cs.scan(cw);
+    for (int i = 0; i < 3; ++i) cs.tick(cw, 0, 0, 100, plNone);
+    cs.use(cw, 1, y, 6, plNone);
+    int inT = -1, outT = -1, lampT = -1;
+    for (int i = 0; i < 16; ++i) {
+      cs.tick(cw, 0, 0, 100, plNone);
+      if (inT < 0 && stValue(cw.getState(2, y, 6)) > 0) inT = i;
+      if (outT < 0 && stValue(cw.getState(4, y, 6)) > 0) outT = i;
+      if (lampT < 0 && cw.getState(5, y, 6) == 1) lampT = i;
+    }
+    std::printf("  [info] same-tick repeator: in t%d out t%d lamp t%d (lag %d)\n", inT, outT, lampT, outT - inT);
+    check(inT >= 0 && outT - inT >= 3 && lampT == outT, "SAME TICK: Repeator keeps its delay (lag >= 3 ticks at fresh delay 4); its lamp lights with its output Trace");
+  }
+  {  // PlayM: CloudAtlas six-button models load from assets (repeator_d2..d64.lthm), no placeholder fallback
+    const std::string errs = foliage::repeatorModelLoadErrors();
+    bool all = errs.empty();
+    for (int i = 0; i < foliage::kRepeatorStates; ++i) all = all && foliage::repeatorMesh(i).fromAsset;
+    if (!errs.empty()) std::printf("  [info] repeator model load: %s\n", errs.c_str());
+    check(all, "REPEATOR six-button models: all 6 states load from assets/models/repeator (.lthm)");
+  }
+  {  // PlayM (JD 10:08 AM): every Repeator setting delays by exactly its labelled ticks (2/4/8/16/32/64),
+     // relative to the 4-tick setting (the same circuit; only the delay differs), and a saved state round-trips.
+    int lag[repeator::kSettings] = {};
+    bool allOk = true;
+    for (int sIdx = 0; sIdx < repeator::kSettings; ++sIdx) {
+      ChunkMap cw; plWorld(cw);
+      cw.set(1, y, 6, kSwitch); cw.set(2, y, 6, kRedTrace); cw.set(3, y, 6, kRepeator); cw.setState(3, y, 6, repeator::encode(0, 1, sIdx, false));
+      cw.set(4, y, 6, kRedTrace);
+      cSignalSim cs; cs.scan(cw);
+      for (int i = 0; i < 3; ++i) cs.tick(cw, 0, 0, 100, plNone);
+      cs.use(cw, 1, y, 6, plNone);
+      int inT = -1, outT = -1;
+      for (int i = 0; i < 100 && outT < 0; ++i) {
+        cs.tick(cw, 0, 0, 100, plNone);
+        if (inT < 0 && stValue(cw.getState(2, y, 6)) > 0) inT = i;
+        if (outT < 0 && stValue(cw.getState(4, y, 6)) > 0) outT = i;
+      }
+      lag[sIdx] = (inT >= 0 && outT >= 0) ? outT - inT : -1;
+      allOk = allOk && lag[sIdx] >= 0 && repeator::delayTicks(cw.getState(3, y, 6)) == repeator::kDelays[sIdx];
+    }
+    for (int sIdx = 0; sIdx < repeator::kSettings; ++sIdx) {
+      const bool ok = allOk && lag[sIdx] - lag[1] == repeator::kDelays[sIdx] - 4;
+      std::printf("  [info] repeator setting %d: delay %d ticks, lag %d\n", sIdx + 1, repeator::kDelays[sIdx], lag[sIdx]);
+      check(ok, std::format("REPEATOR {}-tick setting: output lags exactly {} ticks more than the 4-tick setting", repeator::kDelays[sIdx], repeator::kDelays[sIdx] - 4).c_str());
+    }
+    // save compatibility: a PlayL-era new-encoding state (bit 15 clear, aux 0..3) keeps its exact delay
+    bool compat = true;
+    for (int raw = 0; raw < 4; ++raw) compat = compat && repeator::delayTicks(CellState(makeState(0, 1, raw) | repeator::kNewEncoding)) == (4 << raw);
+    for (int sIdx = 0; sIdx < repeator::kSettings; ++sIdx) compat = compat && repeator::delayIndex(repeator::encode(0, 2, sIdx, true)) == sIdx;
+    check(compat, "REPEATOR save compat: old new-encoding raw 0..3 = 4/8/16/32 ticks (unchanged); every setting encodes and decodes");
+  }
   {  // 2026-10-24 test area Clocks pad: each ring clock self-runs; the latch toggles once per lap.
-    for (int di = 0; di < 4; ++di) {
+    for (int di = 0; di < repeator::kSettings; ++di) {  // PlayM: all six settings (2..64)
       ChunkMap cw;
       cw.setRegistry(&blockRegistry());
       for (int cz = 0; cz < 2; ++cz)
@@ -461,18 +919,22 @@ int runSignalSelfTest() {
       cSignalSim cs;
       cs.scan(cw);
       int toggles = 0, last = -1, period = -1, pulses = 0; bool stable = true, prevOn = false, prevLamp = false;
-      for (int i = 0; i < 800; ++i) {
+      const int nT = std::max(800, 7 * kRingClockPeriod[di]);
+      for (int i = 0; i < nT; ++i) {
         cs.tick(cw, 0, 0, 100, [](int, int, int) {});
         const bool on = stOn(cw.getState(2 + 6, y, 2 + 4));
-        if (on != prevOn) {
+        // 2026-10-31 (JD Latchor ruling): the Latchor (default 64) now FIRES on each matching ring pulse
+        // instead of toggling, so the lap period is measured between its rising edges.
+        if (on && !prevOn) {
           if (last >= 0 && toggles >= 2) { const int p = i - last; if (period < 0) period = p; else if (p != period) stable = false; }
-          last = i; ++toggles; prevOn = on;
+          last = i; ++toggles;
         }
+        prevOn = on;
         const bool lamp = stValue(cw.getState(2 + 4, y, 2 + 5)) > 0;
         pulses += lamp && !prevLamp; prevLamp = lamp;
       }
-      std::printf("  clocks pad: delay %d -> latch toggled %d times in 800 ticks, lap period %d ticks (%s), pulse lamp %d flashes\n",
-                  repeator::kDelays[di], toggles, period, stable ? "steady" : "UNSTEADY", pulses);
+      std::printf("  clocks pad: delay %d -> latch toggled %d times in %d ticks, lap period %d ticks (%s), pulse lamp %d flashes\n",
+                  repeator::kDelays[di], toggles, nT, period, stable ? "steady" : "UNSTEADY", pulses);
       check(toggles >= 4 && stable && period == kRingClockPeriod[di], "clocks pad: ring clock self-runs at its labelled period");
     }
   }
@@ -538,7 +1000,11 @@ int runSignalSelfTest() {
       sb.invalidateNetwork(); sb.tick(b, 0, 0, 100, [](int, int, int) {});
       for (int z = 0; z < 128; ++z)
         for (int x = 0; x < 96; ++x)
-          for (int yy = y; yy <= y + 1; ++yy) mismatch += a.getState(x, yy, z) != b.getState(x, yy, z);
+          for (int yy = y; yy <= y + 1; ++yy)
+            if (a.getState(x, yy, z) != b.getState(x, yy, z)) {
+              if (!mismatch) std::printf("  [info] reflood mismatch tick %d at %d,%d,%d block %u incr %u full %u\n", i, x, yy, z, unsigned(a.get(x, yy, z)), unsigned(a.getState(x, yy, z)), unsigned(b.getState(x, yy, z)));
+              ++mismatch;
+            }
     }
     check(mismatch == 0, "incremental per-network re-flood matches a full pass every tick (framebuffer + display, 1500 ticks)");
   }
@@ -594,11 +1060,107 @@ int runSignalSelfTest() {
     check(both && redOnly && blueOnly, "redirector scene: every pixel lights only from its own wire colour (red / blue / both)");
     setBlock(x0 - 1, z0, kRedTorch); runR(4);
     const bool lit0 = lamp(0) > 0;
+    static const bool muxNoUse = [] { const char* e = std::getenv("LL_MUX_NOUSE"); return !(e && e[0] == '0'); }();  // 2026-11-01 (JD): Multiplexor has no click control
+    const CellState st0 = rw.getState(x0, y, z0 + 1);
     rs.use(rw, x0, y, z0, [](int, int, int) {});  // use the red trace next to Redirector 0: red front E -> S
     runR(4);
     const CellState st = rw.getState(x0, y, z0 + 1);
+    if (muxNoUse)
+      check(lit0 && lamp(0) > 0 && stFacing(st) == stFacing(st0) && stAux(st) == stAux(st0),
+            "multiplexor: using the adjacent red wire does nothing (no click control; lanes unchanged, pixel 0 stays lit)");
+    else
     check(lit0 && lamp(0) == 0 && stFacing(st) == 2 && (stAux(st) & 3) == 0 && pattern(false, true) == false,
           "redirector: using the adjacent red wire cycles only the red front (pixel 0 goes dark, blue front unchanged)");
+  }
+  {  // 2026-10-31 (JD, f3fce6d): Trace across chunk borders on every axis decays exactly 1 per cell.
+    ChunkMap tw;
+    tw.setRegistry(&blockRegistry());
+    for (int cx = -3; cx <= 5; ++cx)
+      for (int cz = -3; cz <= 5; ++cz) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; tw.insert(std::move(col)); }
+    bool ok = true; int firstBad = 0, badAt = 0, badGot = 0;
+    struct Run { int x0, z0, dx, dz; BlockId trace, torch; };  // one y level per run (no crossings)
+    const Run runs[] = {{4, 2, 1, 0, kRedTrace, kRedTorch}, {40, 6, -1, 0, kBlueTrace, kBlueTorch},
+                        {2, 4, 0, 1, kRedTrace, kRedTorch}, {6, 40, 0, -1, kBlueTrace, kBlueTorch}};
+    int ry = 0;
+    for (const Run& r : runs) {
+      const int yy = y + 3 * ry++;
+      for (int i = -1; i <= 66; ++i) tw.set(r.x0 + r.dx * i, yy - 1, r.z0 + r.dz * i, kWaferSilicon);
+      tw.set(r.x0, yy, r.z0, r.torch);
+      for (int i = 1; i <= 66; ++i) tw.set(r.x0 + r.dx * i, yy, r.z0 + r.dz * i, r.trace);
+    }
+    cSignalSim ts;
+    ts.scan(tw);
+    for (int i = 0; i < 8; ++i) ts.tick(tw, 0, 0, 100, [](int, int, int) {});
+    int ri = 0;  // run index (0-based y level; printed 1-based)
+    for (const Run& r : runs) {
+      const int yy = y + 3 * ri++;
+      for (int i = 1; i <= 66; ++i) {
+        const int want = std::max(0, 65 - i), got = stValue(tw.getState(r.x0 + r.dx * i, yy, r.z0 + r.dz * i));
+        if (got != want && ok) { ok = false; firstBad = ri; badAt = i; badGot = got; }
+      }
+    }
+    if (!ok) std::printf("  [info] trace border run %d: cell %d reads %d, wants %d\n", firstBad, badAt, badGot, std::max(0, 65 - badAt));
+    check(ok, "trace: red and blue Trace runs crossing chunk borders on +X, -X, +Z, -Z decay exactly 1 per cell (64 .. 1, then dark)");
+    // Live edits while the source toggles: torch off/on with a Trace cell re-placed at each border cell
+    // (local 15 / 0) between ticks; after settling every run must again decay exactly 1 per cell.
+    auto put = [&](int x, int yy, int z, BlockId id) { tw.set(x, yy, z, id); ts.onBlockChanged(x, yy, z, id); };
+    auto tk = [&](int n) { for (int i = 0; i < n; ++i) ts.tick(tw, 0, 0, 100, [](int, int, int) {}); };
+    ri = 0;
+    for (const Run& r : runs) {
+      const int yy = y + 3 * ri++;
+      for (int cyc = 0; cyc < 3; ++cyc) {
+        put(r.x0, yy, r.z0, kAir); tk(1);
+        for (int i = 1; i <= 66; ++i) {
+          const int x = r.x0 + r.dx * i, z = r.z0 + r.dz * i, l = (r.dx ? x : z) & 15;
+          if (l != 0 && l != 15) continue;
+          put(x, yy, z, kAir); tk(1); put(x, yy, z, r.trace);
+        }
+        put(r.x0, yy, r.z0, r.torch); tk(1 + cyc);
+      }
+    }
+    tk(8);
+    bool ok2 = true; ri = 0;
+    for (const Run& r : runs) {
+      const int yy = y + 3 * ri++;
+      for (int i = 1; i <= 66; ++i) {
+        const int want = std::max(0, 65 - i), got = stValue(tw.getState(r.x0 + r.dx * i, yy, r.z0 + r.dz * i));
+        if (got != want && ok2) { ok2 = false; std::printf("  [info] trace border edit run %d: cell %d reads %d, wants %d\n", ri, i, got, want); }
+      }
+    }
+    check(ok2, "trace: border-cell edits while the source toggles leave every run decaying exactly 1 per cell across chunk borders");
+  }
+  {  // 2026-10-31 (JD repro): Repeator at chunk-0 local x 15 driving blue Trace in chunk 1 (x 16..), and the
+     // mirror (Repeator at x 16 facing W into x 15..), at y 266 (sub-chunk 16); toggled torch, 40 ticks.
+    ChunkMap rw;
+    rw.setRegistry(&blockRegistry());
+    for (int cx = -2; cx <= 3; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = 5; rw.insert(std::move(col)); }
+    const int ry = 266;
+    for (int x = -20; x <= 50; ++x) for (int z = 88; z <= 92; ++z) rw.set(x, ry - 1, z, kWaferSilicon);
+    auto putF = [&](int x, int yy, int z, BlockId b, int f) { rw.set(x, yy, z, b); rw.setState(x, yy, z, makeState(0, f)); };
+    rw.set(13, ry, 88, kBlueTorch); rw.set(14, ry, 88, kBlueTrace); putF(15, ry, 88, kRepeator, 1);
+    for (int x = 16; x <= 40; ++x) rw.set(x, ry, 88, kBlueTrace);
+    rw.set(18, ry, 92, kBlueTorch); rw.set(17, ry, 92, kBlueTrace); putF(16, ry, 92, kRepeator, 3);
+    for (int x = 15; x >= -10; --x) rw.set(x, ry, 92, kBlueTrace);
+    cSignalSim rs;
+    rs.scan(rw);
+    for (int i = 0; i < 60; ++i) rs.tick(rw, 1, 5, 100, [](int, int, int) {});
+    auto v = [&](int x, int z) { return stValue(rw.getState(x, ry, z)); };
+    std::printf("  [info] repeator seam: E run x16=%d x17=%d x22=%d | W run x15=%d x14=%d x9=%d\n", v(16, 88), v(17, 88), v(22, 88), v(15, 92), v(14, 92), v(9, 92));
+    check(v(16, 88) > 0 && v(17, 88) == v(16, 88) - 1 && v(22, 88) == v(16, 88) - 6,
+          "trace seam 15|16: a Repeator at local x 15 drives blue Trace across the seam, decaying 1 per cell (+X)");
+    check(v(15, 92) > 0 && v(14, 92) == v(15, 92) - 1 && v(9, 92) == v(15, 92) - 6,
+          "trace seam 16|15: a Repeator at local x 0 facing W drives blue Trace across the seam, decaying 1 per cell (-X)");
+    // Column (1, 5) replaced in place by an identical fresh copy (same column count, as a reload or an
+    // evict + load in one pump does): the run past the seam must stay lit, not freeze dark on stale pointers.
+    std::unique_ptr<ChunkColumn> oldCol = rw.extract(1, 5);  // kept alive: a stale write must not be a use-after-free here
+    { auto col = std::make_unique<ChunkColumn>(); col->cx = 1; col->cz = 5; rw.insert(std::move(col)); }
+    for (int x = 16; x <= 31; ++x) for (int z = 88; z <= 92; ++z) rw.set(x, ry - 1, z, kWaferSilicon);
+    for (int x = 16; x <= 31; ++x) rw.set(x, ry, 88, kBlueTrace);
+    rw.set(18, ry, 92, kBlueTorch); rw.set(17, ry, 92, kBlueTrace); putF(16, ry, 92, kRepeator, 3);
+    for (int i = 0; i < 60; ++i) rs.tick(rw, 1, 5, 100, [](int, int, int) {});
+    std::printf("  [info] column replace: E run x16=%d x22=%d x31=%d | W run x15=%d\n", v(16, 88), v(22, 88), v(31, 88), v(15, 92));
+    check(v(16, 88) == 64 && v(22, 88) == 58 && v(31, 88) == 49 && v(15, 92) == 64,
+          "trace seam: a column replaced in place (same count) relinks; Trace past the seam carries 64 .. 49 again");
   }
   {  // Vias (vertical, lossless, colour-isolated) and glass (cuts wire stairs).
     ChunkMap vw;
@@ -847,6 +1409,57 @@ int runSignalSelfTest() {
       check(diffTicks == 0, "component sleep: identical world every checked tick (pattern wall, wire torture, wall-pixel, sawtooth)");
     }
   }
+  {  // 2026-11-01 (JD LL_WAKE): awake-list dispatch gives the same world and state hash as candidate-everything mode.
+    struct Case { const char* name; int kind; };
+    bool allSame = true;
+    for (const Case c : {Case{"pattern wall 32", 0}, Case{"wire torture", 1}, Case{"wall-pixel 16", 2}, Case{"sawtooth", 3}}) {
+      ChunkMap a, b;
+      a.setRegistry(&blockRegistry());
+      b.setRegistry(&blockRegistry());
+      for (ChunkMap* m : {&a, &b}) {
+        for (int cz = 0; cz < 7; ++cz) for (int cx = 0; cx < 7; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; m->insert(std::move(col)); }
+        if (c.kind == 0) buildPatternWall(*m, 16, 60, 44, 32, "circles");
+        else if (c.kind == 1) buildWireTorture(*m, 8, 60, 8);
+        else if (c.kind == 2) buildWallPixelScene(*m, 24, 60, 44, 16, 16);
+        else buildSawtoothWall(*m, 8, 60, 20, 16, 4, "circles");
+      }
+      cSignalSim sa, sb;
+      sa.setComponentSleep(true); sa.setWakeList(true);
+      sb.setComponentSleep(true); sb.setWakeList(false);
+      sa.scan(a); sb.scan(b);
+      int diffTicks = 0; size_t tickedA = 0, tickedB = 0;
+      uint64_t ha = 1469598103934665603ull, hb = ha;
+      for (int t = 0; t < 600; ++t) {
+        sa.tick(a, 0, 0, 100, [](int, int, int) {});
+        sb.tick(b, 0, 0, 100, [](int, int, int) {});
+        tickedA += sa.lastTickedComponents(); tickedB += sb.lastTickedComponents();
+        bool same = true;
+        if (t % 7 == 0 || t < 50 || t == 599)
+          for (int z = 0; z < 112; ++z) for (int x = 0; x < 112; ++x) for (int yy = 40; yy < 200; ++yy) {
+            const CellState va = a.getState(x, yy, z), vb = b.getState(x, yy, z);
+            if (va != vb) same = false;
+            if (t == 599) { ha = (ha ^ va) * 1099511628211ull; hb = (hb ^ vb) * 1099511628211ull; }
+          }
+        diffTicks += !same;
+      }
+      std::printf("  LL_WAKE parity %s: %d differing ticks, ticked %zu vs %zu, hash %016llx vs %016llx\n", c.name, diffTicks,
+                  tickedA, tickedB, (unsigned long long)ha, (unsigned long long)hb);
+      allSame = allSame && diffTicks == 0 && ha == hb && tickedA == tickedB;
+    }
+    check(allSame, "LL_WAKE parity: identical world, final state hash and ticked count vs LL_WAKE=0 (4 scenes, 600 ticks)");
+  }
+  {  // 2026-11-01 (JD Option A): cCompiledCompTable publishes only at commit; values survive a relink by key.
+    cCompiledCompTable t;
+    t.rebuild({10, 20, 30});
+    uint32_t v = 99;
+    t.stage(20, 0x1234);
+    const bool hidden = t.published(20, v) && v == 0;
+    t.commit();
+    const bool shown = t.published(20, v) && v == 0x1234;
+    t.rebuild({5, 20, 40});
+    const bool kept = t.published(20, v) && v == 0x1234 && !t.published(30, v) && t.size() == 3;
+    check(hidden && shown && kept, "Option A table: staged simBits hidden until commit, published after, kept across relink");
+  }
   {  // Redirector output is colourless: red Trace in -> blue Trace out and back; a Catchor feeds both split lanes.
     constexpr int Y = 60;
     auto run = [&](auto&& build) {
@@ -1039,13 +1652,21 @@ int runSignalSelfTest() {
     auto again = [&] { setB(0, 3, kAir); runR(3); setB(0, 3, kRedTorch); runR(8); };
     again();
     const bool rc = seen[0] && !seen[1] && !seen[2];
-    cs.use(cw, 3, y, 3, [](int, int, int) {}); again();
-    const bool rl = seen[1] && !seen[0] && !seen[2] && stFacing(cw.getState(3, y, 3)) == 0;
-    cs.use(cw, 3, y, 3, [](int, int, int) {}); again();
-    const bool rr = seen[2] && !seen[0] && !seen[1] && stFacing(cw.getState(3, y, 3)) == 2;
-    cs.use(cw, 3, y, 3, [](int, int, int) {});
-    const bool rBack = stFacing(cw.getState(3, y, 3)) == 1;  // centre again, never west into the Catchor
-    check(rc && rl && rr && rBack, "catchor -> redirector: the Catchor is its input; use cycles centre -> left -> right (never back, never up/down)");
+    static const bool muxNoUse2 = [] { const char* e = std::getenv("LL_MUX_NOUSE"); return !(e && e[0] == '0'); }();  // 2026-11-01 (JD): Multiplexor has no click control
+    if (muxNoUse2) {
+      const CellState b0 = cw.getState(3, y, 3);
+      const bool u = cs.use(cw, 3, y, 3, [](int, int, int) {}); again();
+      check(rc && !u && stFacing(cw.getState(3, y, 3)) == stFacing(b0) && seen[0] && !seen[1] && !seen[2],
+            "catchor -> multiplexor: the Catchor is its input; use does nothing (no click control), output stays centre");
+    } else {
+      cs.use(cw, 3, y, 3, [](int, int, int) {}); again();
+      const bool rl = seen[1] && !seen[0] && !seen[2] && stFacing(cw.getState(3, y, 3)) == 0;
+      cs.use(cw, 3, y, 3, [](int, int, int) {}); again();
+      const bool rr = seen[2] && !seen[0] && !seen[1] && stFacing(cw.getState(3, y, 3)) == 2;
+      cs.use(cw, 3, y, 3, [](int, int, int) {});
+      const bool rBack = stFacing(cw.getState(3, y, 3)) == 1;  // centre again, never west into the Catchor
+      check(rc && rl && rr && rBack, "catchor -> redirector: the Catchor is its input; use cycles centre -> left -> right (never back, never up/down)");
+    }
   }
   {  // Wire support: placement needs a floor or a ceiling; losing both pops the wire.
     ChunkMap sw;
@@ -1290,8 +1911,11 @@ int runSignalSelfTest() {
       r.use(5, 5, true);
       check((r.aux(5, 5) & 2) == 2 && (r.aux(5, 5) & 1) == 0, "ROADMAP-7 thresholdor: sneak+use toggles read mode (aux bit 1), subtract untouched");
       bool follows = true;
-      for (int i = 0; i < 40; ++i) { const int before = r.v(4, 5); r.run(1); follows = follows && r.v(5, 5) == before; }
-      check(follows, "ROADMAP-7 thresholdor: read mode outputs the timer buffer count (read before the tick: one tick behind)");
+      // PlayM (JD 2026-11-01, same tick): the read now sees THIS tick's count; with LL_SAME_TICK=0 it is one tick behind.
+      const bool sameT = cSignalSim::envSameTick();
+      for (int i = 0; i < 40; ++i) { const int before = r.v(4, 5); r.run(1); follows = follows && r.v(5, 5) == (sameT ? r.v(4, 5) : before); }
+      check(follows, sameT ? "ROADMAP-7 thresholdor: read mode outputs the timer buffer count (same tick)"
+                           : "ROADMAP-7 thresholdor: read mode outputs the timer buffer count (LL_SAME_TICK=0: one tick behind)");
       r.use(5, 5);  // subtract mode, still reading
       check((r.aux(5, 5) & 3) == 3, "ROADMAP-7 thresholdor: subtract mode keeps read mode");
       r.put(5, 4, kRedTorch);  // left side (north of an E-facing Thresholdor) = 64 -> subtract to 0
@@ -1382,6 +2006,13 @@ int runSignalSelfTest() {
     for (int i = 0; i < 300; ++i) edit(5, py, 5, 'a' + i % 26, post::kTypeChar);
     txt = pw.cellText(5, py + 1, 5);
     check(txt && txt->size() == post::kMaxChars && txt->compare(0, 6, "HELLO\n") == 0, "POSTS: text is capped at 256 characters");
+    {  // 2026-10-31 (JD, Alt+wheel): kCmdAltUse with a = 1 steps up, a = 63 steps back one.
+      pw.set(9, py, 9, kLatchor); sim.onBlockChanged(pw, 9, py, 9, kLatchor);
+      auto alt = [&](int n) { sim.command(pw, SimCommand{kCmdAltUse, 9, py, 9, n, 0}, [](int, int, int) {}); return stValue(pw.getState(9, py, 9)); };
+      const int v0 = alt(1), v1 = alt(1), vBack = alt(63), vUp = alt(1);
+      std::printf("  alt-wheel latchor: %d -> %d, back %d, up %d\n", v0, v1, vBack, vUp);
+      check(v1 != v0 && vBack == v0 && vUp == v1, "alt-wheel: a 1..64 setting steps +1 (wheel up) and -1 (wheel down, 63 wrapping steps)");
+    }
     const auto lines = post::layout(*txt, 16);
     const auto diag = post::layout(*txt, post::columnsFor(kVirtualPost, hi));
     check(lines.size() == 16 && lines[0] == "HELLO" && lines[1].size() == 16 && post::columnsFor(kVirtualPost, withFacing8(0, 2)) == 16 &&
@@ -1428,6 +2059,291 @@ int runSignalSelfTest() {
       const auto e = post::viewLines("HI\nTHERE", true);
       check(e[2] == "|HI              |" && e[3] == "|THERE           |" && e[0].find("(writing)") != std::string::npos,
             "POSTS viewer: new lines break rows, short rows padded, writing mode titled");
+    }
+  }
+  {  // 2026-10-31 (JD double-pulse bug): count output edges at every stage, fresh world
+    ChunkMap w2;
+    w2.setRegistry(&blockRegistry());
+    for (int cz = 0; cz < 2; ++cz)
+      for (int cx = 0; cx < 3; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; w2.insert(std::move(col)); }
+    for (int z = 0; z < 32; ++z) for (int x = 0; x < 48; ++x) w2.set(x, y - 1, z, kWaferSilicon);
+    cSignalSim s2;
+    auto p2 = [&](int x, int z, BlockId b) { w2.set(x, y, z, b); s2.onBlockChanged(x, y, z, b); };
+    auto pf2 = [&](int x, int z, BlockId b, int f) { w2.set(x, y, z, b); w2.setState(x, y, z, makeState(0, f)); s2.onBlockChanged(x, y, z, b); };
+    auto v2 = [&](int x, int z) { return int(stValue(w2.getState(x, y, z))); };
+    // A) Switch -> trace -> 3 Repeators (each followed by a trace) -> lamp.
+    p2(0, 4, kSwitch); p2(1, 4, kRedTrace);
+    for (int k = 0; k < 3; ++k) { pf2(2 + 2 * k, 4, kRepeator, E); p2(3 + 2 * k, 4, kRedTrace); }
+    p2(8, 4, kLamp);
+    // B) Pulsor: data from an always-on Switch, clock from a toggled Switch on its side (blue).
+    p2(18, 12, kSwitch); p2(19, 12, kRedTrace); pf2(20, 12, kPulsor, E);
+    p2(20, 9, kSwitch); p2(20, 10, kBlueTrace); p2(20, 11, kBlueTrace);
+    for (int x = 21; x <= 25; ++x) p2(x, 12, kRedTrace);
+    auto tk = [&]() { s2.tick(w2, 0, 0, 100, [](int, int, int) {}); };
+    tk();
+    s2.use(w2, 18, y, 12, none);  // data on
+    int edges[4] = {0, 0, 0, 0}, last[4] = {0, 0, 0, 0}, pEdges = 0, pLast = 0, pHigh = 0, clkRises = 0;
+    const int probe[4] = {1, 3, 5, 7};
+    for (int t = 0; t < 120; ++t) {
+      if (t == 2 || t == 40) s2.use(w2, 0, y, 4, none);  // chain: on at t=2, off at t=40 (one long pulse)
+      if (t % 10 == 5) { s2.use(w2, 20, y, 9, none); clkRises += stOn(w2.getState(20, y, 9)) ? 1 : 0; }  // clock period 20
+      tk();
+      for (int i = 0; i < 4; ++i) { const int v = v2(probe[i], 4) > 0; edges[i] += v && !last[i]; last[i] = v; }
+      const int pv = v2(23, 12) > 0; pEdges += pv && !pLast; pHigh += pv; pLast = pv;
+    }
+    std::printf("  [info] edge counts: chain %d %d %d %d, pulsor %d rises %d high-ticks %d (clock rises %d)\n",
+                edges[0], edges[1], edges[2], edges[3], pEdges, pEdges, pHigh, clkRises);
+    check(edges[0] == 1 && edges[1] == 1 && edges[2] == 1 && edges[3] == 1,
+          "DOUBLE-PULSE: one input pulse -> exactly one rising edge after every Repeator stage");
+    check(pEdges == clkRises && pHigh == clkRises * cPulseRules::holdTicks(),
+          "DOUBLE-PULSE: Pulsor fires exactly one pulse (hold-window long) per rising clock edge");
+    // C) Hot swap on a running Repeator ring clock at the fastest delay (4 Repeators, button 1 =
+    // 4 ticks). For every ring position (all four facings) and every phase of the lap, replace the
+    // Repeator (break + place next tick, and in-place replace) mid-run; afterwards the ring must
+    // still carry exactly one 1-tick pulse per lap (never two).
+    int worstRises = 0, badHigh = 0, stopped = 0, cases = 0, base = -1;
+    std::string hsLog;
+    for (int mode = -1; mode < 2; ++mode)
+      for (int pos = 0; pos < (mode < 0 ? 1 : 4); ++pos)
+        for (int phase = 0; phase < (mode < 0 ? 1 : 20); ++phase) {
+          ChunkMap w3;
+          w3.setRegistry(&blockRegistry());
+          for (int cz = 0; cz < 1; ++cz) for (int cx = 0; cx < 1; ++cx) { auto col = std::make_unique<ChunkColumn>(); col->cx = cx; col->cz = cz; w3.insert(std::move(col)); }
+          for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x) w3.set(x, y - 1, z, kWaferSilicon);
+          cSignalSim s3;
+          auto p3 = [&](int x, int z, BlockId b) { w3.set(x, y, z, b); s3.onBlockChanged(x, y, z, b); };
+          auto pf3 = [&](int x, int z, BlockId b, int f) { w3.set(x, y, z, b); w3.setState(x, y, z, makeState(0, f)); s3.onBlockChanged(x, y, z, b); };
+          auto t3 = [&]() { s3.tick(w3, 0, 0, 100, [](int, int, int) {}); };
+          const int ox = 4, oz = 4;
+          for (int i = 0; i <= 4; ++i) { p3(ox + i, oz, kRedTrace); p3(ox + i, oz + 4, kRedTrace); p3(ox, oz + i, kRedTrace); p3(ox + 4, oz + i, kRedTrace); }
+          const int rx[4] = {ox + 2, ox + 4, ox + 2, ox}, rz[4] = {oz, oz + 2, oz + 4, oz + 2}, rf[4] = {1, 2, 3, 0};
+          for (int i = 0; i < 4; ++i) pf3(rx[i], rz[i], kRepeator, rf[i]);
+          t3();
+          w3.setState(ox + 1, y, oz, CellState(64)); s3.invalidateNetwork(); t3();
+          for (int t = 0; t < 40 + phase; ++t) t3();  // settle, then swap at this phase
+          if (mode < 0) {} else if (mode == 0) { p3(rx[pos], rz[pos], kAir); t3(); pf3(rx[pos], rz[pos], kRepeator, rf[pos]); }
+          else pf3(rx[pos], rz[pos], kRepeator, rf[pos]);
+          for (int t = 0; t < 40; ++t) t3();  // let any transient pass
+          int rises = 0, high = 0, last = 0;
+          const int lap = 80;  // >= 4 laps of the 4 x (4 + 0) tick ring
+          for (int t = 0; t < lap; ++t) {
+            t3();
+            const int v = stValue(w3.getState(ox + 3, y, oz)) > 0;
+            rises += v && !last; high += v; last = v;
+          }
+          if (mode < 0) { base = rises; continue; }
+          ++cases;
+          worstRises = std::max(worstRises, rises);
+          if (high != rises) ++badHigh;
+          if (rises == 0) ++stopped;
+          if (hsLog.size() < 600 && (high != rises || rises > base)) hsLog += std::format(" [m{} p{} ph{}: rises {} high {}]", mode, pos, phase, rises, high);
+        }
+    std::printf("  [info] HOTSWAP ring: %d cases, max rises/80t %d (unswapped %d), cases with non-1-tick pulses %d, stopped %d%s\n",
+                cases, worstRises, base, badHigh, stopped, hsLog.c_str());
+    check(badHigh == 0 && base > 0 && worstRises <= base, "DOUBLE-PULSE HOTSWAP: replacing any Repeator of a running fastest ring clock leaves single 1-tick pulses");
+    // D) HOTSWAP2 (JD 3:13-3:15 PM): every delay (4/8/16/32), ring with and without a powered solid
+    // block after a Repeator; mid-window events: add / remove / replace a neighbouring component, replace
+    // the powered block, cycle a Repeator's delay a full turn. One 1-tick pulse per lap, never more.
+    int h2Cases = 0, h2Bad = 0, h2Stopped = 0;
+    std::string h2Log;
+    for (int delay = 1; delay <= 4; ++delay)  // PlayM: settings 2..5 = 4/8/16/32 ticks (the pre-PlayM set)
+      for (int solid = 0; solid < 2; ++solid)
+        for (int ev = -1; ev < 6; ++ev) {
+          const int period = 4 * repeator::kDelays[delay];
+          for (int phase = 0; phase < (ev < 0 ? 1 : period); phase += (period >= 32 ? period / 16 : 1)) {
+            ChunkMap w3;
+            w3.setRegistry(&blockRegistry());
+            { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; w3.insert(std::move(col)); }
+            for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x) w3.set(x, y - 1, z, kWaferSilicon);
+            cSignalSim s3;
+            auto p3 = [&](int x, int z, BlockId b) { w3.set(x, y, z, b); s3.onBlockChanged(x, y, z, b); };
+            auto pf3 = [&](int x, int z, BlockId b, int f) { w3.set(x, y, z, b); w3.setState(x, y, z, makeState(0, f)); s3.onBlockChanged(x, y, z, b); };
+            auto t3 = [&]() { s3.tick(w3, 0, 0, 100, [](int, int, int) {}); };
+            const int ox = 4, oz = 4;
+            for (int i = 0; i <= 4; ++i) { p3(ox + i, oz, kRedTrace); p3(ox + i, oz + 4, kRedTrace); p3(ox, oz + i, kRedTrace); p3(ox + 4, oz + i, kRedTrace); }
+            if (solid) p3(ox + 3, oz, kWaferSilicon);  // Repeator (ox+2) hard-powers this block; the trace beyond picks it up
+            const int rx[4] = {ox + 2, ox + 4, ox + 2, ox}, rz[4] = {oz, oz + 2, oz + 4, oz + 2}, rf[4] = {1, 2, 3, 0};
+            for (int i = 0; i < 4; ++i) pf3(rx[i], rz[i], kRepeator, rf[i]);
+            t3();
+            for (int i = 0; i < 4; ++i) { s3.use(w3, rx[i], y, rz[i], none); for (int k = 0; k < (delay + 3) % 4; ++k) s3.use(w3, rx[i], y, rz[i], none); }  // fresh = idx 0 after first use? normalise below
+            for (int i = 0; i < 4; ++i) for (int g = 0; g < repeator::kSettings && repeator::delayIndex(w3.getState(rx[i], y, rz[i])) != delay; ++g) s3.use(w3, rx[i], y, rz[i], none);
+            t3();
+            w3.setState(ox + 1, y, oz, CellState(64)); s3.invalidateNetwork(); t3();
+            for (int t = 0; t < 2 * period + phase; ++t) t3();
+            switch (ev) {
+              case 0: p3(ox + 1, oz - 1, kLamp); break;                         // add a reader beside the ring
+              case 1: p3(ox + 1, oz - 1, kLamp); t3(); p3(ox + 1, oz - 1, kAir); break;  // add then remove
+              case 2: pf3(ox + 1, oz - 1, kMemor, 0); t3(); pf3(ox + 1, oz - 1, kMemor, 0); break;  // add then replace a component
+              case 3: if (solid) { p3(ox + 3, oz, kAir); t3(); p3(ox + 3, oz, kWaferSilicon); } break;  // replace the powered block
+              case 4: for (int k = 0; k < repeator::kSettings; ++k) s3.use(w3, rx[1], y, rz[1], none); break;  // delay full turn (PlayM: 6 steps)
+              case 5: p3(ox + 2, oz - 1, kRedTrace); t3(); p3(ox + 2, oz - 1, kAir); break;  // trace touching the Repeator side
+              default: break;
+            }
+            for (int t = 0; t < 2 * period; ++t) t3();
+            int rises = 0, high = 0, last = 0;
+            const int probeX = solid ? ox + 4 : ox + 3;
+            for (int t = 0; t < 4 * period; ++t) {
+              t3();
+              const int v = stValue(w3.getState(probeX, y, oz)) > 0;
+              rises += v && !last; high += v; last = v;
+            }
+            if (ev < 0) { if (rises != 4 || high != 4) { ++h2Bad; h2Log += std::format(" [base d{} s{}: rises {} high {}]", delay, solid, rises, high); } continue; }
+            ++h2Cases;
+            if (rises == 0) ++h2Stopped;
+            if (rises > 4 || high != rises) {
+              ++h2Bad;
+              if (h2Log.size() < 900) h2Log += std::format(" [d{} s{} ev{} ph{}: rises {} high {}]", delay, solid, ev, phase, rises, high);
+            }
+          }
+        }
+    std::printf("  [info] HOTSWAP2: %d cases, bad %d, stopped %d%s\n", h2Cases, h2Bad, h2Stopped, h2Log.c_str());
+    check(h2Bad == 0, "DOUBLE-PULSE HOTSWAP2: add/remove/replace beside a running ring clock (every delay, powered block) never doubles a pulse");
+    // E/F (JD 3:19-3:20 PM): mid-pulse delay cycle on one Repeator at every delay and phase; and a
+    // blue<->red Trace swap mid-pulse, then the ring is cut and everything must die within 32 ticks.
+    int e5Cases = 0, e5Bad = 0, f6Cases = 0, f6Bad = 0;
+    std::string e5Log, f6Log;
+    for (int test = 0; test < 2; ++test)
+      for (int delay = 1; delay <= 4; ++delay)  // PlayM: settings 2..5 = 4/8/16/32 ticks (the pre-PlayM set)
+        for (int pos = 0; pos < (test ? 16 : 1); ++pos) {
+          const int period = 4 * repeator::kDelays[delay];
+          for (int phase = 0; phase < period; ++phase) {
+            ChunkMap w3;
+            w3.setRegistry(&blockRegistry());
+            { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; w3.insert(std::move(col)); }
+            for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x) w3.set(x, y - 1, z, kWaferSilicon);
+            cSignalSim s3;
+            auto p3 = [&](int x, int z, BlockId b) { w3.set(x, y, z, b); s3.onBlockChanged(x, y, z, b); };
+            auto pf3 = [&](int x, int z, BlockId b, int f) { w3.set(x, y, z, b); w3.setState(x, y, z, makeState(0, f)); s3.onBlockChanged(x, y, z, b); };
+            auto t3 = [&]() { s3.tick(w3, 0, 0, 100, [](int, int, int) {}); };
+            const int ox = 4, oz = 4;
+            std::vector<std::pair<int, int>> ring;
+            for (int i = 0; i < 4; ++i) { ring.push_back({ox + i, oz}); ring.push_back({ox + 4, oz + i}); ring.push_back({ox + 4 - i, oz + 4}); ring.push_back({ox, oz + 4 - i}); }
+            const BlockId tr = test && (pos & 1) ? kRedTrace : kBlueTrace;
+            for (auto [x, z] : ring) p3(x, z, tr);
+            const int rx[4] = {ox + 2, ox + 4, ox + 2, ox}, rz[4] = {oz, oz + 2, oz + 4, oz + 2}, rf[4] = {1, 2, 3, 0};
+            for (int i = 0; i < 4; ++i) pf3(rx[i], rz[i], kRepeator, rf[i]);
+            t3();
+            for (int i = 0; i < 4; ++i) for (int g = 0; g < repeator::kSettings && repeator::delayIndex(w3.getState(rx[i], y, rz[i])) != delay; ++g) s3.use(w3, rx[i], y, rz[i], none);
+            t3();
+            w3.setState(ox + 1, y, oz, CellState(64)); s3.invalidateNetwork(); t3();
+            for (int t = 0; t < 2 * period + phase; ++t) t3();
+            int newPeriod = period;
+            if (!test) {
+              s3.use(w3, rx[1], y, rz[1], none);  // one delay step mid-pulse
+              newPeriod = 3 * repeator::kDelays[delay] + repeator::kDelays[repeator::nextSetting(delay)];
+            } else {
+              // swap one ring trace (non-Repeator cell) to the other colour, in place
+              std::vector<std::pair<int, int>> tc;
+              for (auto c : ring) { bool isR = false; for (int i = 0; i < 4; ++i) isR |= (c.first == rx[i] && c.second == rz[i]); if (!isR) tc.push_back(c); }
+              auto [sx, sz] = tc[size_t(pos / 2) % tc.size()];
+              p3(sx, sz, tr == kRedTrace ? kBlueTrace : kRedTrace);
+            }
+            for (int t = 0; t < 2 * newPeriod; ++t) t3();
+            int rises = 0, high = 0, last = 0;
+            for (int t = 0; t < 4 * newPeriod; ++t) {
+              t3();
+              const int v = stValue(w3.getState(ox + 3, y, oz)) > 0;
+              rises += v && !last; high += v; last = v;
+            }
+            bool bad = rises > 4 || high != rises;
+            if (test) {
+              p3(ox + 1, oz, kAir);  // cut the ring = stop the clock
+              for (int t = 0; t < 32 * 4; ++t) t3();
+              int live = 0;
+              for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x) live += stValue(w3.getState(x, y, z)) > 0;
+              if (live) bad = true;
+              ++f6Cases; if (bad) { ++f6Bad; if (f6Log.size() < 900) f6Log += std::format(" [d{} pos{} ph{}: rises {} high {} live {}]", delay, pos, phase, rises, high, live); }
+            } else {
+              ++e5Cases; if (bad) { ++e5Bad; if (e5Log.size() < 900) e5Log += std::format(" [d{} ph{}: rises {} high {}]", delay, phase, rises, high); }
+            }
+          }
+        }
+    std::printf("  [info] HOTSWAP-DELAY: %d cases, bad %d%s\n", e5Cases, e5Bad, e5Log.c_str());
+    std::printf("  [info] HOTSWAP-TRACE: %d cases, bad %d%s\n", f6Cases, f6Bad, f6Log.c_str());
+    check(e5Bad == 0, "DOUBLE-PULSE HOTSWAP-DELAY: cycling a running Repeator's delay mid-pulse never adds a pulse");
+    check(f6Bad == 0, "DOUBLE-PULSE HOTSWAP-TRACE: Trace colour swap mid-pulse leaves no ghost; all activity dies 32x4 ticks after the ring is cut");
+  }
+  {  // PlayN (JD): Fusor adder + Breakor rename (old lithokraft:fusor id = Breakor)
+    const auto& reg = blockRegistry();
+    const cCompBehavior* fb = cBehaviorCatalog::get().component(kFusorSum);
+    const auto oldId = reg.findById("lithokraft:fusor");
+    check(fb != nullptr && oldId && *oldId == kFusor && kFusorSum != kFusor && reg.def(kFusor).name == "Breakor" && reg.def(kFusorSum).name == "Fusor" &&
+              cBehaviorCatalog::get().component(kFusor) != nullptr,
+          "FUSOR: new adder has a fresh id; old lithokraft:fusor saves load as the Breakor");
+    bool ok = fb != nullptr;
+    for (int f = 0; ok && f < 4; ++f) {
+      auto run = [&](int b, int l, int r) {
+        ComponentInputs in; in.side[size_t(dirBack(f))] = b; in.side[size_t(dirLeft(f))] = l; in.side[size_t(dirRight(f))] = r;
+        ComponentMemory m{}; return fb->tick(in, makeState(0, f), m).out;
+      };
+      ok = run(10, 20, 0) == 30 && run(10, 0, 20) == 30 && run(40, 40, 0) == 64 && run(0, 0, 0) == 0 && run(5, 0, 0) == 5 && run(0, 7, 0) == 7;
+    }
+    check(ok, "FUSOR: front = min(64, back + side) for all 4 facings");
+  }  {  // Randor (JD 2026-10-31): range bounds, reroll on a rising clock only, held output, determinism
+    const cCompBehavior* rb = cBehaviorCatalog::get().component(kRandor);
+    check(rb != nullptr, "RANDOR: registered as a component");
+    if (rb) {
+      const int f = 0;
+      auto run = [&](int backN, int clk, uint64_t rng, ComponentMemory& m, CellState& st) {
+        ComponentInputs in; in.side[size_t(dirBack(f))] = backN; in.side[size_t(dirLeft(f))] = clk; in.rng = rng;
+        const ComponentStep r = rb->tick(in, st, m); m.out = uint8_t(r.out); st = r.state; return r.out;
+      };
+      bool bounds = true, cover = true;
+      for (int n : {0, 1, 2, 7, 33, 64, 100}) {
+        const int hi = std::clamp(n, std::max(randor::kLow, 1), 64);
+        ComponentMemory m{}; CellState st = makeState(0, f);
+        std::vector<int> seen(65, 0);
+        for (int i = 0; i < 4000; ++i) {
+          run(n, 64, randor::rollSeed(1234, 77, uint64_t(i)), m, st);
+          const int v = run(n, 0, 0, m, st);
+          if (v < randor::kLow || v > hi) bounds = false;
+          if (v >= 0 && v <= 64) seen[size_t(v)] = 1;
+          if (stValue(st) != hi) bounds = false;  // readout = the range N
+        }
+        for (int v = std::max(randor::kLow, 1); v <= hi; ++v) cover = cover && seen[size_t(v)];
+      }
+      check(bounds, "RANDOR: every roll is in kLow..N (N clamped 1..64) and the state value is N");
+      check(cover, "RANDOR: every value kLow..N appears over 4000 rolls");
+      {  // 2026-10-31 (JD): no value twice in a row; uniform over the allowed values
+        bool noRep = true, uni = true, never0 = true;
+        for (int n : {2, 7, 64}) {
+          ComponentMemory m{}; CellState st = makeState(0, f);
+          std::vector<int> cnt(65, 0); int prev = -1;
+          const int kRolls = 20000;
+          for (int i = 0; i < kRolls; ++i) {
+            run(n, 64, randor::rollSeed(4321, 9, uint64_t(i)), m, st);
+            const int v = run(n, 0, 0, m, st);
+            if (v == prev) noRep = false;
+            if (v == 0) never0 = false;
+            prev = v; ++cnt[size_t(v)];
+          }
+          const int c = n - std::max(randor::kLow, 0) + 1;
+          const double exp = double(kRolls) / c;
+          for (int v = std::max(randor::kLow, 0); v <= n; ++v)
+            if (cnt[size_t(v)] < exp * 0.8 || cnt[size_t(v)] > exp * 1.2) uni = false;
+        }
+        check(noRep, "RANDOR: never the same value twice in a row (N = 2, 7, 64; 20000 pulses each)");
+        check(never0, "RANDOR: output is never 0 (range 1..N, never off)");
+        check(uni, "RANDOR: no-repeat rolls stay uniform (every value within 20% of the mean)");
+      }
+      ComponentMemory m{}; CellState st = makeState(0, f);
+      const int first = (run(64, 64, randor::rollSeed(9, 1, 1), m, st), run(64, 0, 0, m, st));
+      bool held = true, edgeOnly = true;
+      for (int t = 0; t < 50; ++t) held = held && run(64, 0, randor::rollSeed(9, 1, uint64_t(t + 5)), m, st) == first;
+      run(64, 64, randor::rollSeed(9, 1, 100), m, st);
+      const int second = m.history;
+      for (int t = 0; t < 50; ++t) edgeOnly = edgeOnly && run(64, 64, randor::rollSeed(9, 1, uint64_t(t + 200)), m, st) == second;
+      check(held && first > 0, "RANDOR: output held at the rolled strength with the clock low (not a pulse)");
+      check(edgeOnly, "RANDOR: a clock held high does not reroll (rising edge only)");
+      int changes = 0, last = second;
+      for (int t = 0; t < 64; ++t) { run(64, 64, randor::rollSeed(9, 1, uint64_t(t + 500)), m, st); const int v = run(64, 0, 0, m, st); changes += v != last; last = v; }
+      check(changes >= 48, "RANDOR: each rising clock edge rerolls");
+      bool det = randor::rollSeed(42, 1000, 7) == randor::rollSeed(42, 1000, 7) && randor::rollSeed(42, 1000, 7) != randor::rollSeed(43, 1000, 7) &&
+                 randor::rollSeed(42, 1000, 7) != randor::rollSeed(42, 1001, 7) && randor::rollSeed(42, 1000, 7) != randor::rollSeed(42, 1000, 8);
+      ComponentMemory a{}, b{}; CellState sa = makeState(0, f), sb = makeState(0, f);
+      for (int t = 0; t < 200; ++t) { const int c = (t & 1) ? 64 : 0; const uint64_t rs = randor::rollSeed(5, 6, uint64_t(t)); det = det && run(40, c, rs, a, sa) == run(40, c, rs, b, sb); }
+      check(det, "RANDOR: splitmix64 rolls are deterministic in (world seed, cell, tick)");
+      std::printf("  [info] RANDOR: kLow %d, first roll %d, second %d, rerolls %d/64\n", randor::kLow, first, second, changes);
     }
   }
   return fails;

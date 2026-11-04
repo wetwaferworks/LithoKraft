@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include "lithokraft/game/game_ui.h"
 #include <algorithm>
 #include <charconv>
@@ -41,7 +42,33 @@ cGameUi::cGameUi(Callbacks callbacks) : cb_(std::move(callbacks)) {}
 void cGameUi::applyTheme(const ui::Theme& theme) {
   ui::Theme t = theme;
   t.setScale(ui_.theme().scale());
+  setDebugStyle(t, autoScale_);
   ui_.setTheme(std::move(t));
+}
+
+// 2026-10-31 (JD): hud_debug = the label style with textScale autoK / k, so the F3 overlay renders at
+// the auto GUI scale whatever hudScale is (gameplay HUD only follows hudScale). LL_DEBUG_HUDSCALE=1: old.
+void cGameUi::setDebugStyle(ui::Theme& t, float autoK) {
+  static const bool old = [] { const char* e = std::getenv("LL_DEBUG_HUDSCALE"); return e && e[0] == '1'; }();
+  autoScale_ = autoK > 0.f ? autoK : 1.f;
+  ui::Style st = t.style("label");
+  const float k = t.scale() > 0.f ? t.scale() : 1.f;
+  st.textScale = old ? 1.f : autoScale_ / k;
+  // 2026-11-01 (JD 12:58): F3 text AND the controls panel share ONE fixed size, independent of
+  // hudScale: hud_small's 0.5 at the AUTO GUI scale (textScale 0.5 * autoK / k), i.e. the panel's
+  // look at hudScale=auto. LL_DEBUG_SMALL=0: F3 = the 10-31 auto-size label, controls = hud_small.
+  static const bool small = [] { const char* e = std::getenv("LL_DEBUG_SMALL"); return !(e && e[0] == '0'); }();
+  ui::Style fixed = t.style("hud_small");
+  if (small && !old) {
+    fixed.textScale = 0.5f * autoScale_ / k;
+    st = fixed;
+  }
+  t.setStyle("hud_debug", st);
+  t.setStyle("hud_controls", fixed);
+  // 2026-10-31 (JD): opaque modal dialogs (inventory) so the world / F3 never bleed through.
+  ui::Style dlg = t.style("dialog");
+  dlg.background.a = 1.f;
+  t.setStyle("dialog", dlg);
 }
 
 void cGameUi::rebuildHud() {
@@ -54,16 +81,22 @@ void cGameUi::rebuildHud() {
   debugPanel_->setLayout(ui::Layout::at({0, 0}, {0, 0}, {8 * k, 24 * k}));  // Playtest 1 #5: top padding (was 8; first line clipped under the header)
   // 2026-10-16 (JD): the look-at line renders red so it stands out; the rest is unchanged.
   auto& debugStack = debugPanel_->add<ui::cStackPanel>(ui::Orientation::Vertical, 0.f);
-  debugText_ = &debugStack.add<ui::cLabel>();
-  debugLook_ = &debugStack.add<ui::cLabel>();
+  // 2026-10-31 (JD): F3 text ignores hudScale and stays at the auto size (hud_debug; LL_DEBUG_HUDSCALE=1 = old).
+  debugText_ = &debugStack.add<ui::cLabel>("", "hud_debug");
+  debugLook_ = &debugStack.add<ui::cLabel>("", "hud_debug");
   debugLook_->setColor({1.f, 0.25f, 0.25f, 1.f});
-  debugTextPost_ = &debugStack.add<ui::cLabel>();
+  debugTextPost_ = &debugStack.add<ui::cLabel>("", "hud_debug");
+
+  // 2026-10-31 (JD): tick stability readout, top right, coloured by cTickStabilityMeter.
+  tickPanel_ = &hud_->add<ui::cPanel>("hud");
+  tickPanel_->setLayout(ui::Layout::at({1, 0}, {1, 0}, {-8 * k, 8 * k}));
+  tickText_ = &tickPanel_->add<ui::cLabel>("", "hud_small");
 
   controlsPanel_ = &hud_->add<ui::cPanel>("hud");
   // Cortana 2026-10-16 (standards review): sits ABOVE the hotbar + slot-name rows (it used to
   // overlap the hotbar at 2x GUI scale) and uses the compact hud_small text.
   controlsPanel_->setLayout(ui::Layout::at({0, 1}, {0, 1}, {8 * k, -(6 + 40 * hotbarScale_ + 24 + 12) * k}));
-  controlsText_ = &controlsPanel_->add<ui::cLabel>("", "hud_small");
+  controlsText_ = &controlsPanel_->add<ui::cLabel>("", "hud_controls");  // 2026-11-01 (JD): fixed size
   controlsText_->setColor({0.9f, 0.95f, 1.f, 1.f});
 
   banner_ = &hud_->add<ui::cPanel>("hud");
@@ -109,6 +142,8 @@ void cGameUi::rebuildHud() {
   lookName_ = &hud_->add<ui::cLabel>();  // 2026-10-16 (JD): one line above the held-item name
   lookName_->setLayout(ui::Layout::at({0.5f, 1}, {0.5f, 1}, {0, -(40 * hotbarScale_ + 6 + 24 + 24) * k}));
   lookName_->setColor({1.f, 1.f, 1.f, 1.f});
+  slotName_->setShadow(true);  // 2026-11-01 (JD): held-item + looked-at names always get a drop shadow
+  lookName_->setShadow(true);
 }
 
 void cGameUi::openInventory(int selectedSlot) { openInventory(selectedSlot, {}); }
@@ -120,6 +155,7 @@ void cGameUi::refreshCarry(const std::vector<ItemStack>& carry) {
     const ItemStack& st = carry_[i];
     carrySlots_[i]->setIcon(st.empty() ? std::string() : itemIconRef(st.itemId));
     carrySlots_[i]->setCaption(st.empty() || st.count <= 1 ? std::string() : std::to_string(st.count));
+    carrySlots_[i]->setTooltip(st.empty() ? std::string() : itemDisplayName(st.itemId) + " x" + std::to_string(st.count));  // 2026-10-31 (JD)
   }
 }
 
@@ -132,16 +168,16 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
   // inventory -- it lists every block in the registry and GIVES a full
   // stack of the clicked block into the player's real inventory hotbar
   // (the same inventory the HUD shows and player.lat persists).
-  const std::string title = "Block palette (creative) - click: give a full stack to hotbar slot " +
-                            std::to_string(selectedSlot + 1) +
-                            ", shift-click: first free slot, E/Esc: close";
+  // 2026-10-31 (JD): short header so it fits the panel; the help text is on the wrapped note lines.
+  const std::string title = "Block palette (creative)";
   ui::cDialog& dlg = ui::cDialog::show(ui_, title);
   dlg.setId("inventory");
   auto& note = dlg.body().add<ui::cLabel>(
-      "Creative palette: every block in the registry. A click gives a full stack (512) "
-      "into your inventory hotbar; placing blocks consumes from the stack.");
+      "Click: full stack (512) to hotbar slot " + std::to_string(selectedSlot + 1) + "\n"
+      "Shift-click: first free slot.  E/Esc: close", "hud_small");
   note.setId("palette-note");
-  const int cols = 9, count = int(blockRegistry().size()) - 1;  // every block type except air
+  const std::vector<BlockId> palette = paletteBlocksGrouped();  // 2026-10-31 (JD): registry-driven, new blocks append
+  const int cols = 9, count = int(palette.size());
   const int rows = (count + cols - 1) / cols;
   const float cell = 40 * k * kInventoryScale;  // Cortana 2026-10-16: +25% slots/icons (JD)
   auto& scroll = dlg.body().add<ui::cScrollView>();
@@ -149,19 +185,18 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
   scroll.setLayout(ui::Layout::sized({float(cols) * cell + ui::cScrollBar::kThickness, std::min(gridH, 5 * cell)}));
   auto& grid = scroll.emplaceContent<ui::cGridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
   for (int i = 0; i < count; ++i) {
-    const BlockId b = BlockId(i + 1);
-    if (isPaletteHidden(b)) continue;  // 2026-10-25: side Vias are placement variants of the Via, not palette entries
+    const BlockId b = palette[size_t(i)];
     ui::cSlot& slot = grid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
     slot.setIcon(blockIcon(b)).setData(int(b));
+    slot.setTooltip(blockName(b));  // 2026-10-31 (JD): hover tooltip with the name (theme scale = hudScale)
     slot.on("click", [this](ui::cWidget& w) {
       if (cb_.pickBlock) cb_.pickBlock(BlockId(static_cast<ui::cSlot&>(w).data()), (ui_.modifiers() & ui::kModShift) != 0);
     });
   }
   if (!carry.empty()) {
     // Playtest 2026-10-16: every carry slot (42 = hotbar 8 + offhand 2 + main 32), 14 per row.
-    dlg.body().add<ui::cLabel>("Carry (50): hotbar 1-16, offhand L/R, main 1-32 - click: swap into hotbar slot " +
-                              std::to_string(selectedSlot + 1));
-    const int ccols = 14;
+    dlg.body().add<ui::cLabel>("Carry: hotbar 1-16, offhand L/R, main 1-32", "hud_small");
+    const int ccols = cols;  // 2026-10-31 (JD): same columns as the palette so the grids line up
     auto& cgrid = dlg.body().add<ui::cGridPanel>(ccols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
     for (int i = 0; i < int(carry.size()); ++i) {
       ui::cSlot& slot = cgrid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
@@ -176,6 +211,11 @@ void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carr
   }
   inventoryHover_ = &dlg.body().add<ui::cLabel>(" ");
   inventoryHover_->setCentered(true);
+  // 2026-10-31 (JD, intermittent width): the hover name and the text lines must never size the
+  // panel; it is the 9-column grid (+ scrollbar) wide, whatever text is showing.
+  const float panelW = float(cols) * cell + ui::cScrollBar::kThickness;
+  inventoryHover_->setLayout(ui::Layout::sized({panelW, 0}));
+  note.setLayout(ui::Layout::sized({panelW, 0}));
   dlg.on("close", [this](ui::cWidget&) {
     inventory_ = nullptr;
     inventoryHover_ = nullptr;
@@ -191,6 +231,8 @@ void cGameUi::openPause() {
   dlg.setId("pause");
   dlg.addButton("Resume").setId("pause-resume");  // closes -> "close" -> pauseClosed
   dlg.addButton("Settings", [this] { if (cb_.openSettings) cb_.openSettings(); }, false).setId("pause-settings");
+  dlg.addButton("Save world", [this] { if (cb_.saveWorld) cb_.saveWorld(); }, false).setId("pause-save");  // 2026-10-31 (JD)
+  dlg.addButton("Load world", [this] { if (cb_.loadWorld) cb_.loadWorld(); }, false).setId("pause-load");  // 2026-10-31 (JD)
   dlg.addButton("Exit to menu", [this] { if (cb_.exitToMenu) cb_.exitToMenu(); }, false).setId("pause-exit-menu");
   dlg.addButton("Quit to desktop", [this] { if (cb_.quit) cb_.quit(); }).setId("pause-quit");
   dlg.on("close", [this](ui::cWidget&) {
@@ -540,6 +582,7 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
     if (k != scale_) {
       ui::Theme t = ui_.theme();
       t.setScale(k);
+      setDebugStyle(t, float(effectiveGuiScale(0, viewport.x, viewport.y)));
       ui_.setTheme(std::move(t));
     }
     scale_ = k;
@@ -550,7 +593,7 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
   hud_->setVisible(m.visible);
   age_ += dt;
   splash_->setVisible(age_ < kSplashSeconds);
-  debugPanel_->setVisible(!m.debugLines.empty() && !menu_);  // Playtest 1 #5: not over the main menu
+  debugPanel_->setVisible(!m.debugLines.empty() && !menu_ && !inventory_);  // 2026-10-31 (JD): hidden under the inventory  // Playtest 1 #5: not over the main menu
   {  // split around the "look: " line (red); with no look line everything stays in debugText_
     std::vector<std::string> pre, post;
     std::string look;
@@ -564,6 +607,12 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
     debugLook_->setVisible(seen);
     debugTextPost_->setText(joinLines(post));
     debugTextPost_->setVisible(!post.empty());
+  }
+  tickPanel_->setVisible(!m.tickLine.empty() && !menu_);
+  if (!m.tickLine.empty()) {
+    static const ui::Color kLv[3] = {{0.35f, 1.f, 0.45f, 1.f}, {1.f, 0.85f, 0.25f, 1.f}, {1.f, 0.3f, 0.3f, 1.f}};
+    tickText_->setText(m.tickLine);
+    tickText_->setColor(kLv[m.tickLevel < 0 ? 0 : m.tickLevel > 2 ? 2 : m.tickLevel]);
   }
   controlsText_->setText(joinLines(m.controlLines));
   banner_->setVisible(!m.bannerLines.empty());

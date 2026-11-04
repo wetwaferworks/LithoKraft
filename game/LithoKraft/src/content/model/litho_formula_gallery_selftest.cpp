@@ -20,6 +20,7 @@
 //     reports Ok and modelEquals holds against the baked model;
 //  5. baking twice yields byte-identical files (determinism).
 
+#include "litholattice/core/quiet_crt.h"
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -89,6 +90,7 @@ int verifyDir(const std::string& dir) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr, no dialog
   if (argc == 3 && std::string(argv[1]) == "--verify-dir")
     return verifyDir(argv[2]);
   if (argc != 1) {

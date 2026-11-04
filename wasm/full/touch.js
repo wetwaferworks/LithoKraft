@@ -1,8 +1,8 @@
 // LithoKraft web shell — BASIC TOUCH CONTROLS (2026-10-20).
 //
 // Page-shell feature only: no engine/WASM code is involved. The overlay
-// translates thumbs into the EXACT DOM event shapes the emscripten
-// backend's own listeners already consume (window_emscripten.cpp):
+// translates thumbs into the EXACT DOM event shapes the web
+// backend's own listeners already consume (window_web.cpp):
 //   document 'keydown'/'keyup'  -> e.code + e.key (+ repeat/ctrl/meta)
 //   canvas   'mousedown'/'mouseup' -> e.button + e.offsetX/e.offsetY
 //   canvas   'mousemove'         -> e.offsetX/e.offsetY (+ movementX/Y)

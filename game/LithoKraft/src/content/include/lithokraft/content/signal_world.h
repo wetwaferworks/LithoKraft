@@ -20,7 +20,7 @@ enum SimCommandCode : uint16_t {
   kCmdItemUse = 3,   ///< per-item use dispatch (brief B1a / A3): a = itemId, (x, y, z) = target cell;
                      ///< routed to content/item_use.h's registry on the sim thread
   // Cortana 2026-10-15 2215 [GAME]:
-  kCmdRepeatorSet = 4,   ///< Repeator at (x, y, z): set delay index a (0..3 = 2/4/8/16), top-button click
+  kCmdRepeatorSet = 4,   ///< Repeator at (x, y, z): set delay setting a (0..5 = 2/4/8/16/32/64), top-button click
   kCmdBridgePlace = 5,   ///< bridge placement: put block a (facing b) into the AIR cell (x, y, z) when a
                          ///< face neighbour is solid and canPlace allows it (Bedrock walk-bridging)
   // 2026-10-25 (JD, Posts):
@@ -59,6 +59,9 @@ class cSignalWorldSim final : public IWorldSim {
     if (gateSet_) applyTortureGate(world, dirty);  // 2026-10-24 (JD): playtest torture lever
     if (!gateSet_ || gateLit_) for (PatternRomScreen& s : romScreens_) tickPatternRom(world, s, dirty);
     if (tpS) { auto& w = ::litholattice::tickprof::worldSub(); w.signalNs = tpR - tpS; w.romNs = ::litholattice::tickprof::nowNs() - tpR; }
+    if (tpS && tpR - tpS > 10'000'000)  // LL_TICK_PROFILE spike reason (measure only)
+      ::litholattice::logInfo("signal spike: %.2f ms reason=%u (1 area moved, 2 columns changed, 4 fullPass preset, 8 nets invalid) pc=%d,%d cols=%zu",
+                              double(tpR - tpS) * 1e-6, signal_.hsReason(), area.pcx, area.pcz, world.columns().size());
   }
   /// Add a Pattern ROM screen (before the cSimThread starts; the sim thread owns it afterwards).
   void addPatternRom(PatternRomScreen s) { romScreens_.push_back(std::move(s)); }

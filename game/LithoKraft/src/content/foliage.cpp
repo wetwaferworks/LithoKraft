@@ -204,11 +204,11 @@ std::vector<model::Model> repeatorModel(int active) {
   box(g, 6, 3, 2, 9, 3, 2, mat::kCrystalCore); box(g, 5, 3, 3, 10, 3, 3, mat::kCrystalCore);
   const int bx[4] = {2, 10, 10, 2}, bz[4] = {4, 4, 10, 10};
   for (int i = 0; i < 4; ++i) {
-    const bool on = i == (active & 3);
+    const bool on = i == (active & 3);  // placeholder only (4 buttons); assets replace it
     box(g, bx[i], 3, bz[i], bx[i] + 3, on ? 4 : 3, bz[i] + 3, on ? mat::kGlow : mat::kBark);
     for (int d = 0; d <= i; ++d) g.set(bx[i] + d, on ? 5 : 4, bz[i] + 1, on ? mat::kGlow : mat::kCrystal);  // 1-4 pips
   }
-  return g.build("repeator_" + std::to_string(active & 3));
+  return g.build("repeator_" + std::to_string(active));
 }
 
 Quad toQuad(const litholattice::micro::MicroQuad& m) {
@@ -397,26 +397,44 @@ const Mesh& crossMesh(Kind k) {
 
 std::vector<model::Model> buildRepeatorModel(int activeIndex) { return repeatorModel(activeIndex); }
 
-const Mesh& repeatorMesh(int activeIndex) {
-  static const std::array<Mesh, 4> all = [] {
-    std::array<Mesh, 4> a;
+namespace {
+// PlayM (2026-11-01, CloudAtlas six-button art): one shipped model per delay setting,
+// assets/models/repeator/repeator_d{2,4,8,16,32,64}.lthm (setting 0..5); the placeholder fills any gap.
+constexpr int kRepeatorTicks[kRepeatorStates] = {2, 4, 8, 16, 32, 64};
+struct RepeatorMeshes {
+  std::array<Mesh, kRepeatorStates> mesh;
+  std::string report;
+};
+const RepeatorMeshes& repeatorMeshes() {
+  static const RepeatorMeshes all = [] {
+    RepeatorMeshes a;
     const std::string dir = std::string(LITHOKRAFT_MODELS_DIR) + "/repeator";
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < kRepeatorStates; ++i) {
       std::vector<model::Model> blocks;
       bool ok = !std::string(LITHOKRAFT_MODELS_DIR).empty();
+      const std::string path = dir + "/repeator_d" + std::to_string(kRepeatorTicks[i]) + ".lthm";
       if (ok) {
-        model::LoadResult r = model::loadModel(dir + "/repeator_" + std::to_string(i) + ".lthm");
+        model::LoadResult r = model::loadModel(path);
         ok = r.error == model::LoadError::Ok && !r.model.geometry.empty();
         if (ok) blocks.push_back(std::move(r.model));
+        else a.report += "repeator_d" + std::to_string(kRepeatorTicks[i]) + ".lthm: " +
+                         (r.error == model::LoadError::Ok ? std::string("empty geometry") : r.message) + "; ";
       }
       if (!ok) blocks = repeatorModel(i);
-      a[size_t(i)] = meshModels(blocks);
-      a[size_t(i)].fromAsset = ok;
+      a.mesh[size_t(i)] = meshModels(blocks);
+      a.mesh[size_t(i)].fromAsset = ok;
     }
     return a;
   }();
-  return all[size_t(activeIndex & 3)];
+  return all;
 }
+}  // namespace
+
+const Mesh& repeatorMesh(int activeIndex) {
+  return repeatorMeshes().mesh[size_t(std::clamp(activeIndex, 0, kRepeatorStates - 1))];
+}
+
+std::string repeatorModelLoadErrors() { return repeatorMeshes().report; }
 
 int repeatorButtonAt(double lx, double lz, int facing) {
   double x = lx * 16.0, z = lz * 16.0;
@@ -424,8 +442,8 @@ int repeatorButtonAt(double lx, double lz, int facing) {
     const double nx = z, nz = 16.0 - x;
     x = nx; z = nz;
   }
-  const bool front = z < 8.0, left = x < 8.0;
-  return front ? (left ? 0 : 1) : (left ? 3 : 2);
+  (void)z;  // PlayM: six buttons in one row across x (CloudAtlas README: button i at x 2+2i .. 3.5+2i /16)
+  return std::clamp(int((x - 2.0) / 2.0), 0, kRepeatorStates - 1);
 }
 
 Quad rotated(const Quad& q, int turns) {

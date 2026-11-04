@@ -1,0 +1,9 @@
+batch b1 2026-10-15T10:06:30
+REL=0
+DBG=0
+build\Release handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+build-debug\Debug handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+stream 32 tps=32 min=31.9 fps=505.6 p50=1.9086 p99=2.9766 render=0.6324 update=0.8307 hitches=2 tick=0.6715/1.1107 mesh=10.6536
+stream 512 tps=512 min=511.8 fps=492.3 p50=1.9358 p99=3.2309 render=0.6215 update=0.9093 hitches=10 tick=0.5567/0.6484 mesh=10.9023
+orbit 32 tps=32.1 min=31.9 fps=9.4 p50=109.0993 p99=125.4476 render=104.1890 update=1.1521 hitches=5 tick=0.5352/0.7209 mesh=0.0000
+orbit 512 tps=512 min=511.8 fps=9.2 p50=109.3220 p99=136.2708 render=106.4245 update=1.4126 hitches=5 tick=0.4056/0.4572 mesh=0.0000

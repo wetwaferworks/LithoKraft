@@ -150,6 +150,18 @@ cDimensionReg createDimensions(const WorldgenSettings& settings) {
   cos->generator = makeGenerator(settings, cos->id); cos->setup = cosmicSetup; cos->belowWorldFill = kStone;
   cos->chunks.setRegistry(&blockRegistry());
   r.add(std::move(cos));
+  // 2026-10-30 (JD): the Flat Lab -- a dead-flat white Ceramic plain (assets/worldgen/flatlab.json,
+  // no procedural generation), used only by --flat-lab. Spawn at the centre, feet on the plain.
+  auto lab = std::make_unique<Dimension>();
+  lab->id = "flatlab"; lab->name = "Flat Lab"; lab->biomes = {"flat_lab"};
+  lab->generator = makeGenerator(settings, lab->id); lab->belowWorldFill = kStone;
+  lab->setup = [](ChunkMap& w, int size) -> Spawn {
+    const int c = std::min(size * 16 / 2, 288);  // fixed origin: the Examples grid runs +x/+z from here
+    const int h = std::max(0, w.surfaceY(c, c));
+    return {float(c), float(h) + 1.f, float(c), 0.785f, -0.35f};
+  };
+  lab->chunks.setRegistry(&blockRegistry());
+  r.add(std::move(lab));
   return r;
 }
 

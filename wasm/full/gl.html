@@ -18,7 +18,6 @@
           border-radius:6px; padding:7px 14px; font:13px ui-monospace, monospace;
           pointer-events:none; white-space:nowrap; }
   #grab.hide { display:none; }
-  #status { margin-top:12px; font:13px ui-monospace, monospace; color:#FF6F00; }
   #stats { margin-top:10px; border-collapse:collapse; font:12px ui-monospace, monospace;
            color:#b9b3d6; background:#0d0d18; border:1px solid #2c2748; border-radius:6px; }
   #stats td { padding:4px 12px; border-bottom:1px solid #1c1830; }
@@ -42,9 +41,9 @@
 <h1>LITHOKRAFT &mdash; FULL TEST</h1>
 <p class="sub">The full engine + game in WebAssembly, booting the
 <b>GL33 renderer on WebGL2</b> (shaders: the pack carries GLSL ES 3.00
-translations; chunk meshes run with <code>--gl-arena off</code> because
-WebGL2 has no base-vertex draw &mdash; same meshes and pixels, per-mesh VAOs
-instead of one arena) &mdash; and it is playable: click the game, press
+translations; chunk meshes run with <code>--gl-arena on</code>: one arena
+VBO/VAO whose per-mesh indices are rebased at upload, so draws need no
+base-vertex call (which WebGL2 lacks) &mdash; same meshes and pixels) &mdash; and it is playable: click the game, press
 <b>Enter</b> on the launch menu (Play), then click again to grab the mouse
 (Esc releases). WASD moves, Space jumps, F3 toggles the live tick overlay.
 Same build, same world seed as the software page.
@@ -61,7 +60,6 @@ hide with <code>?touch=0</code>. Play does not start by itself: the launch menu 
   <canvas id="canvas" width="1280" height="720" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
   <div id="grab">Click the game &mdash; Enter starts play &mdash; click again to grab the mouse (Esc releases)</div>
 </div>
-<div id="status">booting&hellip;</div>
 <table id="stats">
   <tr><td class="k">game release</td><td class="v" id="st-release">&hellip;</td>
       <td class="k">engine build counter</td><td class="v" id="st-counter">&hellip;</td></tr>
@@ -184,7 +182,7 @@ hide with <code>?touch=0</code>. Play does not start by itself: the launch menu 
     }, 4000);
   }
   const logEl = document.getElementById('log');
-  const statusEl = document.getElementById('status');
+  const statusEl = { textContent: '' }; // JD 2026-10-28: no status line; the header is the title plus the render switches. Stub keeps setStatus/error writers harmless.
   const $ = (id) => document.getElementById(id);
   const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
   function setStat(id, v) { const el = $(id); if (el && v) el.textContent = v; }
@@ -262,15 +260,15 @@ hide with <code>?touch=0</code>. Play does not start by itself: the launch menu 
   var Module = {
     canvas: document.getElementById('canvas'),
     arguments: BENCH
-      ? ['--renderer', 'gl33', '--gl-arena', 'off',
+      ? ['--renderer', 'gl33', '--gl-arena', 'on',
          '--bench', '4', '--bench-path', 'orbit',
          '--seed', '20261019', '--stream-radius', RAD,
          '--scripts', 'exe', '--mute',
          '--ui-shot', '/ui-gl.png',
          '--bench-json', '/bench-gl.json']
-      : ['--renderer', 'gl33', '--gl-arena', 'off',
+      : ['--renderer', 'gl33', '--gl-arena', 'on',
          '--seed', '20261019', '--stream-radius', RAD,
-         '--scripts', 'exe', '--mute'],
+         '--scripts', 'exe', '--mute', '--stub-models'],
     print: (s) => toLog(s),
     printErr: (s) => toLog('ERR: ' + s),
     onExit: (code) => { statusEl.textContent = 'run finished (exit ' + code + ') — bench summary in the log above'; },
@@ -307,7 +305,6 @@ hide with <code>?touch=0</code>. Play does not start by itself: the launch menu 
   })(performance.now());
   diagStart();
 </script>
-<script src="lkasm.js"></script>
 <script src="lkboot.js"></script>
 <script src="touch.js"></script>
 <script>

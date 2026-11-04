@@ -82,9 +82,9 @@ WASM binary's declared import surface itself: boot/instantiate, the
 in-memory filesystem (fed by our own `LKP1` pack, built by
 `wasm/lkpack.py`), the syscall/WASI fd layer, a pthread worker pool
 (the same file is the worker bootstrap), the mailbox proxy protocol
-for main-thread services, EM_ASM evaluation (bodies carried as data in
-**`lkasm.js`**, extracted from our own engine source snippets by
-`wasm/extract-asm.py`), and a **state-caching WebGL2 wrapper**
+for main-thread services, the page services the binary imports by name
+(input, canvas, frame loop, WebGL) under our own `lk_*` / `lk_gl*`
+names, and a **state-caching WebGL2 wrapper**
 (redundant state calls are dropped before they cross to the GPU;
 draws are never cached).
 
@@ -250,7 +250,7 @@ the stats panel's mode cell shows the radius in use.
 ## Files
 
 `index.html`, `gl.html`, `lkboot.js` (the hand-written thin loader),
-`lkasm.js` (the engine's EM_ASM body table, as data), `LithoKraft.wasm`,
+`LithoKraft.wasm`,
 `LithoKraft.data` (the asset package in our LKP1 format: engine assets
 with ES 3.00 shaders, the game's real packs/models/textures, scripts,
 config), `touch.js` (touch overlay).

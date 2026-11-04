@@ -1,0 +1,2 @@
+LithoKraft PRE-ALPHA textures, locked by JD Thu Oct 15 12:41:18 EDT 2026 (America/New_York).
+Folders: wafer_2026-10-15 (main set), wafer_2026-10-15_r2 (copper swap, alumitrace, copper_ore), wafer_2026-10-15_r3 (seedor variants), ores_2026-10-15 (14 ores). Each has pack_128/64/32/16 plus manifest.json and contact sheets. Style: v3b ground (#34426C). Open items: new shader masks are needed for the trace/via/lamp shapes; new names need registering.

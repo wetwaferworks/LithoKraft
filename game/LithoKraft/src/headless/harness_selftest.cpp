@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <string>
 #include "lithokraft/game/game.h"
+#include "lithokraft/game/cWorldFileCheck.h"  // 2026-10-31: offline on-disk check
 #include "lithokraft/game/game_ui.h"
 #include "lithokraft/game/settings.h"
 #include "litholattice/ui/controls.h"
@@ -183,6 +184,29 @@ int waitForSurface(cHeadlessGame& hg, Game& g, int x, int z, int maxFrames = 600
   return y;
 }
 
+/// JD ruling t3366u: an in-game pause stops the render pipeline (no Render Ingress
+/// pops, no uploads) while meshing keeps queueing; unpause catches up under N/K.
+void testPauseFreezesRenderPipeline(Checker& check) {
+  cHeadlessGame hg;
+  Game& g = hg.game();
+  g.enterMenu();
+  hg.frame();
+  clickId(hg, "menu-play");
+  bool meshes = false;
+  for (int i = 0; i < 600 && !meshes; ++i) {  // pause right after the first upload: lots still in flight
+    hg.frame();
+    meshes = hg.renderer().stats().meshes > 0;
+  }
+  check(meshes, "pause-render: meshes upload while Playing");
+  g.setPaused(true);
+  const auto frozen = hg.renderer().stats().meshes;
+  for (int i = 0; i < 120; ++i) hg.frame();
+  check(hg.renderer().stats().meshes == frozen, "pause-render: no GPU mesh uploads while the sim is paused");
+  g.setPaused(false);
+  for (int i = 0; i < 600 && hg.renderer().stats().meshes == frozen; ++i) hg.frame();
+  check(hg.renderer().stats().meshes > frozen, "pause-render: unpause catches up the meshes queued during the pause");
+}
+
 void testChunkStreamingWalk(Checker& check) {
   // JD's catch (2026-10-12): the Wafer pre-bake only generated a few chunks
   // around spawn. The harness world pre-bakes chunks [0,4) x [0,4) (blocks
@@ -297,6 +321,66 @@ void testStreamingPersistence(Checker& check) {
     check(waitForSurface(hg, g, 200, 8) >= 0,
           "persist: after relaunch, terrain at x=200 (outside the pre-bake) returns via streaming");
     check(g.streamedColumnCount() > 0, "persist: the relaunch streamed columns in (not just the pre-bake)");
+  }
+  std::filesystem::remove_all(dir, ec);
+}
+
+void testAsyncSave(Checker& check) {
+  // 2026-10-31 (JD, Save World): the async save snapshots on the tick thread at a tick boundary,
+  // writes on a pool worker, never stops the sim; the files must then read back offline and
+  // restore on the next launch.
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "lithokraft_async_save_test";
+  std::error_code ec;
+  std::filesystem::remove_all(dir, ec);
+  cHeadlessGame::Config cfg;
+  cfg.worldChunks = 4;
+  cfg.saveDir = dir.string();
+  {
+    cHeadlessGame hg(cfg);
+    Game& g = hg.game();
+    g.enterMenu();
+    hg.frame();
+    clickId(hg, "menu-play");
+    hg.frame();
+    Vec3 p = g.playerPosition();
+    p.x = 200.f;
+    p.y = 160.f;
+    g.setPlayerPosition(p);
+    check(waitForSurface(hg, g, 200, 8) >= 0, "async-save: streamed terrain at x=200 before saving");
+    check(g.saveWorld("async-test", false), "async-save: posted (sim not stopped)");
+    check(!g.saveWorld("async-test-2", false) || g.lastAsyncSave().has_value(),
+          "async-save: a second save while one is in flight is refused (single writer, nobody waits)");
+    for (int i = 0; i < 3000 && !g.lastAsyncSave(); ++i) hg.frame();
+    const auto& r = g.lastAsyncSave();
+    check(r.has_value() && r->ok, "async-save: the pool write finished ok");
+    if (r) {
+      check(r->columns > 0 && r->bytesOnDisk > 0, "async-save: columns and region bytes on disk");
+      std::printf("async-save profile: %zu columns, snapshot %.2f ms (%.2f MB copied, boundary after %.2f ms), pool write %.2f ms, %.2f MB on disk\n",
+                  r->columns, r->snapshotMs, double(r->bytesCopied) / 1048576.0, r->queueMs, r->commitMs, double(r->bytesOnDisk) / 1048576.0);
+    }
+    const cWorldFileCheck::Result fc = cWorldFileCheck::check(dir.string());
+    std::printf("async-save offline check: %d regions, %d columns, %d errors %s\n", fc.regions, fc.columns, fc.errors, fc.firstError.c_str());
+    check(fc.ok() && fc.columns > 0, "async-save: offline check reads back every region / column record");
+    // Back-to-back: three more async saves in a row, each awaited, then the check again.
+    for (int k = 0; k < 3; ++k) {
+      const auto before = g.lastAsyncSave() ? g.lastAsyncSave()->totalMs : -1.0;
+      (void)before;
+      for (int i = 0; i < 200; ++i) hg.frame();
+      g.saveWorld("async-b2b", false);
+    }
+    for (int i = 0; i < 200; ++i) hg.frame();
+  }  // exit save (sync) follows any in-flight async one
+  const cWorldFileCheck::Result fc2 = cWorldFileCheck::check(dir.string());
+  check(fc2.ok() && fc2.columns > 0, "async-save: offline check after back-to-back saves + exit save");
+  {
+    cHeadlessGame hg(cfg);
+    Game& g = hg.game();
+    g.enterMenu();
+    hg.frame();
+    clickId(hg, "menu-play");
+    hg.frame();
+    check(std::fabs(g.playerPosition().x - 200.f) < 4.f, "async-save: the player restores at x=200 on relaunch");
+    check(waitForSurface(hg, g, 200, 8) >= 0, "async-save: terrain at x=200 returns after relaunch");
   }
   std::filesystem::remove_all(dir, ec);
 }
@@ -435,9 +519,11 @@ int runHeadlessHarnessSelfTest() {
   testQuitFlow(check);
   testFocusLoss(check);
   testFramesRunHeadless(check);
+  testPauseFreezesRenderPipeline(check);
   testChunkStreamingWalk(check);
   testInventoryBinding(check);
   testStreamingPersistence(check);
+  testAsyncSave(check);  // 2026-10-31 (JD, Save World)
   testFragmentOwnership(check);
   testPickBlockInFlight(check);
   // testRepeatorFacing(check);  // BUG-0007 WIP: harness right-click place does not land yet (see CHANGES)

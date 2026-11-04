@@ -1,10 +1,14 @@
 // Headless checks of LithoKraft content that sits on engine interfaces: sound-effect recipes on
 // the engine synth, the block appearance through the engine mesher, the registry layout.
+#include "lithokraft/content/block_families.h"
+#include <cstdlib>
 #include "litholattice/procgen/ramp_shape.h"  // Highway Ramp checks
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 #include <vector>
+#include "lithokraft/content/chunk_coord_text.h"
 #include "lithokraft/content/appearance.h"
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/content/content_selftest.h"
@@ -96,7 +100,7 @@ int runContentSelfTest() {
       {  // 2026-10-16 WaferBeta: Lithographor re-enabled at the END of the registry (id 92), Custom cuboids.
         const auto id = reg.findById("lithokraft:lithographor");
         const BlockDef d = id ? reg.def(*id) : BlockDef{};
-        check(id && *id == BlockId(kFoliageMoss + 5) && reg.size() == size_t(kFoliageMoss) + 17 && kTimerBuffer == BlockId(kFoliageMoss + 12) && kVirtualPost == BlockId(kFoliageMoss + 13) && kOrganicWallPost == BlockId(kFoliageMoss + 16) && kRedViaX == BlockId(kFoliageMoss + 8) && kBlueViaZ == BlockId(kFoliageMoss + 11) &&  /* 2026-10-25: + 4 side vias, + Timer Buffer (roadmap 7), + 4 Posts */ d.shape == Shape::Custom &&
+        check(id && *id == BlockId(kFoliageMoss + 5) && reg.size() == size_t(kFoliageMoss) + 19 && kFusorSum == BlockId(kFoliageMoss + 18) && kRandor == BlockId(kFoliageMoss + 17) &&  /* 2026-10-31: + Randor */ kTimerBuffer == BlockId(kFoliageMoss + 12) && kVirtualPost == BlockId(kFoliageMoss + 13) && kOrganicWallPost == BlockId(kFoliageMoss + 16) && kRedViaX == BlockId(kFoliageMoss + 8) && kBlueViaZ == BlockId(kFoliageMoss + 11) &&  /* 2026-10-25: + 4 side vias, + Timer Buffer (roadmap 7), + 4 Posts */ d.shape == Shape::Custom &&
                   (d.flags & litholattice::kDirectional) && !(d.flags & kOpaque) && d.tex == "lithographor",
               "lithographor: id 92 (appended; Aluminum Ramp 93, Highway Ramp, 4 side Vias, Timer Buffer follow), Custom directional cuboid model, tex lithographor");
         // Cortana 2026-10-16: Aluminum Ramp appended after the Lithographor (id 93), Custom slope, not opaque.
@@ -320,6 +324,33 @@ int runContentSelfTest() {
     ModelBindings bad;
     check(!loadModelBindings(materialBindingsDir(), "../evil", bad) && !loadModelBindings(materialBindingsDir(), "no-such-model", bad),
           "material bindings: traversal and missing ids rejected");
+  }
+  {  // 2026-10-31 (JD): F3 chunk line: chunk + local coords, seam flags at local x / z 0 and 15 (negatives too)
+    const std::string a = cChunkCoordText::block(17, 266, 96), b = cChunkCoordText::block(15, 266, 47), c = cChunkCoordText::block(-1, 5, -16);
+    check(a == "c 1,6 l 1,10,0 [z0]" && b == "c 0,2 l 15,10,15 [x15 z15]" && c == "c -1,-1 l 15,5,0 [x15 z0]" &&
+              cChunkCoordText::line(17, 266, 96, false, 0, 0, 0) == "chunk  player c 1,6 l 1,10,0 [z0]  |  look -",
+          "hud: F3 chunk line names chunk and local x/y/z, flags seams (local 0 / 15), handles negative coords");
+  }
+  {  // 2026-10-31 (JD): every placeable block is in the creative palette, once, in registry order
+    const auto& reg = blockRegistry();
+    const std::vector<BlockId> pal = paletteBlocks(), all = paletteBlocks(true);
+    bool ok = all.size() == reg.size() - 1 && std::find(pal.begin(), pal.end(), kRandor) != pal.end() &&
+              std::find(pal.begin(), pal.end(), kAir) == pal.end();
+    size_t j = 0;
+    for (size_t id = 1; id < reg.size(); ++id) {
+      if (isPaletteHidden(BlockId(id))) continue;
+      ok = ok && j < pal.size() && pal[j] == BlockId(id);
+      ++j;
+    }
+    check(ok && j == pal.size(), "palette: every placeable registry block is listed once, in registry order (Randor included)");
+  }
+  {  // 2026-10-31 (JD): grouped palette = same blocks, families in order 0..3
+    std::vector<BlockId> pal = paletteBlocks(), grp = paletteBlocksGrouped();
+    bool ok = grp.size() == pal.size() && std::is_permutation(grp.begin(), grp.end(), pal.begin());
+    for (size_t i = 1; i < grp.size(); ++i) ok = ok && paletteFamily(grp[i - 1]) <= paletteFamily(grp[i]);
+    ok = ok && !grp.empty() && paletteFamily(grp.front()) == 0;
+    check(ok, "palette grouped: same blocks, Trace family first, then lamps, building, other");
+    check(cBlockFamilies::get().unassigned().empty(), "families: every registered block has a family");
   }
   std::printf(fails ? "CONTENT SELFTEST FAILED (%d)\n" : "CONTENT SELFTEST OK\n", fails);
   return fails;

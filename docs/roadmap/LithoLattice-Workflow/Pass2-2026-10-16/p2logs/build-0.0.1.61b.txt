@@ -1,0 +1,135 @@
+
+  Checking File Globs
+  angelscript.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\angelscript-build\Release\angelscript.lib
+  glfw.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glfw-build\src\Release\glfw3.lib
+  litholattice_core.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\core\Release\litholattice_core.lib
+  litholattice_crypto.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\crypto\Release\litholattice_crypto.lib
+  litholattice_nanosvg.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\assets\Release\litholattice_nanosvg.lib
+  litholattice_stb.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\assets\Release\litholattice_stb.lib
+  litholattice_assets.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\assets\Release\litholattice_assets.lib
+  litholattice_subdiv.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\subdiv\Release\litholattice_subdiv.lib
+  litholattice_procgen.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\procgen\Release\litholattice_procgen.lib
+  lithokraft_model.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\content\model\Release\lithokraft_model.lib
+  litholattice_audio.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\audio\Release\litholattice_audio.lib
+  litholattice_systerian.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\systerian\Release\litholattice_systerian.lib
+  litholattice_ui.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\ui\Release\litholattice_ui.lib
+  litholattice_world.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\world\Release\litholattice_world.lib
+  litholattice_render.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\render\Release\litholattice_render.lib
+  litholattice_sim.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\sim\Release\litholattice_sim.lib
+  litholattice_storage.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\storage\Release\litholattice_storage.lib
+  lithokraft_content.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\content\Release\lithokraft_content.lib
+  LithoKraft build counter bump
+  -- LithoKraft build counter: Alpha 0.0.1.61
+  litholattice_ai.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\ai\Release\litholattice_ai.lib
+  litholattice_index.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\index\Release\litholattice_index.lib
+  litholattice_defrag.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\defrag\Release\litholattice_defrag.lib
+  litholattice_input.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\input\Release\litholattice_input.lib
+  litholattice_mods.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\mods\Release\litholattice_mods.lib
+  litholattice_script.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\script\Release\litholattice_script.lib
+  litholattice_console.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\console\Release\litholattice_console.lib
+  litholattice_camera.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\camera\Release\litholattice_camera.lib
+  litholattice_entity.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\entity\Release\litholattice_entity.lib
+  litholattice_mcp.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\mcp\Release\litholattice_mcp.lib
+  litholattice_platform.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\platform\Release\litholattice_platform.lib
+  litholattice_player.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\player\Release\litholattice_player.lib
+  litholattice_projectile.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\projectile\Release\litholattice_projectile.lib
+  litholattice_sprite.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\sprite\Release\litholattice_sprite.lib
+  build_version.cpp
+  game.cpp
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\core\include\litholattice\core\threeway.h(9,52): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\sim\include\litholattice\sim\sim_thread.h(313,56): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\core\include\litholattice\core\tick_profile.h(13,52): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/game/game.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(52,75): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(66,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(72,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(77,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(905,30): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(907,16): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(1058,33): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(1066,30): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(2779,30): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\game\game.cpp(2781,16): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\lithokraft_game.vcxproj]
+  Generating Code...
+  lithokraft_game.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\game\Release\lithokraft_game.lib
+  litholattice_miniaudio_impl.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\audio\Release\litholattice_miniaudio_impl.lib
+  litholattice_audio_device.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\audio\Release\litholattice_audio_device.lib
+  glslang.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\glslang\Release\glslang.lib
+  glslang-default-resource-limits.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\glslang\Release\glslang-default-resource-limits.lib
+  glslang-standalone.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\_deps\glslang-build\StandAlone\Release\glslang.exe
+  litholattice_render_vk.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\src\render_vk\Release\litholattice_render_vk.lib
+  main.cpp
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(41,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(42,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,61): warning C4100: 'w': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,52): warning C4100: 'z': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,43): warning C4100: 'y': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\procgen\include\litholattice\procgen\noise.h(43,34): warning C4100: 'x': unreferenced parameter [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\core\include\litholattice\core\tick_profile.h(13,52): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\core\include\litholattice\core\threeway.h(9,52): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\engine\src\sim\include\litholattice\sim\sim_thread.h(313,56): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+  (compiling source file '../../../../game/LithoKraft/src/app/main.cpp')
+  
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\main.cpp(1106,63): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\main.cpp(710,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\main.cpp(712,28): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\main.cpp(1147,40): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+     Creating library R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/LithoKraft.lib and object R:/repos/LithoLattice-Workflow/Pass2-2026-10-16/build/game/src/app/Release/LithoKraft.exp
+  lithokraft.vcxproj -> R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\Release\LithoKraft.exe

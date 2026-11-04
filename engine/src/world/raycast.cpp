@@ -43,7 +43,11 @@ bool raycast(const ChunkMap& w, float ox, float oy, float oz, float dx, float dy
   // starting inside a solid block would otherwise miss it entirely.
   {
     const BlockId b0 = w.get(c[0], c[1], c[2]);
-    if (b0 != kAir) { hit[0] = c[0]; hit[1] = c[1]; hit[2] = c[2]; return true; }
+    if (b0 != kAir) {
+      hit[0] = c[0]; hit[1] = c[1]; hit[2] = c[2];
+      prev[0] = c[0]; prev[1] = c[1]; prev[2] = c[2];  // H8: never leave prev unset
+      return true;
+    }
   }
   float t = 0;
   while (t <= maxDist) {
@@ -60,7 +64,8 @@ bool raycast(const ChunkMap& w, float ox, float oy, float oz, float dx, float dy
     } else if (b != kAir && pickShape) {
       constexpr int kMaxBoxes = 16;
       PickBox boxes[kMaxBoxes];
-      const int n = pickShape(w, *blocks, c[0], c[1], c[2], b, boxes, kMaxBoxes);
+      int n = pickShape(w, *blocks, c[0], c[1], c[2], b, boxes, kMaxBoxes);
+      if (n > kMaxBoxes) n = kMaxBoxes;  // H8: never read past the box buffer
       if (n >= 0) {
         bool any = false;
         for (int i = 0; i < n && !any; ++i) {
@@ -76,4 +81,49 @@ bool raycast(const ChunkMap& w, float ox, float oy, float oz, float dx, float dy
   return false;
 }
 
+MarchHit marchRay(const ChunkMap& w, double ox, double oy, double oz, double dx, double dy, double dz,
+                  double maxDist, const cBlockReg* blocks, bool skipOrigin) {
+  MarchHit r;
+  const double o[3] = {ox, oy, oz};
+  double d[3] = {dx, dy, dz};
+  for (int a = 0; a < 3; ++a)
+    if (!(std::fabs(o[a]) < kMarchMaxCoord) || !std::isfinite(d[a])) return r;
+  const double len = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+  if (!(len > 0.0) || !(maxDist > 0.0)) return r;
+  for (double& v : d) v /= len;
+  int c[3], step[3];
+  double tMax[3], tDelta[3];
+  for (int a = 0; a < 3; ++a) {
+    c[a] = int(std::floor(o[a]));
+    step[a] = d[a] > 0.0 ? 1 : -1;
+    tDelta[a] = d[a] != 0.0 ? std::fabs(1.0 / d[a]) : 1e300;
+    const double edge = d[a] > 0.0 ? double(c[a] + 1) - o[a] : o[a] - double(c[a]);
+    tMax[a] = d[a] != 0.0 ? edge * tDelta[a] : 1e300;
+  }
+  auto solid = [&](BlockId b) { return blocks ? blocks->has(b, kSolid) : b != kAir; };
+  int prev[3] = {c[0], c[1], c[2]};
+  double t = 0.0;
+  bool first = true;
+  for (;;) {
+    if (w.column(c[0] >> 4, c[2] >> 4) == nullptr) {
+      r.stoppedByUnloaded = true;
+      r.dist = t;
+      for (int a = 0; a < 3; ++a) { r.cell[a] = c[a]; r.prev[a] = prev[a]; }
+      return r;
+    }
+    if (!(first && skipOrigin) && solid(w.get(c[0], c[1], c[2]))) {
+      r.hit = true;
+      r.dist = t;
+      for (int a = 0; a < 3; ++a) { r.cell[a] = c[a]; r.prev[a] = prev[a]; }
+      return r;
+    }
+    first = false;
+    const int a = tMax[0] <= tMax[1] ? (tMax[0] <= tMax[2] ? 0 : 2) : (tMax[1] <= tMax[2] ? 1 : 2);
+    if (tMax[a] > maxDist) return r;
+    for (int k = 0; k < 3; ++k) prev[k] = c[k];
+    c[a] += step[a];
+    t = tMax[a];
+    tMax[a] += tDelta[a];
+  }
+}
 }  // namespace litholattice

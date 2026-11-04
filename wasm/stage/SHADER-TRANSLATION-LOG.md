@@ -1,7 +1,7 @@
 # Shader translation log (GLSL 330 -> ES 3.00, mechanical)
 
-source: /home/hatch/workspace/torch-receive-2026-10-17/tree/engine/assets
-staging: /home/hatch/workspace/torch-receive-2026-10-17/tree/wasm/stage/engine-assets
+source: /home/hatch/workspace/lk/engine/assets
+staging: /home/hatch/workspace/lk/wasm/stage/engine-assets
 
 ## chunk.frag
 - version line -> `#version 300 es`

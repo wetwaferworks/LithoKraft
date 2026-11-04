@@ -1,0 +1,153 @@
+{
+  "format": "lithokraft_repeator_voxel_v1_6btn",
+  "resolution": 32,
+  "lthm_level": 5,
+  "axes": "x=east(right), y=up, z=south(front/output). input at z=0, output at z=31",
+  "materials": {
+    "1": {
+      "name": "base",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#454D63",
+      "tint": false
+    },
+    "4": {
+      "name": "glow_seam",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "5": {
+      "name": "button_up",
+      "neutral_hex": "#9A9A9A",
+      "tint": true
+    },
+    "6": {
+      "name": "button_down",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "7": {
+      "name": "button_well",
+      "neutral_hex": "#161922",
+      "tint": false
+    }
+  },
+  "tint_colors": {
+    "red": {
+      "off": "#5A5556",
+      "on": "#FF514B"
+    },
+    "blue": {
+      "off": "#535659",
+      "on": "#2FB4FF"
+    }
+  },
+  "states": [
+    {
+      "state": 1,
+      "delay_ticks": 2,
+      "buttons_down": [
+        0
+      ],
+      "lthm": "models/repeator_d2.lthm",
+      "voxels_json": "models/repeator_d2.voxels.json",
+      "cells": 6380,
+      "next_state": 2
+    },
+    {
+      "state": 2,
+      "delay_ticks": 4,
+      "buttons_down": [
+        0,
+        1
+      ],
+      "lthm": "models/repeator_d4.lthm",
+      "voxels_json": "models/repeator_d4.voxels.json",
+      "cells": 6356,
+      "next_state": 3
+    },
+    {
+      "state": 3,
+      "delay_ticks": 8,
+      "buttons_down": [
+        0,
+        1,
+        2
+      ],
+      "lthm": "models/repeator_d8.lthm",
+      "voxels_json": "models/repeator_d8.voxels.json",
+      "cells": 6332,
+      "next_state": 4
+    },
+    {
+      "state": 4,
+      "delay_ticks": 16,
+      "buttons_down": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "lthm": "models/repeator_d16.lthm",
+      "voxels_json": "models/repeator_d16.voxels.json",
+      "cells": 6308,
+      "next_state": 5
+    },
+    {
+      "state": 5,
+      "delay_ticks": 32,
+      "buttons_down": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "lthm": "models/repeator_d32.lthm",
+      "voxels_json": "models/repeator_d32.voxels.json",
+      "cells": 6284,
+      "next_state": 6
+    },
+    {
+      "state": 6,
+      "delay_ticks": 64,
+      "buttons_down": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "lthm": "models/repeator_d64.lthm",
+      "voxels_json": "models/repeator_d64.voxels.json",
+      "cells": 6260,
+      "next_state": 1
+    }
+  ],
+  "button_subpieces": {
+    "up": "models/repeator_button_up.lthm (3x3x4 cells)",
+    "down": "models/repeator_button_down.lthm (3x1x4 cells)",
+    "slots_x": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24
+    ],
+    "slot_z": [
+      14,
+      17
+    ],
+    "seat_y": 6
+  }
+}

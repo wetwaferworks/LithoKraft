@@ -118,6 +118,11 @@ void stampChecks(Checker& check) {
       std::error_code ec;
       for (std::filesystem::path p = std::filesystem::current_path(ec); !p.empty(); p = p.parent_path()) {
         paths.push_back((p / "game" / "LithoKraft" / "assets" / "worldgen" / "wafer.json").string());
+        // 2026-10-29: the engine is a submodule shared by several games, so also take the
+        // wafer.json of whichever game sits next to it (game/<Name>/assets/worldgen).
+        if (std::filesystem::is_directory(p / "game", ec))
+          for (const auto& g : std::filesystem::directory_iterator(p / "game", ec))
+            if (g.is_directory(ec)) paths.push_back((g.path() / "assets" / "worldgen" / "wafer.json").string());
         if (p == p.parent_path()) break;
       }
     }
@@ -130,7 +135,22 @@ void stampChecks(Checker& check) {
         break;
       }
     }
-    if (text.empty()) {
+    // 2026-10-29: a game with no worldgen (the LithoKart scaffold, or the engine repo on its own)
+    // has no wafer.json to check, so the integration check is skipped there. Any game that ships
+    // assets/worldgen keeps the hard failure.
+    bool anyWorldgen = false;
+    {
+      std::error_code ec;
+      for (std::filesystem::path p = std::filesystem::current_path(ec); !p.empty() && !anyWorldgen; p = p.parent_path()) {
+        if (std::filesystem::is_directory(p / "game", ec))
+          for (const auto& g : std::filesystem::directory_iterator(p / "game", ec))
+            if (std::filesystem::is_directory(g.path() / "assets" / "worldgen", ec)) anyWorldgen = true;
+        if (p == p.parent_path()) break;
+      }
+    }
+    if (text.empty() && !anyWorldgen) {
+      std::printf("  [SKIP] lithoform_stamp: no game with assets/worldgen next to the engine\n");
+    } else if (text.empty()) {
       check(false, "lithoform_stamp: wafer.json not found for integration check");
     } else {
       auto stubModels = [](std::string_view name) -> std::optional<LithoStampModel> {

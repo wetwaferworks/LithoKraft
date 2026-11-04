@@ -4,7 +4,9 @@
 // (signal-sim component memory and timers), and <root>/player.lat (position, look, dimension,
 // hotbar). Encoding runs on the caller's thread; file I/O runs on each store's I/O thread.
 #pragma once
+#include <array>
 #include <atomic>
+#include <cstdlib>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -20,10 +22,13 @@
 #include "litholattice/core/math.h"
 #include "litholattice/storage/block_names.h"
 #include "litholattice/storage/storage.h"
+#include "litholattice/storage/lf_world_store.h"  // 2026-11-01 LL_LF_SAVE / LL_LF_LOAD
 #include "litholattice/sim/area_shape.h"  // Fix run 3: level.json v3 area
 #include "litholattice/world/chunk_map.h"
 
 namespace lithokraft {
+
+class cWorldSnapshot;  // cWorldSnapshot.h (2026-10-31, Save World)
 
 constexpr uint32_t kSignalTag = storage::fourcc("SGNL");
 constexpr uint32_t kPostTextTag = storage::fourcc("PTXT");  ///< 2026-10-25 Posts: per-cell panel text
@@ -123,6 +128,12 @@ class cWorldSave {
   /// written through the file contract as part of the save (SV-H2).
   size_t saveDimension(const std::string& dim, const ChunkMap& world, const cSignalSim& signal, bool wait,
                        const std::unordered_set<uint64_t>* dirty = nullptr);
+  /// 2026-10-31 (JD, Save World): saveDimension's disk half. saveDimension == capture a
+  /// cWorldSnapshot (copies only, no I/O) + commit it. commit() does every disk step - name
+  /// table check + write, level.json, region encode/write, flush when `wait` - and touches no
+  /// live world memory, so the async save runs it on a pool worker. One committer at a time
+  /// (Game defers save-on-evict while an async commit is in flight). Same return contract.
+  size_t commit(cWorldSnapshot& snap, bool wait);
   /// Column eviction save (A2 / B-M1): saves ONLY the given columns
   /// (blocks + their SGNL state, exported from `signal` inside this call)
   /// through the same store path and fail-closed discipline as
@@ -227,7 +238,24 @@ class cWorldSave {
 
   const storage::cPayloadReg& payloads() const { return payloads_; }
 
+  /// 2026-11-01 (JD, LL_LF_SAVE=1 / LL_LF_LOAD=1, default off): lock-free asynchronous save and
+  /// load. Either switch moves ALL of this save's region I/O onto cLfWorldStore (one store per
+  /// dimension directory: two store types on the same files would fight), so:
+  ///   - loadColumn / loadDimension: no loadMutex_, no storesMutex_, no streamRemapMutex_; the
+  ///     SGNL sink is per request (thread_local decode context); a load waits for itself only.
+  ///   - commit / saveColumns: no exporting_ mutex; the SGNL export rides each save job as its
+  ///     encode context; wait=true waits for this save's own flush job only.
+  /// Same region files and records: on-disk format unchanged. Call before any I/O.
+  void setLockFreeIo(bool save, bool load) { lfSave_ = save; lfLoad_ = load; }
+  bool lockFreeIo() const { return lfSave_ || lfLoad_; }
+  uint64_t lfLoadsJumped();  ///< loads that skipped the save FIFO (all LF stores)
+
  private:
+  size_t commitLf(cWorldSnapshot& snap, bool wait);
+  size_t saveColumnsLf(const std::string& dim, const std::vector<const ChunkColumn*>& cols, const cSignalSim& signal, bool wait);
+  int loadDimensionLf(const std::string& dim, ChunkMap& world, std::vector<uint8_t>& signalState);
+  LoadedColumn loadColumnLf(const std::string& dim, int cx, int cz);
+  storage::cLfWorldStore& lfStore(const std::string& dim);
   storage::cWorldStore& store(const std::string& dim);
   std::filesystem::path root_;
   storage::cPayloadReg payloads_;
@@ -261,6 +289,18 @@ class cWorldSave {
   // table heals in-session instead of latching a session-wide downgrade.
   std::optional<storage::StableRemap> streamRemap_;
   std::mutex streamRemapMutex_;
+  // ---- 2026-11-01 LL_LF_SAVE / LL_LF_LOAD (declared last: destroyed first, before payloads_)
+  bool lfSave_ = [] { const char* e = std::getenv("LL_LF_SAVE"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
+  bool lfLoad_ = [] { const char* e = std::getenv("LL_LF_LOAD"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
+  struct LfStoreEntry { std::string dim; std::unique_ptr<storage::cLfWorldStore> store; };
+  struct LfStores {  // published once per dimension by CAS; freed at destruction
+    std::array<std::atomic<LfStoreEntry*>, 32> slot{};
+    ~LfStores() { for (auto& s : slot) delete s.load(std::memory_order_acquire); }
+  } lfStores_;
+  struct LfRemap {  // the streamed-load remap, published once by CAS (success only, as before)
+    std::atomic<const storage::StableRemap*> p{nullptr};
+    ~LfRemap() { delete p.load(std::memory_order_acquire); }
+  } lfRemap_;
 };
 
 }  // namespace lithokraft

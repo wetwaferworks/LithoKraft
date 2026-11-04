@@ -19,6 +19,7 @@
 #include <unordered_set>
 #include <bit>
 #include <vector>
+#include <memory>
 #include "litholattice/render/trace_strength_buffer.h"
 #include "lithokraft/engine.h"
 #include "lithokraft/content/component.h"
@@ -74,7 +75,7 @@ class cRadioReg {
   void clear() { cur_.clear(); next_.clear(); for (auto& v : byChannel_) v.clear(); }
   /// Strongest broadcast on `channel` within (power + sensitivity) of (x, y, z).
   /// Returns false when nothing is heard. Tie-breaks are canonical: strongest
-  /// wins, then nearest, then the lowest packPos — so the result never depends on
+  /// wins, then nearest, then the lowest packPos Ã¢â‚¬â€ so the result never depends on
   /// broadcast registration order.
   bool query(uint8_t channel, int x, int y, int z, int dim, int sensitivity,
              int& strength, int& colour) const {
@@ -151,7 +152,7 @@ class cSignalSim {
   /// a network rebuild (fullPass) so no derived net/pointer state can
   /// reference the column again. The caller MUST take the column's SGNL
   /// export first (exportColumnState() / exportState()) and save it
-  /// before unscanning when the state must survive — after this call the
+  /// before unscanning when the state must survive Ã¢â‚¬â€ after this call the
   /// column's component memory is gone from the sim. Sim stopped only,
   /// like scanColumn().
   void unscanColumn(int cx, int cz);
@@ -167,10 +168,13 @@ class cSignalSim {
   /// Number of indexed cells in the column (tests / diagnostics).
   size_t indexedCellCount(int cx, int cz) const;
   void onBlockChanged(int x, int y, int z, BlockId now);
+  // 2026-11-01 (JD placement spikes): wireBelow = a wire sits at (x,y-1,z). Lets a non-wire edit keep the
+  // flood topology (only that wire's links can see this cell's kCutsWire). LL_EDIT_LOCAL=0 kill.
+  void onBlockChanged(int x, int y, int z, BlockId now, bool wireBelow);
   // cPlayer chunk + radius: components outside the radius are frozen.
   void tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty);
 
-  // ---- Timing Handshake surface (hs-design §3.2) ----
+  // ---- Timing Handshake surface (hs-design Ã‚Â§3.2) ----
   // tick() is reassembled from exactly these pieces, in this order, so the
   // legacy and handshake paths share one implementation:
   //   hsBeginCycle; hsFlipAndTorches; hsComponents; hsMark;
@@ -194,15 +198,72 @@ class cSignalSim {
   void hsCommit();                                               // radio_/jammers_ flip
   bool hsCycleSkipped() const { return hsSkip_; }
   bool hsFullPass() const { return fullPass_; }
+  /// LL_TICK_PROFILE (measure only): why the last cycle went wide. 1 area moved, 2 column count changed, 4 fullPass preset (edit/evict), 8 nets already invalid.
+  uint32_t hsReason() const { return hsReason_; }
+  uint32_t hsReason_ = 0;
+  /// LL_SIGNAL_LAZYNETS (2026-10-30; default ON since 2026-10-31, =0 kill): a column load / evict only invalidates the
+  /// nets when it changes the load state of a column that holds an indexed signal cell or borders
+  /// one (the columns buildNets read through). Otherwise the cached nets stay. 32 in hsReason().
+  void setLazyNets(bool on) { lazyNets_ = on; netsValid_ = false; topoDirty_ = true; }
+  /// LL_SIGNAL_RELINK (2026-10-31; default ON, =0 kill; needs LL_SIGNAL_LAZYNETS for the border test): an
+  /// area move or a border-only column load keeps the flood topology (nets, wire->net, net lamps,
+  /// net readers) and only re-derives the pointer / in-area arrays. Same output as a full build.
+  void setRelinkNets(bool on) { relinkNets_ = on; netsValid_ = false; topoDirty_ = true; }
+  uint64_t netRelinks() const { return netRelinks_; }
+  /// LL_SIGNAL_EDGERELINK (2026-10-31; default ON, =0 kill; needs RELINK + LAZYNETS): evicting a column whose wire nets
+  /// all lie inside it (no net crosses a shared column face) drops those nets and compacts the ids instead of a
+  /// full flood. Ids follow each net's min wire key, so the result equals a fresh flood. LL_SIGNAL_EDGECHECK=1
+  /// floods anyway after a drop and logs MATCH / MISMATCH (debug only).
+  void setEdgeRelink(bool on) { edgeRelink_ = on; netsValid_ = false; topoDirty_ = true; }
+  uint64_t edgeDrops() const { return edgeDrops_; }
+  uint64_t edgeCheckMismatches() const { return edgeMismatch_; }
+  bool lazyNets() const { return lazyNets_; }
+  uint64_t netBuilds() const { return netBuilds_; }  ///< buildNets() calls (tests / diagnostics)
+  bool lazyNets_ = [] { const char* e = std::getenv("LL_SIGNAL_LAZYNETS"); return !(e && e[0] == '0' && e[1] == '\0'); }();  // 2026-10-31 (JD PlayC TPS): default ON; =0 kill
+  uint64_t netBuilds_ = 0;
+  bool relinkNets_ = [] { const char* e = std::getenv("LL_SIGNAL_RELINK"); return !(e && e[0] == '0' && e[1] == '\0'); }();  // 2026-10-31 (JD PlayC TPS): default ON; =0 kill
+  bool topoDirty_ = true;      // flood inputs (indexed cells / their blocks) changed since the last build
+  bool editLocal_ = false;   // LL_EDIT_LOCAL: only local edits since the last build (netComps_/netLamps_ patched)
+  uint64_t netRelinks_ = 0;
+  bool edgeRelink_ = [] { const char* e = std::getenv("LL_SIGNAL_EDGERELINK"); return !(e && e[0] == '0' && e[1] == '\0'); }();  // 2026-10-31 (JD PlayC TPS): default ON; =0 kill
+  bool relinkScope_ = [] { const char* e = std::getenv("LL_SIGNAL_RELINKSCOPE"); return !(e && e[0] == '0' && e[1] == '\0'); }();  // relink: fast paths + netTouch only for the sim area (2026-10-31 JD: default ON, LL_SIGNAL_RELINKSCOPE=0 = off)
+  bool edgeCheck_ = [] { const char* e = std::getenv("LL_SIGNAL_EDGECHECK"); return e && e[0] == '1' && e[1] == '\0'; }();
+  bool edgePending_ = false;    // evicted columns recorded in edgeAffected_ since the last buildNets
+  std::vector<int64_t> edgeCols_;  // columns streamed in / out since the last buildNets (cx << 32 | cz)
+  uint64_t edgeDrops_ = 0, edgeMismatch_ = 0;
+  bool edgeMarkColumn(int cx, int cz);
+  bool edgeSplit(ChunkMap& w);
+  struct NetTouch { int cx, cz; bool loaded; bool own = false; };
+  std::vector<NetTouch> netTouch_;  // sorted (cx, cz); built by buildNets when lazyNets_
+  bool netTouchUnchanged(const ChunkMap& w) const;
+  // LL_TICK_PROFILE diagnostic (measure only): what forced the next buildNets.
+  mutable int diagCx_ = 0, diagCz_ = 0;
+  mutable int diagKind_ = 0;  // 0 other/edit, 1 load-state change of a touch column, 2 relevant evict, 3 eager count change
+  mutable bool diagOwn_ = false;
+  bool netTouches(int cx, int cz) const;
   const std::vector<int32_t>& hsMarkedNets() const { return hsMarkedNets_; }
   const std::vector<int64_t>& hsLampKeys() const { return hsLampKeys_; }
   uint64_t tickCount() const { return tickNo_; }
   /// Deferred lamp afterglow update produced by hsLampsBatch (the lampHold_
   /// map is sim-thread owned; pull batches return these, the sim thread
-  /// merges them after the barrier — hs-design §3.3).
+  /// merges them after the barrier Ã¢â‚¬â€ hs-design Ã‚Â§3.3).
   struct LampHoldUpdate { int64_t key = 0; uint64_t end = 0; bool erase = false; };
   void hsApplyLampHolds(const std::vector<LampHoldUpdate>& updates);
-  void hsApplyStrengthPending();  // replay per-net TraceStrengthBuffer writes in canonical order
+  void hsApplyStrengthPending(const DirtyFn* dirty = nullptr);  // replay per-net TraceStrengthBuffer writes in canonical order (+ remesh, 2026-11-01)
+  void hsRefreshSoft(const ChunkMap& w);
+  // 2026-11-01 PlayM (JD): same-tick components. After the flood + soft refresh, components whose inputs
+  // changed re-evaluate from their pre-tick snapshot (one logical tick each, fixed sorted order) and the
+  // changed outputs re-flood, until nothing changes (LL_SAME_TICK=0 off; LL_SETTLE_MAX, default 16).
+  void hsSettle(ChunkMap& w, const DirtyFn& dirty);
+  // Deferred component side effects (sounds, radio, wake timers, Option-A stage+commit) from the final steps.
+  void hsFinalizeComponents();
+  // PlayM: same-tick settle on/off (default from LL_SAME_TICK, on). Selftests that inject raw wire values
+  // (no driver) turn it off around those blocks, since a settled tick would re-flood the injected wire to 0.
+  void setSameTick(bool on) { sameTick_ = on; }
+  bool sameTick() const { return sameTick_; }
+  static bool envSameTick();
+  uint64_t settleIterations() const { return settleIterTotal_; }
+  uint64_t settleCapHits() const { return settleCapHits_; }  // 2026-11-01 PlayL: after the flood (sim thread), before lamps: same-tick soft power
   /// Thread-local hold updates of the calling thread's last hsLampsBatch:
   /// the caller drains this immediately after the call, on the same thread.
   static std::vector<LampHoldUpdate>& hsTlsLampHolds();
@@ -215,6 +276,12 @@ class cSignalSim {
   std::string inspect(const ChunkMap& w, int x, int y, int z) const;
   /// Component sleep (default on): quiescent components skip ticks until a neighbour changes.
   void setComponentSleep(bool on) { compSleep_ = on; allAwake_ = true; }
+  // 2026-11-01 (JD LL_WAKE): awake-list component dispatch (default off; LL_WAKE=1 or this setter).
+  // Must give the same world as tick-everything-candidate mode (selftest: LL_WAKE parity).
+  void setWakeList(bool on) { wakeList_ = on; allAwake_ = true; }
+  bool wakeList() const { return wakeList_; }
+  // 2026-11-01 (JD Option A, LL_OPTION_A=1): last committed component state bits (lock-free read, any thread).
+  bool publishedComponentBits(int64_t key, uint32_t& out) const;
   /// Per-class tick-rate override (JD 2026-10-14 rate scaling): when set
   /// for a block id it replaces the class's declared
   /// cCompBehavior::tickRate() for every placed component of that
@@ -234,7 +301,7 @@ class cSignalSim {
   /// invalid declaration (see TickRate::valid(): powers of two, multiply
   /// <= kMaxRateMultiply, divide <= kMaxRateDivide) is logged as an
   /// error on that first resolution and the NEUTRAL rate is substituted
-  /// — mirroring the Timing Handshake authority's registration refusal
+  /// Ã¢â‚¬â€ mirroring the Timing Handshake authority's registration refusal
   /// (timing_handshake.cpp), which never holds an unschedulable
   /// component. Without this, multiply 0 would run zero sub-pulls and
   /// publish the default step (wiping cell state), an oversized multiply
@@ -267,12 +334,14 @@ class cSignalSim {
 
   bool blockPowered(const ChunkMap& w, int x, int y, int z) const;   // fed by wire or strongly powered
   bool strongPowered(const ChunkMap& w, int x, int y, int z) const;
+  int hardPower(const ChunkMap& w, int x, int y, int z) const;  // 0 = not hard-powered, else strength
   void collectMountPowered(const ChunkMap& w);  // supports of attached switches / buttons that are on  // solid+opaque+powerable above a lit torch
 
  private:
   struct Comp {
     const cCompBehavior* behavior;  // shared, owned by cBehaviorCatalog
     ComponentMemory mem;
+    uint64_t wakeAt = ~uint64_t(0);  ///< LL_WAKE dedupe flag: the tick this component is already queued for
     bool rateHeld = false;  ///< divided-gated on an earlier tick: component sleep must not swallow its due tick (rate scaling)
     // Input fast path (filled by buildNets, valid while the networks are): per side 0 = reads
     // nothing, 1 = wire, 2 = torch, 3 = via (colour only), 4 = generic lookup.
@@ -301,13 +370,46 @@ class cSignalSim {
   int emitToward(const ChunkMap& w, int x, int y, int z, int towardDir) const;  // component at xyz -> dir
   std::unordered_set<int64_t> torches_, wires_, lamps_;
   std::unordered_map<int64_t, Comp> comps_;
+  // 2026-11-01 (Archie list, JD approved): compiled in-range component table. Sorted keys of the
+  // components inside area_, rebuilt only when comps_ changes (compsGen_) or the tick area moves;
+  // no per-tick sort / alloc, range check before quiescent(). LL_COMP_TABLE=0 = old per-tick sort.
+  std::vector<int64_t> compOrder_;
+  uint64_t compsGen_ = 1, compOrderGen_ = 0;
+  // LL_WAKE (2026-11-01): timer ring of tick slots (64), drained up to tickNo_ each component pass.
+  bool wakeList_ = [] { const char* e = std::getenv("LL_WAKE"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
+  std::array<std::vector<int64_t>, 64> wakeRing_;
+  std::vector<int64_t> wakeScratch_;
+  // 2026-11-01 PlayM: same-tick settle state (sim thread only; cleared each component pass)
+  struct CompSnap { ComponentMemory mem; CellState state = 0; };
+  struct CompRec { int64_t k; Comp* c; ComponentStep step; uint8_t out0, out20; bool pulse0, tx; };
+  std::unordered_map<int64_t, CompSnap> compSnap_;
+  std::vector<CompRec> compRecs_;
+  std::unordered_map<int64_t, size_t> compRecIdx_;
+  std::vector<int64_t> settleCand_;
+  uint64_t settleIterTotal_ = 0, settleCapHits_ = 0;
+  bool gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int z, bool fastInputs, bool publish, ComponentInputs& in);
+  void wakeSchedule(int64_t key, uint64_t delta);
+  void connProbe(ChunkMap& w, const DirtyFn& dirty);  // PlayM: LL_CONN_PROBE save/reload census
+  bool sameTick_ = envSameTick();  // PlayM: same-tick settle (setSameTick)
+  uint64_t wakeDrained_ = 0;
+  // Option A (2026-11-01): shared_ptr so cSignalSim stays movable and the type may stay incomplete here.
+  std::shared_ptr<class cCompiledCompTable> compTable_;
+  TickArea compOrderArea_{};
+  uint64_t compOutOfRange_ = 0, compTableRebuilds_ = 0;
+public:
+  uint64_t compOutOfRangeDispatches() const { return compOutOfRange_; }  // must stay 0 (selftest)
+  uint64_t compTableRebuilds() const { return compTableRebuilds_; }
+  size_t compTableSize() const { return compOrder_.size(); }
+private:
   std::unordered_map<BlockId, litholattice::TickRate> classRates_;  ///< per-class tick-rate overrides (rate scaling); empty in shipped content
   mutable std::unordered_map<BlockId, litholattice::TickRate> declaredRates_;  ///< validated class-declared rates, cached per BlockId (A-H2); key-lookup only, never iterated
   cRadioReg radio_;
   cJammerReg jammers_;
   litholattice::TraceStrengthBuffer strengthBuf_;  ///< Step 1: GPU strength slots
   uint8_t dim_ = 1;  ///< this sim's dimension (for cross-dimensional radio)
-  bool compSleep_ = false, allAwake_ = true;
+  // PlayL (JD 2026-11-01): component sleep ON in-game by default so LL_WAKE is live; LL_COMP_SLEEP=0 turns it off.
+  // PlayM (JD 2026-11-01, speed + determinism): component sleep OFF by default; LL_COMP_SLEEP=1 turns it on.
+  bool compSleep_ = [] { const char* e = std::getenv("LL_COMP_SLEEP"); return e && e[0] == '1'; }(), allAwake_ = true;
  public:
   litholattice::TraceStrengthBuffer& strengthBuffer() { return strengthBuf_; }
   void setDimension(uint8_t d) { dim_ = d; }
@@ -332,8 +434,18 @@ class cSignalSim {
   void wakeAround(int64_t k);
   std::array<std::vector<int64_t>, kMaxSignal + 1> buckets_;  // BFS work lists by strength
   std::vector<std::pair<int64_t, uint8_t>> torchNext_;
-  std::unordered_set<int64_t> mountPowered_;                   // rebuilt before torches and after components        // torches ticked this tick (key, lit)
+  // 2026-11-01 (JD soft power, LL_SOFT_POWER=0 off): solid powerable blocks soft-powered by a touching lit
+  // Trace or a Memor front output; value = strongest feeding strength. Max-reduction: order-independent.
+  std::unordered_map<int64_t, uint8_t> softPowered_;
+  bool softAll_ = true;                   // 2026-11-01 PlayL: next hsRefreshSoft rescans every wire (load / import / scan)
+  std::vector<int64_t> softEdits_;        // 2026-11-01 PlayL: edited cells whose soft level is re-read this tick
+  std::vector<int64_t> softChanged_;  // 2026-11-01 PlayK: soft-level changes this cycle (lamps/wake only, no net re-flood)
+  int softPower(int x, int y, int z) const;
+  std::unordered_map<int64_t, uint8_t> mountPrev_;  // PlayM AC item 3: last tick's mountPowered_ (swapped, not copied)
+  std::unordered_map<int64_t, uint8_t> mountPowered_;  // 2026-11-01 PlayL: hard-powered block -> strongest feeder; rebuilt before torches and after components
   TickArea area_;
+  // LL_EDIT_LOCAL: what the flat net arrays were built against
+  TickArea arrArea_{}; uint64_t arrStructGen_ = ~uint64_t(0); size_t arrColumns_ = 0; bool arrValid_ = false;
   bool roundArea_ = false;  // F56-7
   bool diamondArea_ = false;  // diamond (Manhattan) tick area (JD 2026-10-23)
   // Incremental re-flood. Wires and lamps are a pure function of torch / component outputs,
@@ -380,7 +492,11 @@ class cSignalSim {
     std::vector<std::pair<int32_t, int>> seeds;    // (local idx, strength) in legacy seed order
     std::vector<std::pair<int32_t, int>> pulses;   // (local idx, strength) in legacy pulse order
     std::vector<std::pair<int64_t, uint8_t>> strength;  // pending TraceStrengthBuffer writes, cell order
+    std::vector<std::pair<int32_t, int>> lastSeeds;  // PlayM AC item 4: sorted seeds of the last flood
+    uint64_t lastGen = 0;                            // netGen_ of that flood (0 = none / had pulses)
   };
+  uint64_t netGen_ = 1;                          // PlayM AC item 4: bumped by buildNets and every full pass
+  std::atomic<uint64_t> sameSeedSkips_{0};       // PlayM AC item 4: floods skipped (pull workers: atomic)
   std::vector<NetWork> hsNetWork_;  // by net id; only marked nets are filled
   std::unordered_map<int64_t, std::pair<int32_t, int32_t>> wireLoc_;  // in-area wire -> (net, index)
   std::array<std::vector<std::pair<int32_t, int32_t>>, kMaxSignal + 1> nbuckets_;
@@ -389,6 +505,19 @@ class cSignalSim {
   struct LampFast { CellState* self; std::vector<CellState*> wires; bool color; };
   std::unordered_map<int64_t, LampFast> lampFast_;
   size_t netColumns_ = 0;
+  std::vector<std::pair<int64_t, const ChunkColumn*>> netColPtrs_;  // columns the cached pointers reach (indexed cells + 8 neighbours), as built
+  std::vector<int64_t> genSeedCols_;  ///< 2026-10-31: replaced circuit columns this tick (sorted, from netColPtrs_)
+  std::vector<int64_t> genSeeds_;     ///< cells in those columns, re-flooded next pass (incremental GENCHECK)
+  uint64_t genEvents_ = 0;            ///< replaced-column events seen (diag)
+  uint64_t netStructGen_ = ~uint64_t(0);  // 2026-10-31 (JD Trace seam): ChunkMap::structureGen() the cached pointers were built against
+  // Gate 1 (Archie Q0-Q17, LL_SIGNAL_SIMSCOPE=1, default off until JD locks it): the nets'
+  // column-change check is scoped to the sim area plus a 1-column border. A column streamed
+  // in or out far from the player no longer invalidates every net (full rebuild); only a
+  // change inside the area (+border) does. areaFp_ fingerprints the resident ChunkColumn*
+  // set there; simScopeFp() recomputes it (|area| hash lookups per tick).
+  bool simScope_ = [] { const char* e = std::getenv("LL_SIGNAL_SIMSCOPE"); return e && e[0] == '1' && e[1] == '\0'; }();
+  uint64_t areaFp_ = 0;
+  uint64_t simScopeFp(const ChunkMap& w, int pcx, int pcz, int radius) const;
   void wireLinks(const ChunkMap& w, int x, int y, int z, std::vector<int64_t>& out) const;  // no area test
   bool inScope(int64_t wireKey) const {
     if (fullPass_) return true;

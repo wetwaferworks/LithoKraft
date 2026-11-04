@@ -1,0 +1,2 @@
+[23:34:51.376] sim tick radius 32 (LL_SIM_TICK_RADIUS)
+handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=cb32c824f8b3ea98

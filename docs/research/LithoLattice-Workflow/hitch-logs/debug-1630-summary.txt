@@ -1,0 +1,10 @@
+﻿build 0
+LithoKraft.exe : mesh-verify: checked 0 mismatches 0 skipped 0
+At C:\Users\jdwetwork\AppData\Local\Temp\ps-script-2c1f7031-6e10-4f73-b870-8ab9e7c5017c.ps1:82 char:497
++ ... ).FullName; & $e --handshake-scenario 2048 handshake 4 4 2>&1 | Out-F ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (mesh-verify: ch...hes 0 skipped 0:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+mesh-verify: checked 1057 mismatches 0 skipped 0

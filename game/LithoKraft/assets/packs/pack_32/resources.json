@@ -218,6 +218,12 @@
   "switch_side": "textures/blocks/switch_side.png",
   "switch_top_off": "textures/blocks/switch_top_off.png",
   "switch_top_on": "textures/blocks/switch_top_on.png",
+  "randor_back": "textures/blocks/randor_back.png",
+  "randor_front": "textures/blocks/randor_front.png",
+  "randor_side": "textures/blocks/randor_side.png",
+  "randor_top": "textures/blocks/randor_top.png",
+  "randor_top_active": "textures/blocks/randor_top_active.png",
+  "randor_top_mask": "textures/blocks/masks/randor_top_mask.png",
   "thresholdor_back": "textures/blocks/thresholdor_back.png",
   "thresholdor_front": "textures/blocks/thresholdor_front.png",
   "thresholdor_high": "textures/blocks/thresholdor_high.png",
@@ -330,6 +336,10 @@
   "fusor_front_active": "textures/blocks/fusor_front_active.png",
   "fusor_side": "textures/blocks/fusor_side.png",
   "fusor_top": "textures/blocks/fusor_top.png",
+  "fusor_bottom": "textures/blocks/fusor_bottom.png",
+  "fusor_edge_pass": "textures/blocks/fusor_edge_pass.png",
+  "fusor_edge_tripped": "textures/blocks/fusor_edge_tripped.png",
+  "fusor_housing_side": "textures/blocks/fusor_housing_side.png",
   "lithographor_back": "textures/blocks/lithographor_back.png",
   "lithographor_front": "textures/blocks/lithographor_front.png",
   "lithographor_front_active": "textures/blocks/lithographor_front_active.png",
@@ -373,6 +383,10 @@
   "repeator_side_tintmask": "textures/blocks/repeator/repeator_side_tintmask.png",
   "repeator_top_d16_base": "textures/blocks/repeator/repeator_top_d16_base.png",
   "repeator_top_d16_tintmask": "textures/blocks/repeator/repeator_top_d16_tintmask.png",
+  "repeator_top_d32_base": "textures/blocks/repeator/repeator_top_d32_base.png",
+  "repeator_top_d32_tintmask": "textures/blocks/repeator/repeator_top_d32_tintmask.png",
+  "repeator_top_d64_base": "textures/blocks/repeator/repeator_top_d64_base.png",
+  "repeator_top_d64_tintmask": "textures/blocks/repeator/repeator_top_d64_tintmask.png",
   "repeator_top_d2_base": "textures/blocks/repeator/repeator_top_d2_base.png",
   "repeator_top_d2_tintmask": "textures/blocks/repeator/repeator_top_d2_tintmask.png",
   "repeator_top_d4_base": "textures/blocks/repeator/repeator_top_d4_base.png",
@@ -401,7 +415,25 @@
   "switch_shaft": "textures/blocks/switch_shaft.png",
   "switch_tip_blue_on": "textures/blocks/switch_tip_blue_on.png",
   "switch_tip_red_on": "textures/blocks/switch_tip_red_on.png",
-  "switch_tip_red": "textures/blocks/switch_tip_red.png"
+  "switch_tip_red": "textures/blocks/switch_tip_red.png",
+  "breakor_top_closed_base": "textures/blocks/breakor/breakor_top_closed_base.png",
+  "breakor_top_closed_tintmask": "textures/blocks/breakor/breakor_top_closed_tintmask.png",
+  "breakor_top_tripped_base": "textures/blocks/breakor/breakor_top_tripped_base.png",
+  "breakor_top_tripped_tintmask": "textures/blocks/breakor/breakor_top_tripped_tintmask.png",
+  "breakor_front_closed_base": "textures/blocks/breakor/breakor_front_closed_base.png",
+  "breakor_front_closed_tintmask": "textures/blocks/breakor/breakor_front_closed_tintmask.png",
+  "breakor_back_closed_base": "textures/blocks/breakor/breakor_back_closed_base.png",
+  "breakor_back_closed_tintmask": "textures/blocks/breakor/breakor_back_closed_tintmask.png",
+  "breakor_side_closed_base": "textures/blocks/breakor/breakor_side_closed_base.png",
+  "breakor_side_closed_tintmask": "textures/blocks/breakor/breakor_side_closed_tintmask.png",
+  "fusor_sum_top_base": "textures/blocks/fusor_sum/fusor_sum_top_base.png",
+  "fusor_sum_top_tintmask": "textures/blocks/fusor_sum/fusor_sum_top_tintmask.png",
+  "fusor_sum_front_base": "textures/blocks/fusor_sum/fusor_sum_front_base.png",
+  "fusor_sum_front_tintmask": "textures/blocks/fusor_sum/fusor_sum_front_tintmask.png",
+  "fusor_sum_back_base": "textures/blocks/fusor_sum/fusor_sum_back_base.png",
+  "fusor_sum_back_tintmask": "textures/blocks/fusor_sum/fusor_sum_back_tintmask.png",
+  "fusor_sum_side_base": "textures/blocks/fusor_sum/fusor_sum_side_base.png",
+  "fusor_sum_side_tintmask": "textures/blocks/fusor_sum/fusor_sum_side_tintmask.png"
  },
  "animations": {
   "pulsor_top_firing": {
@@ -636,16 +668,13 @@
   "fusor": {
    "faces": {
     "front": "fusor_front",
-    "back": "fusor_back",
-    "side": "fusor_side",
+    "back": "fusor_front",
+    "side": "fusor_edge_pass",
     "top": "fusor_top",
-    "bottom": "fusor_side"
+    "bottom": "fusor_bottom"
    },
    "active": {
     "front": "fusor_front_active"
-   },
-   "masks": {
-    "tint:fusor_front_active": "fusor_front_active_mask"
    }
   },
   "glass": {
@@ -879,7 +908,9 @@
     "tint:repeator_top_d2_base": "repeator_top_d2_tintmask",
     "tint:repeator_top_d4_base": "repeator_top_d4_tintmask",
     "tint:repeator_top_d8_base": "repeator_top_d8_tintmask",
-    "tint:repeator_top_d16_base": "repeator_top_d16_tintmask"
+    "tint:repeator_top_d16_base": "repeator_top_d16_tintmask",
+    "tint:repeator_top_d32_base": "repeator_top_d32_tintmask",
+    "tint:repeator_top_d64_base": "repeator_top_d64_tintmask"
    }
   },
   "signal_receivor": {
@@ -996,6 +1027,19 @@
     "left": "switch_tip_red_on",
     "right": "switch_tip_blue_on",
     "top": "switch_top_on"
+   }
+  },
+  "randor": {
+   "faces": {
+    "back": "randor_back",
+    "front": "randor_front",
+    "left": "randor_side",
+    "right": "randor_side",
+    "side": "randor_side",
+    "top": "randor_top"
+   },
+   "active": {
+    "top": "randor_top_active"
    }
   },
   "thresholdor": {
@@ -1285,6 +1329,37 @@
    },
    "masks": {
     "tint:lithographor_front_active": "lithographor_front_active_mask"
+   }
+  },
+  "breakor": {
+   "faces": {
+    "front": "breakor_front_closed_base",
+    "back": "breakor_back_closed_base",
+    "side": "breakor_side_closed_base",
+    "top": "breakor_top_closed_base",
+    "bottom": "breakor_side_closed_base"
+   },
+   "masks": {
+    "tint:breakor_top_closed_base": "breakor_top_closed_tintmask",
+    "tint:breakor_top_tripped_base": "breakor_top_tripped_tintmask",
+    "tint:breakor_front_closed_base": "breakor_front_closed_tintmask",
+    "tint:breakor_back_closed_base": "breakor_back_closed_tintmask",
+    "tint:breakor_side_closed_base": "breakor_side_closed_tintmask"
+   }
+  },
+  "fusor_sum": {
+   "faces": {
+    "front": "fusor_sum_front_base",
+    "back": "fusor_sum_back_base",
+    "side": "fusor_sum_side_base",
+    "top": "fusor_sum_top_base",
+    "bottom": "fusor_sum_side_base"
+   },
+   "masks": {
+    "tint:fusor_sum_top_base": "fusor_sum_top_tintmask",
+    "tint:fusor_sum_front_base": "fusor_sum_front_tintmask",
+    "tint:fusor_sum_back_base": "fusor_sum_back_tintmask",
+    "tint:fusor_sum_side_base": "fusor_sum_side_tintmask"
    }
   }
  }

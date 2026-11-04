@@ -1,0 +1,17 @@
+batch b8 2026-10-15T12:17:50
+REL=0
+DBG=0
+build\Release handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+build-debug\Debug handshake-scenario ticks=2048 mode=handshake workers=4 phases=4 hash=aa82e7afb1eff9d3
+stream 32 tps=32 min=31.9 fps=336.7 p50=2.8200 p99=4.4735 render=1.3625 update=0.8188 hitches=4 tick=0.6649/0.8294 mesh=4.6642
+stream 512 tps=512 min=511.7 fps=318.8 p50=2.9769 p99=5.1037 render=1.3963 update=0.9040 hitches=6 tick=0.5416/0.5940 mesh=4.8441
+orbit 32 tps=32 min=31.9 fps=20.1 p50=50.0006 p99=63.7659 render=47.8876 update=0.9305 hitches=1 tick=0.5798/0.6926 mesh=0.0000
+orbit 512 tps=512 min=511.6 fps=19.2 p50=52.1800 p99=66.5066 render=49.8922 update=1.1062 hitches=1 tick=0.5101/0.5295 mesh=0.0000
+stream 512 rt8 tps=512 min=511.7 fps=313.4 p50=3.0353 p99=4.9852 render=1.4266 update=0.9112 hitches=5 tick=0.5205/0.5601 mesh=4.8607
+orbit 512 rt8 tps=512 min=511.8 fps=29.4 p50=34.0273 p99=42.1462 render=31.9249 update=1.1686 hitches=1 tick=0.5473/0.5936 mesh=0.0000
+ 6/48 Test  #6: engine_systerian .................***Failed    0.74 sec
+14/48 Test #14: engine_storage ...................***Failed    0.98 sec
+19/48 Test #19: engine_litho_formula .............***Failed    0.25 sec
+94% tests passed, 3 tests failed out of 48
++ ... T -ne '1'){ & $ct --test-dir build-debug -C Debug --timeout 900 *> "$ ...
+DONE

@@ -1,0 +1,2 @@
+R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\game\LithoKraft\src\app\selftest.cpp(1228,7): error C2664: 'void lithokraft::runSelfTests::<lambda_1>::operator ()(bool,const char *) const': cannot convert argument 2 from 'std::basic_string<char,std::char_traits<char>,std::allocator<char>>' to 'const char *' [R:\repos\LithoLattice-Workflow\Pass2-2026-10-16\build\game\src\app\lithokraft.vcxproj]
+BUILD exit 1

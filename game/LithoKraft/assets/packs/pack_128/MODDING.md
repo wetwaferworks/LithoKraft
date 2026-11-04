@@ -79,11 +79,11 @@ Strength-level wire PNGs, baked C4 rings, the baked color-lamp colors for every 
 
 | Block | Face layout | Files | States |
 |---|---|---|---|
-| `repeator` | **top+side+front+back** | top: repeator_top / repeator_top_on; front (output): repeator_front; back (input): repeator_back; left/right/bottom: repeator_side | unpowered/powered (top); delay 1-8 via masks/repeator_delay_mask.png |
+| `repeator` | **top+side+front+back** | top: repeator_top / repeator_top_on; front (output): repeator_front; back (input): repeator_back; left/right/bottom: repeator_side | unpowered/powered (top); delay 4/8/16/32 readout (masks/repeator_value_mask.png) |
 | `thresholder` | **top+front+back+left+right** | top: thresholder_top / thresholder_top_on; front (output): thresholder_front; back (input): thresholder_back; LEFT (reference LOW): thresholder_low; RIGHT (reference HIGH): thresholder_high; bottom: thresholder_side | one side powered = threshold (out when input >= ref); both = window comparator (out when low <= input <= high; engine uses min/max so swapped values still work) |
 | `redirector` | **top+side+front** | top: redirector_top / _on (arrow points to output); front (output): redirector_front / _on; other 4 faces: redirector_side (target rings) | idle/emitting; aimed on placement (no click-rotate) |
 | `pulsar` | **top+side+front+back** | top: pulsar_top (+ pulsar_top_firing strip, 6 frames); front: pulsar_front; back: pulsar_back; left+right (clock ports): pulsar_side; bottom: pulsar_side | idle/firing animation |
-| `memory_cell` | **top+side+front+back** | top: memory_cell_top_empty (0) / memory_cell_top (neutral base, value via masks/memory_cell_value_mask.png); front (output): memory_cell_front; back (input): memory_cell_back; left/right/bottom: memory_cell_side | 0 empty, 1-64 stored; aimed on placement |
+| `memory_cell` | **top+side+front+back** | top: memory_cell_top_empty (0) / memory_cell_top (8x8 purple bit grid, value via masks/memor_value_mask.png); front (output): memory_cell_front; back (input): memory_cell_back; left/right/bottom: memory_cell_side | 0 empty, 1-64 stored; aimed on placement |
 | `fast_latch` | **all-same** | all faces: fast_latch_off / fast_latch_on | off/on |
 | `switch` | **top+side** | top: switch_top_off / switch_top_on; sides+bottom: switch_side | off/on |
 | `button` | **top+side** | top: button_top / button_top_pressed; sides+bottom: button_side | up/pressed |
@@ -97,8 +97,9 @@ Port language (the same on every block): a **filled** socket or tab = output, a 
 **Placement / aiming:** every directional block (repeator, thresholder, pulsar, memory_cell, redirector, keyboard) faces the direction it's placed in. There's no click-to-rotate. Thresholder: one side powered = threshold (output when input ≥ reference); both sides powered = **window comparator** (output when LOW ≤ input ≤ HIGH). Left is marked LOW and right HIGH; the game sorts the two values itself, so swapping them still works. Keyboard: SIXBIT codes come out the front (s = code + 1), and control codes come out the **right** side (s = code: 1 Enter, 2 Backspace, 3–8 reserved for Up/Down/Left/Right/Tab/Escape, 9–64 reserved). The memory cell takes input at the back and outputs at the front.
 
 ### Shader-driven states (one texture plus a mask instead of N textures)
-- Repeator delay 1–8: `masks/repeator_delay_mask.png`. R = pip index × 28 (pips 1–8, left to right), G = coverage. A pip is lit (#FFD36B) when its index ≤ delay. Baked delay1–8 references are in `reference/batch2/`.
-- Memory cell value 1–64: `masks/memory_cell_value_mask.png`. R = cell index × 4 − 1 (cells 1–64, row-major from top-left), G = coverage. Cell i is lit (#8FD6E8) when i ≤ value. A value of 0 uses `memory_cell_top_empty.png`.
+- Repeator delay readout (4/8/16/32, 2026-10-31): the top (`repeator/repeator_top_d*_base.png`, the d2 art turned 180°) has a readout window bottom-right (north-facing); the shader draws the delay as purple seven-segment digits (#D6BEFA, ghost 8s) in the 22×14 box at 128-space x91–112, y101–114 (`masks/repeator_value_mask.png`: R = 1 inside, G/B = local x/y). Only the per-vertex value changes; no texture swaps.
+- Memor value 1–64 (2026-10-31): the top is an 8×8 grid (`memor_top.png`); `masks/memor_value_mask.png` R = raw bit index 1–64 (0 = not a bit; NEAREST, no sRGB). Bit i lights purple (#8B65DD, emissive) when i ≤ value; value 0 shows the empty grid.
+- Latchor value 1–64 (2026-10-31): `fast_latch_top.png` shows the configured value as purple seven-segment digits in the right eye square, box 128-space x87–108, y39–52 (`masks/latchor_value_mask.png`); bright while on.
 - GLSL for both is in `docs/batch2_shaders.frag`.
 
 ### Animation

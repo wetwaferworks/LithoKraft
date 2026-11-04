@@ -1,0 +1,334 @@
+[14:41:17.994] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.002] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 24.1 ms
+[14:41:18.003] spawn: granted the starting item (the Fragment)
+  [PASS] headless: boot: the game constructs headless (world loaded, no window/GPU)
+[14:41:18.003] menu: launch menu (dimension 'wafer' loaded, sim paused)
+  [PASS] headless: boot: enterMenu puts the game in the Menu state
+  [PASS] headless: boot: the launch menu overlay is open
+  [PASS] headless: boot: menu shows the LITHOKRAFT title
+  [PASS] headless: boot: tagline reads 'A LITHOLATTICE GAME'
+[14:41:18.073] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.080] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 21.7 ms
+[14:41:18.081] spawn: granted the starting item (the Fragment)
+[14:41:18.081] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[14:41:18.082] menu: play - creative/testing
+  [PASS] headless: menu->play: the Play button exists and is clickable
+  [PASS] headless: menu->play: clicking Play leaves the Menu state
+  [PASS] headless: menu->play: the sim is unpaused in creative/testing
+  [PASS] headless: menu->play: the menu overlay is closed
+[14:41:18.148] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.156] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 21.1 ms
+[14:41:18.157] spawn: granted the starting item (the Fragment)
+[14:41:18.157] menu: launch menu (dimension 'wafer' loaded, sim paused)
+  [PASS] headless: settings: the dialog opens from the game
+  [PASS] headless: settings: the volume slider exists
+  [PASS] headless: settings: the volume change applies to the live game settings
+  [PASS] headless: settings: the mute change applies to the live game settings
+  [PASS] headless: settings: the dialog closes
+[14:41:18.231] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.240] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 24.6 ms
+[14:41:18.240] spawn: granted the starting item (the Fragment)
+[14:41:18.241] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[14:41:18.242] menu: play - creative/testing
+  [PASS] headless: pause: playing, unpaused
+  [PASS] headless: pause: setPaused(true) pauses
+  [PASS] headless: pause: the pause dialog opens
+  [PASS] headless: pause: the Resume button exists
+  [PASS] headless: pause: Resume unpauses
+  [PASS] headless: pause: Resume closes the dialog
+[14:41:18.304] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.311] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 20.8 ms
+[14:41:18.312] spawn: granted the starting item (the Fragment)
+[14:41:18.313] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[14:41:18.314] menu: play - creative/testing
+[14:41:18.315] menu: launch menu (dimension 'wafer' loaded, sim paused)
+  [PASS] headless: exit-to-menu: the button exists
+  [PASS] headless: exit-to-menu: back in the Menu state
+  [PASS] headless: exit-to-menu: the launch menu overlay is open again
+[14:41:18.386] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.392] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 19.3 ms
+[14:41:18.393] spawn: granted the starting item (the Fragment)
+[14:41:18.394] menu: launch menu (dimension 'wafer' loaded, sim paused)
+  [PASS] headless: quit: nothing requested at boot
+  [PASS] headless: quit: the Exit button exists
+  [PASS] headless: quit: clicking Exit requests quit
+[14:41:18.465] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.472] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 20.5 ms
+[14:41:18.473] spawn: granted the starting item (the Fragment)
+[14:41:18.473] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[14:41:18.475] menu: play - creative/testing
+  [PASS] headless: focus-loss: losing focus while Playing pauses
+  [PASS] headless: focus-loss: the pause menu auto-pops
+[14:41:18.476] menu: launch menu (dimension 'wafer' loaded, sim paused)
+  [PASS] headless: focus-loss: losing focus in the menu does not pop the pause dialog
+  [PASS] headless: focus-loss: refocusing does not unpause by itself
+[14:41:18.540] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.546] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 17.3 ms
+[14:41:18.546] spawn: granted the starting item (the Fragment)
+[14:41:18.547] menu: launch menu (dimension 'wafer' loaded, sim paused)
+  [PASS] headless: frames: 600 headless frames run; the mesh pipeline uploaded through the null renderer
+  [PASS] headless: frames: the null renderer holds uploaded chunk meshes
+[14:41:18.606] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:18.614] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 19.9 ms
+[14:41:18.615] spawn: granted the starting item (the Fragment)
+  [PASS] headless: streaming: boot loads exactly the 4x4 pre-bake (16 columns)
+[14:41:18.616] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[14:41:18.619] menu: play - creative/testing
+[14:41:18.631] stream: +1 columns around chunk (4, 1); 17 loaded
+[14:41:18.632] stream: +1 columns around chunk (4, 1); 18 loaded
+[14:41:18.633] stream: +1 columns around chunk (4, 1); 19 loaded
+[14:41:18.633] stream: +1 columns around chunk (4, 1); 20 loaded
+[14:41:18.634] stream: +1 columns around chunk (4, 1); 21 loaded
+[14:41:18.634] stream: +1 columns around chunk (4, 1); 22 loaded
+[14:41:18.635] stream: +1 columns around chunk (6, 1); 23 loaded
+[14:41:18.636] stream: +1 columns around chunk (6, 1); 24 loaded
+[14:41:18.637] stream: +2 columns around chunk (6, 1); 26 loaded
+[14:41:18.637] stream: +1 columns around chunk (6, 1); 27 loaded
+[14:41:18.638] stream: +1 columns around chunk (6, 1); 28 loaded
+[14:41:18.639] stream: +1 columns around chunk (6, 1); 29 loaded
+[14:41:18.639] stream: +1 columns around chunk (6, 1); 30 loaded
+[14:41:18.640] stream: +1 columns around chunk (6, 1); 31 loaded
+[14:41:18.641] stream: +1 columns around chunk (6, 1); 32 loaded
+[14:41:18.641] stream: +1 columns around chunk (6, 1); 33 loaded
+[14:41:18.642] stream: +1 columns around chunk (6, 1); 34 loaded
+[14:41:18.643] stream: +1 columns around chunk (6, 1); 35 loaded
+[14:41:18.643] stream: +1 columns around chunk (6, 1); 36 loaded
+[14:41:18.644] stream: +1 columns around chunk (6, 1); 37 loaded
+[14:41:18.645] stream: +1 columns around chunk (6, 1); 38 loaded
+[14:41:18.646] stream: +1 columns around chunk (6, 1); 39 loaded
+[14:41:18.648] stream: +2 columns around chunk (6, 1); 41 loaded
+[14:41:18.649] stream: +2 columns around chunk (6, 1); 43 loaded
+[14:41:18.652] stream: +3 columns around chunk (6, 1); 46 loaded
+[14:41:18.652] stream: +1 columns around chunk (6, 1); 47 loaded
+[14:41:18.653] stream: +1 columns around chunk (6, 1); 48 loaded
+[14:41:18.654] stream: +1 columns around chunk (6, 1); 49 loaded
+[14:41:18.655] stream: +1 columns around chunk (8, 1); 50 loaded
+[14:41:18.657] stream: +1 columns around chunk (8, 1); 51 loaded
+[14:41:18.660] stream: +1 columns around chunk (8, 1); 52 loaded
+[14:41:18.662] stream: +1 columns around chunk (8, 1); 53 loaded
+[14:41:18.664] stream: +1 columns around chunk (8, 1); 54 loaded
+[14:41:18.666] stream: +1 columns around chunk (8, 1); 55 loaded
+[14:41:18.669] stream: +1 columns around chunk (8, 1); 56 loaded
+[14:41:18.671] stream: +1 columns around chunk (8, 1); 57 loaded
+[14:41:18.672] stream: +1 columns around chunk (8, 1); 58 loaded
+[14:41:18.675] stream: +1 columns around chunk (8, 1); 59 loaded
+[14:41:18.677] stream: +1 columns around chunk (8, 1); 60 loaded
+[14:41:18.678] stream: evicted 4 far columns around chunk (10, 1); 56 loaded
+[14:41:18.679] stream: evicted 1 far columns around chunk (10, 1); 55 loaded
+[14:41:18.680] stream: +1 columns around chunk (10, 1); 56 loaded
+[14:41:18.681] stream: +1 columns around chunk (10, 1); 57 loaded
+[14:41:18.683] stream: +1 columns around chunk (10, 1); 58 loaded
+[14:41:18.684] stream: +1 columns around chunk (10, 1); 59 loaded
+[14:41:18.687] stream: +1 columns around chunk (10, 1); 60 loaded
+[14:41:18.690] stream: +1 columns around chunk (10, 1); 61 loaded
+[14:41:18.692] stream: +1 columns around chunk (10, 1); 62 loaded
+[14:41:18.693] stream: +1 columns around chunk (10, 1); 63 loaded
+[14:41:18.695] stream: +1 columns around chunk (10, 1); 64 loaded
+[14:41:18.696] stream: +1 columns around chunk (10, 1); 65 loaded
+[14:41:18.698] stream: +1 columns around chunk (10, 1); 66 loaded
+[14:41:18.700] stream: +1 columns around chunk (10, 1); 67 loaded
+[14:41:18.701] stream: +1 columns around chunk (10, 1); 68 loaded
+[14:41:18.707] stream: +1 columns around chunk (10, 1); 69 loaded
+[14:41:18.707] stream: +1 columns around chunk (10, 1); 70 loaded
+[14:41:18.710] stream: +1 columns around chunk (10, 1); 71 loaded
+[14:41:18.717] stream: +1 columns around chunk (10, 1); 72 loaded
+[14:41:18.718] stream: +1 columns around chunk (10, 1); 73 loaded
+[14:41:18.719] stream: +1 columns around chunk (10, 1); 74 loaded
+[14:41:18.721] stream: +1 columns around chunk (10, 1); 75 loaded
+[14:41:18.724] stream: +1 columns around chunk (10, 1); 76 loaded
+[14:41:18.726] stream: +1 columns around chunk (10, 1); 77 loaded
+[14:41:18.727] stream: evicted 4 far columns around chunk (12, 1); 73 loaded
+[14:41:18.728] stream: +1 columns around chunk (12, 1); 74 loaded
+[14:41:18.729] stream: evicted 4 far columns around chunk (12, 1); 70 loaded
+[14:41:18.729] stream: +1 columns around chunk (12, 1); 71 loaded
+[14:41:18.730] stream: evicted 1 far columns around chunk (12, 1); 70 loaded
+[14:41:18.731] stream: evicted 1 far columns around chunk (12, 1); 69 loaded
+[14:41:18.732] stream: +1 columns around chunk (12, 1); 70 loaded
+[14:41:18.733] stream: evicted 1 far columns around chunk (12, 1); 69 loaded
+[14:41:18.734] stream: +1 columns around chunk (12, 1); 70 loaded
+[14:41:18.737] stream: +1 columns around chunk (12, 1); 71 loaded
+[14:41:18.738] stream: +1 columns around chunk (12, 1); 72 loaded
+[14:41:18.740] stream: +1 columns around chunk (12, 1); 73 loaded
+[14:41:18.742] stream: +1 columns around chunk (12, 1); 74 loaded
+[14:41:18.743] stream: +1 columns around chunk (12, 1); 75 loaded
+[14:41:18.745] stream: +1 columns around chunk (12, 1); 76 loaded
+[14:41:18.746] stream: +1 columns around chunk (12, 1); 77 loaded
+[14:41:18.748] stream: +1 columns around chunk (12, 1); 78 loaded
+[14:41:18.750] stream: +1 columns around chunk (12, 1); 79 loaded
+[14:41:18.751] stream: +1 columns around chunk (12, 1); 80 loaded
+[14:41:18.752] stream: evicted 1 far columns around chunk (14, 1); 79 loaded
+[14:41:18.753] stream: +1 columns around chunk (14, 1); 80 loaded
+[14:41:18.755] stream: +1 columns around chunk (14, 1); 81 loaded
+[14:41:18.756] stream: +1 columns around chunk (14, 1); 82 loaded
+[14:41:18.758] stream: +1 columns around chunk (14, 1); 83 loaded
+[14:41:18.760] stream: +1 columns around chunk (14, 1); 84 loaded
+[14:41:18.761] stream: +1 columns around chunk (14, 1); 85 loaded
+[14:41:18.764] stream: +1 columns around chunk (14, 1); 86 loaded
+[14:41:18.765] stream: +1 columns around chunk (14, 1); 87 loaded
+[14:41:18.768] stream: +1 columns around chunk (14, 1); 88 loaded
+[14:41:18.769] stream: +1 columns around chunk (14, 1); 89 loaded
+[14:41:18.771] stream: +1 columns around chunk (14, 1); 90 loaded
+[14:41:18.772] stream: +1 columns around chunk (14, 1); 91 loaded
+[14:41:18.774] stream: +1 columns around chunk (14, 1); 92 loaded
+[14:41:18.775] stream: +1 columns around chunk (14, 1); 93 loaded
+[14:41:18.777] stream: +1 columns around chunk (14, 1); 94 loaded
+[14:41:18.779] stream: +1 columns around chunk (14, 1); 95 loaded
+[14:41:18.782] stream: +1 columns around chunk (14, 1); 96 loaded
+[14:41:18.784] stream: +1 columns around chunk (14, 1); 97 loaded
+[14:41:18.786] stream: +1 columns around chunk (14, 1); 98 loaded
+[14:41:18.787] stream: +1 columns around chunk (16, 1); 99 loaded
+[14:41:18.789] stream: +1 columns around chunk (16, 1); 100 loaded
+[14:41:18.791] stream: +1 columns around chunk (16, 1); 101 loaded
+[14:41:18.792] stream: +1 columns around chunk (16, 1); 102 loaded
+[14:41:18.793] stream: +1 columns around chunk (16, 1); 103 loaded
+[14:41:18.795] stream: +1 columns around chunk (16, 1); 104 loaded
+[14:41:18.798] stream: +1 columns around chunk (16, 1); 105 loaded
+[14:41:18.800] stream: +1 columns around chunk (16, 1); 106 loaded
+[14:41:18.803] stream: +1 columns around chunk (16, 1); 107 loaded
+[14:41:18.804] stream: +1 columns around chunk (16, 1); 108 loaded
+[14:41:18.805] stream: +1 columns around chunk (16, 1); 109 loaded
+[14:41:18.806] stream: +1 columns around chunk (16, 1); 110 loaded
+[14:41:18.808] stream: +1 columns around chunk (16, 1); 111 loaded
+[14:41:18.809] stream: +1 columns around chunk (16, 1); 112 loaded
+[14:41:18.812] stream: +1 columns around chunk (16, 1); 113 loaded
+[14:41:18.814] stream: +1 columns around chunk (18, 1); 114 loaded
+[14:41:18.817] stream: +1 columns around chunk (18, 1); 115 loaded
+[14:41:18.819] stream: +1 columns around chunk (18, 1); 116 loaded
+[14:41:18.820] stream: +1 columns around chunk (18, 1); 117 loaded
+[14:41:18.821] stream: +1 columns around chunk (18, 1); 118 loaded
+[14:41:18.823] stream: +1 columns around chunk (18, 1); 119 loaded
+[14:41:18.824] stream: +1 columns around chunk (18, 1); 120 loaded
+[14:41:18.827] stream: +1 columns around chunk (18, 1); 121 loaded
+[14:41:18.828] stream: +1 columns around chunk (18, 1); 122 loaded
+[14:41:18.829] stream: +1 columns around chunk (18, 1); 123 loaded
+[14:41:18.833] stream: +1 columns around chunk (18, 1); 124 loaded
+[14:41:18.834] stream: +1 columns around chunk (18, 1); 125 loaded
+[14:41:18.836] stream: +1 columns around chunk (18, 1); 126 loaded
+[14:41:18.837] stream: +1 columns around chunk (18, 1); 127 loaded
+[14:41:18.841] stream: +1 columns around chunk (18, 1); 128 loaded
+[14:41:18.841] stream: +1 columns around chunk (18, 1); 129 loaded
+[14:41:18.844] stream: +1 columns around chunk (18, 1); 130 loaded
+[14:41:18.846] stream: +1 columns around chunk (18, 1); 131 loaded
+[14:41:18.848] stream: +1 columns around chunk (20, 1); 132 loaded
+[14:41:18.850] stream: +1 columns around chunk (20, 1); 133 loaded
+[14:41:18.852] stream: +1 columns around chunk (20, 1); 134 loaded
+[14:41:18.853] stream: +1 columns around chunk (20, 1); 135 loaded
+[14:41:18.856] stream: +1 columns around chunk (20, 1); 136 loaded
+[14:41:18.856] stream: +1 columns around chunk (20, 1); 137 loaded
+[14:41:18.859] stream: +1 columns around chunk (20, 1); 138 loaded
+[14:41:18.862] stream: +1 columns around chunk (20, 1); 139 loaded
+[14:41:18.864] stream: +1 columns around chunk (20, 1); 140 loaded
+[14:41:18.865] stream: +1 columns around chunk (20, 1); 141 loaded
+[14:41:18.869] stream: +1 columns around chunk (20, 1); 142 loaded
+[14:41:18.870] stream: +1 columns around chunk (20, 1); 143 loaded
+[14:41:18.873] stream: +1 columns around chunk (20, 1); 144 loaded
+[14:41:18.874] stream: +1 columns around chunk (20, 1); 145 loaded
+[14:41:18.875] stream: +1 columns around chunk (20, 1); 146 loaded
+[14:41:18.878] stream: +1 columns around chunk (20, 1); 147 loaded
+[14:41:18.882] stream: +1 columns around chunk (22, 1); 148 loaded
+[14:41:18.885] stream: +1 columns around chunk (22, 1); 149 loaded
+[14:41:18.887] stream: +1 columns around chunk (22, 1); 150 loaded
+[14:41:18.890] stream: +1 columns around chunk (22, 1); 151 loaded
+[14:41:18.893] stream: +1 columns around chunk (22, 1); 152 loaded
+[14:41:18.894] stream: +1 columns around chunk (22, 1); 153 loaded
+[14:41:18.896] stream: +1 columns around chunk (22, 1); 154 loaded
+[14:41:18.901] stream: +1 columns around chunk (22, 1); 155 loaded
+[14:41:18.903] stream: +1 columns around chunk (22, 1); 156 loaded
+[14:41:18.905] stream: +1 columns around chunk (22, 1); 157 loaded
+[14:41:18.909] stream: +1 columns around chunk (22, 1); 158 loaded
+[14:41:18.910] stream: +1 columns around chunk (22, 1); 159 loaded
+[14:41:18.912] stream: +1 columns around chunk (22, 1); 160 loaded
+[14:41:18.914] stream: +1 columns around chunk (22, 1); 161 loaded
+[14:41:18.917] stream: +1 columns around chunk (22, 1); 162 loaded
+[14:41:18.919] stream: +1 columns around chunk (22, 1); 163 loaded
+[14:41:18.921] stream: +1 columns around chunk (22, 1); 164 loaded
+[14:41:18.924] stream: +1 columns around chunk (24, 1); 165 loaded
+[14:41:18.925] stream: +1 columns around chunk (24, 1); 166 loaded
+[14:41:18.928] stream: +1 columns around chunk (24, 1); 167 loaded
+[14:41:18.932] stream: +1 columns around chunk (24, 1); 168 loaded
+[14:41:18.935] stream: +1 columns around chunk (24, 1); 169 loaded
+[14:41:18.937] stream: +1 columns around chunk (24, 1); 170 loaded
+[14:41:18.939] stream: +1 columns around chunk (24, 1); 171 loaded
+[14:41:18.943] stream: +1 columns around chunk (24, 1); 172 loaded
+[14:41:18.946] stream: +1 columns around chunk (24, 1); 173 loaded
+[14:41:18.947] stream: +1 columns around chunk (24, 1); 174 loaded
+[14:41:18.950] stream: +1 columns around chunk (24, 1); 175 loaded
+[14:41:18.951] stream: +1 columns around chunk (24, 1); 176 loaded
+[14:41:18.955] stream: +1 columns around chunk (24, 1); 177 loaded
+[14:41:18.956] stream: +1 columns around chunk (24, 1); 178 loaded
+[14:41:18.960] stream: +1 columns around chunk (24, 1); 179 loaded
+[14:41:18.962] stream: +1 columns around chunk (24, 1); 180 loaded
+  [PASS] headless: streaming: terrain underfoot at every 32-block sample, spawn to +384 blocks
+  [PASS] headless: streaming: columns far beyond the pre-bake were generated on demand (streamed=196, loaded=180)
+[14:41:19.093] world clock: tick 0, day 0 00:00
+[14:41:19.110] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:19.118] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 23.5 ms
+[14:41:19.119] spawn: granted the starting item (the Fragment)
+  [PASS] headless: inventory: fresh spawn -- the Fragment is in hotbar slot 0 of the canonical inventory
+  [PASS] headless: inventory: the fresh-spawn creative kit is real stacks in the same inventory
+[14:41:19.119] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[14:41:19.132] menu: play - creative/testing
+  [PASS] headless: inventory: the HUD hotbar renders the inventory -- slot 0 shows the Fragment's item icon
+  [PASS] headless: inventory: the HUD selection is the game's selected inventory slot
+[14:41:19.171] save (inv-test): 'wafer' 8 changed / component columns, sim paused 33.19 ms, on disk
+  [PASS] headless: inventory: saveWorld writes the player (v4 inventory block)
+[14:41:19.194] save (exit): 'wafer' 6 changed / component columns, sim paused 14.19 ms, on disk
+[14:41:19.231] world clock: tick 1, day 0 00:00
+[14:41:19.252] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:19.259] save: 'wafer' restored 8 columns
+[14:41:19.260] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 28.2 ms
+[14:41:19.261] save: player restored in 'wafer'
+  [PASS] headless: inventory: after relaunch the persisted Fragment is kept exactly once -- no duplicate grant
+  [PASS] headless: inventory: hotbar stacks persist across relaunch (the HUD reads the same store that saved)
+[14:41:19.295] save (exit): 'wafer' 6 changed / component columns, sim paused 28.56 ms, on disk
+[14:41:19.325] world clock: tick 0, day 0 00:00
+[14:41:19.337] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:19.345] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 20.1 ms
+[14:41:19.346] spawn: granted the starting item (the Fragment)
+[14:41:19.346] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[14:41:19.358] menu: play - creative/testing
+[14:41:19.360] stream: evicted 4 far columns around chunk (12, 1); 12 loaded
+[14:41:19.408] stream: evicted 4 far columns around chunk (12, 1); 8 loaded
+[14:41:19.410] stream: +4 columns around chunk (12, 1); 12 loaded
+[14:41:19.410] stream: evicted 1 far columns around chunk (12, 1); 11 loaded
+[14:41:19.412] stream: +4 columns around chunk (12, 1); 15 loaded
+[14:41:19.413] stream: evicted 1 far columns around chunk (12, 1); 14 loaded
+[14:41:19.414] stream: +4 columns around chunk (12, 1); 18 loaded
+[14:41:19.416] stream: +4 columns around chunk (12, 1); 22 loaded
+[14:41:19.417] stream: evicted 3 far columns around chunk (12, 1); 19 loaded
+[14:41:19.419] stream: +4 columns around chunk (12, 1); 23 loaded
+[14:41:19.420] stream: evicted 1 far columns around chunk (12, 1); 22 loaded
+[14:41:19.421] stream: +4 columns around chunk (12, 1); 26 loaded
+[14:41:19.422] stream: evicted 2 far columns around chunk (12, 1); 24 loaded
+[14:41:19.423] stream: +4 columns around chunk (12, 1); 28 loaded
+[14:41:19.424] stream: evicted 2 far columns around chunk (12, 1); 26 loaded
+[14:41:19.426] stream: +4 columns around chunk (12, 1); 30 loaded
+[14:41:19.426] stream: evicted 1 far columns around chunk (12, 1); 29 loaded
+[14:41:19.428] stream: +4 columns around chunk (12, 1); 33 loaded
+  [PASS] headless: persist: streamed terrain exists at x=200 before saving
+[14:41:19.455] save (stream-test): 'wafer' 5 changed / component columns, sim paused 22.40 ms, on disk
+  [PASS] headless: persist: saveWorld writes the world (incl. streamed columns)
+[14:41:19.542] save (exit): 'wafer' 4 changed / component columns, sim paused 19.03 ms, on disk
+[14:41:19.577] world clock: tick 5, day 0 00:00
+[14:41:19.596] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:19.604] save: 'wafer' restored 8 columns
+[14:41:19.605] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 28.0 ms
+[14:41:19.606] save: player restored in 'wafer'
+[14:41:19.606] menu: launch menu (dimension 'wafer' loaded, sim paused)
+[14:41:19.607] stream: evicted 4 far columns around chunk (12, 1); 12 loaded
+[14:41:19.627] menu: play - creative/testing
+[14:41:19.629] stream: +4 columns around chunk (12, 1); 16 loaded
+[14:41:19.690] stream: evicted 4 far columns around chunk (12, 1); 12 loaded
+[14:41:19.696] stream: +4 columns around chunk (12, 1); 16 loaded
+  [PASS] headless: persist: after relaunch, terrain at x=200 (outside the pre-bake) returns via streaming
+  [PASS] headless: persist: the relaunch streamed columns in (not just the pre-bake)
+[14:41:19.754] save (exit): 'wafer' 4 changed / component columns, sim paused 28.41 ms, on disk
+[14:41:19.797] timing handshake: ON (phases/cycle 4; applies at this world load)
+[14:41:19.805] dimension 'wafer' loaded: 16 columns, 59 sub-chunks, 19.3 ms
+[14:41:19.806] spawn: granted the starting item (the Fragment)
+  [PASS] headless: fragment (A3): game constructs for the Fragment ownership test
+  [PASS] headless: fragment (A3): production Game owns a fresh FragmentState (tier 0, markdown locked)
+  [PASS] headless: fragment (A3): renderFragmentText feeds markdown_unlocked()=false (plain paragraphs, no heading parse)
+  [PASS] headless: fragment (A3): upgradeFragment applies on the production-owned state
+  [PASS] headless: fragment (A3): after upgrade, the same production render path parses markdown (flag from state)
+headless harness: OK (0 failures)

@@ -2,6 +2,7 @@
 // determinism against the design prototype (cell count + FNV-1a over the
 // canonical sorted cell list), and the rig pipeline (extractRig +
 // computeSkinning + validateRig) on the real figure.
+#include "litholattice/core/quiet_crt.h"
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -19,6 +20,7 @@ void check(bool ok, const char* name) {
 }  // namespace
 
 int main() {
+  litholattice::quietCrtDialogsForTests();  // CRT asserts -> stderr, no dialog
   using namespace lithokraft::model::agents;
   namespace pal = lithokraft::model::agents::palette;
 

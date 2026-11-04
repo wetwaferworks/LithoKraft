@@ -1,0 +1,2 @@
+add_library(litholattice_mods INTERFACE)
+target_include_directories(litholattice_mods INTERFACE include)

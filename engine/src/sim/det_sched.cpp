@@ -3,6 +3,7 @@
 #include "litholattice/sim/det_sched.h"
 
 #include "litholattice/core/bitops.h"
+#include "litholattice/core/counter_hash.h"
 
 #include <utility>
 
@@ -12,7 +13,8 @@ uint64_t detMix64(uint64_t x) {
   // splitmix64 (public domain, Steele et al.): well-defined unsigned overflow.
   // Build 59: spelled through the shared bit-ops header; bit-exact with
   // the original body (tools/bitops_diff_test.cpp).
-  return bitops::splitmixMix64(x + 0x9E3779B97F4A7C15ULL);
+  // 2026-10-29: shared with the engine counter hash (core/counter_hash.h).
+  return counterMix64(x);
 }
 
 uint64_t detKey(uint64_t entity, uint64_t tick, uint64_t salt) {
@@ -94,6 +96,22 @@ void cDeterministicScheduler::drainStage(void* world) {
   drainTmp_.clear();
 }
 
+// P0.5 review fix 4 (external review by Cryosis (sirlinhart), 2026-10-29): a stage whose
+// job threw must commit NOTHING. The old code drained (applied) the stage's command
+// buffers before checking for the failure, so the successful systems' structural
+// commands landed and the failed one's were partly there too. Now the failure is checked
+// first and the stage's buffers are discarded unapplied. Earlier stages of the same tick
+// stay committed (they finished cleanly); in-place world writes a system makes during
+// update() are outside the command-buffer contract and not rolled back here.
+void cDeterministicScheduler::discardStage() {
+  for (auto& b : buffers_) {
+    if (b->empty()) continue;
+    drainTmp_.clear();
+    b->drainInto(drainTmp_);
+  }
+  drainTmp_.clear();
+}
+
 void cDeterministicScheduler::runTick(uint64_t tick, void* world, cJobPool& pool) {
   const uint64_t failedBefore = pool.failedJobs();
   for (size_t s = 0; s < stages_.size(); ++s) {
@@ -106,10 +124,11 @@ void cDeterministicScheduler::runTick(uint64_t tick, void* world, cJobPool& pool
       });
     }
     pool.waitIdle();
-    drainStage(world);
     if (pool.failedJobs() != failedBefore) {
-      throw std::runtime_error("det-sched: a system job threw; tick aborted (world may be half-updated)");
+      discardStage();
+      throw std::runtime_error("det-sched: a system job threw; tick aborted, failed stage not committed");
     }
+    drainStage(world);
   }
 }
 
@@ -125,10 +144,11 @@ void cDeterministicScheduler::runTick(uint64_t tick, void* world, cJobSystem& jo
       });
     }
     const int failed = fence.wait();
-    drainStage(world);
     if (failed != 0) {
-      throw std::runtime_error("det-sched: a system job threw; tick aborted (world may be half-updated)");
+      discardStage();
+      throw std::runtime_error("det-sched: a system job threw; tick aborted, failed stage not committed");
     }
+    drainStage(world);
   }
 }
 

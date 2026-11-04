@@ -132,13 +132,13 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       raw2 << "{\"fpsCap\": -5}\n";
       raw2.close();
       check(GameSettings::load(path).fpsCap == -1, "fps cap: settings.json load clamps -5 -> -1 (auto)");
-    check(GameSettings{}.renderer == "software", "renderer: shipped default is software (JD 2026-10-24)");
+    check(GameSettings{}.renderer == "vulkan", "renderer: shipped default is vulkan (JD 2026-10-30)");
     {
       GameSettings rs; rs.renderer = "vulkan";
       const std::string rp = path + ".renderer";
       check(rs.save(rp) && GameSettings::load(rp).renderer == "vulkan", "renderer: settings.json round-trips renderer=vulkan");
       std::ofstream(rp) << "{\"renderer\": \"dx12\"}\n";
-      check(GameSettings::load(rp).renderer == "software", "renderer: unknown value loads as software");
+      check(GameSettings::load(rp).renderer == "vulkan", "renderer: unknown value loads as vulkan (the default)");
       std::remove(rp.c_str());
     }
       std::error_code ec;
@@ -390,6 +390,56 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     for (int i = 0; i < 70; ++i) { sig.tick(wafer->chunks, 2, 2, 12, noDirty); sig2.tick(restored, 2, 2, 12, noDirty); }
     check(sameCells(wafer->chunks, restored) && sig2.exportState() == sig.exportState(),
           "save: the restored world ticks identically to the original (70 more ticks)");
+    {  // PlayN (JD): Switch facing (4 yaws x floor / ceiling / 4 wall mounts) survives save / load
+      ChunkMap m = emptyLike(wafer->chunks);
+      const auto& c0 = m.columns().begin()->second;
+      const int bx = c0->cx * 16, bz = c0->cz * 16, by = 100;
+      int k = 0;
+      for (int face = 1; face <= 6; ++face)
+        for (int f = 0; f < 4; ++f, ++k) { m.set(bx + k % 16, by + 2 * (k / 16), bz + 4, kSwitch); m.setState(bx + k % 16, by + 2 * (k / 16), bz + 4, withAttach(makeState(0, f), face)); }
+      cSignalSim ss; ss.scan(m);
+      const auto d3 = dir / "switch_facing";
+      { cWorldSave w(d3); w.saveDimension("wafer", m, ss, true); }
+      ChunkMap m2 = emptyLike(wafer->chunks); std::vector<uint8_t> b3;
+      { cWorldSave w(d3); w.loadDimension("wafer", m2, b3); }
+      bool ok = true; k = 0;
+      for (int face = 1; face <= 6; ++face)
+        for (int f = 0; f < 4; ++f, ++k) {
+          const CellState s = m2.getState(bx + k % 16, by + 2 * (k / 16), bz + 4);
+          ok = ok && m2.get(bx + k % 16, by + 2 * (k / 16), bz + 4) == kSwitch && stFacing(s) == f && stAttach(s) == face;
+        }
+      check(ok, "save: Switch facing + mount face (24 combos) round trip");
+    }    {  // 2026-11-01 (JD LL_LF_SAVE / LL_LF_LOAD): on-disk round trip old <-> lock-free, both
+       // directions, plus the streamed path (LF loadColumn) and save-then-immediate-load ordering.
+      const auto now = sig.exportState();
+      for (int mode = 0; mode < 2; ++mode) {
+        const auto d2 = dir / (mode == 0 ? "lf_save_old_load" : "old_save_lf_load");
+        ChunkMap back = emptyLike(wafer->chunks);
+        std::vector<uint8_t> b2;
+        int n2 = 0;
+        { cWorldSave w(d2); w.setLockFreeIo(mode == 0, mode == 0); w.saveDimension("wafer", wafer->chunks, sig, true); }
+        { cWorldSave r(d2); r.setLockFreeIo(mode == 1, mode == 1); n2 = r.loadDimension("wafer", back, b2); }
+        cSignalSim s3; s3.scan(back);
+        check(n2 == int(wafer->chunks.columns().size()) && s3.importState(b2) && sameCells(wafer->chunks, back) && s3.exportState() == now,
+              mode == 0 ? "LL_LF_SAVE: lock-free save, old load: blocks and component state bit for bit (format unchanged)"
+                        : "LL_LF_LOAD: old save, lock-free load: blocks and component state bit for bit (format unchanged)");
+        if (mode == 1) {
+          cWorldSave r(d2); r.setLockFreeIo(true, true);
+          bool all = true; int cols = 0;
+          for (const auto& [k, col] : wafer->chunks.columns()) {
+            auto lc = r.loadColumn("wafer", col->cx, col->cz);
+            all = all && lc.status == cWorldSave::ColumnLoad::Loaded && lc.column; ++cols;
+          }
+          check(all && cols > 0, "LL_LF_LOAD: every column streams back through the lock-free loadColumn");
+          // Save (no wait) then load at once: the load must queue behind the pending save of its region.
+          const ChunkColumn* first = &*wafer->chunks.columns().begin()->second;
+          std::vector<const ChunkColumn*> one{first};
+          r.saveColumns("wafer", one, sig, false);
+          auto lc = r.loadColumn("wafer", first->cx, first->cz);
+          check(lc.status == cWorldSave::ColumnLoad::Loaded && r.flush(), "LL_LF_SAVE: save-then-immediate-load sees the saved column (FIFO behind pending saves)");
+        }
+      }
+    }
     {
       std::fstream f(dir / "player.lat", std::ios::in | std::ios::out | std::ios::binary);
       f.seekp(12); f.put('\x7f'); f.close();
@@ -786,6 +836,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       // SW-H2: a hand-edited wire value of 100 in the streamed column clamps
       // TO 64 at the component input Ã¢â‚¬â€ the memor stores 64, never 100, and no
       // out-of-range output is produced (the pre-fix code indexed buckets_[100]).
+      dstSim.setSameTick(false);  // PlayM: injected (undriven) wire value; a same-tick settle would re-flood it to 0
       dst.setState(325, gy, 322, CellState(100));
       dstSim.invalidateNetwork();
       dstSim.tick(dst, 20, 20, 4, noDirty);
@@ -1326,6 +1377,18 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         if (!d.startingItem) fresh = fresh && inv.addItem(d.itemId, 1) == 0 && inv.countOf(d.itemId) >= 1;
       check(fresh, "items: fresh spawn inventory holds the Fragment + every lore tool item");
     }
+    {  // 2026-10-31 (JD): inventory screen click is one-way: list slot -> hotbar copy, never a swap
+      Inventory inv;
+      inv.hotbar()[2] = ItemStack{uint32_t(kRedTorch), uint16_t(5)};
+      inv.main()[3] = ItemStack{uint32_t(kBlueTrace), uint16_t(9)};
+      const int from = kInvHotbarSlots + 2 + 3;  // flat order: hotbar, offhand L/R, main
+      const bool ok = inv.assignToHotbar(from, 2) && inv.hotbar()[2].itemId == uint32_t(kBlueTrace) &&
+                      inv.hotbar()[2].count == 9 && inv.main()[3].itemId == uint32_t(kBlueTrace) && inv.main()[3].count == 9 &&
+                      !inv.assignToHotbar(2, 2) && !inv.assignToHotbar(-1, 0) && !inv.assignToHotbar(kTotalSlots, 0);
+      bool noRedTorch = true;
+      for (const ItemStack* s : inv.allSlots()) noRedTorch = noRedTorch && s->itemId != uint32_t(kRedTorch);
+      check(ok && noRedTorch, "inventory: a click copies the list slot into the hotbar one-way (source kept, old hotbar stack not moved into the list)");
+    }
     {
       HudLayer hud;
       cHudUiRenderer r(hud, {}, [&](std::string_view) { return rm.icon(kRedTorch); });
@@ -1395,9 +1458,9 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   }
   {  // HUD readout comes from each block's behaviour class, through the registry
     const auto& cat = cBehaviorCatalog::get();
-    check(cat.describe(kRepeator, makeState(64, 1, 3, true)) == "Repeator | delay 8 ticks (button 2/4) | out 64 | facing E" &&
+    check(cat.describe(kRepeator, makeState(64, 1, 3, true)) == "Repeator | delay 8 ticks (setting 3/6) | out 64 | facing E" &&
               cat.describe(kRedTrace, 40) == "Red Trace | strength 40" &&
-              cat.describe(kColorLamp16, makeState(17, 0)) == "Color Lamp 16 | tier 16 (wrap) | strength 17 -> colour 0" &&
+              cat.describe(kColorLamp16, makeState(17, 0)) == "lamp16 | tier 16 (wrap) | strength 17 -> colour 0" &&
               cat.describe(kToneBlock, makeState(34, 2)).find("A4 (440.0 Hz)") != std::string::npos &&
               cat.describe(kWaferSilicon, 0) == "Wafer Silicon" && cat.component(kRepeator) && !cat.component(kRedTrace),
           "look-at readout: describe() per block behaviour (repeator, wire, color lamp, tone, plain)");
