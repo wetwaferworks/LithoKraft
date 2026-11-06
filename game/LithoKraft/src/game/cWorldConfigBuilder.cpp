@@ -7,19 +7,6 @@
 
 namespace lithokraft {
 
-bool cWorldConfigBuilder::inProcess() {
-  const char* e = std::getenv("LL_WORLD_RELAUNCH");
-  if (e && std::strcmp(e, "1") == 0) return false;
-  // 2026-10-31 (JD, world select bounce): under threeway (LL_THREEWAY=1, on by default with
-  // LL_THREAD_LAYOUT=8) the in-process Load World request is never served by main(), so every
-  // non-current world fell back to the menu. Threeway runs take the relaunch path instead.
-  // LL_WORLD_INPROCESS_THREEWAY=1 is the kill switch back to the old behaviour.
-  const char* t = std::getenv("LL_THREEWAY");
-  const char* k = std::getenv("LL_WORLD_INPROCESS_THREEWAY");
-  if (t && t[0] == '1' && !(k && k[0] == '1')) return false;
-  return true;
-}
-
 bool cWorldConfigBuilder::looksLikeWorld(const std::string& dir) {
   std::error_code ec;
   const std::filesystem::path p(dir);

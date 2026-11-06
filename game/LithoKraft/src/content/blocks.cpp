@@ -43,12 +43,12 @@ cBlockReg& mutableRegistry() {
     r.add(def("lithokraft:silicon", "Wafer Silicon", kTerrain, S::Cube, "silicon", "", R::None, 0, 0, 45));
     r.add(def("lithokraft:red_trace", "Red Trace", kTransparent | kFlatPick, S::Custom, "red_trace", "wire", R::Wire, 1, 0, 0));
     r.add(def("lithokraft:blue_trace", "Blue Trace", kTransparent | kFlatPick, S::Custom, "blue_trace", "wire", R::Wire, 2, 0, 0));
-    r.add(def("lithokraft:red_torch", "Red LED", kTransparent | kAttachable, S::Cross, "red_torch", "on_off", R::Torch, 1, 0, 0));
+    r.add(def("lithokraft:red_torch", "Red LED", kTransparent | kAttachable, S::Cross, "red_torch", "torch", R::Torch, 1, 0, 0));
     r.add(def("lithokraft:lamp", "Lamp", kTerrain, S::Cube, "lamp", "on_off", R::Lamp, 0, 0, 40));
     r.add(def("lithokraft:grass", "Grass", kTerrain, S::Cube, "grass", "", R::None, 0, 0, 20));
     r.add(def("lithokraft:dirt", "Dirt", kTerrain, S::Cube, "dirt", "", R::None, 0, 0, 20));
     r.add(def("lithokraft:stone", "Stone", kTerrain, S::Cube, "stone", "", R::None, 0, 0, 50));
-    r.add(def("lithokraft:blue_torch", "Blue LED", kTransparent | kAttachable, S::Cross, "blue_torch", "on_off", R::Torch, 2, 0, 0));
+    r.add(def("lithokraft:blue_torch", "Blue LED", kTransparent | kAttachable, S::Cross, "blue_torch", "torch", R::Torch, 2, 0, 0));
     // Cortana 2026-10-15 2215 [GAME] (JD D4): low-slab placeholder voxel model with 4 delay buttons
   // (foliage.h repeatorMesh). Shape::Custom; kTransparent and no kOpaque, so neighbours draw the faces
   // the slab no longer covers. Collision and pick stay a full cell for now (block shapes are deferred).
@@ -56,12 +56,12 @@ cBlockReg& mutableRegistry() {
   // string id, which chunks, saves and the handshake hash store. Keep the PRE-RENAME stable id so
   // worlds, saves and e015e51cf1559089 are untouched; the string id alias below covers name lookups.
   r.addWithStableId(def("lithokraft:repeator", "Repeator", kSolid | kCutsWire | kDirectional | kTransparent | kInteractive, S::Custom, "repeator", "repeator", R::Repeator, 0, 0, 45), litholattice::stableIdFor("block", "lithokraft:repeater"));
-    r.add(def("lithokraft:thresholdor", "Thresholdor", kDir, S::Cube, "thresholdor", "thresholdor", R::Thresholdor, 0, 0, 45));
+    r.add(def("lithokraft:thresholdor", "Thresholdor", kDir | kInteractive /* 2026-11-04 (JD t4305u): right click = subtract mode in game (was test-only) */, S::Cube, "thresholdor", "thresholdor", R::Thresholdor, 0, 0, 45));
     // 2026-11-01 (JD): the Redirector is now the Multiplexor (id + name; old string id aliased below,
     // stable id kept from "lithokraft:redirector" like the Repeator rename, so saves are untouched), and
     // it has no click / use: only a Repeator on its side switches it. LL_MUX_RENAME=0 / LL_MUX_NOUSE=0: old.
     r.addWithStableId(def([] { const char* e = std::getenv("LL_MUX_RENAME"); return !(e && e[0] == '0'); }() ? "lithokraft:multiplexor" : "lithokraft:redirector", [] { const char* e = std::getenv("LL_MUX_RENAME"); return !(e && e[0] == '0'); }() ? "Multiplexor" : "Redirector",
-            kDir | ([] { const char* e = std::getenv("LL_MUX_NOUSE"); return !(e && e[0] == '0'); }() ? decltype(kInteractive){} : kInteractive), S::Cube, "redirector", "redirector", R::Redirector, 0, 0, 45),
+            kDir | ([] { const char* e = std::getenv("LL_MUX_NOUSE"); return !(e && e[0] == '0'); }() ? decltype(kInteractive){} : kInteractive), S::Cube, "multiplexor" /* 2026-11-04 (JD): own multiplexor_* art */, "redirector", R::Redirector, 0, 0, 45),
                       litholattice::stableIdFor("block", "lithokraft:redirector"));
     r.add(def("lithokraft:pulsor", "Pulsor", kDir, S::Cube, "pulsor", "pulsor", R::Pulsor, 0, 0, 45));
     r.add(def("lithokraft:memor", "Memor", kDir, S::Cube, "memor", "memor", R::Memor, 0, 0, 45));
@@ -272,9 +272,15 @@ cBlockReg& mutableRegistry() {
   r.add(def("lithokraft:virtual_wall_post", "Virtual Wall Post", kSolid | kTransparent | kInteractive | kDirectional, S::Custom, "virtual_wall_post", "wall_post", R::None, 0, 0, 45));
   r.add(def("lithokraft:organic_wall_post", "Organic Wall Post", kSolid | kTransparent | kInteractive | kDirectional, S::Custom, "organic_wall_post", "wall_post", R::None, 0, 0, 45));
   r.add(def("lithokraft:randor", "Randor", kDir, S::Cube, "randor", "randor", R::Randor, 0, 0, 45));
-  r.add(def("lithokraft:fusor_sum", "Fusor", kDir, S::Cube, "fusor_sum" /* PlayO (JD): CloudAtlas Fusor art */, "fusor_sum", R::cFusorSum, 0, 0, 45));  // PlayN (JD): new adder, fresh id; placeholder tex (CloudAtlas art TODO)  // 2026-10-31 (JD): appended (stable ids)
+  r.add(def("lithokraft:fusor_sum", "Fusor", kDir, S::Cube, "fusor_sum" /* PlayO (JD): CloudAtlas Fusor art */, "fusor_sum", R::cFusorSum, 0, 0, 45));
+  // 2026-11-04 (JD t4302u): the Redirector is its own block again (selected back / left / right input ->
+  // front). New string id (the old lithokraft:redirector string id stays the Multiplexor's save alias), appended.
+  r.add(def("lithokraft:routor", "Routor", kDir | kInteractive, S::Cube, "routor", "routor", R::Redirector,  /* PlayB (JD t4346u): the Redirector is the Routor; same registry slot (saves) */ 0, 0, 45));  // PlayN (JD): new adder, fresh id; placeholder tex (CloudAtlas art TODO)  // 2026-10-31 (JD): appended (stable ids)
+  // 2026-11-05 (JD, CloudAtlas art): Dividor, front = floor(back / 2), 1 tick. Appended (stable ids).
+  r.add(def("lithokraft:dividor", "Dividor", kDir, S::Cube, "dividor", "dividor", R::Dividor, 0, 0, 45));
     // Save migration: pre-rename ids remap to the -OR names (2026-10-10).
     r.addAlias("lithokraft:pulsar", "lithokraft:pulsor");
+    r.addAlias("lithokraft:redirector_select", "lithokraft:routor");  // PlayB (JD t4346u): old saves
     if ([] { const char* e = std::getenv("LL_MUX_RENAME"); return !(e && e[0] == '0'); }()) r.addAlias("lithokraft:redirector", "lithokraft:multiplexor");  // 2026-11-01 (JD): old saves
     // 2026-10-16 (JD): the Repeater is now the Repeator; old saves name the old id.
     r.addAlias("lithokraft:repeater", "lithokraft:repeator");
@@ -424,6 +430,8 @@ const BlockId kVirtualWallPost      = resolveId(blockRegistry(), "lithokraft:vir
 const BlockId kOrganicWallPost      = resolveId(blockRegistry(), "lithokraft:organic_wall_post");
 const BlockId kRandor               = resolveId(blockRegistry(), "lithokraft:randor");
 const BlockId kFusorSum            = resolveId(blockRegistry(), "lithokraft:fusor_sum");
+const BlockId kDividor             = resolveId(blockRegistry(), "lithokraft:dividor");  // 2026-11-05 (JD)
+const BlockId kRedirectorSelect    = resolveId(blockRegistry(), "lithokraft:routor");  /* PlayB: the Routor (name kept for callers) */  // 2026-11-04 (JD t4302u)
 
 std::vector<BlockId> paletteBlocks(bool includeHidden) {  // 2026-10-31 (JD): registry-driven palette
   std::vector<BlockId> out;

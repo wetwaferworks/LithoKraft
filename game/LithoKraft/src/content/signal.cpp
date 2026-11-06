@@ -1,16 +1,27 @@
 #include <chrono>
+#include <unordered_set>
+#include <deque>
 #include <vector>
 #include "lithokraft/content/randor_rng.h"  // 2026-10-31 (JD): Randor
 #include "lithokraft/content/signal.h"
+#include "lithokraft/content/blocks.h"  // PlayB: kRedirectorSelect (Routor)
 #include "lithokraft/content/compiled_comp_table.h"  // 2026-11-01 Option A
 #include <algorithm>
 #include <climits>
 #include "litholattice/core/log.h"
+#include "litholattice/core/threading.h"  // PlayK: cJobPool component shards
 #include "litholattice/storage/storage.h"
 #include "litholattice/sim/det_sched.h"
 #include "lithokraft/content/component.h"
 #include "lithokraft/content/pulse_rules.h"  // 2026-11-01 PlayK
 #include "lithokraft/content/repeator.h"  // 2026-10-31: chain colour
+
+// PlayL2 / MCHPRS takeaways (JD 2026-11-06) â€” folded into levers 1-12, NOT a Redpiler port:
+//  1. Changed-node flush only (PR #206-style): mark/prep/flood walk changedSrc_ + marked nets, never the
+//     whole graph on quiet ticks (levers 1/3/6/7). Full Redpiler/Trace-in-time IR = option 16 via lithography (compile settled Trace into a chip + set clock) — NOT an L2 deliverable.
+//  2. Precomputed connections: K2 compAdj_ + PlayL2 emitNet/emitIdx + dense Comp*; fanout is edges.
+//  3. Decouple sim rate from remesh/UI: signal phase must not wait on mesh rebuild (lever 5/12).
+//  4. Plot-thread isolation: ownership handoff / phases only â€” no new mutex, no second world model.
 #include "lithokraft/content/trace_conn.h"  // 2026-11-01 PlayL: Trace connection states
 #include <algorithm>
 #include <cstdio>
@@ -82,6 +93,16 @@ bool cSignalSim::importState(const std::vector<uint8_t>& b) {
 
 namespace {
 // Index every signal cell of ONE column (shared by scan() and scanColumn()).
+
+// Archie Phase 4: emitMode 1 = front? out : 0; else virtual (mode 0 = PlayJ path).
+inline int compEmit(const cCompBehavior* behavior, const ComponentMemory& mem, uint8_t emitMode, int dir, CellState st) {
+  if (emitMode) return (dir == stFacing(st)) ? int(mem.out) : 0;
+  return behavior->emitToward(dir, st, mem);
+}
+inline int compEmitChan(const cCompBehavior* behavior, const ComponentMemory& mem, uint8_t traitFlags, int dir, CellState st) {
+  if (traitFlags & cCompTraits::kEmitChan0) return 0;
+  return behavior->emitChannel(dir, st, mem);
+}
 void scanOneColumn(cSignalSim& sim, const ChunkColumn& col, const cBlockReg& reg) {
   std::vector<BlockId> lut;  // StableId palette -> BlockId, resolved once per sub-chunk
   for (int sy = 0; sy < kSubChunks; ++sy) {
@@ -106,12 +127,19 @@ void scanOneColumn(cSignalSim& sim, const ChunkColumn& col, const cBlockReg& reg
 }  // namespace
 
 void cSignalSim::scan(const ChunkMap& w) {
-  torches_.clear(); wires_.clear(); lamps_.clear(); comps_.clear(); ++compsGen_;
+  ++editGen_;  // PlayM2
+  torches_.clear(); wires_.clear(); lamps_.clear(); comps_.clear(); ++compsGen_; mountFlipOk_ = false;
   const cBlockReg& reg = blockRegistry();
-  for (const auto& [k, col] : w.columns()) scanOneColumn(*this, *col, reg);
+  // Archie PlayI: skip ONLY StagedSim (outside-sim columns parked until promote). In-sim columns
+  // are Active from load (PlayI restore), so Examples in tickRadius scan/tick from the first tick.
+  for (const auto& [k, col] : w.columns()) {
+    if (col->state.stage() == litholattice::ChunkStage::StagedSim) continue;
+    scanOneColumn(*this, *col, reg);
+  }
 }
 
 void cSignalSim::scanColumn(const ChunkMap& w, int cx, int cz) {
+  ++editGen_;  // PlayM2
   const ChunkColumn* col = w.column(cx, cz);
   if (!col) return;
   const bool wasValid = netsValid_;
@@ -158,6 +186,7 @@ size_t cSignalSim::indexedCellCount(int cx, int cz) const {
 }
 
 void cSignalSim::unscanColumn(int cx, int cz) {
+  ++editGen_;  // PlayM2
   // LL_SIGNAL_LAZYNETS: a column the valid nets never read (no indexed cell in it or beside it)
   // leaves the nets, their cached pointers and the incremental pass alone.
   const bool relevant = !lazyNets_ || !netsValid_ || netTouches(cx, cz);
@@ -180,23 +209,41 @@ void cSignalSim::unscanColumn(int cx, int cz) {
     if (keyInColumn(it->first, cx, cz)) it = lampHold_.erase(it);
     else ++it;
   }
-  eraseColumnKeys(awake_, cx, cz);
+  for (auto it = lampDelay_.begin(); it != lampDelay_.end();) {  // PlayB lamp delay line
+    if (keyInColumn(it->first, cx, cz)) it = lampDelay_.erase(it);
+    else ++it;
+  }
+  // PlayJ: awake_ is epoch-flat; drop keys in this column from the live epoch list.
+  {
+    std::vector<int64_t> kept;
+    kept.reserve(awakeKeys_.size());
+    for (int64_t ak : awakeKeys_) if (!keyInColumn(ak, cx, cz)) kept.push_back(ak);
+    awakeKeys_.swap(kept);
+    for (int64_t ak : awakeKeys_) awakeStamp_[ak] = awakeEpoch_;
+  }
   for (auto it = comps_.begin(); it != comps_.end();) {
-    if (keyInColumn(it->first, cx, cz)) { it = comps_.erase(it); ++compsGen_; }
+    if (keyInColumn(it->first, cx, cz)) { it = comps_.erase(it); ++compsGen_; mountFlipOk_ = false; }
     else ++it;
   }
   std::erase_if(mountPowered_, [&](const auto& e) { return keyInColumn(e.first, cx, cz); });  // rebuilt per tick anyway; drop now
+  mountFlipOk_ = false;
   std::erase_if(softPowered_, [&](const auto& e) { return keyInColumn(e.first, cx, cz); });   // PlayL: no soft level for gone cells
   // Per-tick scratch naming this column must not survive into the next
   // tick (the sim is stopped for eviction, so clearing is safe): pending
   // lamp recomputes and changed-source marks for cells that are gone.
-  eraseColumnKeys(dirtyLamps_, cx, cz);
+  {
+    std::vector<int64_t> kept;
+    kept.reserve(dirtyLampKeys_.size());
+    for (int64_t dk : dirtyLampKeys_) if (!keyInColumn(dk, cx, cz)) kept.push_back(dk);
+    dirtyLampKeys_.swap(kept);
+    for (int64_t dk : dirtyLampKeys_) dirtyLampStamp_[dk] = dirtyLampEpoch_;
+  }
   std::erase_if(extraLamps_, [&](int64_t k) { return keyInColumn(k, cx, cz); });
   std::erase_if(changedSrc_, [&](int64_t k) { return keyInColumn(k, cx, cz); });
   std::erase_if(softChanged_, [&](int64_t k) { return keyInColumn(k, cx, cz); });
   if (!relevant) return;
   if (!relinkNets_ || (ownCells && !edgeDrop)) topoDirty_ = true;  // LL_SIGNAL_RELINK: a border-only evict keeps the flood
-  srcReach_.clear();  // cached reach sets reference wire nets; rebuilt with the nets
+  srcReach_.clear(); netReach_.clear();  // PlayK: inverse reach dies with the nets
   fullPass_ = true;   // layout changed: nets and cached pointers are stale
   netsValid_ = false;
 }
@@ -318,21 +365,56 @@ bool cSignalSim::netTouchUnchanged(const ChunkMap& w) const {
 }
 
 void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now) {
+  ++editGen_;  // PlayM2
   const int64_t k = packPos(x, y, z);
   if (netsValid_) { diagKind_ = 6; diagCx_ = x >> 4; diagCz_ = z >> 4; diagOwn_ = true; }  // diag: edit (scan overrides to 5)
-  fullPass_ = true; netsValid_ = false; topoDirty_ = true; editLocal_ = false;
-  torches_.erase(k); wires_.erase(k); lamps_.erase(k); comps_.erase(k); lampHold_.erase(k); ++compsGen_;
+  const bool wasWire = wires_.contains(k);
   const SimRole r = roleOf(now);
+  const bool nowWire = (r == SimRole::Wire);
+  // PlayJ fix 4 (held from I2): wire membership change in one column uses edgeSplit machinery
+  // (edgeMarkColumn) instead of topoDirty_ full rebuild when EDGERELINK+LAZYNETS+RELINK are clean.
+  // Cross-column Trace links that fail the edgeSplit boundary test still fall back to a full flood
+  // (do not worsen the known chunk-border Trace bug â€” refuse and rebuild).
+  static const bool kColLocal = [] { const char* e = std::getenv("LL_COLUMN_LOCAL_NETS"); return !(e && e[0] == '0'); }();
+  const bool wireEdit = wasWire || nowWire;
+  const bool edgeOk = kColLocal && edgeRelink_ && relinkNets_ && lazyNets_ && !topoDirty_ && netsValid_ &&
+                      wireEdit && netComps_.size() == nets_.size() && netLamps_.size() == nets_.size();
+  fullPass_ = true; netsValid_ = false; editLocal_ = false;
+  if (edgeOk) {
+    edgeMarkColumn(x >> 4, z >> 4);
+    // topoDirty_ stays false so buildNets takes the edgeSplit path
+  } else {
+    topoDirty_ = true;
+  }
+  torches_.erase(k); wires_.erase(k); lamps_.erase(k); comps_.erase(k); lampHold_.erase(k); lampDelay_.erase(k); ++compsGen_; mountFlipOk_ = false;
   if (r == SimRole::Torch) torches_.insert(k);
   else if (r == SimRole::Wire) wires_.insert(k);
   else if (r == SimRole::Lamp || r == SimRole::ColorLamp) lamps_.insert(k);
-  else if (const cCompBehavior* b = cBehaviorCatalog::get().component(now)) comps_[k] = Comp{b, {}};
+  else if (const cCompBehavior* b = cBehaviorCatalog::get().component(now)) {
+        const cCompTraits& tr = cBehaviorCatalog::get().traits(now);
+        Comp c{};
+        c.behavior = b;
+        c.traitFlags = tr.flags;
+        c.quietMode = tr.quietMode();
+        c.emitMode = tr.emitMode();
+        c.delayFixed = tr.delayFixed;
+        c.rate = classTickRate(now, b);  // PlayL Phase5: pack once
+        // PlayL2 #9: tag ALU-stress hot types once at place.
+        { const auto role = blockRegistry().def(now).role;
+          c.hotKind = (role == SimRole::Repeator) ? 1
+                    : (role == SimRole::Thresholdor) ? 2
+                    : (role == SimRole::cFusor) ? 3
+                    : (role == SimRole::Randor) ? 4 : 0; }
+        syncCompWords(c);
+        comps_[k] = c;
+      }
 }
 
 // 2026-11-01 (JD placement spikes): a component / lamp / plain block edit with no wire in or under the cell leaves
 // every wire link unchanged (wireLinks reads kCutsWire of a cell only for the wire directly below it), so the
 // net flood is kept (relink) and only the readers of the touching nets are patched. LL_EDIT_LOCAL=0 kill.
 void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now, bool wireBelow) {
+  ++editGen_;  // PlayM2
   const int64_t k = packPos(x, y, z);
   const SimRole r = roleOf(now);
   // 2026-11-01 (box): torch edits are local too - torches are never in a net, a reader list or a wire link
@@ -346,12 +428,30 @@ void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now, bool wireBelow
   if (netsValid_) { diagKind_ = 7; diagCx_ = x >> 4; diagCz_ = z >> 4; diagOwn_ = true; }  // diag: local edit
   fullPass_ = true; netsValid_ = false; editLocal_ = true;
   const bool wasComp = comps_.contains(k), wasLamp = lamps_.contains(k);
-  lamps_.erase(k); comps_.erase(k); lampHold_.erase(k); torches_.erase(k); ++compsGen_;
+  lamps_.erase(k); comps_.erase(k); lampHold_.erase(k); lampDelay_.erase(k); torches_.erase(k); ++compsGen_; mountFlipOk_ = false;
   if (r == SimRole::Torch) torches_.insert(k);
   const bool isLamp = r == SimRole::Lamp || r == SimRole::ColorLamp;
   bool isComp = false;
   if (isLamp) lamps_.insert(k);
-  else if (const cCompBehavior* b = cBehaviorCatalog::get().component(now)) { comps_[k] = Comp{b, {}}; isComp = true; }
+  else if (const cCompBehavior* b = cBehaviorCatalog::get().component(now)) {
+        const cCompTraits& tr = cBehaviorCatalog::get().traits(now);
+        Comp c{};
+        c.behavior = b;
+        c.traitFlags = tr.flags;
+        c.quietMode = tr.quietMode();
+        c.emitMode = tr.emitMode();
+        c.delayFixed = tr.delayFixed;
+        c.rate = classTickRate(now, b);  // PlayL Phase5: pack once
+        // PlayL2 #9: tag ALU-stress hot types once at place.
+        { const auto role = blockRegistry().def(now).role;
+          c.hotKind = (role == SimRole::Repeator) ? 1
+                    : (role == SimRole::Thresholdor) ? 2
+                    : (role == SimRole::cFusor) ? 3
+                    : (role == SimRole::Randor) ? 4 : 0; }
+        syncCompWords(c);
+        comps_[k] = c;
+        isComp = true;
+      }
   auto patch = [&](std::vector<std::vector<int64_t>>& lists, int64_t wk, bool add) {
     const auto it = wireNet_.find(wk);
     if (it == wireNet_.end() || size_t(it->second) >= lists.size()) return;
@@ -389,10 +489,34 @@ int cSignalSim::hardPower(const ChunkMap& w, int x, int y, int z) const {
 bool cSignalSim::strongPowered(const ChunkMap& w, int x, int y, int z) const { return hardPower(w, x, y, z) > 0; }
 
 void cSignalSim::collectMountPowered(const ChunkMap& w) {
-  // B-L1 acceptance (P3-2): unordered comps_ iteration — the result is a
-  // membership SET (mountPowered_); iteration order cannot leak anywhere.
+  // B-L1 acceptance (P3-2): result is a membership SET (mountPowered_); visit order cannot leak.
+  // PlayL2: walk dense Comp* (sorted keys) instead of unordered comps_ hashing.
+  const auto m0 = std::chrono::steady_clock::now();
+  rebuildCompDense();
   mountPowered_.clear();
-  for (const auto& [k, c] : comps_) {
+  const size_t n = compAllKeys_.size();
+  // PlayM2 incremental mount (LL_MOUNT_INCR=0 restores the full walk): only candidates are visited.
+  static const bool kIncr = [] { const char* e = std::getenv("LL_MOUNT_INCR"); return !(e && e[0] == '0'); }();
+  const bool hardAny = cPulseRules::hardAnyComponent();
+  if (kIncr && (mountCandGen_ != editGen_ || mountCandN_ != n || mountCandPtr_ != compAllKeys_.data() || mountCandHard_ != hardAny)) {
+    mountCand_.clear();
+    const auto& reg = blockRegistry();
+    for (size_t i = 0; i < n; ++i) {
+      int x, y, z; unpackPos(compAllKeys_[i], x, y, z);
+      const BlockId b = w.get(x, y, z);
+      const auto r = reg.def(b).role;
+      bool cand = r == uint16_t(SimRole::Switch) || r == uint16_t(SimRole::cButton);
+      if (!cand && (hardAny || r == uint16_t(SimRole::Repeator) || r == uint16_t(SimRole::Pulsor) || b == kRedirectorSelect))
+        for (int d = 0; d < 4 && !cand; ++d) cand = reg.hasAll(w.get(x + kDirX[d], y, z + kDirZ[d]), kSolid | kOpaque | kPowerable);
+      if (cand) mountCand_.push_back(uint32_t(i));
+    }
+    mountCandGen_ = editGen_; mountCandN_ = n; mountCandPtr_ = compAllKeys_.data(); mountCandHard_ = hardAny;
+  }
+  const size_t nIter = kIncr ? mountCand_.size() : n;
+  for (size_t ii = 0; ii < nIter; ++ii) {
+    const size_t i = kIncr ? size_t(mountCand_[ii]) : ii;
+    const int64_t k = compAllKeys_[i];
+    Comp& c = *compAllPtrs_[i];
     int x, y, z; unpackPos(k, x, y, z);
     const CellState s = w.getState(x, y, z);
     if (!stAttach(s) || !stOn(s)) continue;
@@ -403,14 +527,19 @@ void cSignalSim::collectMountPowered(const ChunkMap& w) {
   }
   // A lit Repeator hard-powers the solid conductive block it faces (not glass / ceramic: they are
   // not powerable), so wire and components on that block's other faces pick the signal up.
-  for (const auto& [k, c] : comps_) {
-    if (!c.mem.out || c.mem.pulse) continue;
+  for (size_t ii = 0; ii < nIter; ++ii) {
+    const size_t i = kIncr ? size_t(mountCand_[ii]) : ii;
+    const int64_t k = compAllKeys_[i];
+    Comp& c = *compAllPtrs_[i];
+    if (!(c.faceWord & 0xFFFFu) && !c.mem.out && !c.mem.out2) continue;  // PlayL2 #8: faceWord out|out2
     int x, y, z; unpackPos(k, x, y, z);
+    if (!c.mem.out && w.get(x, y, z) != kRedirectorSelect) continue;  // PlayB: a Routor's second path hard-powers too
     // 2026-11-01 PlayL (JD, LL_HARD_ANY): any component output facing the block hard-powers it, not only a Repeator.
-    if (!cPulseRules::hardAnyComponent() && blockRegistry().def(w.get(x, y, z)).role != uint16_t(SimRole::Repeator)) continue;
+    if (const auto hr = blockRegistry().def(w.get(x, y, z)).role; !cPulseRules::hardAnyComponent() && hr != uint16_t(SimRole::Repeator) &&
+        hr != uint16_t(SimRole::Pulsor) && w.get(x, y, z) != kRedirectorSelect) continue;  // PlayB: Pulsor / Routor always hard-power
     const CellState s = w.getState(x, y, z);
     for (int d = 0; d < 4; ++d) {
-      const int es = c.behavior->emitToward(d, s, c.mem);
+      const int es = compEmit(c.behavior, c.mem, c.emitMode, d, s);
       if (es <= 0) continue;
       const int nx = x + kDirX[d], nz = z + kDirZ[d];
       if (!blockRegistry().hasAll(w.get(nx, y, nz), kSolid | kOpaque | kPowerable)) continue;
@@ -418,7 +547,10 @@ void cSignalSim::collectMountPowered(const ChunkMap& w) {
       hv = uint8_t(std::max(int(hv), std::min(es, int(kMaxSignal))));
     }
   }
+  mountFlipOk_ = true;
+  phase_.mount += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - m0).count();
 }
+
 
 // 2026-11-01 (JD soft power; PlayL 7:45 same-tick): a lit flat Trace soft-powers every solid powerable
 // block it touches on a CONNECTED side (either colour). Soft never feeds Trace; it lights attached lamps
@@ -441,6 +573,14 @@ bool acSeedsOn() { static const bool on = [] { const char* e = std::getenv("LL_A
 bool acSameSeedsOn() { static const bool on = [] { const char* e = std::getenv("LL_AC_SAME_SEEDS"); return !(e && e[0] == '0'); }(); return on; }
 bool acMountSwapOn() { static const bool on = [] { const char* e = std::getenv("LL_AC_MOUNT_SWAP"); return !(e && e[0] == '0'); }(); return on; }
 bool acWakeOn() { static const bool on = [] { const char* e = std::getenv("LL_AC_WAKE"); return !(e && e[0] == '0'); }(); return on; }
+// PlayL2: reuse end-of-last-tick mountPowered_ for flip/torches (skip a full comps walk). =0 restores.
+bool acMountReuseOn() { static const bool on = [] { const char* e = std::getenv("LL_AC_MOUNT_REUSE"); return !(e && e[0] == '0'); }(); return on; }
+// PlayL2: defer net zero until same-seed miss (skip zero+restore on stable nets). =0 restores.
+bool acDeferZeroOn() { static const bool on = [] { const char* e = std::getenv("LL_AC_DEFER_ZERO"); return !(e && e[0] == '0'); }(); return on; }
+bool hotSpecOn() { static const bool on = [] { const char* e = std::getenv("LL_HOT_SPEC"); return !(e && e[0] == '0'); }(); return on; }
+bool netLevelSoaOn() { static const bool on = [] { const char* e = std::getenv("LL_NET_LEVEL_SOA"); return !(e && e[0] == '0'); }(); return on; }
+bool interestCullOn() { static const bool on = [] { const char* e = std::getenv("LL_INTEREST_CULL"); return !(e && e[0] == '0'); }(); return on; }
+bool emitCacheOn() { static const bool on = [] { const char* e = std::getenv("LL_EMIT_CACHE"); return !(e && e[0] == '0'); }(); return on; }  // PlayM2: default ON (via/colour guarded); was L2 default OFF — open-end viaAx must go through seed()
 bool optionAOn() { static const bool on = [] { const char* e = std::getenv("LL_OPTION_A"); return !(e && e[0] == '0'); }(); return on; }
 }
 void cSignalSim::hsRefreshSoft(const ChunkMap& w) {
@@ -541,7 +681,7 @@ bool cSignalSim::blockPowered(const ChunkMap& w, int x, int y, int z) const {
 
 int cSignalSim::emitToward(const ChunkMap& w, int x, int y, int z, int dir) const {
   const auto it = comps_.find(packPos(x, y, z));
-  return it == comps_.end() ? 0 : it->second.behavior->emitToward(dir, w.getState(x, y, z), it->second.mem);
+  return it == comps_.end() ? 0 : compEmit(it->second.behavior, it->second.mem, it->second.emitMode, dir, w.getState(x, y, z));
 }
 
 int cSignalSim::inputFrom(const ChunkMap& w, int x, int y, int z, int d) const {
@@ -549,8 +689,8 @@ int cSignalSim::inputFrom(const ChunkMap& w, int x, int y, int z, int d) const {
   const BlockDef nd = blockRegistry().def(w.get(nx, y, nz));
   const CellState s = w.getState(nx, y, nz);
   // SW-H2: a disk-loaded wire cell state carries a 7-bit value (65..127 are
-  // representable); clamp at this sampling point so no component input — and
-  // therefore no pass-through output — can ever exceed kMaxSignal.
+  // representable); clamp at this sampling point so no component input Ã¢â‚¬â€ and
+  // therefore no pass-through output Ã¢â‚¬â€ can ever exceed kMaxSignal.
   if (nd.role == SimRole::Wire)
     return isVia(w.get(nx, y, nz)) || !cTraceConn::sideOn(s, -kDirX[d], 0, -kDirZ[d]) ? 0 : std::min(stValue(s), kMaxSignal);
   if (nd.role == SimRole::Torch) return stValue(s) ? kMaxSignal : 0;
@@ -581,7 +721,7 @@ bool cSignalSim::use(ChunkMap& w, int x, int y, int z, const DirtyFn& dirty, boo
     if (wd.role != SimRole::Wire) return false;
     if (alt && cTraceConn::enabled() && isFlatWire(w.get(x, y, z))) {  // 2026-11-01 PlayL: Alt-click / Alt+wheel cycles connections
       w.setState(x, y, z, cTraceConn::cycled(w.getState(x, y, z), 1));
-      fullPass_ = true; netsValid_ = false; topoDirty_ = true; editLocal_ = false; softAll_ = true;
+      fullPass_ = true; netsValid_ = false; topoDirty_ = true; editLocal_ = false; softAll_ = true; mountFlipOk_ = false;
       dirty(x, y, z);
       for (auto& d : kH) dirty(x + d[0], y, z + d[1]);  // neighbours re-mesh their arms
       return true;
@@ -657,27 +797,70 @@ double epMs() { return std::chrono::duration<double, std::milli>(std::chrono::st
 struct EpTimer { double& acc; double s; EpTimer(double& a) : acc(a), s(epOn() ? epMs() : 0) {} ~EpTimer() { if (epOn()) acc += epMs() - s; } };
 }
 void cSignalSim::tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty) {
-  // Reassembled from the hs* pieces (hs-design §3.2); the handshake path in
+  // Reassembled from the hs* pieces (hs-design Ã‚Â§3.2); the handshake path in
   // cSignalWorldSim drives the identical pieces through the authority.
   hsBeginCycle(w, pcx, pcz, radius);
   hsFlipAndTorches(w, dirty);
   hsComponents(w, dirty);
   hsMark(w);
   if (!hsSkip_) {
-    if (fullPass_) hsPropagateFull(w, dirty);
-    else {
-      hsPrepIncremental(w);
-      for (int32_t id : hsMarkedNets_) hsPropagateNet(w, id, dirty);
-      hsApplyStrengthPending(&dirty);
+    if (epOn()) {
+      const auto w0 = std::chrono::steady_clock::now();
+      if (fullPass_) hsPropagateFull(w, dirty);
+      else {
+        hsPrepIncremental(w);
+        for (int32_t id : hsMarkedNets_) hsPropagateNet(w, id, dirty);
+        hsApplyStrengthPending(&dirty);
+      }
+      hsRefreshSoft(w);  // 2026-11-01 PlayL: this tick's wire values, before lamps / next components read soft
+      phase_.wires += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - w0).count();
+      const auto s0 = std::chrono::steady_clock::now();
+      hsSettle(w, dirty);
+      phase_.settle += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - s0).count();
+      const auto l0 = std::chrono::steady_clock::now();
+      hsLampsBatch(hsLampKeys_, w, dirty);
+      hsApplyLampHolds(hsTlsLampHolds());
+      hsTlsLampHolds().clear();
+      hsFinishCycle(w);
+      phase_.lamps += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - l0).count();
+    } else {
+      if (fullPass_) hsPropagateFull(w, dirty);
+      else {
+        hsPrepIncremental(w);
+        for (int32_t id : hsMarkedNets_) hsPropagateNet(w, id, dirty);
+        hsApplyStrengthPending(&dirty);
+      }
+      hsRefreshSoft(w);  // 2026-11-01 PlayL: this tick's wire values, before lamps / next components read soft
+      hsSettle(w, dirty);
+      hsLampsBatch(hsLampKeys_, w, dirty);
+      hsApplyLampHolds(hsTlsLampHolds());
+      hsTlsLampHolds().clear();
+      hsFinishCycle(w);
     }
-    hsRefreshSoft(w);  // 2026-11-01 PlayL: this tick's wire values, before lamps / next components read soft
-    hsSettle(w, dirty);  // 2026-11-01 PlayM: components read this tick's wires (same tick)
-    hsLampsBatch(hsLampKeys_, w, dirty);
-    hsApplyLampHolds(hsTlsLampHolds());
-    hsTlsLampHolds().clear();
-    hsFinishCycle(w);
   }
   hsFinalizeComponents();
+  // Archie Phase 5: dump phase ms/tick under LL_TICK_PROFILE (every 512 ticks).
+  if (epOn()) {
+    static uint64_t phTicks = 0;
+    static PhaseMs phSum{};
+    // PlayK: takePhaseMs folds hsWiresNs_/hsLampsNs_ (pull-worker path) into the split.
+    const PhaseMs snap = takePhaseMs();
+    ++phTicks;
+    phSum.comps += snap.comps; phSum.mark += snap.mark; phSum.wires += snap.wires;
+    phSum.lamps += snap.lamps; phSum.settle += snap.settle; phSum.rebuild += snap.rebuild;
+    phSum.begin += snap.begin; phSum.flip += snap.flip; phSum.finalize += snap.finalize; phSum.mount += snap.mount;
+    if ((phTicks % 512) == 0) {
+      const double n = double(phTicks);
+      // PlayK fix 1: mark / settle / comps / lamps / rebuild readable under LL_TICK_PROFILE (epOn).
+      ::litholattice::logInfo("signal phases: ticks=%llu comps %.3f mark %.3f wires %.3f lamps %.3f settle %.3f rebuild %.3f | begin %.3f flip %.3f finalize %.3f mount %.3f ms/tick (sum %.3f labeled %.3f)",
+                              (unsigned long long)phTicks, phSum.comps / n, phSum.mark / n, phSum.wires / n, phSum.lamps / n,
+                              phSum.settle / n, phSum.rebuild / n,
+                              phSum.begin / n, phSum.flip / n, phSum.finalize / n, phSum.mount / n,
+                              (phSum.comps + phSum.mark + phSum.wires + phSum.lamps + phSum.settle + phSum.rebuild + phSum.begin + phSum.flip + phSum.finalize) / n,
+                              (phSum.comps + phSum.mark + phSum.wires + phSum.lamps + phSum.settle + phSum.rebuild) / n);
+      phSum = {}; phTicks = 0;  // windowed avg (next 512 ticks)
+    }
+  }
   hsCommit();
 }
 
@@ -695,9 +878,10 @@ uint64_t cSignalSim::simScopeFp(const ChunkMap& w, int pcx, int pcz, int radius)
 }
 
 void cSignalSim::hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius) {
+  const auto b0 = std::chrono::steady_clock::now();
   if (epOn()) { g_ep = EditProf{}; g_ep.t0 = int64_t(epMs() * 1000.0); g_ep.fp = fullPass_; }
   ++tickNo_;
-  // NOTE: radio_/jammers_ flips are NOT here any more — they are hsCommit()
+  // NOTE: radio_/jammers_ flips are NOT here any more Ã¢â‚¬â€ they are hsCommit()
   // at cycle end, in both modes (D12; see signal.h).
   hsReason_ = (fullPass_ ? 4u : 0u) | (netsValid_ ? 0u : 8u);  // LL_TICK_PROFILE spike reason (measure only)
   if (area_.pcx != pcx || area_.pcz != pcz || area_.radius != radius) { if (netsValid_) diagKind_ = 4; fullPass_ = true; netsValid_ = false; hsReason_ |= 1u; }
@@ -741,7 +925,7 @@ void cSignalSim::hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius) {
     areaFp_ = fp;
   }
   if (colsChanged) {  // columns loaded / dropped: cached pointers stale
-    if (lazyNets_ && netsValid_ && !genChanged && netTouchUnchanged(w)) { netColumns_ = w.columns().size(); hsReason_ |= 32u; }  // LL_SIGNAL_LAZYNETS
+    if (lazyNets_ && netsValid_ && !genChanged && netTouchUnchanged(w)) { netColumns_ = w.columns().size(); hsReason_ |= 32u; }  // LL_SIGNAL_LAZYNETS  // PlayL2 #5: keep lazy/edge path (column streaming hygiene); no deeper world rewrite this pass.
     else {
       if (!lazyNets_) diagKind_ = 3;
       bool topo = !(relinkNets_ && lazyNets_ && (netsValid_ || (edgeRelink_ && !topoDirty_)));  // EDGERELINK: topoDirty_ already covers own-cell loads/evicts  // LL_SIGNAL_RELINK: only own-cell columns change the flood
@@ -773,9 +957,12 @@ void cSignalSim::hsBeginCycle(ChunkMap& w, int pcx, int pcz, int radius) {
       else nextHoldExpiry_ = std::min(nextHoldExpiry_, end);
     }
   }
+  // PlayB (JD t4339u): lamps with a delayed state due this tick recompute (and show it) this pass.
+  for (const auto& [k, d] : lampDelay_) extraLamps_.push_back(k);
   const bool wakeAll = allAwake_ || fullPass_ || !compSleep_;
   allAwake_ = wakeAll;  // read by tickComponents
   hsSkip_ = false;
+  if (epOn()) phase_.begin += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - b0).count();
 }
 
 // 2026-11-01 PlayM (JD): save -> quit -> reload probe for Trace connection states (test runs only).
@@ -818,10 +1005,30 @@ void cSignalSim::connProbe(ChunkMap& w, const DirtyFn& dirty) {
   }
 }
 
+void cSignalSim::rebuildCompDense() {
+  if (compDenseGen_ == compsGen_ && compAllKeys_.size() == comps_.size()) return;
+  compAllKeys_.clear();
+  compAllKeys_.reserve(comps_.size());
+  for (const auto& [k, c] : comps_) { (void)c; compAllKeys_.push_back(k); }
+  std::sort(compAllKeys_.begin(), compAllKeys_.end());
+  compAllPtrs_.resize(compAllKeys_.size());
+  for (size_t i = 0; i < compAllKeys_.size(); ++i) {
+    const auto it = comps_.find(compAllKeys_[i]);
+    compAllPtrs_[i] = (it == comps_.end()) ? nullptr : &it->second;
+  }
+  compDenseGen_ = compsGen_;
+}
+
 void cSignalSim::hsFlipAndTorches(ChunkMap& w, const DirtyFn& dirty) {
+  const auto f0 = std::chrono::steady_clock::now();
   connProbe(w, dirty);  // PlayM test probe (LL_CONN_PROBE, off by default)
-  collectMountPowered(w);
+  // PlayL2 lever 1: end-of-last-tick mounts already match live outs (mark/settle collected).
+  // Torches read previous-tick hard power â€” reuse unless an edit invalidated mountFlipOk_.
+  // fullPass_ always rebuilds (first tick / topology / gen swap). LL_AC_MOUNT_REUSE=0 restores.
+  if (!(acMountReuseOn() && mountFlipOk_ && !fullPass_ && !mountPowered_.empty()))
+    collectMountPowered(w);
   tickTorches(w, dirty);
+  if (epOn()) phase_.flip += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - f0).count();
 }
 
 void cSignalSim::hsComponents(ChunkMap& w, const DirtyFn& dirty) {
@@ -834,7 +1041,7 @@ void cSignalSim::hsMark(ChunkMap& w) {
   const auto m0 = std::chrono::steady_clock::now();
   // Next tick's wake set: around every changed source; the readers of every re-flooded network.
   allAwake_ = fullPass_ || !compSleep_ || !netsValid_;
-  awake_.clear();
+  awakeClear();
   auto populateWake = [this] {
     // The legacy WakeNets RAII ran at tick() exit over the marked bitset as
     // it stood then; on the skip path that bitset still holds the PREVIOUS
@@ -845,7 +1052,8 @@ void cSignalSim::hsMark(ChunkMap& w) {
     for (int64_t k : changedSrc_) wakeAround(k);
     if (!acWakeOn() || fullPass_)  // AC item 1: else hsApplyStrengthPending wakes only beside wires that changed
       forEachMarkedNet([&](int32_t id) {
-        if (size_t(id) < netComps_.size()) awake_.insert(netComps_[size_t(id)].begin(), netComps_[size_t(id)].end());
+        if (size_t(id) < netComps_.size())
+          for (int64_t ck : netComps_[size_t(id)]) awakeInsert(ck);
       });
     for (int64_t k : extraLamps_) wakeAround(k);
   };
@@ -868,36 +1076,37 @@ void cSignalSim::hsMark(ChunkMap& w) {
   }
   if (!fullPass_) {
     if (!netsValid_) buildNets(w);
-    clearNetMarks(); dirtyLamps_.clear();
+    clearNetMarks(); dirtyLampsClear();
     for (int64_t k : changedSrc_) {
       auto [rit, fresh] = srcReach_.try_emplace(k);
       SrcReach& r = rit->second;
-      if (fresh) {  // the 5 x 5 x 5 box once per source, cached until the networks change
-        int x, y, z; unpackPos(k, x, y, z);
-        for (int dy = -2; dy <= 2; ++dy)
-          for (int dz = -2; dz <= 2; ++dz)
-            for (int dx = -2; dx <= 2; ++dx) {
-              const int64_t n = packPos(x + dx, y + dy, z + dz);
-              if (const auto it = wireNet_.find(n); it != wireNet_.end()) {
-                if (std::find(r.nets.begin(), r.nets.end(), it->second) == r.nets.end()) r.nets.push_back(it->second);
-              } else if (lamps_.contains(n)) r.lamps.push_back(n);
-            }
-      }
+      if (fresh) fillSrcReach(k, r);  // PlayK fix 3: flat scratch 5x5x5, cached until nets rebuild
       for (int32_t id : r.nets) markNet(id);
-      dirtyLamps_.insert(r.lamps.begin(), r.lamps.end());
+      dirtyLampsInsertRange(r.lamps.begin(), r.lamps.end());
     }
-    forEachMarkedNet([&](int32_t id) { dirtyLamps_.insert(netLamps_[size_t(id)].begin(), netLamps_[size_t(id)].end()); });
-    dirtyLamps_.insert(extraLamps_.begin(), extraLamps_.end());
+    forEachMarkedNet([&](int32_t id) { dirtyLampsInsertRange(netLamps_[size_t(id)].begin(), netLamps_[size_t(id)].end()); });
+    dirtyLampsInsertRange(extraLamps_.begin(), extraLamps_.end());
   }
-  // Canonical work lists for this cycle (hs-design §3.2/§9.6): marked nets
+  // Canonical work lists for this cycle (hs-design Ã‚Â§3.2/Ã‚Â§9.6): marked nets
   // ascending by id; lamp keys sorted ascending (legacy iterated the
-  // unordered sets — per-lamp writes are disjoint and hold merges are
+  // unordered sets Ã¢â‚¬â€ per-lamp writes are disjoint and hold merges are
   // commutative, so sorting changes no outcome, only the visit order).
   hsMarkedNets_.clear();
   if (!fullPass_) forEachMarkedNet([&](int32_t id) { hsMarkedNets_.push_back(id); });
+  // PlayL2 #12: interest cull â€” drop marked nets with zero in-area wires (rendered play).
+  // Headless ALU Stress sits inside sim distance, so this is a no-op there.
+  if (interestCullOn() && !fullPass_ && !hsMarkedNets_.empty()) {
+    std::vector<int32_t> kept;
+    kept.reserve(hsMarkedNets_.size());
+    for (int32_t id : hsMarkedNets_) {
+      if (size_t(id) >= netArr_.size() || netArr_[size_t(id)].keys.empty()) continue;
+      kept.push_back(id);
+    }
+    hsMarkedNets_.swap(kept);
+  }
   hsLampKeys_.clear();
   if (fullPass_) hsLampKeys_.assign(lamps_.begin(), lamps_.end());
-  else hsLampKeys_.assign(dirtyLamps_.begin(), dirtyLamps_.end());
+  else hsLampKeys_ = dirtyLampKeys_;  // already unique via epoch stamp
   std::sort(hsLampKeys_.begin(), hsLampKeys_.end());
   phase_.mark += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - m0).count();
   populateWake();
@@ -910,12 +1119,34 @@ void cSignalSim::hsFinishCycle(ChunkMap& w) {
 }
 
 void cSignalSim::hsCommit() {
+  // PlayL2 / MCHPRS #4: cycle end is radio/jammer flip + phase dump only. No remesh, no UI, no mutex.
+
   if (epOn() && g_ep.t0) {
     static const double kSpike = [] { const char* e = std::getenv("LL_SPIKE_MS"); return e ? std::atof(e) : 10.0; }();
     const double tot = epMs() - double(g_ep.t0) / 1000.0;
     if (tot >= kSpike)
       ::litholattice::logInfo("signal cycle: %.2f ms fullPass=%d | buildNets %.2f propagateFull %.2f components %.2f lamps %.2f | comps %zu wires %zu lamps %zu",
                               tot, int(g_ep.fp), g_ep.build, g_ep.full, g_ep.comps, g_ep.lamps, comps_.size(), wires_.size(), lamps_.size());
+  }
+  // PlayK fix 1: handshake path never enters tick(), so dump phases here too (same windowed avg).
+  if (epOn()) {
+    static uint64_t phTicksHs = 0;
+    static PhaseMs phSumHs{};
+    const PhaseMs snap = takePhaseMs();
+    ++phTicksHs;
+    phSumHs.comps += snap.comps; phSumHs.mark += snap.mark; phSumHs.wires += snap.wires;
+    phSumHs.lamps += snap.lamps; phSumHs.settle += snap.settle; phSumHs.rebuild += snap.rebuild;
+    phSumHs.begin += snap.begin; phSumHs.flip += snap.flip; phSumHs.finalize += snap.finalize; phSumHs.mount += snap.mount;
+    if ((phTicksHs % 512) == 0) {
+      const double n = double(phTicksHs);
+      ::litholattice::logInfo("signal phases: ticks=%llu comps %.3f mark %.3f wires %.3f lamps %.3f settle %.3f rebuild %.3f | begin %.3f flip %.3f finalize %.3f mount %.3f ms/tick (sum %.3f labeled %.3f)",
+                              (unsigned long long)phTicksHs, phSumHs.comps / n, phSumHs.mark / n, phSumHs.wires / n, phSumHs.lamps / n,
+                              phSumHs.settle / n, phSumHs.rebuild / n,
+                              phSumHs.begin / n, phSumHs.flip / n, phSumHs.finalize / n, phSumHs.mount / n,
+                              (phSumHs.comps + phSumHs.mark + phSumHs.wires + phSumHs.lamps + phSumHs.settle + phSumHs.rebuild + phSumHs.begin + phSumHs.flip + phSumHs.finalize) / n,
+                              (phSumHs.comps + phSumHs.mark + phSumHs.wires + phSumHs.lamps + phSumHs.settle + phSumHs.rebuild) / n);
+      phSumHs = {}; phTicksHs = 0;
+    }
   }
   if (wpOn() && (++g_wp.ticks % 4096) == 0)
     ::litholattice::logInfo("signal wake/settle: ticks=%llu wake bookkeeping %.4f ms/tick, wakeAround %.1f/tick | settle iters %.3f/tick comps re-eval %.1f/tick cap hits %llu | AC same-seed skips %llu",
@@ -927,12 +1158,17 @@ void cSignalSim::hsCommit() {
 
 void cSignalSim::wakeAround(int64_t k) {
   if (wpOn()) ++g_wp.around;
+  // PlayK fix 2+5: prefer packed adjacency (wake-only Trace / AC-style); geometric fallback.
+  if (const auto it = compAdj_.find(k); it != compAdj_.end()) {
+    for (int64_t n : it->second) awakeInsert(n);
+    return;
+  }
   int x, y, z; unpackPos(k, x, y, z);
   for (int dy = -1; dy <= 2; ++dy)  // +2: a torch powers the block above it, read beside that block
     for (int dz = -1; dz <= 1; ++dz)
       for (int dx = -1; dx <= 1; ++dx) {
         const int64_t n = packPos(x + dx, y + dy, z + dz);
-        if (comps_.contains(n)) awake_.insert(n);
+        if (comps_.contains(n)) awakeInsert(n);
       }
 }
 
@@ -994,6 +1230,7 @@ void cSignalSim::buildNets(ChunkMap& w) {
   EpTimer ept(g_ep.build);
   static const bool diag = [] { const char* e = std::getenv("LL_TICK_PROFILE"); return e && e[0] == '1'; }();
   const auto diagT0 = std::chrono::steady_clock::now();
+  const auto rebuildT0 = std::chrono::steady_clock::now();  // PlayK fix 1
   bool relink = relinkNets_ && !topoDirty_;  // LL_SIGNAL_RELINK: flood topology unchanged
   std::vector<std::vector<int64_t>> chkNets, chkLamps, chkComps;  // LL_SIGNAL_EDGECHECK (debug)
   bool edgeChk = false;
@@ -1006,7 +1243,7 @@ void cSignalSim::buildNets(ChunkMap& w) {
   const bool localEdit = relink && editLocal_ && !hadEdge;  // LL_EDIT_LOCAL: cell set changed, wires did not
   const bool relinkScope = relinkScope_ && relink && !hadEdge && !editLocal_;  // LL_SIGNAL_RELINKSCOPE: area_ is current (an area change forces this rebuild)
   std::vector<int64_t> stack, links;
-  srcReach_.clear();
+  srcReach_.clear(); netReach_.clear(); compAdj_.clear();  // PlayK: rebuild after flood
   if (!relink) {
   wireNet_.clear(); nets_.clear(); netLamps_.clear();
   wireNet_.reserve(wires_.size());
@@ -1045,8 +1282,8 @@ void cSignalSim::buildNets(ChunkMap& w) {
       const BlockId nb = w.get(nx, y, nz);
       const BlockDef nd = reg.def(nb);
       c.nb[d] = statePtr(w, nx, y, nz); c.ch[d] = 0;
-      if (nd.role == SimRole::Wire) { c.kind[d] = isVia(nb) ? 3 : 1; c.ch[d] = nd.channel; }
-      else if (nd.role == SimRole::Torch) { c.kind[d] = 2; c.ch[d] = nd.channel; }
+      if (nd.role == SimRole::Wire) { c.kind[d] = isVia(nb) ? 3 : 1; c.ch[d] = uint8_t(cBehaviorCatalog::get().colour(nd)); }
+      else if (nd.role == SimRole::Torch) { c.kind[d] = 2; c.ch[d] = uint8_t(cBehaviorCatalog::get().colour(nd)); }  // 2026-11-05 LED colour
       else if (comps_.contains(packPos(nx, y, nz)) || reg.hasAll(nb, kSolid | kOpaque | kPowerable) ||
                (kDirectComp && (nd.role == SimRole::Switch || nd.role == SimRole::cButton))) c.kind[d] = 4;
       else c.kind[d] = 0;
@@ -1054,6 +1291,7 @@ void cSignalSim::buildNets(ChunkMap& w) {
     }
     c.top = isFlatWire(w.get(x, y + 1, z)) ? statePtr(w, x, y + 1, z) : nullptr;
     c.fast = ok;
+    for (int d = 0; d < 4; ++d) { c.emitNet[d] = -1; c.emitIdx[d] = -1; }
   }
   // Readers of each network: components beside one of its wires, or under one (top input).
   if (!relink) netComps_.assign(nets_.size(), {});
@@ -1099,7 +1337,7 @@ void cSignalSim::buildNets(ChunkMap& w) {
       wireLoc_[k] = {int32_t(id), int32_t(a.keys.size())};
       a.keys.push_back(k); a.st.push_back(statePtr(w, x, y, z)); a.via.push_back(uint8_t(isVia(w.get(x, y, z))));
     }
-    a.old.resize(a.keys.size()); a.stamp.assign(a.keys.size(), 0);
+    a.old.resize(a.keys.size()); a.stamp.assign(a.keys.size(), 0); a.level.assign(a.keys.size(), 0);  // PlayL2 #11
   }
   for (size_t id = 0; id < nets_.size(); ++id) {  // CSR links (all indices known now)
     NetArr& a = netArr_[id];
@@ -1114,6 +1352,19 @@ void cSignalSim::buildNets(ChunkMap& w) {
     a.adjStart.push_back(int32_t(a.adj.size()));
   }
   arrValid_ = true; arrArea_ = area_; arrStructGen_ = w.structureGen(); arrColumns_ = w.columns().size();
+  // PlayL2 #7: cache emit target (net, local idx) per component dir â€” seed path skips wireLoc_ hash.
+  if (emitCacheOn()) {
+    for (auto& [k, c] : comps_) {
+      int x, y, z; unpackPos(k, x, y, z);
+      for (int d = 0; d < 4; ++d) {
+        c.emitNet[d] = -1; c.emitIdx[d] = -1;
+        const int64_t tk = packPos(x + kDirX[d], y, z + kDirZ[d]);
+        if (const auto it = wireLoc_.find(tk); it != wireLoc_.end()) {
+          c.emitNet[d] = it->second.first; c.emitIdx[d] = it->second.second;
+        }
+      }
+    }
+  }
   }  // !keepArr
   // Lamps fed only by wires get a pointer fast path; anything that can be strongly powered or sits
   // next to a component keeps the generic path.
@@ -1204,6 +1455,53 @@ void cSignalSim::buildNets(ChunkMap& w) {
   }
   diagKind_ = 0;
   netsValid_ = true;
+  // PlayK fix 3+5: rebuild inverse reach + packed adjacency after nets settle.
+  netReach_.assign(nets_.size(), {});
+  for (const auto& [sk, r] : srcReach_)
+    for (int32_t id : r.nets)
+      if (size_t(id) < netReach_.size()) netReach_[size_t(id)].push_back(sk);
+  rebuildCompAdj();
+  phase_.rebuild += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rebuildT0).count();
+}
+void cSignalSim::rebuildCompAdj() {
+  // PlayL2 / MCHPRS #2: precomputed fanout edges (compAdj_). Option 16 (stable-subgraph IR /
+  // Redpiler-style compile) would lower this graph to a straight-line tick â€” deferred.
+
+  // PlayK fix 5: for each component, neighbour components inside the wake box (same geometry as wakeAround).
+  compAdj_.clear();
+  compAdj_.reserve(comps_.size());
+  for (const auto& [k, c] : comps_) {
+    (void)c;
+    int x, y, z; unpackPos(k, x, y, z);
+    std::vector<int64_t> adj;
+    adj.reserve(16);
+    for (int dy = -1; dy <= 2; ++dy)
+      for (int dz = -1; dz <= 1; ++dz)
+        for (int dx = -1; dx <= 1; ++dx) {
+          if (dx == 0 && dy == 0 && dz == 0) continue;
+          const int64_t n = packPos(x + dx, y + dy, z + dz);
+          if (comps_.contains(n)) adj.push_back(n);
+        }
+    std::sort(adj.begin(), adj.end());
+    adj.erase(std::unique(adj.begin(), adj.end()), adj.end());
+    if (!adj.empty()) compAdj_.emplace(k, std::move(adj));
+  }
+}
+void cSignalSim::fillSrcReach(int64_t k, SrcReach& r) {
+  // PlayK fix 3: one 5x5x5 walk into reused scratch, then copy into the cached SrcReach.
+  reachNetScratch_.clear(); reachLampScratch_.clear();
+  int x, y, z; unpackPos(k, x, y, z);
+  for (int dy = -2; dy <= 2; ++dy)
+    for (int dz = -2; dz <= 2; ++dz)
+      for (int dx = -2; dx <= 2; ++dx) {
+        const int64_t n = packPos(x + dx, y + dy, z + dz);
+        if (const auto it = wireNet_.find(n); it != wireNet_.end()) {
+          if (std::find(reachNetScratch_.begin(), reachNetScratch_.end(), it->second) == reachNetScratch_.end())
+            reachNetScratch_.push_back(it->second);
+        } else if (lamps_.contains(n)) reachLampScratch_.push_back(n);
+      }
+  r.nets = reachNetScratch_;
+  r.lamps = reachLampScratch_;
 }
 void cSignalSim::tickTorches(ChunkMap& w, const DirtyFn& dirty) {
   // 1) Torches: decide from the previous tick's state, then apply together.
@@ -1228,7 +1526,7 @@ static CellState stateOf(const ChunkMap& w, int64_t k) { int x, y, z; unpackPos(
 namespace {
 // Deterministic per-cell phase inside a divide period (rate scaling, JD
 // 2026-10-14): divided components spread across the period instead of
-// all firing on one tick — load spreading, the anti-hitch half of
+// all firing on one tick Ã¢â‚¬â€ load spreading, the anti-hitch half of
 // dividing. Pure function of the cell key: same world -> same phase on
 // every run and platform. (Authority-registered components carry an
 // explicit TickRate::phase instead; placed cells derive theirs here.)
@@ -1242,16 +1540,22 @@ litholattice::TickRate cSignalSim::classTickRate(BlockId block, const cCompBehav
   // (setClassTickRate), so it needs no re-validation here.
   if (const auto it = classRates_.find(block); it != classRates_.end()) return it->second;
   // A-H2: the class-declared rate is validated once per BlockId and the
-  // validated result cached (key lookup only — the cache is never
+  // validated result cached (key lookup only Ã¢â‚¬â€ the cache is never
   // iterated, so no unordered order can reach execution).
   if (const auto it = declaredRates_.find(block); it != declaredRates_.end()) return it->second;
-  const litholattice::TickRate declared = behavior ? behavior->tickRate() : litholattice::TickRate{};
+  // Archie Phase 4: POD rate when this behavior is the catalog component for `block`.
+  litholattice::TickRate declared{};
+  if (behavior) {
+    const auto& cat = cBehaviorCatalog::get();
+    if (cat.component(block) == behavior) declared = cat.traits(block).rate;
+    else declared = behavior->tickRate();
+  }
   litholattice::TickRate resolved = declared;
   if (!declared.valid()) {
     // Logged exactly once per class: after this, the cached neutral
     // result is what every later resolution returns.
     litholattice::logError(
-        "signal: invalid class tick rate for block %u (multiply %u, divide %u) — substituting the neutral rate; "
+        "signal: invalid class tick rate for block %u (multiply %u, divide %u) Ã¢â‚¬â€ substituting the neutral rate; "
         "a class rate must be powers of two with multiply <= %u and divide <= %u (review A-H2)",
         unsigned(block), declared.multiply, declared.divide, litholattice::kMaxRateMultiply,
         litholattice::kMaxRateDivide);
@@ -1293,6 +1597,12 @@ bool cSignalSim::gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int
       in.chainCh = 3;
       if (stOn(us)) in.switchIn = uint8_t(kMaxSignal);
     }
+    // 2026-11-05 (JD): LEDs pass colour like Trace (behaviour.colour). A lit LED on the back port
+    // feeds the Repeator chain colour the same way a Trace would.
+    if (ur == SimRole::Torch) {
+      const BlockDef& ub = blockRegistry().def(w.get(bx, y, bz));
+      if (const int ledCh = cBehaviorCatalog::get().colour(ub)) in.chainCh = uint8_t(ledCh);
+    }
   }
   if (role == SimRole::Catchor && cPulseRules::repeatorLinks()) {  // 2026-11-01 (JD, PlayK): Repeator -> Catchor direct
     for (int d = 0; d < 4; ++d) {
@@ -1302,7 +1612,7 @@ bool cSignalSim::gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int
     }
   }
   if (role == SimRole::Randor) in.rng = randor::rollSeed(randor::worldSeed().load(std::memory_order_relaxed), k, tickNo_);  // 2026-10-31 (JD)
-  if (role == SimRole::Redirector || role == SimRole::cFusor) {  // 2026-10-31 (JD): Repeator on left / right = mux select / fuse reset
+  if (role == SimRole::Redirector || role == SimRole::cFusor || role == SimRole::Repeator) {  // 2026-11-05 (JD): + Repeator side lock
     const int rf = stFacing(w.getState(x, y, z));
     for (int d : {dirLeft(rf), dirRight(rf)}) {
       const int nx = x + kDirX[d], nz = z + kDirZ[d];
@@ -1331,29 +1641,84 @@ bool cSignalSim::gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int
   for (int d = 0; d < 4; ++d) {
     in.side[d] = inputFrom(w, x, y, z, d);
     const BlockDef nd = blockRegistry().def(w.get(x + kDirX[d], y, z + kDirZ[d]));
-    if (nd.role == SimRole::Wire || nd.role == SimRole::Torch) in.ch[d] = nd.channel;
+    if (const int sc = cBehaviorCatalog::get().colour(nd)) in.ch[d] = uint8_t(sc);  // 2026-11-05: Trace + LED colour
   }
   if (isFlatWire(w.get(x, y + 1, z))) in.top = std::min(stValue(w.getState(x, y + 1, z)), kMaxSignal);  // SW-H2 clamp
   return false;
 }
 
+
+namespace {
+// PlayL2 #9: specialized ticks for ALU Stress diet (Repeator / Thresholdor). Fusor/Randor stay virtual
+// (heavier / less frequent on the stress). Kill: LL_HOT_SPEC=0.
+uint64_t hotRepLowMask(int bits) { return bits >= 64 ? ~uint64_t(0) : ((uint64_t(1) << bits) - 1u); }
+uint64_t hotRepLoadLine(const ComponentMemory& m) {
+  return uint64_t(m.history) | (uint64_t(m.timer) << 8) | (uint64_t(m.historyHi) << 16) | (uint64_t(m.prevIn) << 32) |
+         (uint64_t(m.prevSide) << 40) | (uint64_t(m.prevClk) << 48) | (uint64_t(uint8_t(m.channel ^ 1u)) << 56);
+}
+void hotRepStoreLine(ComponentMemory& m, uint64_t line) {
+  m.history = uint8_t(line); m.timer = uint8_t(line >> 8); m.historyHi = uint16_t(line >> 16);
+  m.prevIn = uint8_t(line >> 32); m.prevSide = uint8_t(line >> 40); m.prevClk = uint8_t(line >> 48);
+  m.channel = uint8_t(uint8_t(line >> 56) ^ 1u);
+}
+ComponentStep hotTickRepeator(const ComponentInputs& in, CellState st, ComponentMemory& m) {
+  const int f = stFacing(st), idx = repeator::delayIndex(st), delay = repeator::kDelays[idx];
+  const int L = dirLeft(f), R = dirRight(f);
+  const bool locked = ((in.muxSides & (1u << L)) != 0 || (in.muxSides & (1u << R)) != 0) && in.muxOn;
+  uint64_t line = hotRepLoadLine(m);
+  if (locked) {
+    const int out = (stOn(st) || m.out > 0) ? kMaxSignal : 0;
+    const int col = repeator::colourOf(st);
+    line = (line << 1) | (out > 0 ? 1u : 0u);
+    hotRepStoreLine(m, line);
+    return {out, 0, repeator::withColour(repeator::encode(out, f, idx, out > 0), col)};
+  }
+  static const bool kFresh = [] { const char* e = std::getenv("LL_REP_FRESH"); return !(e && e[0] == '0'); }();
+  const int bv = std::max(in.back(f), int(in.switchIn));
+  const bool fresh = kFresh && bv > 0 && m.lastIn > 0 && bv != m.lastIn;
+  m.lastIn = uint8_t(std::min(bv, 255));
+  line = (line << 1) | ((bv > 0 && !fresh) ? 1u : 0u);
+  hotRepStoreLine(m, line);
+  const int out = ((line >> (delay - 1)) & 1) ? kMaxSignal : 0;
+  const int bch = in.ch[size_t(dirBack(f))] ? in.ch[size_t(dirBack(f))] : in.chainCh;
+  const int col = bch ? bch : repeator::colourOf(st);
+  return {out, 0, repeator::withColour(repeator::encode(out, f, idx, out > 0), col)};
+}
+ComponentStep hotTickThresholdor(const ComponentInputs& in, CellState st) {
+  constexpr int kSubtract = 1, kRead = 2;
+  const int f = stFacing(st), keep = stAux(st) & kRead;
+  int back = in.back(f);
+  if ((stAux(st) & kRead) != 0) back = std::max(back, in.level[dirBack(f)]);
+  if ((stAux(st) & kSubtract) != 0) {
+    const int v = std::min(back, kMaxSignal);
+    const int side = std::min(std::max(in.left(f), in.right(f)), kMaxSignal);
+    const int out = std::max(0, v - side);
+    return {out, 0, makeState(out, f, kSubtract | keep, out > 0)};
+  }
+  const int v = std::min(back, kMaxSignal), lo = in.left(f), hi = in.right(f);
+  const bool pass = (lo > 0 && hi > 0) ? (v >= std::min(lo, hi) && v <= std::max(lo, hi)) : v >= std::max(lo, hi);
+  const int out = (pass && v > 0) ? v : 0;
+  return {out, 0, makeState(v, f, keep, out > 0)};
+}
+}  // namespace
+
 void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
   EpTimer ept(g_ep.comps);
   // 2) Components: new outputs from the previous tick's inputs (computed first, applied together).
-  struct Next { int64_t k; Comp* c; ComponentStep step; };
-  std::vector<Next> compNext;
+  // PlayK fix 4: CompNext lives on the class; per-shard buffers merged in canonical key order.
+  std::vector<CompNext> compNext;
   compNext.reserve(comps_.size());
   const bool all = allAwake_, fastInputs = netsValid_ && !fullPass_;
   lastTicked_ = 0;
   const bool sameTick = sameTick_;
   compSnap_.clear(); compRecs_.clear(); compRecIdx_.clear();
   // B-L1 (P3-2): iterate a SORTED key snapshot, not the unordered_map.
-  // comps_ iteration order is hash order — it leaks into externally
+  // comps_ iteration order is hash order Ã¢â‚¬â€ it leaks into externally
   // visible ordering: compNext's apply order below is the order sounds_
   // entries are appended and radio_ broadcasts are published. Sorted
   // (packPos) order makes both deterministic and identical across runs
   // and paths. Component INPUTS are all read before any apply, so the
-  // iteration order cannot change any component's result — only the
+  // iteration order cannot change any component's result Ã¢â‚¬â€ only the
   // publish/sound order, which is exactly what this fixes.
   static const bool kTable = [] { const char* e = std::getenv("LL_COMP_TABLE"); return !(e && e[0] == '0'); }();
   static const bool kOptionA = [] { const char* e = std::getenv("LL_OPTION_A"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();  // 2026-11-01
@@ -1369,7 +1734,21 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
     std::sort(compOrder_.begin(), compOrder_.end());
     compOrderGen_ = compsGen_; compOrderArea_ = area_; ++compTableRebuilds_;
     rebuiltNow = true;
+    rebuildCompDense();
+    compOrderPtrs_.resize(compOrder_.size());
+    for (size_t i = 0; i < compOrder_.size(); ++i) {
+      const auto it = comps_.find(compOrder_[i]);
+      compOrderPtrs_[i] = (it == comps_.end()) ? nullptr : &it->second;
+    }
     if (kOptionA) { if (!compTable_) compTable_ = std::make_shared<cCompiledCompTable>(); compTable_->rebuild(compOrder_); }
+  } else if (compOrderPtrs_.size() != compOrder_.size()) {
+    // PlayL2: pointers may be stale after a rehash without area/gen change â€” refresh.
+    rebuildCompDense();
+    compOrderPtrs_.resize(compOrder_.size());
+    for (size_t i = 0; i < compOrder_.size(); ++i) {
+      const auto it = comps_.find(compOrder_[i]);
+      compOrderPtrs_[i] = (it == comps_.end()) ? nullptr : &it->second;
+    }
   }
   // 2026-11-01 (JD LL_WAKE): with the wake list on, a pass that is not a full / rebuild pass iterates
   // only the queued components (timer ring slots up to this tick + awake_), sorted by coordinate (same
@@ -1391,9 +1770,15 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
       wakeDrained_ = tickNo_;
     }
     if (wakeIter) {
-      wakeScratch_.insert(wakeScratch_.end(), awake_.begin(), awake_.end());
+      wakeScratch_.insert(wakeScratch_.end(), awakeKeys_.begin(), awakeKeys_.end());
       std::sort(wakeScratch_.begin(), wakeScratch_.end());
       wakeScratch_.erase(std::unique(wakeScratch_.begin(), wakeScratch_.end()), wakeScratch_.end());
+      // PlayL2: one hash resolve per wake key, then shards walk Contiguous Comp*.
+      wakePtrs_.resize(wakeScratch_.size());
+      for (size_t i = 0; i < wakeScratch_.size(); ++i) {
+        const auto it = comps_.find(wakeScratch_[i]);
+        wakePtrs_[i] = (it == comps_.end()) ? nullptr : &it->second;
+      }
     }
   }
   auto wakeSched = [&](int64_t key, uint64_t delta) {
@@ -1419,42 +1804,123 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
   }
   const uint64_t pcRun0 = lastTicked_;
   struct RunTally { uint64_t& sum; const uint64_t& now; uint64_t base; bool on; ~RunTally() { if (on && now >= base) sum += now - base; } } pcTally{pcRun, lastTicked_, pcRun0, kProfC};
-  for (int64_t k : iterKeys) {
-    const auto cit = comps_.find(k);
-    if (cit == comps_.end()) continue;  // LL_WAKE: a queued key whose component is gone
-    Comp& c = cit->second;
-    int x, y, z; unpackPos(k, x, y, z);
-    if (!kTable && !all && !c.rateHeld && c.behavior->quiescent(stateOf(w, k), c.mem) && !awake_.contains(k)) continue;
-    if (!area_.contains(x, z)) { if (kTable) ++compOutOfRange_; continue; }
-    if (kTable && !all && !c.rateHeld && c.behavior->quiescent(stateOf(w, k), c.mem) && !awake_.contains(k)) continue;
-    // Rate scaling (JD 2026-10-14): the class's effective tick rate.
-    // divide > 1: this cell is pulled only on its phase tick of the
-    // period; on other ticks it HOLDS — its published outputs (mem.out)
-    // are read by the propagate phase exactly as before, so readers
-    // always sample published state, never a half-advanced one.
-    // multiply > 1 is applied at the behaviour calls below. Every
-    // shipped class is neutral, so this gate never skips shipped content.
-    const litholattice::TickRate rate = classTickRate(w.get(x, y, z), c.behavior);
-    if (rate.divide > 1 && (tickNo_ % rate.divide) != uint64_t(ratePhaseFor(k, rate.divide))) {
-      c.rateHeld = true;  // component sleep must not swallow the due tick
-      if (wakeOn) {  // LL_WAKE timer: queue for its next phase tick
-        const uint64_t ph = uint64_t(ratePhaseFor(k, rate.divide)), cur = tickNo_ % rate.divide;
-        wakeSched(k, (ph + rate.divide - cur) % rate.divide);
+  // PlayK fix 4: shard awake list across the job pool. Contiguous ranges of sorted
+  // iterKeys preserve canonical merge order (shard0 then shard1 â€¦). Per-shard
+  // CompNext / wake / snap buffers; single waitIdle barrier; no mutex on the three
+  // main threads. LL_COMP_SHARD=0 disables (serial). Small lists stay serial.
+  static const bool kShard = [] { const char* e = std::getenv("LL_COMP_SHARD"); return !(e && e[0] == '0'); }();
+  // PlayL2 lever 2: prefer dense Comp* (wakePtrs_ or compOrderPtrs_) over per-key hash find.
+  const std::vector<Comp*>* iterPtrs = wakeIter ? &wakePtrs_ : &compOrderPtrs_;
+  auto runRange = [&](size_t begin, size_t endEx, std::vector<CompNext>& out,
+                      std::vector<std::pair<int64_t, uint64_t>>* wakes,
+                      std::vector<std::pair<int64_t, CompSnap>>* snaps,
+                      size_t* ticked, size_t* oor) {
+    for (size_t ii = begin; ii < endEx; ++ii) {
+      const int64_t k = iterKeys[ii];
+      Comp* cp = (iterPtrs && ii < iterPtrs->size()) ? (*iterPtrs)[ii] : nullptr;
+      if (!cp) {
+        const auto cit = comps_.find(k);
+        if (cit == comps_.end()) continue;  // LL_WAKE: a queued key whose component is gone
+        cp = &cit->second;
       }
-      continue;
+      Comp& c = *cp;
+      int x, y, z; unpackPos(k, x, y, z);
+      if (!all && !c.rateHeld && !wakeIter) {
+        switch (c.quietMode) {
+          case 1:
+            if (!c.sched.pending() && !awakeContains(k)) continue;
+            break;
+          case 2:
+            break;
+          default:
+            if (c.behavior->quiescent(stateOf(w, k), c.mem) && !c.sched.pending() && !awakeContains(k)) continue;
+            break;
+        }
+      }
+      if (!area_.contains(x, z)) { if (kTable) { if (oor) ++(*oor); else ++compOutOfRange_; } continue; }
+      const BlockId bid = w.get(x, y, z);
+      litholattice::TickRate rate = c.rate;
+      if (const auto rit = classRates_.find(bid); rit != classRates_.end()) rate = rit->second;
+      if (rate.divide > 1 && (tickNo_ % rate.divide) != uint64_t(ratePhaseFor(k, rate.divide))) {
+        c.rateHeld = true;
+        if (wakeOn) {
+          const uint64_t ph = uint64_t(ratePhaseFor(k, rate.divide)), cur = tickNo_ % rate.divide;
+          const uint64_t delta = (ph + rate.divide - cur) % rate.divide;
+          if (wakes) wakes->push_back({k, delta});
+          else wakeSched(k, delta);
+        }
+        continue;
+      }
+      c.rateHeld = false;
+      if (ticked) ++(*ticked); else ++lastTicked_;
+      ComponentInputs in;
+      const bool fastUsed = gatherInputs(w, k, c, x, y, z, fastInputs, true, in);
+      const CellState pre = fastUsed ? *c.self : w.getState(x, y, z);
+      if (sameTick) {
+        if (snaps) snaps->push_back({k, CompSnap{c.mem, pre}});
+        else compSnap_.insert_or_assign(k, CompSnap{c.mem, pre});
+      }
+      ComponentStep step{};
+      CellState cur = pre;
+      // PlayL2 #9: specialized hot types (Repeator / Thresholdor). Fusor/Randor remain virtual.
+      for (uint32_t s = 0; s < rate.multiply; ++s) {
+        if (hotSpecOn() && c.hotKind == 1) step = hotTickRepeator(in, cur, c.mem);
+        else if (hotSpecOn() && c.hotKind == 2) step = hotTickThresholdor(in, cur);
+        else step = c.behavior->tick(in, cur, c.mem);
+        cur = step.state;
+      }
+      step = scheduleOutput(k, c, w.get(x, y, z), step);
+      // PlayL2 #10: timer wheel = existing wakeRing_ (64 slots). scheduleOutput/pending + wakeSchedule
+      // already enqueue only the due bucket; wakeIter drains just that slot. No extra queue here.
+      out.push_back({k, &c, step});
     }
-    c.rateHeld = false;
-    ++lastTicked_;
-    ComponentInputs in;
-    const bool fastUsed = gatherInputs(w, k, c, x, y, z, fastInputs, true, in);
-    const CellState pre = fastUsed ? *c.self : w.getState(x, y, z);
-    if (sameTick) compSnap_.insert_or_assign(k, CompSnap{c.mem, pre});  // PlayM: pre-tick snapshot for the settle
-    ComponentStep step{};
-    // A-H3: chain CellState across sub-pulls (see gatherInputs history note).
-    CellState cur = pre;
-    for (uint32_t s = 0; s < rate.multiply; ++s) { step = c.behavior->tick(in, cur, c.mem); cur = step.state; }
-    compNext.push_back({k, &c, step});
+  };
+
+  unsigned nShards = 1;
+  litholattice::cJobPool* pool = nullptr;
+  if (kShard && iterKeys.size() >= 32) {
+    pool = &litholattice::cJobPool::shared();
+    nShards = std::min(8u, std::max(1u, pool->size()));
+    if (nShards > unsigned(iterKeys.size())) nShards = unsigned(iterKeys.size());
+    if (nShards < 2) nShards = 1;
   }
+  if (nShards <= 1) {
+    runRange(0, iterKeys.size(), compNext, nullptr, nullptr, nullptr, nullptr);
+  } else {
+    if (shardNext_.size() < nShards) shardNext_.resize(nShards);
+    if (shardWake_.size() < nShards) shardWake_.resize(nShards);
+    if (shardSnap_.size() < nShards) shardSnap_.resize(nShards);
+    if (shardTicked_.size() < nShards) shardTicked_.assign(nShards, 0);
+    else std::fill(shardTicked_.begin(), shardTicked_.begin() + nShards, size_t(0));
+    if (shardOor_.size() < nShards) shardOor_.assign(nShards, 0);
+    else std::fill(shardOor_.begin(), shardOor_.begin() + nShards, size_t(0));
+    const size_t n = iterKeys.size(), base = n / nShards, rem = n % nShards;
+    for (unsigned i = 0; i < nShards; ++i) {
+      shardNext_[i].clear();
+      shardWake_[i].clear();
+      if (sameTick) shardSnap_[i].clear();
+      const size_t start = size_t(i) * base + std::min(size_t(i), rem);
+      const size_t len = base + (size_t(i) < rem ? 1 : 0);
+      shardNext_[i].reserve(len);
+      pool->submitUrgent([&, i, start, len] {
+        runRange(start, start + len, shardNext_[i], &shardWake_[i],
+                 sameTick ? &shardSnap_[i] : nullptr, &shardTicked_[i], &shardOor_[i]);
+      });
+    }
+    pool->waitIdle();  // single atomic barrier; ownership returns to sim thread
+    // Canonical merge: contiguous ranges of sorted iterKeys â†’ shard order = key order.
+    size_t total = 0;
+    for (unsigned i = 0; i < nShards; ++i) total += shardNext_[i].size();
+    compNext.reserve(total);
+    for (unsigned i = 0; i < nShards; ++i) {
+      compNext.insert(compNext.end(), shardNext_[i].begin(), shardNext_[i].end());
+      lastTicked_ += shardTicked_[i];
+      if (kTable) compOutOfRange_ += shardOor_[i];
+      for (const auto& [wk, wd] : shardWake_[i]) wakeSched(wk, wd);
+      if (sameTick) for (const auto& [sk, ss] : shardSnap_[i]) compSnap_.insert_or_assign(sk, ss);
+    }
+  }
+
   for (const auto& [k, cp, step] : compNext) {
     ComponentMemory& m = cp->mem;
     // SW-H2 defense-in-depth at the store point: clamp TO kMaxSignal (see history).
@@ -1463,13 +1929,28 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
     const bool outChanged = m.out != out || m.out2 != out2 || m.pulse != step.pulse;
     if (outChanged || step.pulse) changedSrc_.push_back(k);  // 2026-11-01 PlayK: a held Pulsor pulse re-floods its run every tick (matches a full pass)
     m.out = uint8_t(out); m.out2 = uint8_t(out2); m.pulse = step.pulse;
+    syncCompWords(*cp);  // PlayL2 #8: pack face/latch words for mount/emit
     int x, y, z; unpackPos(k, x, y, z);
+    // PlayL2 #8: branchless-ish state publish (only write when bits differ).
     if (w.getState(x, y, z) != step.state) { w.setState(x, y, z, step.state); dirty(x, y, z); }
     compRecIdx_.emplace(k, compRecs_.size());
     compRecs_.push_back(CompRec{k, cp, step, o0, o20, p0, blockRegistry().def(w.get(x, y, z)).role == SimRole::cSignalTransmittor});  // PlayM: sounds / radio / wake / Option A deferred to hsFinalizeComponents
   }
 }
 
+
+// 2026-11-04 (JD t4304u): every component's output goes through its cScheduledOutput line.
+ComponentStep cSignalSim::scheduleOutput(int64_t k, Comp& c, BlockId b, ComponentStep step) {
+  (void)b;
+  const bool queued = (c.traitFlags & cCompTraits::kQueuedOutput) != 0;
+  const int d = !queued ? 0
+      : (c.delayFixed >= 0) ? int(c.delayFixed)
+      : c.behavior->delayTicks(step.state, k, tickNo_);
+  const cScheduledOutput::Out raw{uint8_t(std::clamp(step.out, 0, kMaxSignal)), uint8_t(std::clamp(step.out2, 0, kMaxSignal)), step.pulse};
+  const cScheduledOutput::Out pub = c.sched.step(tickNo_, d, raw);
+  step.out = pub.out; step.out2 = pub.out2; step.pulse = pub.pulse;
+  return step;
+}
 
 void cSignalSim::wakeSchedule(int64_t key, uint64_t delta) {  // PlayM: member twin of tickComponents' wakeSched
   const auto it = comps_.find(key);
@@ -1485,6 +1966,7 @@ void cSignalSim::wakeSchedule(int64_t key, uint64_t delta) {  // PlayM: member t
 void cSignalSim::hsFinalizeComponents() {
   // 2026-11-01 PlayM: side effects of each component's FINAL step this tick, ascending key order
   // (= the pre-PlayM apply order), so sounds / radio publish order stay deterministic.
+  const auto z0 = std::chrono::steady_clock::now();
   const bool wakeOn = wakeList_ && compTableOn(), kOptA = optionAOn();
   std::sort(compRecs_.begin(), compRecs_.end(), [](const CompRec& a, const CompRec& b) { return a.k < b.k; });
   for (const CompRec& r : compRecs_) {
@@ -1493,7 +1975,17 @@ void cSignalSim::hsFinalizeComponents() {
     const bool outChanged = m.out != r.out0 || m.out2 != r.out20 || m.pulse != r.pulse0;
     if (wakeOn) {
       WpTimer t;
-      if (!r.c->behavior->quiescent(r.step.state, m)) wakeSchedule(r.k, 1);
+      // PlayL Phase4 fold: one quiescent decision - reuse quietMode (Always/Never)
+      // instead of a second virtual call; virtual only when quietMode==0.
+      bool keepAwake = r.c->sched.pending();
+      if (!keepAwake) {
+        switch (r.c->quietMode) {
+          case 1: break;                         // Always-quiet: no wake from quiescence
+          case 2: keepAwake = true; break;       // Never-quiet
+          default: keepAwake = !r.c->behavior->quiescent(r.step.state, m); break;
+        }
+      }
+      if (keepAwake) wakeSchedule(r.k, 1);
       if (outChanged) for (int d = 0; d < 4; ++d) wakeSchedule(packPos(x + kDirX[d], y, z + kDirZ[d]), 1);
     }
     if (kOptA && compTable_) compTable_->stage(r.k, uint32_t(r.step.state));
@@ -1504,11 +1996,14 @@ void cSignalSim::hsFinalizeComponents() {
   }
   compRecs_.clear(); compRecIdx_.clear(); compSnap_.clear();
   if (kOptA && compTable_) compTable_->commit();
+  if (epOn()) phase_.finalize += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - z0).count();
 }
 
 bool cSignalSim::envSameTick() { return sameTickOn(); }
 
 void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
+  const auto settleT0 = std::chrono::steady_clock::now();  // PlayK fix 1: handshake settle split
+  struct SettleTally { std::chrono::steady_clock::time_point t0; double& acc; bool on; ~SettleTally() { if (on) acc += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); } } settleTally{settleT0, phase_.settle, epOn()};
   // 2026-11-01 PlayM (JD): components read THIS tick's wire values. Every component already ran once this
   // tick (tickComponents) against the previous flood. Here, the ones whose inputs may have changed since
   // re-evaluate FROM THEIR PRE-TICK SNAPSHOT with fresh inputs (still one logical tick each: delay lines,
@@ -1553,7 +2048,10 @@ void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
       // A Repeator is a pure delay line: it keeps sampling at the start of the tick (pass 0), so its labelled
       // delay stays exact (re-reading here would make every Repeator one tick shorter; JD: delays stay).
       if (blockRegistry().def(w.get(x, y, z)).role == SimRole::Repeator) continue;
-      const litholattice::TickRate rate = classTickRate(w.get(x, y, z), c.behavior);
+      // PlayL Phase5: packed rate at place; classRates_ override (RATE handshake / lithography) still wins.
+    const BlockId bid = w.get(x, y, z);
+    litholattice::TickRate rate = c.rate;
+    if (const auto rit = classRates_.find(bid); rit != classRates_.end()) rate = rit->second;
       if (rate.divide > 1 && (tickNo_ % rate.divide) != uint64_t(ratePhaseFor(k, rate.divide))) continue;  // not its phase tick: holds
       auto sit = compSnap_.find(k);
       if (sit == compSnap_.end()) sit = compSnap_.emplace(k, CompSnap{c.mem, w.getState(x, y, z)}).first;  // slept in pass 0: state is pre-tick
@@ -1563,6 +2061,7 @@ void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
       CellState cur = sit->second.state;
       ComponentStep step{};
       for (uint32_t s = 0; s < rate.multiply; ++s) { step = c.behavior->tick(in, cur, mem); cur = step.state; }
+      step = scheduleOutput(k, c, w.get(x, y, z), step);  // 2026-11-04 (JD t4304u): same-tick settle replaces this tick's entry
       re.push_back({k, &c, step, std::move(mem)});
     }
     if (wpOn()) g_wp.settleComps += re.size();
@@ -1574,6 +2073,7 @@ void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
       const uint8_t keepOut = m.out, keepOut2 = m.out2; const bool keepPulse = m.pulse;
       m = std::move(r.mem);
       m.out = uint8_t(out); m.out2 = uint8_t(out2); m.pulse = r.step.pulse;
+      syncCompWords(*r.c);  // PlayL2 #8
       (void)keepOut; (void)keepOut2; (void)keepPulse;
       if (outChanged) newSrc.push_back(r.k);
       int x, y, z; unpackPos(r.k, x, y, z);
@@ -1598,11 +2098,11 @@ void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
       iterSrc = newSrc;
     } else {
       const std::vector<int64_t> lampsBefore = hsLampKeys_;
-      std::unordered_set<int64_t> awakeBefore;
-      if (!allAwake_) awakeBefore = awake_;
+      std::vector<int64_t> awakeBefore;
+      if (!allAwake_) awakeBefore = awakeKeys_;
       changedSrc_ = newSrc;
       hsMark(w);  // marks the reached nets / lamps, diffs hard power (appends mount changes to changedSrc_)
-      if (!allAwake_) awake_.insert(awakeBefore.begin(), awakeBefore.end());
+      if (!allAwake_) for (int64_t ak : awakeBefore) awakeInsert(ak);
       if (!hsSkip_) {
         hsPrepIncremental(w);
         for (int32_t id : hsMarkedNets_) hsPropagateNet(w, id, dirty);
@@ -1660,7 +2160,7 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
   for (auto& b : nbuckets_) b.clear();
   auto seed = [&](int x, int y, int z, int s, uint8_t channel, int viaAx = 0) {  // channel 0 = either colour; viaAx: Repeator emit axis
     const BlockDef d = reg.def(w.get(x, y, z));
-    // SW-H2: guard the high end too — buckets_ has kMaxSignal + 1 entries, so
+    // SW-H2: guard the high end too Ã¢â‚¬â€ buckets_ has kMaxSignal + 1 entries, so
     // s in 65..255 (reachable via a disk-loaded value before the input clamps)
     // was an out-of-bounds array access.
     if (d.role != SimRole::Wire || (isVia(w.get(x, y, z)) && !(viaAx > 0 && viaAxis(w.get(x, y, z)) == viaAx)) || (channel && d.channel != channel) || s <= 0 || s > kMaxSignal) return;
@@ -1678,11 +2178,11 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
   }
   std::vector<std::pair<int64_t, int>> pulses;
   // B-L1 acceptance (P3-2): this comps_ iteration stays unordered BY
-  // DESIGN — it only SEEDS buckets/pulses. Bucket BFS resolves by max
+  // DESIGN Ã¢â‚¬â€ it only SEEDS buckets/pulses. Bucket BFS resolves by max
   // strength and pulses flood a fixed strength, so the final wire states
   // are independent of seed order; nothing externally ordered (sounds,
   // radio) is emitted here. (tickComponents, which does emit those, uses
-  // a sorted snapshot — see there.)
+  // a sorted snapshot Ã¢â‚¬â€ see there.)
   for (const auto& [k, c] : comps_) {  // components drive either colour; pulses are flooded below
     if (!c.mem.out && !c.mem.out2) continue;
     int x, y, z; unpackPos(k, x, y, z);
@@ -1707,16 +2207,22 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
       continue;
     }
     for (int d = 0; d < 4; ++d) {
-      const int s = c.behavior->emitToward(d, st, c.mem);
+      const int s = compEmit(c.behavior, c.mem, c.emitMode, d, st);
       if (s <= 0) continue;
       if (c.mem.pulse) pulses.push_back({packPos(x + kDirX[d], y, z + kDirZ[d]), s});
       else if (cTraceConn::sideOn(w.getState(x + kDirX[d], y, z + kDirZ[d]), -kDirX[d], 0, -kDirZ[d]))  // PlayL: connected side only
-        seed(x + kDirX[d], y, z + kDirZ[d], s, uint8_t(c.behavior->emitChannel(d, st, c.mem)),
+        seed(x + kDirX[d], y, z + kDirZ[d], s, uint8_t(compEmitChan(c.behavior, c.mem, c.traitFlags, d, st)),
            reg.def(w.get(x, y, z)).role == SimRole::Repeator ? (kDirX[d] ? 1 : 2) : 0);  // Repeator feeds a side via end-on
       // Hard-powered block in front of a Repeator: colourless power to its other five faces.
-      if (!c.mem.pulse && mountPowered_.contains(packPos(x + kDirX[d], y, z + kDirZ[d])) && (cPulseRules::hardAnyComponent() || reg.def(w.get(x, y, z)).role == SimRole::Repeator))
+      if (mountPowered_.contains(packPos(x + kDirX[d], y, z + kDirZ[d])) && (cPulseRules::hardAnyComponent() || reg.def(w.get(x, y, z)).role == SimRole::Repeator || reg.def(w.get(x, y, z)).role == SimRole::Pulsor || w.get(x, y, z) == kRedirectorSelect))
         for (auto& e : k6) if (!(e[1] == 0 && e[0] == -kDirX[d] && e[2] == -kDirZ[d])) seed(x + kDirX[d] + e[0], y + e[1], z + kDirZ[d] + e[2], s, 0);  // not back into the source face
     }
+  }
+  // PlayN (JD hard-power): seed every face of each hard-powered block (torch semantics).
+  for (const auto& [bk, hs] : mountPowered_) {
+    int bx, by, bz; unpackPos(bk, bx, by, bz);
+    if (!area_.contains(bx, bz)) continue;
+    for (auto& d : k6) seed(bx + d[0], by + d[1], bz + d[2], int(hs), 0);
   }
   // Neighbours of a wire cell along the run (same channel; one-block stairs).
   auto forEachLink = [&](int x, int y, int z, auto&& fn) {
@@ -1811,8 +2317,8 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
 // effects are RECORDED per net (in the exact legacy visit order) instead of
 // applied into the shared bucket arrays: the shared nbuckets_ and the
 // TraceStrengthBuffer are the two thread hazards of the legacy code
-// (TraceStrengthBuffer::set is NOT a plain slot store — it mutates a shared
-// dirty-word bitset, and slotFor() mutates the slot map — see
+// (TraceStrengthBuffer::set is NOT a plain slot store Ã¢â‚¬â€ it mutates a shared
+// dirty-word bitset, and slotFor() mutates the slot map Ã¢â‚¬â€ see
 // hs-integration-notes). hsPropagateNet then applies a net's recorded seeds
 // to net-local buckets, so the per-net result is the legacy result (cross-net
 // interleaving in the legacy global bucket loop cannot change a net's final
@@ -1822,9 +2328,14 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
   HsTimer timer{hsWiresNs_};
   const auto& reg = blockRegistry();
   if (hsNetWork_.size() != netArr_.size()) hsNetWork_.assign(netArr_.size(), NetWork{});
+  // PlayL2 lever 3: clear work lists only here. Wire zero + noteStateEdit move into
+  // hsPropagateNet after the same-seed check (LL_AC_DEFER_ZERO), so stable nets skip
+  // zero+restore. =0 restores the legacy zero-before-seed behaviour.
+  const bool deferZero = acDeferZeroOn();
   for (int32_t id : hsMarkedNets_) {
     NetWork& nw = hsNetWork_[size_t(id)];
     nw.seeds.clear(); nw.pulses.clear(); nw.strength.clear();
+    if (deferZero) continue;
     NetArr& a = netArr_[size_t(id)];
     for (size_t i = 0; i < a.st.size(); ++i) { a.old[i] = *a.st[i]; *a.st[i] = cTraceConn::withValue(*a.st[i], 0); }
     // M9 (Archie ruling 4): this cycle rewrites the net's wire state through cached
@@ -1854,17 +2365,7 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
     if (!acSeedsOn()) return true;
     auto [rit, fresh] = srcReach_.try_emplace(k);
     SrcReach& r = rit->second;
-    if (fresh) {
-      int x, y, z; unpackPos(k, x, y, z);
-      for (int dy = -2; dy <= 2; ++dy)
-        for (int dz = -2; dz <= 2; ++dz)
-          for (int dx = -2; dx <= 2; ++dx) {
-            const int64_t n = packPos(x + dx, y + dy, z + dz);
-            if (const auto it = wireNet_.find(n); it != wireNet_.end()) {
-              if (std::find(r.nets.begin(), r.nets.end(), it->second) == r.nets.end()) r.nets.push_back(it->second);
-            } else if (lamps_.contains(n)) r.lamps.push_back(n);
-          }
-    }
+    if (fresh) fillSrcReach(k, r);  // PlayK fix 3
     for (int32_t id : r.nets) if (isNetMarked(id)) return true;
     return false;
   };
@@ -1878,11 +2379,14 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
       for (auto& d : k6) seed(x + d[0], y + 1 + d[1], z + d[2], kMaxSignal, 0);
   }
   // B-L1 acceptance (P3-2): unordered comps_ iteration is safe here for
-  // the same reason as in hsPropagateFull — this loop only RECORDS seeds
+  // the same reason as in hsPropagateFull Ã¢â‚¬â€ this loop only RECORDS seeds
   // and pulses into per-net work lists; each net's flood resolves by max
   // strength independent of record order across nets, and nets are
   // disjoint. No externally visible ordering originates here.
-  for (const auto& [k, c] : comps_) {  // components drive either colour; pulses are flooded per net
+  rebuildCompDense();
+  for (size_t ci = 0; ci < compAllKeys_.size(); ++ci) {  // PlayL2: dense Comp* seed gather
+    const int64_t k = compAllKeys_[ci];
+    Comp& c = *compAllPtrs_[ci];
     if (!c.mem.out && !c.mem.out2) continue;
     if (!touchesMarked(k)) continue;
     int x, y, z; unpackPos(k, x, y, z);
@@ -1905,7 +2409,7 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
       continue;
     }
     for (int d = 0; d < 4; ++d) {
-      const int s = c.behavior->emitToward(d, st, c.mem);
+      const int s = compEmit(c.behavior, c.mem, c.emitMode, d, st);
       if (s <= 0) continue;
       if (c.mem.pulse) {
         const int64_t target = packPos(x + kDirX[d], y, z + kDirZ[d]);
@@ -1913,13 +2417,27 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
         if (it != wireLoc_.end() && isNetMarked(it->second.first) &&
             !netArr_[size_t(it->second.first)].via[size_t(it->second.second)])
           hsNetWork_[size_t(it->second.first)].pulses.push_back({it->second.second, s});
+      } else if (emitCacheOn() && c.emitNet[d] >= 0 && s <= kMaxSignal && isNetMarked(c.emitNet[d]) &&
+                 !netArr_[size_t(c.emitNet[d])].via[size_t(c.emitIdx[d])] &&  // PlayM2: vias (viaAx) + coloured emits take seed()
+                 compEmitChan(c.behavior, c.mem, c.traitFlags, d, st) == 0 &&
+                 cTraceConn::sideOn(w.getState(x + kDirX[d], y, z + kDirZ[d]), -kDirX[d], 0, -kDirZ[d])) {
+        hsNetWork_[size_t(c.emitNet[d])].seeds.push_back({c.emitIdx[d], s});
       } else if (cTraceConn::sideOn(w.getState(x + kDirX[d], y, z + kDirZ[d]), -kDirX[d], 0, -kDirZ[d]))  // PlayL: connected side only
-        seed(x + kDirX[d], y, z + kDirZ[d], s, uint8_t(c.behavior->emitChannel(d, st, c.mem)),
+        seed(x + kDirX[d], y, z + kDirZ[d], s, uint8_t(compEmitChan(c.behavior, c.mem, c.traitFlags, d, st)),
            reg.def(w.get(x, y, z)).role == SimRole::Repeator ? (kDirX[d] ? 1 : 2) : 0);  // Repeator feeds a side via end-on
       // Hard-powered block in front of a Repeator: colourless power to its other five faces.
-      if (!c.mem.pulse && mountPowered_.contains(packPos(x + kDirX[d], y, z + kDirZ[d])) && (cPulseRules::hardAnyComponent() || reg.def(w.get(x, y, z)).role == SimRole::Repeator))
+      if (mountPowered_.contains(packPos(x + kDirX[d], y, z + kDirZ[d])) && (cPulseRules::hardAnyComponent() || reg.def(w.get(x, y, z)).role == SimRole::Repeator || reg.def(w.get(x, y, z)).role == SimRole::Pulsor || w.get(x, y, z) == kRedirectorSelect))
         for (auto& e : k6) if (!(e[1] == 0 && e[0] == -kDirX[d] && e[2] == -kDirZ[d])) seed(x + kDirX[d] + e[0], y + e[1], z + kDirZ[d] + e[2], s, 0);  // not back into the source face
     }
+  }
+  // PlayN (JD hard-power): seed every face of each hard-powered block (torch semantics).
+  // PlayL2 lever 3: skip mounts whose 5x5x5 box touches no marked net (AC seeds already filters
+  // each seed(); this avoids unpacking every mount on quiet ticks).
+  for (const auto& [bk, hs] : mountPowered_) {
+    if (!touchesMarked(bk)) continue;
+    int bx, by, bz; unpackPos(bk, bx, by, bz);
+    if (!area_.contains(bx, bz)) continue;
+    for (auto& d : k6) seed(bx + d[0], by + d[1], bz + d[2], int(hs), 0);
   }
 }
 
@@ -1928,7 +2446,7 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
 // shared buckets, slotFor/TraceStrengthBuffer, or the real DirtyFn (the
 // incremental flood reports through the strength buffer only, as legacy).
 
-void cSignalSim::hsPropagateNet(ChunkMap& /*w*/, int32_t netId, const DirtyFn& /*dirty*/) {
+void cSignalSim::hsPropagateNet(ChunkMap& w, int32_t netId, const DirtyFn& /*dirty*/) {
   HsTimer timer{hsWiresNs_};
   NetArr& a = netArr_[size_t(netId)];
   NetWork& nw = hsNetWork_[size_t(netId)];
@@ -1936,10 +2454,14 @@ void cSignalSim::hsPropagateNet(ChunkMap& /*w*/, int32_t netId, const DirtyFn& /
   // nets were built / the last full pass (netGen_) -> the flood result is the old one: restore it
   // and skip the spread. Pulses (a held Pulsor) always re-send. Wire values change only through
   // this net's flood or a full pass, so a.old is exactly that last result.
+  // PlayL2: with LL_AC_DEFER_ZERO, wires were NOT cleared in prep â€” a same-seed hit leaves them
+  // untouched (already the last flood). A miss zeros here before spreading.
   if (acSameSeedsOn()) {
     std::sort(nw.seeds.begin(), nw.seeds.end());
     if (nw.pulses.empty() && nw.lastGen == netGen_ && nw.seeds == nw.lastSeeds) {
-      for (size_t i = 0; i < a.st.size(); ++i) *a.st[i] = a.old[i];
+      if (!acDeferZeroOn()) {
+        for (size_t i = 0; i < a.st.size(); ++i) *a.st[i] = a.old[i];
+      }
       nw.strength.clear();
       sameSeedSkips_.fetch_add(1, std::memory_order_relaxed);
       return;
@@ -1947,8 +2469,42 @@ void cSignalSim::hsPropagateNet(ChunkMap& /*w*/, int32_t netId, const DirtyFn& /
     nw.lastSeeds = nw.seeds;
     nw.lastGen = nw.pulses.empty() ? netGen_ : 0;  // pulse values are not a seed-only result
   }
+  if (acDeferZeroOn()) {
+    for (size_t i = 0; i < a.st.size(); ++i) { a.old[i] = *a.st[i]; *a.st[i] = cTraceConn::withValue(*a.st[i], 0); }
+    int64_t lastSub = INT64_MIN;
+    for (int64_t k : a.keys) {
+      int x, y, z; unpackPos(k, x, y, z);
+      const int64_t sub = packPos(x >> 4, y >> 4, z >> 4);
+      if (sub != lastSub) { w.noteStateEdit(x, y, z); lastSub = sub; }
+    }
+  }
   thread_local std::array<std::vector<int32_t>, kMaxSignal + 1> lb;
   for (auto& b : lb) b.clear();
+  // PlayL2 #11: optional SoA flood into a.level (contiguous bytes), then one sync to CellState*.
+  const bool soa = netLevelSoaOn() && a.level.size() == a.st.size();
+  if (soa) {
+    std::fill(a.level.begin(), a.level.end(), uint8_t(0));
+    for (const auto& [li, s] : nw.seeds) {
+      if (s <= 0 || s > kMaxSignal) continue;
+      if (a.level[size_t(li)] >= uint8_t(s)) continue;
+      a.level[size_t(li)] = uint8_t(s);
+      lb[size_t(s)].push_back(li);
+    }
+    for (int s = kMaxSignal; s >= 1; --s)
+      for (size_t i = 0; i < lb[size_t(s)].size(); ++i) {
+        const int32_t li = lb[size_t(s)][i];
+        if (int(a.level[size_t(li)]) != s) continue;
+        for (int32_t e = a.adjStart[size_t(li)]; e < a.adjStart[size_t(li) + 1]; ++e) {
+          const int32_t nj = a.adj[size_t(e)];
+          const int ns = (a.via[size_t(li)] || a.via[size_t(nj)]) ? s : s - 1;
+          if (ns <= 0 || int(a.level[size_t(nj)]) >= ns) continue;
+          a.level[size_t(nj)] = uint8_t(ns);
+          lb[size_t(ns)].push_back(nj);
+        }
+      }
+    for (size_t i = 0; i < a.st.size(); ++i)
+      *a.st[i] = cTraceConn::withValue(*a.st[i], int(a.level[i]));
+  } else {
   // Apply this net's recorded seeds, in legacy seed order, to net-local buckets.
   for (const auto& [li, s] : nw.seeds) {
     if (s <= 0 || s > kMaxSignal) continue;  // SW-H2 defense-in-depth: lb is sized kMaxSignal + 1
@@ -1970,6 +2526,7 @@ void cSignalSim::hsPropagateNet(ChunkMap& /*w*/, int32_t netId, const DirtyFn& /
         lb[size_t(ns)].push_back(nj);
       }
     }
+  }  // !soa
   thread_local std::vector<int32_t> frontier, next;
   for (const auto& [li0, s] : nw.pulses) {
     if (s <= 0 || s > kMaxSignal) continue;  // SW-H2: never write an out-of-range strength into a cell
@@ -1995,7 +2552,7 @@ void cSignalSim::hsPropagateNet(ChunkMap& /*w*/, int32_t netId, const DirtyFn& /
     if (*a.st[i] != a.old[i]) {
       // Step 1: strength -> buffer slot, no remesh. Deferred: slotFor/set are
       // not thread-safe; hsApplyStrengthPending replays these on the sim
-      // thread in canonical (net, cell) order — the legacy final-loop order.
+      // thread in canonical (net, cell) order Ã¢â‚¬â€ the legacy final-loop order.
       nw.strength.push_back({a.keys[i], uint8_t(stValue(*a.st[i]))});
     }
 }
@@ -2005,6 +2562,8 @@ void cSignalSim::hsApplyStrengthPending(const DirtyFn* dirty) {
   // 2026-11-01 (JD wire render bug): the mesher bakes each Trace cell's value into the chunk mesh (no shader
   // reads the strength buffer yet), so an incremental flood that changed a wire must queue its sub-chunk for a
   // remesh, exactly as the full pass does. Serial, sim thread. LL_WIRE_REMESH=0: old (buffer only).
+  // PlayL2 / MCHPRS #3: dirty() here only marks for later remesh â€” must not block the signal phase
+  // on mesh build / UI send (rtps vs wsr split). Ownership handoff keeps remesh off the signal critical path.
   static const bool kRemesh = [] { const char* e = std::getenv("LL_WIRE_REMESH"); return !(e && e[0] == '0'); }();
   for (int32_t id : hsMarkedNets_) {
     NetWork& nw = hsNetWork_[size_t(id)];
@@ -2018,7 +2577,7 @@ void cSignalSim::hsApplyStrengthPending(const DirtyFn* dirty) {
         for (int dy = -2; dy <= 2; ++dy)
           for (int dz = -2; dz <= 2; ++dz)
             for (int dx = -2; dx <= 2; ++dx)
-              if (const int64_t n = packPos(x + dx, y + dy, z + dz); comps_.contains(n)) awake_.insert(n);
+              if (const int64_t n = packPos(x + dx, y + dy, z + dz); comps_.contains(n)) awakeInsert(n);
       }
     }
     nw.strength.clear();
@@ -2034,6 +2593,10 @@ std::vector<cSignalSim::LampHoldUpdate>& cSignalSim::hsTlsLampHolds() {
 
 void cSignalSim::hsApplyLampHolds(const std::vector<LampHoldUpdate>& updates) {
   for (const LampHoldUpdate& u : updates) {
+    if (u.delay) {  // PlayB lamp delay line
+      if (u.erase) lampDelay_.erase(u.key); else lampDelay_[u.key] = {u.ns, u.end};
+      continue;
+    }
     if (u.erase) lampHold_.erase(u.key);
     else {
       lampHold_[u.key] = u.end;
@@ -2052,7 +2615,20 @@ void cSignalSim::hsLampsBatch(const std::vector<int64_t>& keys, ChunkMap& w, con
   //    the strongest adjacent strength (palette index = (s-1) mod N in the renderer).
   // lampHold_ is read here (concurrent reads are safe: nobody writes it during
   // a batch) but never written: hold updates go to the thread-local list and
-  // are merged by the sim thread via hsApplyLampHolds (hs-design §3.3).
+  // are merged by the sim thread via hsApplyLampHolds (hs-design Ã‚Â§3.3).
+  // PlayB (JD t4339u): 1-tick lamp delay, on and off. The lamp shows the state computed LAST tick
+  // (lampDelay_, read-only here); this tick's result is queued as a thread-local update (merged on
+  // the sim thread with the holds), so the batch stays lock-free. LL_LAMP_DELAY=0: no delay.
+  static const bool kLampDelay = [] { const char* e = std::getenv("LL_LAMP_DELAY"); return !(e && e[0] == '0'); }();
+  auto delayed = [&](int64_t k, CellState cur, CellState want) -> CellState {
+    if (!kLampDelay) return want;
+    CellState shown = cur;
+    const auto p = lampDelay_.find(k);
+    if (p != lampDelay_.end() && p->second.second < tickNo_) shown = p->second.first;
+    if (want != shown) holds.push_back({k, tickNo_, false, true, want});
+    else if (p != lampDelay_.end()) holds.push_back({k, 0, true, true, 0});
+    return shown;
+  };
   auto one = [&](int64_t k) {
     int x, y, z; unpackPos(k, x, y, z);
     if (!area_.contains(x, z)) return;
@@ -2089,16 +2665,349 @@ void cSignalSim::hsLampsBatch(const std::vector<int64_t>& keys, ChunkMap& w, con
       // Plain non-directional lamps only ever hold 0/1, so their states are unchanged.
       if (!fast->color && (*fast->self & 0x0180) && reg.has(w.get(x, y, z), kDirectional))
         ns = CellState(ns | (*fast->self & 0x0180));
-      if (*fast->self != ns) { *fast->self = ns; dirty(x, y, z); }
+      const CellState shown = delayed(k, *fast->self, ns);
+      if (*fast->self != shown) { *fast->self = shown; dirty(x, y, z); }
       return;
     }
     const bool color = reg.def(w.get(x, y, z)).role == SimRole::ColorLamp;
     CellState ns = color ? makeState(v, 0, 0, v > 0) : CellState(v > 0 ? 1 : 0);
     if (!color && reg.has(w.get(x, y, z), kDirectional))  // Cortana 2026-10-15 1900: keep the Emitor's facing
       ns = CellState(ns | (w.getState(x, y, z) & 0x0180));
-    if (w.getState(x, y, z) != ns) { w.setState(x, y, z, ns); dirty(x, y, z); }
+    const CellState cur = w.getState(x, y, z), shown = delayed(k, cur, ns);
+    if (cur != shown) { w.setState(x, y, z, shown); dirty(x, y, z); }
   };
   for (int64_t k : keys) one(k);
+}
+
+
+// ===================== PlayM2: lithography spike (Trace-in-time compile) =====================
+// JD 2026-11-06: "lithography step" - bake a SETTLED region into a tickable IR, run it at any clock,
+// drop it on place/break (batch bake like MCHPRS Redpiler, not live-incremental). LithoKraft-native:
+// nodes reuse the real cCompBehavior::tick + cScheduledOutput; Trace nets are precomputed into
+// (source, wire distance) links using the live flood rule (-1 per wire, vias free). Sources are
+// component emits, lit torches (frozen at compile) and hard-powered blocks (mounts). Same-tick
+// semantics: each tick every node evaluates from its pre-tick snapshot, then non-Repeators
+// re-evaluate until outputs stop changing (cap LL_SETTLE_MAX, default 16), like hsSettle.
+// Repeators sample only on settle pass 0 (live hsSettle skips them) so a hard-power->copper->Trace
+// edge raised mid-settle cannot shorten their labelled delay.
+// Not modelled (spike): switches/buttons/pulsors/radio, torch inversion (torches frozen), Trace colour
+// filtering on seeds, tick-rate divide, lamps (not nodes), state write-back to the world.
+struct LithoIR {
+  struct Src { uint8_t kind; uint8_t dir; uint8_t dist; int32_t a; };  // kind 0 node emit(a,dir) 1 mount a 2 const a 3 torch a
+  struct Torch { int64_t k; int32_t mount = -1; std::vector<int32_t> wires; bool lit = false; };
+  struct In { uint8_t kind = 0; int32_t a = -1; std::vector<int32_t> soft; };  // 0 none 1 wire sink 2 comp 3 const 4 mount(+soft sinks)
+  struct Node {
+    int64_t k; const cCompBehavior* beh; uint8_t emitMode, traitFlags, hotKind; int16_t delayFixed; uint32_t multiply;
+    SimRole role;
+    ComponentMemory mem; CellState st; cScheduledOutput sched;
+    In in[4]; int32_t topIn = -1;
+    uint8_t ch[4] = {};
+    int32_t chainUp = -1;
+    uint8_t muxSides = 0; int32_t muxNode[4] = {-1, -1, -1, -1};
+    int32_t levelNode[4] = {-1, -1, -1, -1};
+  };
+  std::vector<Node> nodes;
+  std::vector<std::vector<Src>> sinks;
+  std::vector<std::vector<std::pair<int32_t, uint8_t>>> mountFeed;  // per mount: (node, dir) feeders
+  std::vector<int32_t> mountTorch;                                   // torch below the block (-1 none): lit = 64
+  std::vector<Torch> torches;
+  uint64_t gen = 0, tick = 0, seed = 0, tick0 = 0;
+};
+
+bool cSignalSim::lithoValid() const { return litho_ && litho_->gen == editGen_; }
+void cSignalSim::lithoReset() { litho_.reset(); }
+void cSignalSim::lithoStates(std::vector<std::pair<int64_t, uint32_t>>& out) const {
+  out.clear(); if (!litho_) return;
+  for (const auto& n : litho_->nodes) out.push_back({n.k, uint32_t(n.st)});
+}
+
+void cSignalSim::lithoWriteBack(ChunkMap& w, const DirtyFn& dirty) {  // PlayM4 (JD t4701u)
+  if (!litho_) return;
+  for (const auto& n : litho_->nodes) {
+    int x, y, z; unpackPos(n.k, x, y, z);
+    if (w.getState(x, y, z) != n.st) { w.setState(x, y, z, n.st); if (dirty) dirty(x, y, z); }
+  }
+}
+void cSignalSim::lithoCommit() {  // PlayM4: live resumes from the chip's state (nets rebuilt next tick)
+  if (!litho_) return;
+  for (const auto& n : litho_->nodes)
+    if (auto it = comps_.find(n.k); it != comps_.end()) { it->second.mem = n.mem; it->second.sched = n.sched; }
+  if (litho_->tick > tickNo_) tickNo_ = litho_->tick;
+  fullPass_ = true; netsValid_ = false;
+}
+
+bool cSignalSim::lithoCompile(const ChunkMap& w, int x0, int y0, int z0, int x1, int y1, int z1, LithoStats* st) {
+  const auto t0 = std::chrono::steady_clock::now();
+  auto ir = std::make_shared<LithoIR>();
+  const auto& reg = blockRegistry();
+  auto inBox = [&](int x, int y, int z) { return x >= x0 && x <= x1 && y >= y0 && y <= y1 && z >= z0 && z <= z1; };
+  const bool hardAny = cPulseRules::hardAnyComponent();
+  static const bool kAutoSoftL = [] { const char* e = std::getenv("LL_TRACE_AUTO_SOFT"); return e && e[0] == '1'; }();
+  std::vector<int64_t> keys;
+  for (const auto& [k, c] : comps_) { int x, y, z; unpackPos(k, x, y, z); if (inBox(x, y, z)) keys.push_back(k); }
+  std::sort(keys.begin(), keys.end());
+  std::unordered_map<int64_t, int32_t> idx;
+  for (int64_t k : keys) {
+    const Comp& c = comps_.at(k);
+    int x, y, z; unpackPos(k, x, y, z);
+    LithoIR::Node n{};
+    n.k = k; n.beh = c.behavior; n.emitMode = c.emitMode; n.traitFlags = c.traitFlags; n.hotKind = c.hotKind; n.delayFixed = c.delayFixed;
+    n.multiply = c.rate.multiply ? c.rate.multiply : 1u;
+    n.role = roleOf(reg.def(w.get(x, y, z))); n.mem = c.mem; n.st = w.getState(x, y, z); n.sched = c.sched;
+    idx[k] = int32_t(ir->nodes.size()); ir->nodes.push_back(std::move(n));
+  }
+  std::unordered_map<int64_t, int32_t> torchIdx;
+  auto torchFor = [&](int64_t tk) -> int32_t {
+    if (auto it = torchIdx.find(tk); it != torchIdx.end()) return it->second;
+    int tx, ty, tz; unpackPos(tk, tx, ty, tz);
+    LithoIR::Torch t; t.k = tk; t.lit = stValue(w.getState(tx, ty, tz)) > 0;
+    const int32_t id = int32_t(ir->torches.size()); ir->torches.push_back(std::move(t)); torchIdx[tk] = id; return id;
+  };
+  // Mounts: solid powerable blocks next to a hard-capable node, or above a torch.
+  std::unordered_map<int64_t, int32_t> mountIdx;
+  auto mountFor = [&](int64_t bk) -> int32_t {
+    if (auto it = mountIdx.find(bk); it != mountIdx.end()) return it->second;
+    const int32_t id = int32_t(ir->mountFeed.size()); ir->mountFeed.emplace_back(); ir->mountTorch.push_back(-1); mountIdx[bk] = id;
+    int bx, by, bz; unpackPos(bk, bx, by, bz);
+    if (reg.def(w.get(bx, by - 1, bz)).role == SimRole::Torch) ir->mountTorch[size_t(id)] = torchFor(packPos(bx, by - 1, bz));
+    return id;
+  };
+  for (size_t i = 0; i < ir->nodes.size(); ++i) {
+    const auto& n = ir->nodes[i];
+    int x, y, z; unpackPos(n.k, x, y, z);
+    const BlockId b = w.get(x, y, z);
+    if (!(hardAny || n.role == SimRole::Repeator || n.role == SimRole::Pulsor || b == kRedirectorSelect)) continue;
+    for (int d = 0; d < 4; ++d)
+      if (reg.hasAll(w.get(x + kDirX[d], y, z + kDirZ[d]), kSolid | kOpaque | kPowerable))
+        ir->mountFeed[size_t(mountFor(packPos(x + kDirX[d], y, z + kDirZ[d])))].push_back({int32_t(i), uint8_t(d)});
+  }
+  // Seeds per wire cell (mirrors seed() in hsPrepIncremental).
+  std::unordered_map<int64_t, std::vector<LithoIR::Src>> seedAt;
+  auto seedOk = [&](int x, int y, int z, int viaAx) {
+    const BlockId tb = w.get(x, y, z);
+    if (reg.def(tb).role != SimRole::Wire) return false;
+    return !(isVia(tb) && !(viaAx > 0 && viaAxis(tb) == viaAx));
+  };
+  for (size_t i = 0; i < ir->nodes.size(); ++i) {
+    int x, y, z; unpackPos(ir->nodes[i].k, x, y, z);
+    for (int d = 0; d < 4; ++d) {
+      const int tx = x + kDirX[d], tz = z + kDirZ[d];
+      if (!cTraceConn::sideOn(w.getState(tx, y, tz), -kDirX[d], 0, -kDirZ[d])) continue;
+      if (!seedOk(tx, y, tz, ir->nodes[i].role == SimRole::Repeator ? (kDirX[d] ? 1 : 2) : 0)) continue;
+      seedAt[packPos(tx, y, tz)].push_back({0, uint8_t(d), 0, int32_t(i)});
+    }
+  }
+  for (int y = y0; y <= y1; ++y) for (int z = z0; z <= z1; ++z) for (int x = x0; x <= x1; ++x) {
+    const BlockId b = w.get(x, y, z);
+    if (reg.def(b).role == SimRole::Torch) {
+      const int32_t ti = torchFor(packPos(x, y, z));
+      for (auto& d : k6) if (seedOk(x + d[0], y + d[1], z + d[2], 0)) seedAt[packPos(x + d[0], y + d[1], z + d[2])].push_back({3, 0, 0, ti});
+    }
+  }
+  for (const auto& [bk, id] : mountIdx) {
+    int bx, by, bz; unpackPos(bk, bx, by, bz);
+    for (auto& d : k6) if (seedOk(bx + d[0], by + d[1], bz + d[2], 0)) seedAt[packPos(bx + d[0], by + d[1], bz + d[2])].push_back({1, 0, 0, id});
+  }
+  std::unordered_map<int64_t, int32_t> sinkIdx;
+  size_t wiresSeen = 0, nLinks = 0, nComp = 0;
+  std::vector<int64_t> links;
+  auto sinkFor = [&](int64_t start) -> int32_t {
+    if (auto it = sinkIdx.find(start); it != sinkIdx.end()) return it->second;
+    std::unordered_map<int64_t, int> dist; std::deque<int64_t> dq; dist[start] = 0; dq.push_back(start);
+    std::vector<LithoIR::Src> srcs;
+    std::unordered_set<int64_t> done;
+    while (!dq.empty()) {
+      const int64_t cur = dq.front(); dq.pop_front();
+      if (!done.insert(cur).second) continue;
+      const int cd = dist[cur];
+      if (cd >= kMaxSignal) continue;
+      if (auto s = seedAt.find(cur); s != seedAt.end()) for (auto e : s->second) { e.dist = uint8_t(cd); srcs.push_back(e); }
+      int x, y, z; unpackPos(cur, x, y, z);
+      if (!inBox(x, y, z)) continue;
+      links.clear(); wireLinks(w, x, y, z, links);
+      const bool cv = isVia(w.get(x, y, z));
+      for (int64_t nb : links) {
+        int nx, ny, nz; unpackPos(nb, nx, ny, nz);
+        const int nd = cd + ((cv || isVia(w.get(nx, ny, nz))) ? 0 : 1);
+        auto it = dist.find(nb);
+        if (it != dist.end() && it->second <= nd) continue;
+        dist[nb] = nd;
+        if (nd == cd) dq.push_front(nb); else dq.push_back(nb);
+      }
+    }
+    wiresSeen += dist.size(); nLinks += srcs.size();
+    const int32_t id = int32_t(ir->sinks.size()); ir->sinks.push_back(std::move(srcs)); sinkIdx[start] = id; return id;
+  };
+  for (auto& n : ir->nodes) {
+    int x, y, z; unpackPos(n.k, x, y, z);
+    for (int d = 0; d < 4; ++d) {
+      const int nx = x + kDirX[d], nz = z + kDirZ[d];
+      const BlockId nb = w.get(nx, y, nz);
+      const BlockDef nd = reg.def(nb);
+      const CellState ns = w.getState(nx, y, nz);
+      if (const int sc = cBehaviorCatalog::get().colour(nd)) n.ch[d] = uint8_t(sc);
+      LithoIR::In& in = n.in[d];
+      if (nd.role == SimRole::Wire) {
+        if (!isVia(nb) && cTraceConn::sideOn(ns, -kDirX[d], 0, -kDirZ[d])) { in.kind = 1; in.a = sinkFor(packPos(nx, y, nz)); }
+      } else if (nd.role == SimRole::Torch) {
+        in.kind = 5; in.a = torchFor(packPos(nx, y, nz));
+      } else if (auto it = idx.find(packPos(nx, y, nz)); it != idx.end()) {
+        if (nd.role != SimRole::Pulsor && kDirectComp) { in.kind = 2; in.a = it->second; ++nComp; }
+      } else if (reg.hasAll(nb, kSolid | kOpaque | kPowerable)) {
+        in.kind = 4; in.a = mountFor(packPos(nx, y, nz));
+        for (int i = 0; i < 6; ++i) {
+          const auto& e = k6[i];
+          const int wx = nx + e[0], wy = y + e[1], wz = nz + e[2];
+          if (!isFlatWire(w.get(wx, wy, wz))) continue;
+          if (!cTraceConn::sideOn(w.getState(wx, wy, wz), -e[0], -e[1], -e[2])) continue;
+          if (!kAutoSoftL && cTraceConn::isAuto(w.getState(wx, wy, wz))) continue;
+          in.soft.push_back(sinkFor(packPos(wx, wy, wz)));
+        }
+      }
+      if (auto it = idx.find(packPos(nx, y, nz)); it != idx.end()) {
+        n.levelNode[d] = it->second;
+        if ((n.role == SimRole::Redirector || n.role == SimRole::cFusor || n.role == SimRole::Repeator) &&
+            (d == dirLeft(stFacing(n.st)) || d == dirRight(stFacing(n.st))) && nd.role == SimRole::Repeator &&
+            stFacing(ns) == dirBack(d)) { n.muxSides |= uint8_t(1u << d); n.muxNode[d] = it->second; }
+      }
+    }
+    if (isFlatWire(w.get(x, y + 1, z))) n.topIn = sinkFor(packPos(x, y + 1, z));
+    if (n.role == SimRole::Repeator) {
+      const int bd = dirBack(stFacing(n.st));
+      if (auto it = idx.find(packPos(x + kDirX[bd], y, z + kDirZ[bd])); it != idx.end() &&
+          ir->nodes[size_t(it->second)].role == SimRole::Repeator && stFacing(ir->nodes[size_t(it->second)].st) == stFacing(n.st))
+        n.chainUp = it->second;
+    }
+  }
+  for (size_t ti = 0; ti < ir->torches.size(); ++ti) {  // support: lit = !blockPowered(support) from last tick
+    int tx, ty, tz; unpackPos(ir->torches[ti].k, tx, ty, tz);
+    int sx, sy, sz; torchSupport(w.getState(tx, ty, tz), tx, ty, tz, sx, sy, sz);
+    if (!reg.has(w.get(sx, sy, sz), kPowerable)) continue;
+    std::vector<int32_t> ws;
+    if (reg.hasAll(w.get(sx, sy, sz), kSolid | kOpaque | kPowerable)) { const int32_t mi = mountFor(packPos(sx, sy, sz)); ir->torches[ti].mount = mi; }
+    if (isFlatWire(w.get(sx, sy + 1, sz))) ws.push_back(sinkFor(packPos(sx, sy + 1, sz)));
+    for (auto& d : kH) if (isFlatWire(w.get(sx + d[0], sy, sz + d[1]))) ws.push_back(sinkFor(packPos(sx + d[0], sy, sz + d[1])));
+    ir->torches[ti].wires = std::move(ws);
+  }
+  if (std::getenv("LL_LITHO_DBG")) {
+    for (const auto& n : ir->nodes) { int qx, qy, qz; unpackPos(n.k, qx, qy, qz); if (n.role != SimRole::Repeator || qy != 65 || qx > 110 || qz > 110) continue;
+      for (int d = 0; d < 4; ++d) { const auto& li = n.in[d]; std::fprintf(stdout, "LSRC rep(%d,%d,%d) d=%d kind=%d a=%d soft=%zu\n", qx, qy, qz, d, li.kind, li.a, li.soft.size());
+        if (li.kind == 1) for (const auto& sr : ir->sinks[size_t(li.a)]) { int sx2 = 0, sy2 = 0, sz2 = 0; if (sr.kind == 0) unpackPos(ir->nodes[size_t(sr.a)].k, sx2, sy2, sz2);
+          std::fprintf(stdout, "   src kind=%d a=%d dir=%d dist=%d node@(%d,%d,%d)\n", sr.kind, sr.a, sr.dir, sr.dist, sx2, sy2, sz2); }
+        if (li.kind == 4) for (auto [fn, fd] : ir->mountFeed[size_t(li.a)]) { int sx2, sy2, sz2; unpackPos(ir->nodes[size_t(fn)].k, sx2, sy2, sz2); std::fprintf(stdout, "   feeder (%d,%d,%d) dir=%d const=%d\n", sx2, sy2, sz2, fd, ir->mountTorch[size_t(li.a)]); } } }
+    for (const auto& [bk, id] : mountIdx) { int bx, by, bz; unpackPos(bk, bx, by, bz); if (by == 65 && bx < 110 && bz < 110) { std::fprintf(stdout, "LMOUNT (%d,%d,%d) id=%d feeders:", bx, by, bz, id); for (auto [fn, fd] : ir->mountFeed[size_t(id)]) { int sx2, sy2, sz2; unpackPos(ir->nodes[size_t(fn)].k, sx2, sy2, sz2); std::fprintf(stdout, " (%d,%d,%d)d%d", sx2, sy2, sz2, fd); } std::fprintf(stdout, "\n"); } }
+  }
+  ir->gen = editGen_; ir->tick = tickNo_; ir->tick0 = tickNo_; ir->seed = randor::worldSeed().load(std::memory_order_relaxed);
+  litho_ = ir;
+  if (st) {
+    st->nodes = ir->nodes.size(); st->links = nLinks; st->wires = wiresSeen; st->compLinks = nComp;
+    st->compileMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  }
+  return true;
+}
+
+int cSignalSim::lithoRun(int ticks) {
+  if (!litho_) return -1;
+  if (litho_->gen != editGen_) { litho_.reset(); return -1; }  // place/break since compile: drop the chip
+  LithoIR& ir = *litho_;
+  static const int kMax = [] { const char* e = std::getenv("LL_SETTLE_MAX"); const int v = e ? std::atoi(e) : 16; return v < 1 ? 1 : v; }();
+  const size_t n = ir.nodes.size();
+  struct Snap { ComponentMemory mem; CellState st; cScheduledOutput sched; };
+  thread_local std::vector<Snap> pre; thread_local std::vector<int> sinkVal, mountVal;
+  thread_local std::vector<ComponentInputs> ins;
+  pre.resize(n); ins.resize(n); sinkVal.resize(ir.sinks.size()); mountVal.resize(ir.mountFeed.size());
+  auto emitOf = [&](const LithoIR::Node& s, int dir) { return compEmit(s.beh, s.mem, s.emitMode, dir, s.st); };
+  for (int t = 0; t < ticks; ++t) {
+    ++ir.tick;
+    for (size_t i = 0; i < n; ++i) pre[i] = {ir.nodes[i].mem, ir.nodes[i].st, ir.nodes[i].sched};
+    auto flood = [&] {
+      for (size_t mi = 0; mi < ir.mountFeed.size(); ++mi) {
+        int v = (ir.mountTorch[mi] >= 0 && ir.torches[size_t(ir.mountTorch[mi])].lit) ? int(kMaxSignal) : 0;
+        for (auto [nd, dd] : ir.mountFeed[mi]) v = std::max(v, std::min(emitOf(ir.nodes[size_t(nd)], dd), int(kMaxSignal)));
+        mountVal[mi] = v;
+      }
+      for (size_t si = 0; si < ir.sinks.size(); ++si) {
+        int v = 0;
+        for (const auto& s : ir.sinks[si]) {
+          const int src = s.kind == 0 ? std::min(emitOf(ir.nodes[size_t(s.a)], s.dir), int(kMaxSignal)) : s.kind == 1 ? mountVal[size_t(s.a)]
+                        : s.kind == 3 ? (ir.torches[size_t(s.a)].lit ? int(kMaxSignal) : 0) : s.a;
+          if (src - int(s.dist) > v) v = src - int(s.dist);
+        }
+        sinkVal[si] = v;
+      }
+    };
+    // torches decide from the previous tick's settled state (tickTorches), then apply together
+    flood();
+    thread_local std::vector<uint8_t> tl; tl.resize(ir.torches.size());
+    for (size_t ti = 0; ti < ir.torches.size(); ++ti) {
+      const auto& tc = ir.torches[ti];
+      bool pw = tc.mount >= 0 && mountVal[size_t(tc.mount)] > 0;
+      for (int32_t sk : tc.wires) pw = pw || sinkVal[size_t(sk)] > 0;
+      tl[ti] = (tc.mount >= 0 || !tc.wires.empty()) ? uint8_t(!pw) : uint8_t(tc.lit);
+    }
+    for (size_t ti = 0; ti < ir.torches.size(); ++ti) ir.torches[ti].lit = tl[ti] != 0;
+    for (int it = 0; it < kMax; ++it) {
+      flood();
+      for (size_t i = 0; i < n; ++i) {
+        const auto& nd = ir.nodes[i];
+        ComponentInputs& in = ins[i]; in = ComponentInputs{};
+        for (int d = 0; d < 4; ++d) {
+          in.ch[d] = nd.ch[d];
+          const LithoIR::In& li = nd.in[d];
+          switch (li.kind) {
+            case 1: in.side[d] = sinkVal[size_t(li.a)]; break;
+            case 2: { const auto& s = ir.nodes[size_t(li.a)]; in.side[d] = compEmit(s.beh, s.mem, s.emitMode, dirBack(d), s.st); break; }
+            case 3: in.side[d] = li.a; break;
+            case 5: in.side[d] = ir.torches[size_t(li.a)].lit ? int(kMaxSignal) : 0; break;
+            case 4: {
+              int v = mountVal[size_t(li.a)];
+              if (v <= 0) for (int32_t sk : li.soft) v = std::max(v, sinkVal[size_t(sk)]);
+              in.side[d] = std::min(v, int(kMaxSignal)); break;
+            }
+            default: break;
+          }
+          if (nd.role == SimRole::Thresholdor && (stAux(pre[i].st) & 2) && nd.levelNode[d] >= 0) {
+            const auto& s = pre[size_t(nd.levelNode[d])];
+            in.level[d] = ir.nodes[size_t(nd.levelNode[d])].beh->readLevel(s.st, s.mem);
+          }
+          if (nd.muxSides & (1u << d)) { in.muxSides |= uint8_t(1u << d); in.muxOn = in.muxOn || stOn(pre[size_t(nd.muxNode[d])].st); }
+        }
+        if (nd.topIn >= 0) in.top = sinkVal[size_t(nd.topIn)];
+        if (nd.chainUp >= 0) in.chainCh = uint8_t(repeator::colourOf(pre[size_t(nd.chainUp)].st));
+        if (nd.role == SimRole::Randor) in.rng = randor::rollSeed(ir.seed, nd.k, ir.tick);
+        static const bool kDbg = std::getenv("LL_LITHO_DBG") != nullptr;
+        if (kDbg && ir.tick - ir.tick0 < 30 && nd.role == SimRole::Repeator) {
+          int qx, qy, qz; unpackPos(nd.k, qx, qy, qz);
+          if (qy == 65 && qx < 110 && qz < 110) std::fprintf(stdout, "LDBG t=%d it=%d tl=%d,%d rep(%d,%d,%d) st=%08x face=%d side=%d,%d,%d,%d kinds=%d,%d,%d,%d top=%d sw=%d mux=%d/%d\n", int(ir.tick - ir.tick0), it, int(ir.torches.size() > 0 && ir.torches[0].lit), int(ir.torches.size() > 1 && ir.torches[1].lit), qx, qy, qz, unsigned(pre[i].st), stFacing(pre[i].st),
+            in.side[0], in.side[1], in.side[2], in.side[3], nd.in[0].kind, nd.in[1].kind, nd.in[2].kind, nd.in[3].kind, in.top, in.switchIn, in.muxSides, int(in.muxOn));
+        }
+      }
+      bool changed = false;
+      for (size_t i = 0; i < n; ++i) {
+        auto& nd = ir.nodes[i];
+        // Mirror hsSettle: a Repeator is a pure delay line — pass-0 sample only. Re-reading after
+        // a same-tick hard-power->copper->Trace flood would make every Repeator one tick shorter
+        // per hop (tick-25 clock drift on ALU Stress).
+        if (it > 0 && nd.role == SimRole::Repeator) continue;
+        const uint8_t o0 = nd.mem.out, o20 = nd.mem.out2; const bool p0 = nd.mem.pulse;
+        nd.mem = pre[i].mem; nd.sched = pre[i].sched;
+        ComponentStep step{}; CellState cur = pre[i].st;
+        for (uint32_t s = 0; s < nd.multiply; ++s) {  // same dispatch as runRange (hot paths are the live semantics)
+          if (hotSpecOn() && nd.hotKind == 1) step = hotTickRepeator(ins[i], cur, nd.mem);
+          else if (hotSpecOn() && nd.hotKind == 2) step = hotTickThresholdor(ins[i], cur);
+          else step = nd.beh->tick(ins[i], cur, nd.mem);
+          cur = step.state; }
+        const bool queued = (nd.traitFlags & cCompTraits::kQueuedOutput) != 0;
+        const int dl = !queued ? 0 : (nd.delayFixed >= 0) ? int(nd.delayFixed) : nd.beh->delayTicks(step.state, nd.k, ir.tick);
+        const cScheduledOutput::Out raw{uint8_t(std::clamp(step.out, 0, kMaxSignal)), uint8_t(std::clamp(step.out2, 0, kMaxSignal)), step.pulse};
+        const cScheduledOutput::Out pub = nd.sched.step(ir.tick, dl, raw);
+        nd.mem.out = pub.out; nd.mem.out2 = pub.out2; nd.mem.pulse = pub.pulse; nd.st = step.state;
+        if (nd.mem.out != o0 || nd.mem.out2 != o20 || nd.mem.pulse != p0) changed = true;
+      }
+      if (!changed) break;
+    }
+  }
+  return ticks;
 }
 
 }  // namespace lithokraft

@@ -23,6 +23,7 @@
 #include "litholattice/render/trace_strength_buffer.h"
 #include "lithokraft/engine.h"
 #include "lithokraft/content/component.h"
+#include "lithokraft/content/scheduled_output.h"  // 2026-11-04 (JD t4304u)
 #include "litholattice/world/chunk_map.h"
 
 namespace lithokraft {
@@ -75,7 +76,7 @@ class cRadioReg {
   void clear() { cur_.clear(); next_.clear(); for (auto& v : byChannel_) v.clear(); }
   /// Strongest broadcast on `channel` within (power + sensitivity) of (x, y, z).
   /// Returns false when nothing is heard. Tie-breaks are canonical: strongest
-  /// wins, then nearest, then the lowest packPos Ã¢â‚¬â€ so the result never depends on
+  /// wins, then nearest, then the lowest packPos ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â so the result never depends on
   /// broadcast registration order.
   bool query(uint8_t channel, int x, int y, int z, int dim, int sensitivity,
              int& strength, int& colour) const {
@@ -152,7 +153,7 @@ class cSignalSim {
   /// a network rebuild (fullPass) so no derived net/pointer state can
   /// reference the column again. The caller MUST take the column's SGNL
   /// export first (exportColumnState() / exportState()) and save it
-  /// before unscanning when the state must survive Ã¢â‚¬â€ after this call the
+  /// before unscanning when the state must survive ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â after this call the
   /// column's component memory is gone from the sim. Sim stopped only,
   /// like scanColumn().
   void unscanColumn(int cx, int cz);
@@ -168,13 +169,29 @@ class cSignalSim {
   /// Number of indexed cells in the column (tests / diagnostics).
   size_t indexedCellCount(int cx, int cz) const;
   void onBlockChanged(int x, int y, int z, BlockId now);
+  // PlayM2 lithography spike (Trace-in-time, JD 2026-11-06): compile a settled region into a tickable
+  // IR (component nodes + precomputed wire-distance links); place/break (editGen_) invalidates it.
+  struct LithoStats { size_t nodes = 0, links = 0, wires = 0, compLinks = 0; double compileMs = 0; };
+  bool lithoCompile(const ChunkMap& w, int x0, int y0, int z0, int x1, int y1, int z1, LithoStats* st = nullptr);
+  int lithoRun(int ticks);           ///< ticks run; -1 = invalidated by an edit since compile (IR dropped)
+  bool lithoValid() const;
+  void lithoReset();
+  bool lithoActive() const { return litho_ != nullptr; }
+  /// PlayM4: copy each chip node's cell state into the world (dirty only on change) so the chip is visible.
+  void lithoWriteBack(ChunkMap& w, const DirtyFn& dirty);
+  /// PlayM4: hand the chip's component memory + tick back to the live sim (then lithoReset) before live resumes.
+  void lithoCommit();
+  void lithoStates(std::vector<std::pair<int64_t, uint32_t>>& out) const;  ///< (cell, state) per node, key order
+  uint64_t editGen() const { return editGen_; }
+  int debugInputFrom(const ChunkMap& w, int x, int y, int z, int d) const { return inputFrom(w, x, y, z, d); }
+  const ComponentMemory* debugMem(int x, int y, int z) const { auto it = comps_.find(packPos(x, y, z)); return it == comps_.end() ? nullptr : &it->second.mem; }
   // 2026-11-01 (JD placement spikes): wireBelow = a wire sits at (x,y-1,z). Lets a non-wire edit keep the
   // flood topology (only that wire's links can see this cell's kCutsWire). LL_EDIT_LOCAL=0 kill.
   void onBlockChanged(int x, int y, int z, BlockId now, bool wireBelow);
   // cPlayer chunk + radius: components outside the radius are frozen.
   void tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty);
 
-  // ---- Timing Handshake surface (hs-design Ã‚Â§3.2) ----
+  // ---- Timing Handshake surface (hs-design Ãƒâ€šÃ‚Â§3.2) ----
   // tick() is reassembled from exactly these pieces, in this order, so the
   // legacy and handshake paths share one implementation:
   //   hsBeginCycle; hsFlipAndTorches; hsComponents; hsMark;
@@ -246,8 +263,9 @@ class cSignalSim {
   uint64_t tickCount() const { return tickNo_; }
   /// Deferred lamp afterglow update produced by hsLampsBatch (the lampHold_
   /// map is sim-thread owned; pull batches return these, the sim thread
-  /// merges them after the barrier Ã¢â‚¬â€ hs-design Ã‚Â§3.3).
-  struct LampHoldUpdate { int64_t key = 0; uint64_t end = 0; bool erase = false; };
+  /// merges them after the barrier ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â hs-design Ãƒâ€šÃ‚Â§3.3).
+  struct LampHoldUpdate { int64_t key = 0; uint64_t end = 0; bool erase = false;
+    bool delay = false; CellState ns = 0; };  ///< PlayB (JD t4339u): delay = a 1-tick lamp delay-line entry (ns shown next tick)
   void hsApplyLampHolds(const std::vector<LampHoldUpdate>& updates);
   void hsApplyStrengthPending(const DirtyFn* dirty = nullptr);  // replay per-net TraceStrengthBuffer writes in canonical order (+ remesh, 2026-11-01)
   void hsRefreshSoft(const ChunkMap& w);
@@ -301,7 +319,7 @@ class cSignalSim {
   /// invalid declaration (see TickRate::valid(): powers of two, multiply
   /// <= kMaxRateMultiply, divide <= kMaxRateDivide) is logged as an
   /// error on that first resolution and the NEUTRAL rate is substituted
-  /// Ã¢â‚¬â€ mirroring the Timing Handshake authority's registration refusal
+  /// ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â mirroring the Timing Handshake authority's registration refusal
   /// (timing_handshake.cpp), which never holds an unschedulable
   /// component. Without this, multiply 0 would run zero sub-pulls and
   /// publish the default step (wiping cell state), an oversized multiply
@@ -340,7 +358,17 @@ class cSignalSim {
  private:
   struct Comp {
     const cCompBehavior* behavior;  // shared, owned by cBehaviorCatalog
+    uint8_t traitFlags = 0;   ///< copy of cCompTraits::flags at place (queued / chan bits)
+    uint8_t quietMode = 0;    ///< 0=virtual quiescent, 1=always, 2=never (table-driven)
+    uint8_t emitMode = 0;     ///< 0=virtual emitToward, 1=front? mem.out : 0
+    uint8_t hotKind = 0;      ///< PlayL2 #9: 0=generic, 1=Repeator, 2=Thresholdor, 3=Fusor, 4=Randor
+    int16_t delayFixed = -1;  ///< copy of cCompTraits::delayFixed
+    litholattice::TickRate rate{};  ///< PlayL Phase5: classTickRate resolved once at place
     ComponentMemory mem;
+    // PlayL2 #8: packed dual-word mirror of wire-facing + latch (synced on apply; mount/emit reads these).
+    uint32_t faceWord = 0;   ///< out | (out2<<8) | (pulse?1:0)<<16 | (timer<<24)
+    uint32_t latchWord = 0;  ///< history | (historyHi<<8) | (prevIn<<24) — cooldown/LFSR-ish bits
+    cScheduledOutput sched;  ///< 2026-11-04 (JD t4304u): input -> output delay line (not saved: in-flight changes drop on reload)
     uint64_t wakeAt = ~uint64_t(0);  ///< LL_WAKE dedupe flag: the tick this component is already queued for
     bool rateHeld = false;  ///< divided-gated on an earlier tick: component sleep must not swallow its due tick (rate scaling)
     // Input fast path (filled by buildNets, valid while the networks are): per side 0 = reads
@@ -350,7 +378,16 @@ class cSignalSim {
     CellState* nb[4] = {};
     CellState* top = nullptr;
     CellState* self = nullptr;
+    // PlayL2 #7: emit target wire (net, local idx) per absolute dir; -1 = none (filled in buildNets).
+    int32_t emitNet[4] = {-1, -1, -1, -1};
+    int32_t emitIdx[4] = {-1, -1, -1, -1};
   };
+  static void syncCompWords(Comp& c) {
+    const ComponentMemory& m = c.mem;
+    c.faceWord = uint32_t(m.out) | (uint32_t(m.out2) << 8) | (uint32_t(m.pulse ? 1u : 0u) << 16) | (uint32_t(m.timer) << 24);
+    c.latchWord = uint32_t(m.history) | (uint32_t(m.historyHi) << 8) | (uint32_t(m.prevIn) << 24);
+  }
+  ComponentStep scheduleOutput(int64_t k, Comp& c, BlockId b, ComponentStep step);  // 2026-11-04 (JD t4304u)
   struct TickArea {  // components outside the player's ticking radius are frozen
     int pcx = 0, pcz = 0, radius = 0;
     bool round = false;  // F56-7 (Proposed by JD, Built by Cortana): same disc rule as litholattice::TickArea
@@ -370,6 +407,15 @@ class cSignalSim {
   int emitToward(const ChunkMap& w, int x, int y, int z, int towardDir) const;  // component at xyz -> dir
   std::unordered_set<int64_t> torches_, wires_, lamps_;
   std::unordered_map<int64_t, Comp> comps_;
+  // PlayL2: dense Comp* parallel to a sorted all-keys snapshot (compsGen_). Mount collect,
+  // seed gather, and sharded tick walk contiguous pointers instead of hashing every key.
+  std::vector<int64_t> compAllKeys_;
+  std::vector<Comp*> compAllPtrs_;
+  std::vector<Comp*> compOrderPtrs_;  // parallel to compOrder_ (in-range)
+  std::vector<Comp*> wakePtrs_;       // parallel to wakeScratch_ / iterKeys when wake-iterating
+  uint64_t compDenseGen_ = 0;
+  void rebuildCompDense();
+  bool mountFlipOk_ = false;  // PlayL2: last collectMountPowered matches live outs (skip flip rebuild)
   // 2026-11-01 (Archie list, JD approved): compiled in-range component table. Sorted keys of the
   // components inside area_, rebuilt only when comps_ changes (compsGen_) or the tick area moves;
   // no per-tick sort / alloc, range check before quiescent(). LL_COMP_TABLE=0 = old per-tick sort.
@@ -408,13 +454,18 @@ private:
   litholattice::TraceStrengthBuffer strengthBuf_;  ///< Step 1: GPU strength slots
   uint8_t dim_ = 1;  ///< this sim's dimension (for cross-dimensional radio)
   // PlayL (JD 2026-11-01): component sleep ON in-game by default so LL_WAKE is live; LL_COMP_SLEEP=0 turns it off.
-  // PlayM (JD 2026-11-01, speed + determinism): component sleep OFF by default; LL_COMP_SLEEP=1 turns it on.
-  bool compSleep_ = [] { const char* e = std::getenv("LL_COMP_SLEEP"); return e && e[0] == '1'; }(), allAwake_ = true;
+  // PlayM had flipped default OFF for determinism; Archie Phase 5 (2026-11-05): restore ON — pattern-wall
+  // 14.7→2.0 ms/tick at 512 TPS; LL_COMP_SLEEP=0 remains the kill switch. Selftest/handshake must stay known-good.
+  bool compSleep_ = [] { const char* e = std::getenv("LL_COMP_SLEEP"); return !(e && e[0] == '0'); }(), allAwake_ = true;
  public:
   litholattice::TraceStrengthBuffer& strengthBuffer() { return strengthBuf_; }
   void setDimension(uint8_t d) { dim_ = d; }
-  /// Phase timing (ms, summed since the last call): components, wakes + marking, wires, lamps.
-  struct PhaseMs { double comps = 0, mark = 0, wires = 0, lamps = 0; };
+  /// Phase timing (ms, summed since the last call). PlayK: comps/mark/wires/lamps/settle/rebuild.
+  /// PlayL2: begin/flip/finalize/mount name the former unlabeled gap (~3 ms at 512 ALU).
+  struct PhaseMs {
+    double comps = 0, mark = 0, wires = 0, lamps = 0, settle = 0, rebuild = 0;
+    double begin = 0, flip = 0, finalize = 0, mount = 0;
+  };
   PhaseMs takePhaseMs() {
     PhaseMs p = phase_; phase_ = {};
     // Wires/lamps are timed inside the hs* methods (atomically: pull workers
@@ -428,10 +479,38 @@ private:
   std::atomic<uint64_t> hsWiresNs_{0}, hsLampsNs_{0};  // hs* method self-timing (ns)
   struct SrcReach { std::vector<int32_t> nets; std::vector<int64_t> lamps; };
   std::unordered_map<int64_t, SrcReach> srcReach_;  // per changed source: nets / lamps within 2 (cleared with the nets)
-  std::unordered_set<int64_t> awake_;               // components to tick next tick (sleep on)
+  // PlayK fix 3: inverse cache — net id -> sources whose 5x5x5 box touches that net (rebuilt with nets).
+  std::vector<std::vector<int64_t>> netReach_;
+  std::vector<int32_t> reachNetScratch_;   // reused 5x5x5 fill
+  std::vector<int64_t> reachLampScratch_;
+  // PlayJ fix 5: epoch-stamped flat vectors (clear = bump epoch; no unordered_set insert churn).
+  uint32_t awakeEpoch_ = 1;
+  std::vector<int64_t> awakeKeys_;                  // components to tick next tick (sleep on)
+  std::unordered_map<int64_t, uint32_t> awakeStamp_; // key -> epoch (warm; no erase on clear)
+  void awakeClear() { if (++awakeEpoch_ == 0) { awakeStamp_.clear(); awakeEpoch_ = 1; } awakeKeys_.clear(); }
+  void awakeInsert(int64_t k) {
+    uint32_t& s = awakeStamp_[k];
+    if (s != awakeEpoch_) { s = awakeEpoch_; awakeKeys_.push_back(k); }
+  }
+  bool awakeContains(int64_t k) const {
+    const auto it = awakeStamp_.find(k);
+    return it != awakeStamp_.end() && it->second == awakeEpoch_;
+  }
   std::vector<std::vector<int64_t>> netComps_;      // per wire network: components reading it
+  // PlayK fix 5: who-reads-whom adjacency for wake fanout (rebuilt in buildNets).
+  std::unordered_map<int64_t, std::vector<int64_t>> compAdj_;
   size_t lastTicked_ = 0;
   void wakeAround(int64_t k);
+  void rebuildCompAdj();
+  void fillSrcReach(int64_t k, SrcReach& r);  // PlayK: flat scratch 5x5x5
+  // PlayK fix 4: shard scratch (warm; no hot-path heap after first use).
+  std::vector<std::vector<int64_t>> shardChanged_;
+  struct CompNext { int64_t k; Comp* c; ComponentStep step; };
+  std::vector<std::vector<CompNext>> shardNext_;
+  std::vector<std::vector<std::pair<int64_t, uint64_t>>> shardWake_;  // key,delta — merged after barrier
+  std::vector<std::vector<std::pair<int64_t, CompSnap>>> shardSnap_;  // sameTick snaps — merged after barrier
+  std::vector<size_t> shardTicked_;
+  std::vector<size_t> shardOor_;
   std::array<std::vector<int64_t>, kMaxSignal + 1> buckets_;  // BFS work lists by strength
   std::vector<std::pair<int64_t, uint8_t>> torchNext_;
   // 2026-11-01 (JD soft power, LL_SOFT_POWER=0 off): solid powerable blocks soft-powered by a touching lit
@@ -472,14 +551,25 @@ private:
       }
     }
   }
-  std::unordered_set<int64_t> dirtyLamps_;
-  std::vector<int64_t> changedSrc_, extraLamps_;
+  // PlayJ fix 5: dirty lamps as flat vector (sorted/unique into hsLampKeys_); epoch stamp avoids set churn.
+  uint32_t dirtyLampEpoch_ = 1;
+  std::vector<int64_t> dirtyLampKeys_;
+  std::unordered_map<int64_t, uint32_t> dirtyLampStamp_;
+  void dirtyLampsClear() { if (++dirtyLampEpoch_ == 0) { dirtyLampStamp_.clear(); dirtyLampEpoch_ = 1; } dirtyLampKeys_.clear(); }
+  void dirtyLampsInsert(int64_t k) {
+    uint32_t& s = dirtyLampStamp_[k];
+    if (s != dirtyLampEpoch_) { s = dirtyLampEpoch_; dirtyLampKeys_.push_back(k); }
+  }
+  template <typename It> void dirtyLampsInsertRange(It b, It e) { for (; b != e; ++b) dirtyLampsInsert(*b); }
+  std::vector<int64_t> changedSrc_, extraLamps_;  // PlayL2/MCHPRS PR#206: changed-node flush list (sources this tick)
+  // Option 16 / lithography Trace-in-time: compile settled Trace (nets_/compAdj_/emitNet) into a chip + clock � deferred past L2.
   void buildNets(ChunkMap& w);
   // Flat per-network arrays for the incremental pass (no hash lookups in the flood): cached state
   // pointers (valid until the layout changes, which rebuilds them), CSR links, scratch.
   struct NetArr {
     std::vector<int64_t> keys; std::vector<CellState*> st; std::vector<int32_t> adjStart, adj;
     std::vector<CellState> old; std::vector<uint32_t> stamp; std::vector<uint8_t> via;
+    std::vector<uint8_t> level;  // PlayL2 #11: SoA net power (contiguous); flood writes here, syncs to CellState*
     uint32_t pulseGen = 0;  // per-net pulse visited epoch (was the shared stampGen_ for this net's
                             // stamps; stamp arrays are per-net, so a per-net epoch is equivalent)
   };
@@ -526,7 +616,16 @@ private:
   }
   int lampHoldTicks_ = 0;
   std::unordered_map<int64_t, uint64_t> lampHold_;  // lamp -> tick its afterglow ends
+  /// PlayB (JD t4339u): LEDs / lamps have a 1-tick delay on both on and off. lamp -> (state to show,
+  /// tick it was computed); sim-thread owned, read-only during lamp batches, merged by hsApplyLampHolds.
+  std::unordered_map<int64_t, std::pair<CellState, uint64_t>> lampDelay_;
   uint64_t tickNo_ = 0, nextHoldExpiry_ = UINT64_MAX;
+  uint64_t editGen_ = 0;  // PlayM2: bumped by every place/break/scan (mount candidates + lithography invalidation)
+  // PlayM2 incremental mount: dense indices of comps that can ever hard-power a block (switch/button, or
+  // a hard-capable comp beside a solid powerable block). Rebuilt only when editGen_/dense layout changes.
+  std::vector<uint32_t> mountCand_;
+  uint64_t mountCandGen_ = ~uint64_t(0); size_t mountCandN_ = ~size_t(0); const void* mountCandPtr_ = nullptr; bool mountCandHard_ = false;
+  std::shared_ptr<struct LithoIR> litho_;
   std::vector<SoundEvent> sounds_;
 };
 

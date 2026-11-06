@@ -1,0 +1,94 @@
+{
+  "format": "lithokraft_switch_voxel_v1",
+  "resolution": 32,
+  "lthm_level": 5,
+  "axes": "x=east, y=up, z=south; rotated 180 (flow convention)",
+  "engine_id": "lithokraft:switch",
+  "shape": "floor_plate",
+  "tint": "none \u2014 purple-only output source (JD 2026-11-04); tintmasks empty",
+  "palette": {
+    "plate": "#1D165A",
+    "bevel": "#3C268E",
+    "accent": "#9F77EC",
+    "glow": "#8B65DD",
+    "pale": "#C8A9F6",
+    "well": "#090724"
+  },
+  "materials": {
+    "1": {
+      "name": "plate",
+      "neutral_hex": "#1D165A",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "7": {
+      "name": "well",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "18": {
+      "name": "seam",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "19": {
+      "name": "lever_shaft",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "20": {
+      "name": "lever_tip_off",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "21": {
+      "name": "lever_tip_on",
+      "neutral_hex": "#8B65DD",
+      "tint": false
+    },
+    "22": {
+      "name": "lever_glow",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "23": {
+      "name": "cap_up",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "24": {
+      "name": "cap_pressed",
+      "neutral_hex": "#8B65DD",
+      "tint": false
+    },
+    "25": {
+      "name": "cap_pressed_hi",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    }
+  },
+  "note": "toggle lever on floor plate; toward front = on; outputs 64 steady. PURPLE-ONLY (JD 2026-11-04): output source, no Trace input tint.",
+  "states": [
+    {
+      "state": "off",
+      "lthm": "models/switch_off.lthm",
+      "voxels_json": "models/switch_off.voxels.json",
+      "cells": 632
+    },
+    {
+      "state": "on",
+      "lthm": "models/switch_on.lthm",
+      "voxels_json": "models/switch_on.voxels.json",
+      "cells": 640
+    }
+  ]
+}

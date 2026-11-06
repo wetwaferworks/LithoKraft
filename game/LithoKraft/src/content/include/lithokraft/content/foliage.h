@@ -66,8 +66,10 @@ Mesh crossFromMesh(const Mesh& detail, int heightBlocks);
 inline constexpr float kLodDistanceBlocks = 32.f;
 /// Asset path of block i of kind k under `dir`.
 std::string assetPath(const std::string& dir, Kind k, int i);
-/// Mesh a model stack into shared quads (LOD 4 = the 1/16 vertex grid).
-Mesh meshModels(const std::vector<model::Model>& blocks);
+/// Mesh a model stack into shared quads. lodLevel 4 = 16^3 (foliage); level-5 component
+// .lthm models need lodLevel 5 (32^3) or empty-majority downsampling erases thin features
+// (Switch off lever: JD E2 2026-11-05).
+Mesh meshModels(const std::vector<model::Model>& blocks, int lodLevel = 4);
 
 /// Instance variant: quarter turns (0..3) from the world position (deterministic).
 inline int variantAt(int wx, int wy, int wz) {

@@ -487,6 +487,11 @@ void cGameUi::openSettings(const GameSettings& cur) {
     ui::cNumberField& nf = rr.add<ui::cNumberField>(0, 64, cur.streamRadius);
     nf.setId("set-stream-radius");
     nf.on("change", [changed, state](ui::cWidget& w) { state->streamRadius = static_cast<ui::cNumberField&>(w).value(); changed(); });
+    // Archie Phase 1 (JD 2026-11-04): far-LOD detail slider (software renderer; live, never beyond the view).
+    ui::cStackPanel& lr = row(pg, "Far LOD detail (0 off, 1 high, 2 balanced, 3 fast)");
+    ui::cSlider& ls = lr.add<ui::cSlider>(0.f, 3.f, float(cur.lodDetail), 1.f);
+    ls.setId("set-lod");
+    ls.on("change", [changed, state](ui::cWidget& w) { state->lodDetail = int(static_cast<ui::cSlider&>(w).value() + 0.5f); changed(); });
     // JD Vulkan push (Cortana 2026-10-16): one toggle per Vulkan effect (live; GL33 / software keep their look).
     pg.add<ui::cLabel>("Vulkan effects (live; OpenGL / software unchanged)");
     struct FxBox { const char* name; const char* id; int bit; };
@@ -610,9 +615,9 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
   }
   tickPanel_->setVisible(!m.tickLine.empty() && !menu_);
   if (!m.tickLine.empty()) {
-    static const ui::Color kLv[3] = {{0.35f, 1.f, 0.45f, 1.f}, {1.f, 0.85f, 0.25f, 1.f}, {1.f, 0.3f, 0.3f, 1.f}};
+    static const ui::Color kLv[4] = {{0.35f, 1.f, 0.45f, 1.f}, {1.f, 0.85f, 0.25f, 1.f}, {1.f, 0.3f, 0.3f, 1.f}, {0.75f, 0.8f, 0.9f, 1.f}};  // 2026-11-05 Neutral=paused
     tickText_->setText(m.tickLine);
-    tickText_->setColor(kLv[m.tickLevel < 0 ? 0 : m.tickLevel > 2 ? 2 : m.tickLevel]);
+    tickText_->setColor(kLv[m.tickLevel < 0 ? 0 : m.tickLevel > 3 ? 3 : m.tickLevel]);
   }
   controlsText_->setText(joinLines(m.controlLines));
   banner_->setVisible(!m.bannerLines.empty());

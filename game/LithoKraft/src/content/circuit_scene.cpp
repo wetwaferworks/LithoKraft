@@ -3,8 +3,10 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <cstdio>
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/content/repeator.h"
+#include "lithokraft/content/randor_rng.h"  // alu32 fixed seed
 
 namespace lithokraft {
 
@@ -543,4 +545,117 @@ FramebufferLayout buildWireTorture(ChunkMap& w, int X, int Y, int Z) {
   L.screenZ0 = Z; L.screenZ1 = Z + 27; L.cacheZ = F + 24;
   return L;
 }
+
+Alu32Layout buildAlu32Scene(ChunkMap& w, int x0, int y, int z0, int copies, uint64_t seed) {
+  constexpr int N = 0, E = 1, S = 2, W = 3;
+  constexpr int kTileW = 8, kTileD = 5;
+  constexpr int kFoot = 64;   // 4x4 chunks
+  constexpr int kPitch = 3;   // support, components, empty
+  constexpr int kRange = 32;
+  (void)S; (void)W;
+  if (copies < 1) copies = 1;
+  if (copies > 4096) copies = 4096;
+  if (!seed) seed = 0xA11A32ull;
+  randor::worldSeed().store(seed, std::memory_order_relaxed);
+
+  const int cols = kFoot / kTileW;                 // 8
+  const int rows = kFoot / kTileD;                 // 12
+  const int perFloor = cols * rows;                // 96
+  const int layers = (copies + perFloor - 1) / perFloor;
+
+  Alu32Layout L;
+  L.x0 = x0; L.y = y; L.z0 = z0; L.copies = copies;
+  L.cols = cols; L.rows = rows; L.layers = layers;
+  L.tileW = kTileW; L.tileD = kTileD; L.pitch = kPitch; L.footprint = kFoot; L.seed = seed;
+  int placed = 0;
+  auto put = [&](int x, int yy, int z, BlockId b, int facing = 0, int value = 0, int aux = 0, bool on = false) {
+    if (b != kWaferSilicon && b != kAir && w.get(x, yy - 1, z) == kAir) {
+      if (w.set(x, yy - 1, z, kWaferSilicon)) ++placed;
+    }
+    if (w.set(x, yy, z, b)) {
+      if (facing || value || aux || on) w.setState(x, yy, z, makeState(value, facing, uint8_t(aux), on));
+      ++placed;
+    } else if (facing || value || aux || on) {
+      w.setState(x, yy, z, makeState(value, facing, uint8_t(aux), on));
+    }
+  };
+
+  // Silicon pads per floor (support layer).
+  for (int layer = 0; layer < layers; ++layer) {
+    const int sy = y + layer * kPitch;
+    for (int z = z0 - 1; z < z0 + rows * kTileD; ++z)
+      for (int x = x0; x < x0 + cols * kTileW; ++x) put(x, sy, z, kWaferSilicon);
+  }
+
+  for (int i = 0; i < copies; ++i) {
+    const int layer = i / perFloor;
+    const int idx = i % perFloor;
+    const int col = idx % cols, row = idx / cols;
+    const int tx = x0 + col * kTileW, tz = z0 + row * kTileD;
+    const int cy = y + layer * kPitch + 1;  // component row
+    const bool golden = (i == 0);
+
+    // Clock: blue Trace bus (isolated from red data). Skip x+3 (B hop) and x+5 (C hop).
+    put(tx + 0, cy, tz + 1, kBlueTorch);
+    put(tx + 1, cy, tz + 1, kPulsor, E);
+    put(tx + 2, cy, tz + 1, kBlueTrace);
+    put(tx + 4, cy, tz + 1, kBlueTrace);
+    if (!golden) {  // golden Memors must not see a side clock edge (Memor side clears)
+      put(tx + 2, cy, tz + 2, kBlueTrace);
+      put(tx + 4, cy, tz + 2, kBlueTrace);
+    }
+
+    // A path (z+0): Memor32 -> [Randor|Memor] -> Trace -> Fusor -> Thr
+    put(tx + 0, cy, tz + 0, kMemor, E, kRange, 0, true);
+    if (golden) put(tx + 1, cy, tz + 0, kMemor, E, kRange, 0, true);
+    else put(tx + 1, cy, tz + 0, kRandor, E);
+    put(tx + 2, cy, tz + 0, kRedTrace);
+    put(tx + 3, cy, tz + 0, kFusorSum, E);
+
+    put(tx + 4, cy, tz + 0, kRedTrace);
+    put(tx + 4, cy, tz - 1, kColorLamp64);  // Fusor sum colour on silicon (adjacent Trace); not stacked in empty gap
+    put(tx + 5, cy, tz + 0, kThresholdor, E, 0, 1, false);
+    put(tx + 6, cy, tz + 0, kRedTrace);
+    put(tx + 7, cy, tz + 0, kColorLamp64);  // Thresholdor out colour on silicon
+    // B into Fusor right via (tx+3,tz+1)
+    put(tx + 3, cy, tz + 1, kRedTrace);
+    if (golden) {
+      put(tx + 3, cy, tz + 2, kMemor, N, kRange, 0, true);
+    } else {
+      put(tx + 3, cy, tz + 3, kMemor, N, kRange, 0, true);
+      put(tx + 3, cy, tz + 2, kRandor, N);
+    }
+
+    // C into Thresholdor right via (tx+5,tz+1)
+    put(tx + 5, cy, tz + 1, kRedTrace);
+    if (golden) {
+      put(tx + 5, cy, tz + 2, kMemor, N, kRange, 0, true);
+    } else {
+      put(tx + 5, cy, tz + 3, kMemor, N, kRange, 0, true);
+      put(tx + 5, cy, tz + 2, kRandor, N);
+    }
+  }
+
+  // Support check: only our component rows (ignore worldgen). Want floated=0.
+  int floated = 0;
+  for (int layer = 0; layer < layers; ++layer) {
+    const int cy = y + layer * kPitch + 1;
+    for (int z = z0 - 1; z < z0 + rows * kTileD; ++z) {
+      for (int x = x0; x < x0 + cols * kTileW; ++x) {
+        const BlockId b = w.get(x, cy, z);
+        if (b == kAir || b == kWaferSilicon) continue;
+        if (w.get(x, cy - 1, z) == kAir) {
+          if (floated < 8) std::printf("alu32 float @ (%d,%d,%d) block=%u\n", x, cy, z, unsigned(b));
+          ++floated;
+          if (w.set(x, cy - 1, z, kWaferSilicon)) ++placed;
+        }
+      }
+    }
+  }
+  std::printf("alu32 support: floated=%d (want 0)\n", floated);
+  L.blocks = placed;
+  return L;
+}
+
+
 }  // namespace lithokraft

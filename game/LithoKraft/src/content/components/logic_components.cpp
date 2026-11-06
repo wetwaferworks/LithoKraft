@@ -1,9 +1,12 @@
 // Signal-processing components: repeator, thresholder, redirector, pulsor, memory cell, fast latch.
+#include <cstdlib>
 #include <algorithm>
 #include <format>
 #include "components.h"
 #include "latchor.h"
 #include "fusor_sum.h"  // PlayN (JD)
+#include "dividor.h"  // 2026-11-05 (JD)
+#include "routor.h"  // PlayB (JD t4343u): the Redirector became the Routor
 #include "randor.h"  // 2026-10-31 (JD): Randor  // 2026-10-31: cLatchor (was cFastLatch)
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215
 #include "lithokraft/content/signal.h"
@@ -17,10 +20,31 @@ namespace {
 /// Cortana 2026-10-15 2215 (JD D4): was 1..8; encoding + lazy legacy migration in content/repeator.h.
 class cRepeator final : public cCompBehavior {
  public:
+  int delayTicks(CellState s, int64_t, uint64_t) const override { return repeator::delayTicks(s); }  // 2026-11-04 (JD t4306u): its setting
+  bool queuedOutput() const override { return false; }  // own 2..64 delay line in tick()
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), idx = repeator::delayIndex(st), delay = repeator::kDelays[idx];
+    // 2026-11-05 (JD #5): side lock - a powered Repeator whose OUTPUT faces our left or right
+    // freezes current out + colour and ignores back-input until the lock drops (Minecraft-style;
+    // only Repeators lock Repeators). muxSides/muxOn filled for Repeator role in signal.cpp.
+    const int L = dirLeft(f), R = dirRight(f);
+    const bool locked = ((in.muxSides & (1u << L)) != 0 || (in.muxSides & (1u << R)) != 0) && in.muxOn;
     uint64_t line = loadLine(m);  // bit i = input i ticks ago
-    line = (line << 1) | ((in.back(f) > 0 || in.switchIn > 0) ? 1u : 0u);  // 2026-10-31: Switch direct
+    if (locked) {
+      // Freeze out+colour; keep delay line feeding the frozen bit so unlock resumes after delay.
+      const int out = (stOn(st) || m.out > 0) ? kMaxSignal : 0;
+      const int col = repeator::colourOf(st);
+      line = (line << 1) | (out > 0 ? 1u : 0u);
+      storeLine(m, line);
+      return {out, 0, repeator::withColour(repeator::encode(out, f, idx, out > 0), col)};
+    }
+    // PlayN (JD 11-05 Randor chain): a NEW non-zero input value is a fresh edge: one 0 bit in the line, so the
+    // output dips for one tick and rises again (downstream clocks see a rising edge). LL_REP_FRESH=0 kill.
+    static const bool kFresh = [] { const char* e = std::getenv("LL_REP_FRESH"); return !(e && e[0] == '0'); }();
+    const int bv = std::max(in.back(f), int(in.switchIn));
+    const bool fresh = kFresh && bv > 0 && m.lastIn > 0 && bv != m.lastIn;
+    m.lastIn = uint8_t(std::min(bv, 255));
+    line = (line << 1) | ((bv > 0 && !fresh) ? 1u : 0u);  // 2026-10-31: Switch direct
     storeLine(m, line);
     const int out = ((line >> (delay - 1)) & 1) ? kMaxSignal : 0;
     const int bch = in.ch[size_t(dirBack(f))] ? in.ch[size_t(dirBack(f))] : in.chainCh;  // 1 red, 2 blue, 0 none (keeps the last colour)
@@ -74,6 +98,7 @@ std::string describeOutput(const BlockDef& d, CellState s) {
 /// wafer count. Minecraft's comparator reading a container, in both compare and subtract mode.
 class cThresholdor final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 1; }  // 2026-11-04 (JD t4304u)
   static constexpr int kSubtract = 1;  // aux bit 0
   static constexpr int kRead = 2;      // aux bit 1
   static bool subtract(CellState s) { return (stAux(s) & kSubtract) != 0; }
@@ -178,11 +203,13 @@ class cTimerBuffer final : public cCompBehavior {
 /// to split and cycles that colour's front; using the block then cycles the red front.
 class cRedirector final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 4; }  // 2026-11-04 (JD t4304u)  // Multiplexor
   static bool split(CellState s) { return (stAux(s) & 4) != 0; }
   static int blueFront(CellState s) { return stAux(s) & 3; }
   // Lane off flags (split only; bits 13 / 14, free on a cRedirector): an off lane takes no input and
   // drives nothing, so a pixel's unused colour has nowhere to leak through the colourless output.
   static constexpr CellState kRedOff = 1u << 13, kBlueOff = 1u << 14;
+  static constexpr CellState kMuxBlue = 1u << 15;
   static CellState keep(CellState st) { return CellState(st & (kRedOff | kBlueOff)); }
   // 2026-11-01 (JD): Multiplexor: no use / wire-use control (Repeator side only). LL_MUX_NOUSE=0: old.
   static bool muxNoUse() { static const bool v = [] { const char* e = std::getenv("LL_MUX_NOUSE"); return !(e && e[0] == '0'); }(); return v; }
@@ -199,7 +226,8 @@ class cRedirector final : public cCompBehavior {
         if (in.ch[d] == 2 || in.ch[d] == 0) blue = std::max(blue, in.side[d]);
       }
       const int out = std::min(in.muxOn ? blue : red, kMaxSignal);
-      return {out, 0, CellState(makeState(out, f, stAux(st), out > 0) | keep(st))};
+      // 2026-11-04 (CloudAtlas v2 art): bit 15 = blue selected (render only: multiplexor_*_sel_blue).
+      return {out, 0, CellState(makeState(out, f, stAux(st), out > 0) | keep(st) | (in.muxOn ? kMuxBlue : 0))};
     }
     if (!split(st)) {
       const int out = std::min(std::max({in.back(f), in.left(f), in.right(f), in.top}), kMaxSignal);  // SW-H2 clamp
@@ -254,6 +282,7 @@ class cRedirector final : public cCompBehavior {
 /// data strength that travels the connected wire run without decay.
 class cPulsor final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 1; }  // 2026-11-04 (JD t4304u)
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), data = std::min(in.back(f), kMaxSignal), clock = std::max(in.left(f), in.right(f));  // SW-H2: data is passed through as the pulse strength
     // 2026-11-01 (JD): relay mode. With no clock on either side, a rising edge on the back (any strength,
@@ -274,8 +303,12 @@ class cPulsor final : public cCompBehavior {
     // 2026-11-01 (JD, PlayK): fires on one tick, stays high for cPulseRules::holdTicks() ticks
     // (default 4) so it can hold a Multiplexor open for an exact window. The held value is the
     // published m.out; the countdown is the saved anim timer, so the save format is unchanged.
-    const bool held = !fire && !lastRelay && m.out > 0 && m.timer > kPulsorAnimTicks - lithokraft::cPulseRules::holdTicks();
-    const int out = fire ? (relay ? pending : data) : (held ? int(m.out) : 0);
+    // PlayB (Elfie F3 / JD t4328u double blink): hold on the Pulsor's OWN last fired value, not m.out
+    // (m.out is the delayed published value since the 1-tick delay, so the hold re-fired: on, off, on, on).
+    // m.history is unused by the Pulsor (saved byte, no save-format change).
+    const bool held = !fire && !lastRelay && m.history > 0 && m.timer > kPulsorAnimTicks - lithokraft::cPulseRules::holdTicks();
+    const int out = fire ? (relay ? pending : data) : (held ? int(m.history) : 0);
+    m.history = uint8_t(out);
     ComponentStep step{out, 0, makeState(out, f, std::min<int>(m.timer, 7), m.timer > 0), out > 0};
     if (fire) step.sound = SoundCue::PulsorFire;
     return step;
@@ -288,6 +321,7 @@ class cPulsor final : public cCompBehavior {
 /// Back = write, front = stored value (continuous), sides = clear on a rising edge. 0 = empty.
 class cMemor final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 8; }  // PlayB (JD t4331u): 8 ticks (was 16)
   bool quiescent(CellState, const ComponentMemory&) const override { return true; }  // pure in inputs + edges
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     const int f = stFacing(st), v = std::min(in.back(f), kMaxSignal), side = std::max(in.left(f), in.right(f));  // SW-H2: v is stored and re-emitted
@@ -316,6 +350,7 @@ class cMemor final : public cCompBehavior {
 /// Use cycles the output (centre -> left -> right); sneak + use steps the match value.
 class cCatchor final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 1; }  // 2026-11-04 (JD t4304u)
   static bool wired(CellState s) { return (stAux(s) & 3) != 3; }
   // Same inputs and nothing fired last tick: prevIn already equals the match result, out stays 0.
   bool quiescent(CellState s, const ComponentMemory& m) const override { return m.out == 0 && !stOn(s); }
@@ -523,6 +558,7 @@ class cPortor final : public cCompBehavior {
 /// Use toggles reset (untrip).
 class cFusor final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 2; }  // 2026-11-04 (JD t4304u)  // Breakor
   bool quiescent(CellState s, const ComponentMemory& m) const override {
     return (stAux(s) & 1) != 0 && !m.prevSide;  // tripped = quiescent, unless a reset Repeator is on (edge tracking)
   }
@@ -578,7 +614,9 @@ void registerLogic(const Registrar& add) {
   add("fusor", std::make_unique<cFusor>());
   add("timer_buffer", std::make_unique<cTimerBuffer>());
   add("fusor_sum", std::make_unique<cFusorSum>());  // PlayN (JD)
-  add("randor", std::make_unique<cRandor>());  // 2026-10-31 (JD): random range block  // 2026-10-25 roadmap 7
+  add("dividor", std::make_unique<cDividor>());  // 2026-11-05 (JD)
+  add("randor", std::make_unique<cRandor>());
+  add("routor", std::make_unique<cRoutor>());  // PlayB (JD t4343u): was redirector_select  // 2026-11-04 (JD t4302u)  // 2026-10-31 (JD): random range block  // 2026-10-25 roadmap 7
 }
 
 }  // namespace lithokraft::components

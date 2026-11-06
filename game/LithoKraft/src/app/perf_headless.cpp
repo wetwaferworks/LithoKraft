@@ -15,7 +15,6 @@
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -34,6 +33,7 @@
 #include "litholattice/render/unified_mesher.h"
 #include "litholattice/sim/sim_thread.h"
 #include "litholattice/world/mesh_input.h"
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 namespace {
@@ -70,7 +70,7 @@ class cTimedSim final : public IWorldSim {
     const auto t0 = Clock::now();
     s_->tick(w, a, d);
     const double ms = msBetween(t0, Clock::now());
-    std::lock_guard l(m_); ticks_.push_back(ms);
+    litholattice::cGateGuard l(m_); ticks_.push_back(ms);
   }
   size_t activeCount() const override { return s_->activeCount(); }
   void takeEvents(std::vector<SimEvent>& out) override { s_->takeEvents(out); }
@@ -79,10 +79,10 @@ class cTimedSim final : public IWorldSim {
     auto* sw = dynamic_cast<cSignalWorldSim*>(s_.get());
     return sw ? &sw->signal() : nullptr;
   }
-  std::vector<double> take() { std::lock_guard l(m_); return std::move(ticks_); }
+  std::vector<double> take() { litholattice::cGateGuard l(m_); return std::move(ticks_); }
  private:
   std::unique_ptr<IWorldSim> s_;
-  std::mutex m_;
+  litholattice::cAtomicGate m_;
   std::vector<double> ticks_;
 };
 
@@ -375,7 +375,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   const bool useBenchScene = bench.scene != "default" && bench.scene != "circuits";
   std::printf("== stress %s, 3 s per rate\n", useBenchScene ? bench.scene.c_str() : "circuits (clock grid + wire meshes + repeator chains)");
   json += "  \"circuits\": [";
-  wafer->load(pool, 8);
+  Alu32Layout aluLay{}; const int loadSz = (bench.scene == "alu32") ? 12 : 8; wafer->load(pool, loadSz);  // 4x4 tower + margin
   const int y = wafer->chunks.surfaceY(8, 8) + 1;
   int placed = 0;
   if (bench.scene == "display") {
@@ -397,23 +397,33 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   } else if (bench.scene == "wire-torture") {
     buildWireTorture(wafer->chunks, 4, y, 4);
     placed = 24 * 48;
+  } else if (bench.scene == "alu32") {
+    const int n = std::max(1, bench.copies > 0 ? bench.copies : 256);
+    aluLay = buildAlu32Scene(wafer->chunks, 4, y, 4, n);
+    placed = aluLay.blocks;
+    std::printf("  alu32: copies=%d floor=%dx%d layers=%d pitch=%d foot=%d seed=0x%llx blocks=%d\n", aluLay.copies, aluLay.cols, aluLay.rows, aluLay.layers, aluLay.pitch, aluLay.footprint,
+                (unsigned long long)aluLay.seed, aluLay.blocks);
   } else {
     placed = buildCircuitScene(wafer->chunks, 4, y, 4, 120);
   }
-  const int rates[] = {32, 64, 128, 256, 512};
-  for (size_t ri = 0; ri < std::size(rates); ++ri) {
+  // 2026-11-05 (JD): alu32 stress is 512 TPS only (with correctness); other scenes keep the sweep.
+  const int ratesAlu[] = {512};
+  const int ratesAll[] = {32, 64, 128, 256, 512};
+  const int* rates = (bench.scene == "alu32") ? ratesAlu : ratesAll;
+  const size_t rateCount = (bench.scene == "alu32") ? 1u : 5u;
+  for (size_t ri = 0; ri < rateCount; ++ri) {
     std::atomic<int> remesh{0};
     auto timed = std::make_unique<cTimedSim>(std::make_unique<cSignalWorldSim>());
     cTimedSim* t = timed.get();
     SimConfig sc;
-    sc.tickRate = rates[ri]; sc.radiusChunks = 8; sc.belowWorldFill = wafer->belowWorldFill;
+    sc.tickRate = rates[ri]; sc.radiusChunks = (bench.scene == "alu32") ? std::max(8, loadSz) : 8; sc.belowWorldFill = wafer->belowWorldFill;
     sc.timingHandshake = bench.timingHandshake; sc.handshakePhasesPerCycle = bench.handshakePhases;
     cSimThread sim(wafer->chunks, blockRegistry(), std::move(timed), std::move(sc), [&](std::shared_ptr<MeshInput>) { ++remesh; });
     sim.setPlayerChunk(4, 4);
     sim.start();
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     t->take(); remesh = 0;
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    const int sampleS = (bench.scene == "alu32") ? 6 : 3; std::this_thread::sleep_for(std::chrono::seconds(sampleS));
     const std::vector<double> ticks = t->take();
     const int rm = remesh.load();
     const SimStats st = sim.stats();
@@ -431,9 +441,41 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
       const cSignalSim::PhaseMs pm = sig->takePhaseMs();
       phComps = pm.comps; phMark = pm.mark; phWires = pm.wires; phLamps = pm.lamps;
     }
+    // alu32 correctness (read settled cells)
+    int okTiles = 0, badSum = 0, badCap = 0, badThr = 0, goldenOk = 0;
+    double tickMax = 0;
+    for (double ms : ticks) if (ms > tickMax) tickMax = ms;
+    if (bench.scene == "alu32" && aluLay.copies > 0) {
+      auto sval = [&](int x, int yy, int z) { return int(stValue(wafer->chunks.getState(x, yy, z))); };
+      for (int i = 0; i < aluLay.copies; ++i) {
+        const int per = std::max(1, aluLay.cols * aluLay.rows);
+        const int layer = i / per, idx = i % per;
+        const int col = idx % aluLay.cols, row = idx / aluLay.cols;
+        const int tx = aluLay.x0 + col * aluLay.tileW, tz = aluLay.z0 + row * aluLay.tileD;
+        const int cy = aluLay.y + layer * aluLay.pitch + 1;
+        const int a = sval(tx + 2, cy, tz + 0);
+        const int b = sval(tx + 3, cy, tz + 1);  // B hop Trace
+        const int sum = sval(tx + 3, cy, tz + 0);  // Fusor state value = out
+        const int c = sval(tx + 5, cy, tz + 1);   // C hop into Thr right
+        const int thr = sval(tx + 5, cy, tz + 0);
+        const int expectSum = std::min(64, a + b);
+        const int expectThr = std::max(0, sum - c);
+        if (sum > 64) ++badCap;
+        if (sum != expectSum) ++badSum;
+        else if (thr != expectThr) ++badThr;
+        else ++okTiles;
+        if (i == 0) { std::printf("  alu32 tile0: a=%d b=%d sum=%d c=%d thr=%d\n", a, b, sum, c, thr); if (sum == 64 && thr == 32) goldenOk = 1; }
+      }
+      std::printf("  alu32 correctness: ok=%d/%d badSum=%d badCap=%d badThr=%d golden32+32->64=%s\n",
+                  okTiles, aluLay.copies, badSum, badCap, badThr, goldenOk ? "PASS" : "FAIL");
+      std::printf("  alu32 timing: achieved=%.0f tick avg=%.3f p99=%.3f max=%.3f ms budget=%.1f%% dropped=%llu components=%u blocks=%d ram=%.1f MB\n",
+                  double(ticks.size()) / double(sampleS), avg(ticks), pct(ticks, 0.99), tickMax,
+                  avg(ticks) * rates[ri] / 10.0, (unsigned long long)st.droppedTicks, st.active, placed,
+                  double(processWorkingSetBytes()) / 1048576.0);
+    }
     sim.stop();
     std::printf("  %3d TPS: %4zu ticks/3s (%.0f achieved), tick avg %.3f ms p99 %.3f ms, components %u, remesh %.0f/s, budget %.1f%%%s\n", rates[ri],
-                ticks.size(), double(ticks.size()) / 3.0, avg(ticks), pct(ticks, 0.99), st.active, rm / 3.0, avg(ticks) * rates[ri] / 10.0,
+                ticks.size(), double(ticks.size()) / double(sampleS), avg(ticks), pct(ticks, 0.99), st.active, rm / double(sampleS), avg(ticks) * rates[ri] / 10.0,
                 bench.timingHandshake ? " [handshake]" : " [legacy]");
     if (bench.timingHandshake)
       std::printf("    handshake: overrun phases %llu, overrun ns %llu, mean barrier wait %.0f ns/phase, phase ms comps %.2f mark %.2f wires %.2f lamps %.2f\n",
@@ -441,7 +483,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
                   hsPhases ? double(hsBarrierNs) / double(hsPhases) : 0.0, phComps, phMark, phWires, phLamps);
     char buf[512];
     std::snprintf(buf, sizeof buf, "%s\n    {\"tps\": %d, \"achieved_tps\": %.1f, \"tick_ms_avg\": %.4f, \"tick_ms_p99\": %.4f, \"components\": %u, \"remesh_per_s\": %.1f, \"mode\": \"%s\", \"phases_per_cycle\": %d, \"hs_overrun_phases\": %llu, \"hs_overrun_ns\": %llu, \"hs_barrier_wait_ns_mean\": %.1f, \"phase_ms\": {\"comps\": %.3f, \"mark\": %.3f, \"wires\": %.3f, \"lamps\": %.3f}}",
-                  ri ? "," : "", rates[ri], double(ticks.size()) / 3.0, avg(ticks), pct(ticks, 0.99), st.active, rm / 3.0,
+                  ri ? "," : "", rates[ri], double(ticks.size()) / double(sampleS), avg(ticks), pct(ticks, 0.99), st.active, rm / double(sampleS),
                   bench.timingHandshake ? "handshake" : "legacy", bench.handshakePhases,
                   (unsigned long long)hsOverruns, (unsigned long long)hsOverrunNs,
                   hsPhases ? double(hsBarrierNs) / double(hsPhases) : 0.0, phComps, phMark, phWires, phLamps);

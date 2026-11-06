@@ -379,6 +379,7 @@ void testAsyncSave(Checker& check) {
     hg.frame();
     clickId(hg, "menu-play");
     hg.frame();
+    std::printf("async-save: restored player x = %.2f (want 200 +- 4)\n", double(g.playerPosition().x));  // 2026-11-04 (Elfie F7 instrumentation)
     check(std::fabs(g.playerPosition().x - 200.f) < 4.f, "async-save: the player restores at x=200 on relaunch");
     check(waitForSurface(hg, g, 200, 8) >= 0, "async-save: terrain at x=200 returns after relaunch");
   }

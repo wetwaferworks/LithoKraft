@@ -11,7 +11,9 @@ ComponentStep cRandor::tick(const ComponentInputs& in, CellState st, ComponentMe
   const int n = std::clamp(in.back(f), std::max(randor::kLow, 1), kMaxSignal);
   const int clock = std::max(in.left(f), in.right(f));
   static const bool kNoRepeat = [] { const char* e = std::getenv("LL_RANDOR_NOREPEAT"); return !(e && e[0] == '0'); }();  // kill: =0
-  if (clock > 0 && m.prevClk == 0)
+  // PlayN (JD 11-05): every fresh clock edge re-rolls: a rise from 0, or a new non-zero clock value. LL_RANDOR_FRESH=0 kill.
+  static const bool kFreshClk = [] { const char* e = std::getenv("LL_RANDOR_FRESH"); return !(e && e[0] == '0'); }();
+  if (clock > 0 && (m.prevClk == 0 || (kFreshClk && clock != m.prevClk)))
     m.history = uint8_t(kNoRepeat ? randor::rollNoRepeat(in.rng, n, m.history) : randor::roll(in.rng, n));
   m.prevClk = uint8_t(std::min(clock, 255));
   const int out = m.history;

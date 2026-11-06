@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
-#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,6 +16,7 @@
 #include "lithokraft/game/actions.h"
 #include "lithokraft/game/player.h"
 #include "lithokraft/game/player_adapter.h"  // playerEyePos (CAM-1 FP eye)
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 namespace {
@@ -173,7 +173,7 @@ struct cPilotCameraRig::State {
     bool resolvedValid = false;
     CameraViewPose resolved{};
   };
-  mutable std::mutex mutex;
+  mutable litholattice::cAtomicGate mutex;
   std::map<std::string, Pilot, std::less<>> pilots;
 };
 
@@ -185,12 +185,12 @@ cPilotCameraRig::cPilotCameraRig(GameCameraHooks /*hooks*/) : state_(std::make_s
 cPilotCameraRig::~cPilotCameraRig() = default;
 
 bool cPilotCameraRig::hasPilot(std::string_view pilot) const {
-  std::lock_guard<std::mutex> lk(state_->mutex);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(state_->mutex);
   return state_->pilots.find(pilot) != state_->pilots.end();
 }
 
 bool cPilotCameraRig::setFreePose(std::string_view pilot, const litholattice::mcp::CameraPose& pose) {
-  std::lock_guard<std::mutex> lk(state_->mutex);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return false;
   it->second.mirror = pose;
@@ -199,7 +199,7 @@ bool cPilotCameraRig::setFreePose(std::string_view pilot, const litholattice::mc
 }
 
 bool cPilotCameraRig::trackPlayer(std::string_view pilot) {
-  std::lock_guard<std::mutex> lk(state_->mutex);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return false;
   it->second.mirror.trackPlayer = true;
@@ -207,7 +207,7 @@ bool cPilotCameraRig::trackPlayer(std::string_view pilot) {
 }
 
 bool cPilotCameraRig::mirrorPose(std::string_view pilot, litholattice::mcp::CameraPose& out) const {
-  std::lock_guard<std::mutex> lk(state_->mutex);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return false;
   out = it->second.mirror;
@@ -215,7 +215,7 @@ bool cPilotCameraRig::mirrorPose(std::string_view pilot, litholattice::mcp::Came
 }
 
 bool cPilotCameraRig::resolvedPose(std::string_view pilot, CameraViewPose& out) const {
-  std::lock_guard<std::mutex> lk(state_->mutex);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end() || !it->second.resolvedValid) return false;
   out = it->second.resolved;
@@ -223,7 +223,7 @@ bool cPilotCameraRig::resolvedPose(std::string_view pilot, CameraViewPose& out) 
 }
 
 std::vector<std::string> cPilotCameraRig::pilotNames() const {
-  std::lock_guard<std::mutex> lk(state_->mutex);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(state_->mutex);
   std::vector<std::string> names;
   names.reserve(state_->pilots.size());
   for (const auto& [name, p] : state_->pilots) names.push_back(name);
@@ -231,7 +231,7 @@ std::vector<std::string> cPilotCameraRig::pilotNames() const {
 }
 
 cPilotCameraRig::Request cPilotCameraRig::request(std::string_view pilot) const {
-  std::lock_guard<std::mutex> lk(state_->mutex);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(state_->mutex);
   Request r;
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return r;
@@ -241,7 +241,7 @@ cPilotCameraRig::Request cPilotCameraRig::request(std::string_view pilot) const 
 }
 
 void cPilotCameraRig::publishResolved(std::string_view pilot, const CameraViewPose& pose) {
-  std::lock_guard<std::mutex> lk(state_->mutex);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(state_->mutex);
   const auto it = state_->pilots.find(pilot);
   if (it == state_->pilots.end()) return;
   it->second.resolved = pose;

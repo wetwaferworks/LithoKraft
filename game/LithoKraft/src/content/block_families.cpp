@@ -21,7 +21,7 @@ const char* cBlockFamilies::name(BlockFamily f) {
 
 cBlockFamilies::cBlockFamilies() {
   static constexpr SimRole kTraceOrder[] = {
-      SimRole::Wire, SimRole::Pulsor, SimRole::Memor, SimRole::Randor, SimRole::cFusorSum, SimRole::Repeator, SimRole::Thresholdor,
+      SimRole::Wire, SimRole::Pulsor, SimRole::Memor, SimRole::Randor, SimRole::cFusorSum, SimRole::Dividor, SimRole::Repeator, SimRole::Thresholdor,
       SimRole::Redirector, SimRole::Latchor, SimRole::Catchor, SimRole::Switch, SimRole::cButton, SimRole::Keyboard,
       SimRole::Tone, SimRole::cSignalTransmittor, SimRole::cSignalReceivor, SimRole::cDish, SimRole::cOverclockor,
       SimRole::cPortor, SimRole::cFusor, SimRole::Chipor, SimRole::Lithographor, SimRole::Etchor};

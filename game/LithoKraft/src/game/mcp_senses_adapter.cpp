@@ -9,6 +9,7 @@
 
 #include "litholattice/core/math.h"
 #include "litholattice/world/chunk.h"  // packPos
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 namespace {
@@ -50,7 +51,7 @@ cMcpSensesAdapter::~cMcpSensesAdapter() { audio_.setTapEnabled(false); }
 
 void cMcpSensesAdapter::noteMesh(const litholattice::ChunkMesh& m) {
   const int64_t k = litholattice::packPos(m.cx, m.sy, m.cz);
-  std::lock_guard<std::mutex> lk(mutex_);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
   if (m.verts.empty()) {
     meshes_.erase(k);  // mesh removed
     return;
@@ -69,25 +70,25 @@ void cMcpSensesAdapter::noteMesh(const litholattice::ChunkMesh& m) {
 }
 
 void cMcpSensesAdapter::clearMeshes() {
-  std::lock_guard<std::mutex> lk(mutex_);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
   meshes_.clear();
   spriteVerts_.clear();
 }
 
 void cMcpSensesAdapter::setSpriteVerts(std::vector<litholattice::PackedVertex> verts,
                                        litholattice::Vec3 origin) {
-  std::lock_guard<std::mutex> lk(mutex_);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
   spriteVerts_ = std::move(verts);
   spriteOrigin_ = origin;
 }
 
 void cMcpSensesAdapter::syncCvars(const CvarState& s) {
-  std::lock_guard<std::mutex> lk(mutex_);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
   cvars_ = s;
 }
 
 cMcpSensesAdapter::CvarState cMcpSensesAdapter::cvars() const {
-  std::lock_guard<std::mutex> lk(mutex_);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
   return cvars_;
 }
 
@@ -109,7 +110,7 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
   std::vector<litholattice::PackedVertex> spriteVerts;
   litholattice::Vec3 spriteOrigin;
   {
-    std::lock_guard<std::mutex> lk(mutex_);
+    litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
     cv = cvars_;
     meshes = meshes_;
     spriteVerts = spriteVerts_;
@@ -134,7 +135,7 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
                         litholattice::lookDir(eye, fwd));
 
   {
-    std::lock_guard<std::mutex> rlk(renderMutex_);
+    litholattice::cGateGuard<litholattice::cAtomicGate> rlk(renderMutex_);
     sw_.setPerPixelShading(false);  // flat = the downgraded path
     sw_.resize(uint32_t(w), uint32_t(h));
     sw_.clear(kSkyClear);  // beyond loaded chunks: sky, not a crash
@@ -148,7 +149,7 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
     std::vector<std::shared_ptr<const CachedMesh>> drawList;
     drawList.reserve(meshes.size());
     {
-      std::lock_guard<std::mutex> plk(protoMutex_);
+      litholattice::cGateGuard<litholattice::cAtomicGate> plk(protoMutex_);
       auto& st = protoStates_[std::string(pilot)];  // per-pilot camera state
       litholattice::CullProtoConfig cfg;
       cfg.cometTailFrames = cv.cometTailFrames;
@@ -233,7 +234,7 @@ bool cMcpSensesAdapter::captureAudioChunk(std::string_view pilot, int tier, Audi
   const size_t need = litholattice::mcp::kAudioChunkFrames * step;
 
   // drainTap() is the tap's single reader; serialize captures.
-  std::lock_guard<std::mutex> alk(audioMutex_);
+  litholattice::cGateGuard<litholattice::cAtomicGate> alk(audioMutex_);
   const size_t got = audio_.drainTap(tapScratch_.data(), need);
   if (got < need) return false;  // tap has no data yet (or underran)
 

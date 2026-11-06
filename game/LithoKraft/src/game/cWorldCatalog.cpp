@@ -1,12 +1,5 @@
 // World catalog: see cWorldCatalog.h. 2026-10-30 (JD).
 #include "lithokraft/game/cWorldCatalog.h"
-#include <cerrno>
-#include <cstdio>
-#if defined(_WIN32)
-#include <process.h>
-#else
-#include <unistd.h>
-#endif
 
 namespace lithokraft {
 
@@ -43,33 +36,6 @@ int cWorldCatalog::indexFor(const std::string& benchScene, const std::string& di
   for (size_t i = 0; i < entries_.size(); ++i)
     if (entries_[i].id == id) return int(i);
   return -1;
-}
-
-bool cWorldCatalog::launch(const std::string& exe, const std::vector<std::string>& args) const {
-  std::vector<std::string> all{exe};
-  all.insert(all.end(), args.begin(), args.end());
-#if defined(_WIN32)
-  std::vector<std::string> quoted;
-  for (const auto& a : all) {
-    std::string q = "\"";
-    for (char c : a) { if (c == '"') q += '\\'; q += c; }
-    if (q.back() == '\\') q += '\\';
-    q += '"';
-    quoted.push_back(std::move(q));
-  }
-  std::vector<const char*> av;
-  for (const auto& q : quoted) av.push_back(q.c_str());
-  av.push_back(nullptr);
-  if (_spawnv(_P_NOWAIT, exe.c_str(), av.data()) == -1) { std::fprintf(stderr, "world picker: launch failed (errno %d)\n", errno); return false; }
-  return true;
-#else
-  std::vector<char*> av;
-  for (auto& a : all) av.push_back(a.data());
-  av.push_back(nullptr);
-  execv(exe.c_str(), av.data());
-  std::fprintf(stderr, "world picker: launch failed (errno %d)\n", errno);
-  return false;
-#endif
 }
 
 }  // namespace lithokraft

@@ -2,16 +2,17 @@
 // Modes (from main.cpp): --handshake-test (all proofs),
 // --handshake-scenario TICKS legacy|handshake WORKERS PHASES (hash only).
 #include "handshake_test.h"
+#include "litholattice/core/atomic_gate.h"
+#include "litholattice/core/gate_lock.h"
+#include "litholattice/core/atomic_condition.h"
 
 #include <algorithm>
 #include <cstdlib>  // F56-7 getenv
 #include <array>
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <cstdio>
 #include <filesystem>
-#include <mutex>
 #include <set>
 #include <string>
 #include <thread>
@@ -168,11 +169,11 @@ uint64_t runScenario(int ticks, bool handshake, int workers, int phases) {
 
 // ---- §6.2 WAIT proof ----
 struct Latch {
-  std::mutex m;
-  std::condition_variable cv;
+  ::litholattice::cAtomicGate m;
+  ::litholattice::cAtomicCondition cv;
   bool released = false;
-  void wait() { std::unique_lock lk(m); cv.wait(lk, [&] { return released; }); }
-  void release() { { std::lock_guard lk(m); released = true; } cv.notify_all(); }
+  void wait() { ::litholattice::cGateLock lk(m); cv.wait(lk, [&] { return released; }); }
+  void release() { { ::litholattice::cGateGuard lk(m); released = true; } cv.notify_all(); }
 };
 
 // 2026-10-30: LL_HS_LAYOUT=original runs shard work inline on the tick (caller) thread. A component
@@ -807,7 +808,7 @@ void testRateShuffleInvariance() {
     hc.phasesPerCycle = 4;
     hc.workerThreads = 2;
     hc.watchdogCeiling = std::chrono::seconds(10);
-    std::mutex mapM;  // pull workers share the bookkeeping maps; each name's stream is its own component's
+    ::litholattice::cAtomicGate mapM;  // pull workers share the bookkeeping maps; each name's stream is its own component's
     litholattice::cTimingHandshakeAuthority auth(hc);
     for (int i = 0; i < 6; ++i) {
       const int idx = reverse ? 5 - i : i;
@@ -816,7 +817,7 @@ void testRateShuffleInvariance() {
       d.rate = cases[size_t(idx)].rate;
       out.ids[cases[size_t(idx)].name] = auth.registerComponent(
           d, [&out, &mapM, &cases, idx](uint64_t phase, uint64_t) {
-            std::lock_guard lk(mapM);
+            ::litholattice::cGateGuard lk(mapM);
             uint64_t& st = out.states[cases[size_t(idx)].name];
             st = mixState(st, cases[size_t(idx)].mixConst, phase);
             ++out.pulls[cases[size_t(idx)].name];

@@ -6,22 +6,24 @@
 // requested through the SubmitMesh callback with an immutable MeshInput.
 #pragma once
 #include "litholattice/core/thread_census.h"  // Thread Handshake P2
+#include "litholattice/core/gate_lock.h"
 #include "litholattice/core/lock_timing.h"
 #include "litholattice/core/threeway.h"  // LL_THREEWAY (Proposed by JD; co-implemented by JD and Cortana)
 #include <chrono>
 #include <array>
 #include <atomic>
 #include <cassert>  // Cortana 2026-10-15 1658: F-2
-#include <condition_variable>
 #include <cstdint>
 #include <cstdio>  // LL_SIM_STALL_MS parse (Proposed by Herominde; implemented by Cortana)
 #include <functional>
-#include <mutex>
+#include "litholattice/core/atomic_gate.h"
+#include "litholattice/core/block_gate.h"
 #include <optional>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include "litholattice/core/fail_fast.h"
@@ -185,11 +187,11 @@ class cSimThread {
   /// pausing or stopping it, so the game thread can insert/erase chunk
   /// columns. Returns false (nothing held) when the timing handshake is
   /// frozen or has an outstanding worker; callers then fall back to stop().
-  bool holdBetweenTicks(std::unique_lock<std::recursive_mutex>& hold);
+  bool holdBetweenTicks(::litholattice::cGateLock<cBlockGate>& hold);
   /// 2026-10-25 (JD hitch): non-blocking form for the frame thread. Returns false with *busy = true
   /// when the sim is mid-tick (blockMutex_ taken) instead of waiting the tick out; false with
   /// *busy = false is the same refusal as holdBetweenTicks (frozen / workers outstanding).
-  bool tryHoldBetweenTicks(std::unique_lock<std::recursive_mutex>& hold, bool* busy);
+  bool tryHoldBetweenTicks(::litholattice::cGateLock<cBlockGate>& hold, bool* busy);
   /// Ticks stepped so far (for test verification).
   uint64_t ticksStepped() const { return ticksStepped_.load(std::memory_order_acquire); }
   /// Flips clock domain `index` on / off (SimConfig::domains order).
@@ -232,7 +234,7 @@ class cSimThread {
   }
   /// 2026-10-25 (JD hitch): non-blocking getBlock for the frame thread; nullopt while the sim is mid-tick.
   std::optional<BlockId> tryGetBlock(int x, int y, int z) {
-    std::unique_lock<std::recursive_mutex> l(blockMutex_, std::try_to_lock);
+    ::litholattice::cGateLock<cBlockGate> l(blockMutex_, ::litholattice::kTryToLock);
     if (!l.owns_lock()) return std::nullopt;
     return chunks_.get(x, y, z);
   }
@@ -259,6 +261,9 @@ class cSimThread {
   const cControlStream& controlStream() const { return *control_; }
   /// Re-snapshots every loaded sub-chunk for meshing at the next tick (textures were reloaded).
   void requestRemeshAll() { remeshAll_.store(true); notifyWake(); }
+  /// PlayJ fix 3: when false, flushDirty keeps dirty flags but skips pinForMeshing / submit (null renderer / headless benches).
+  void setMeshConsumer(bool on) { meshConsumes_ = on; }
+  bool meshConsumer() const { return meshConsumes_; }
   /// Columns whose cells changed (player edits, simulation ticks, random ticks, commands) since
   /// the last call: what a partial save must write. Clears the set. Call only while stopped.
   std::unordered_set<uint64_t> takeChangedColumns() { std::unordered_set<uint64_t> out; out.swap(changedCols_); return out; }
@@ -319,7 +324,7 @@ class cSimThread {
   /// edit changed the world (the caller re-casts before the next edit).
   bool applyOneEdit(EditCmd& e, const std::function<void(int, int, int)>& dirty);
   bool applyPlace(EditCmd& e);
-  std::mutex receiptM_;
+  cAtomicGate receiptM_;  // PlayL: was ::litholattice::cAtomicGate
   std::vector<uint8_t> receipts_;
   /// Look-at raycast for the HUD highlight only (no edit application).
   void castRay(const RayInput& ray);
@@ -328,16 +333,14 @@ class cSimThread {
   /// non-pow2 or above kMaxDomainHz.
   static void validateTickRate(int tps);
   void handleHandshakeFreeze();  // watchdog: pause + report (never simFailFast)
-  // Paused-loop parking (review A-M7): bumps the wake epoch under wakeM_
-  // and notifies wakeCv_. Every external change a parked paused loop must
-  // react to (pause toggle, step request, edit, ray, rate/domain change,
-  // remesh request, stop) goes through here. The epoch bump happens under
-  // wakeM_ so a parked loop cannot miss it between predicate check and
-  // wait: the bumper cannot acquire wakeM_ until the waiter has released
-  // it by actually waiting.
+  // Paused-loop parking (review A-M7 / PlayL): bumps the wake epoch.
+  // Every external change a parked paused loop must react to (pause toggle,
+  // step request, edit, ray, rate/domain change, remesh request, stop) goes
+  // through here. The loop spin/polls the epoch (no CV; threads never wait
+  // on each other).
   void notifyWake() {
-    { std::lock_guard l(wakeM_); wakeEpoch_.fetch_add(1, std::memory_order_acq_rel); }
-    wakeCv_.notify_all();
+    // PlayL JD: no CV wait/notify; bump epoch so a paused loop's spin/poll sees it.
+    wakeEpoch_.fetch_add(1, std::memory_order_acq_rel);
   }
   void markDirty(int x, int y, int z);
   void popAttached(int x, int y, int z);
@@ -359,8 +362,13 @@ class cSimThread {
   // across the edit drain + every tick of each loop iteration; getBlock() takes it
   // for the read. Uncontended on the sim thread; getBlock() may wait one burst.
   // Recursive: runBetweenTicks holds it across fn(), and fn() may legitimately
-  // call getBlock() (which takes the same mutex). A plain mutex deadlocks there.
-  std::recursive_mutex blockMutex_;
+  // call getBlock() (which takes the same gate). A plain non-reentrant gate deadlocks there.
+  // Archie PlayI: cBlockGate (atomics), not std::recursive_mutex.
+  // PlayJ fix 7 note: tick mutation window + getBlock/holdBetweenTicks still need this ownership gate
+  // (phase boundary between sim/main/stream). remesh/flush unlocks it when CoW columns are on
+  // (pin reads snapshots). Cannot remove for non-CoW pin or mid-tick getBlock without a new
+  // ownership/phase handoff for live column pointers.
+  cBlockGate blockMutex_;
   // Three-way split timing handshake (LL_THREEWAY=1, default OFF). Proposed by JD; co-implemented by JD and Cortana.
   // Point readers (getBlock / getBlockAndState) announce themselves; between whole ticks of a catch-up
   // burst the sim hands blockMutex_ over for their short read instead of making them wait out the
@@ -428,6 +436,7 @@ class cSimThread {
   TripleBuffer<SimStats> stats_;
   std::atomic<std::thread::id> statsReader_{};  // Cortana 2026-10-15 1658: F-2 (checked in Debug only)
   float rayEye_[3] = {0.f, -1e9f, 0.f};  ///< 2026-10-25: eye of the last cast ray (placement overlap check)
+  float rayDir_[3] = {0.f, 0.f, 1.f};    ///< PlayJ: look direction for remesh frustum cull
   TripleBuffer<RayInput> ray_;  // presentation only (HUD look-at); edit resolution uses stampedRay_
   // The serialized control stream: every sim-affecting control input
   // crosses here (edits, the stamped ray, the player chunk). Constructed
@@ -451,13 +460,22 @@ class cSimThread {
   // Pooled MeshInput buffers: the pool is shared with the submit() deleter so it
   // outlives any in-flight snapshot (a cSimThread may die while mesh workers still
   // hold snapshots). Cap bounds the retained memory (~64 x 24 KB).
+  // PlayI (JD, lock-free): fixed slot array, ownership handed off by atomic exchange / CAS (no gate).
   struct MeshInputPool {
-    std::mutex m;
-    std::vector<std::unique_ptr<MeshInput>> free;
+    static constexpr int kSlots = 64;
+    std::atomic<MeshInput*> slot[kSlots] = {};
+    std::unique_ptr<MeshInput> take() { for (auto& s : slot) if (MeshInput* p = s.exchange(nullptr, std::memory_order_acquire)) return std::unique_ptr<MeshInput>(p); return nullptr; }
+    void give(std::unique_ptr<MeshInput> u) { MeshInput* p = u.get(); for (auto& s : slot) { MeshInput* e = nullptr; if (s.compare_exchange_strong(e, p, std::memory_order_release, std::memory_order_relaxed)) { u.release(); return; } } }  // full: u frees it
+    ~MeshInputPool() { for (auto& s : slot) delete s.exchange(nullptr); }
   };
   std::shared_ptr<MeshInputPool> meshPool_ = std::make_shared<MeshInputPool>();
   RandomTickCache randomTickCache_;  // ticking column pointers (opt: skip hash lookups)
   uint64_t meshSeq_ = 1ull << 32;  // above the initial-load sequence numbers
+  std::unordered_map<uint64_t, uint64_t> flushMasks_;               // PlayI: flushDirty scratch, reused (no per-flush alloc)
+  std::vector<std::pair<uint64_t, uint64_t>> flushOrdered_;         // PlayI: flushDirty scratch, reused
+  std::vector<int64_t> flushWork_;                                 // PlayJ: in-view dirty keys this flush
+  std::vector<int64_t> flushHold_;                                 // PlayJ: out-of-view dirty keys retained
+  bool meshConsumes_ = true;                                       // PlayJ fix 3: pin/submit when a mesh consumer exists
   uint64_t flushBatch_ = 0;  // Cortana 2026-10-15 1350: phase-boundary publish batch id
 
   // ---- persistent tick state (review CH-H8) — sim thread only ----
@@ -484,10 +502,8 @@ class cSimThread {
   // step body runs; the body reports edit/raycast work back through these.
   bool stepEditsApplied_ = false, stepRaycastDone_ = false;
 
-  // ---- paused-loop parking (review A-M7) ----
-  std::mutex wakeM_;
-  std::condition_variable wakeCv_;
-  std::atomic<uint64_t> wakeEpoch_{0};  // bumped (under wakeM_) by notifyWake()
+  // ---- paused-loop parking (review A-M7 / PlayL: epoch spin/poll, no CV) ----
+  std::atomic<uint64_t> wakeEpoch_{0};  // bumped by notifyWake()
   bool hit_ = false; float hitDist_ = 0; int hit_xyz_[3]{}, prev_xyz_[3]{};
   // Look-at inspector cache: sim_->inspect is re-run only when the looked-at cell
   // changes (formatting it every loop iteration was pure churn).

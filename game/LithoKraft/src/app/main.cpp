@@ -5,6 +5,9 @@
 // falling back to gl33) -> game.
 // Input runs on the main thread only (see docs/ARCHITECTURE.md, "Input").
 #include "litholattice/core/lf_job_queue.h"
+#include "litholattice/core/atomic_gate.h"
+#include "litholattice/core/gate_lock.h"
+#include "litholattice/core/atomic_condition.h"
 #include "litholattice/core/named_thread_load.h"
 #include "litholattice/core/work_trace.h"  // duplicate-work trace
 #include "lithokraft/game/exit_watchdog.h"  // 2026-10-31 close-hang
@@ -16,7 +19,6 @@
 #include "litholattice/procgen/silicon_cities.h"  // --cities on|off
 #include <atomic>
 #include <charconv>
-#include <mutex>
 #include <system_error>
 #if !defined(_WIN32)
 #include <cerrno>
@@ -104,9 +106,7 @@ static std::string g_frameDumpDir;  // --frame-dump DIR (showcase capture)
 #include "litholattice/core/threeway.h"  // LL_THREEWAY (Proposed by JD; co-implemented by JD and Cortana)
 #include "litholattice/core/tick_profile.h"  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
 #include <atomic>
-#include <condition_variable>
 #include <functional>
-#include <mutex>
 #include <span>
 #include <thread>
 #include <type_traits>
@@ -176,7 +176,7 @@ class cMcpStdioTransport final : public litholattice::mcp::IStdioTransport {
   }
 
   void writeLine(std::string_view line) override {
-    std::lock_guard<std::mutex> lk(writeMutex_);
+    ::litholattice::cGateGuard<::litholattice::cAtomicGate> lk(writeMutex_);
     std::string out(line);
     out.push_back('\n');
     const char* p = out.data();
@@ -196,7 +196,7 @@ class cMcpStdioTransport final : public litholattice::mcp::IStdioTransport {
   int outFd_;
   std::atomic<bool> stop_{false};
   std::string buffer_;
-  std::mutex writeMutex_;
+  ::litholattice::cAtomicGate writeMutex_;
 };
 #endif  // !_WIN32
 
@@ -596,8 +596,8 @@ struct RenderWorker {
       std::function<bool()> pending;  // B61-1
       bool shotArmed = false;          // B61-1: a capture was armed for the frame submitted last
       std::thread th;
-      std::mutex m;
-      std::condition_variable cv;
+      ::litholattice::cAtomicGate m;
+      ::litholattice::cAtomicCondition cv;
       bool has = false, busy = false, quit = false;
       FrameParams job{};
       std::vector<Quad> quads;
@@ -605,7 +605,7 @@ struct RenderWorker {
       uint64_t pagesVer = ~0ull;
       std::atomic<bool> lost{false};
       void loop() {
-        std::unique_lock<std::mutex> l(m);
+        ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m);
         for (;;) {
           cv.wait(l, [&] { return has || quit; });
           if (!has) return;
@@ -626,7 +626,7 @@ struct RenderWorker {
         }
       }
       void submit(const FrameParams& fp) {  // main thread: the render handshake
-        std::unique_lock<std::mutex> l(m);
+        ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m);
         const int64_t ph0 = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only)
         cv.wait(l, [&] { return !busy && !has; });
         if (ph0) { ::litholattice::tickprof::frames().handoffNs.fetch_add(::litholattice::tickprof::nowNs() - ph0); ::litholattice::tickprof::frames().handoffs.fetch_add(1); }
@@ -648,7 +648,7 @@ struct RenderWorker {
       }
       void stop() {
         if (!th.joinable()) return;
-        { std::lock_guard<std::mutex> l(m); quit = true; }
+        { ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m); quit = true; }
         cv.notify_all();
         th.join();
         if (shotArmed && post) post();  // B61-1: a capture armed for the last rendered frame still lands (render thread joined)
@@ -675,8 +675,8 @@ struct SwRenderWorker {
       std::function<void()> post;     // B61-1 mirror: capture of a finished frame (game state lives on main)
       std::function<bool()> pending;  // B61-1 mirror: a capture is armed (game.screenshotPending())
       bool shotArmed = false;         // B61-1: a capture was armed for the job submitted last
-      std::mutex m;
-      std::condition_variable cv;
+      ::litholattice::cAtomicGate m;
+      ::litholattice::cAtomicCondition cv;
       SwRenderJob job;                // the one mailbox slot (producer side)
       uint64_t pagesVer = ~0ull;      // atlas version the job's page copy belongs to
       bool jobActive = false;         // a job is submitted and not yet completed (m)
@@ -688,7 +688,7 @@ struct SwRenderWorker {
       std::atomic<size_t> lastDrawn{0};  // meshes drawn by the last completed frame (overlay readout)
       void submit(const FrameParams& fp) {  // main thread: copy the job in, hand it to the executor, return
         std::exception_ptr err;
-        { std::unique_lock<std::mutex> l(m); cv.wait(l, [&] { return !jobActive; }); err = jobErr; jobErr = nullptr; }
+        { ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m); cv.wait(l, [&] { return !jobActive; }); err = jobErr; jobErr = nullptr; }
         if (err) std::rethrow_exception(err);  // a failed render surfaces on main one frame late (the sync path throws out of renderFrame itself)
         // B61-1 (mirrors RenderWorker::submit): the screenshot capture touches main-thread
         // game state, so it runs here on main while no job is in flight — the armed job has
@@ -704,7 +704,7 @@ struct SwRenderWorker {
         job.fp.spriteAtlasPages = std::span<const SwRenderJob::Page>(job.pages.data(), job.pages.size());
         job.drainTarget = r->uploadRingPublished();  // the seal: every upload staged by now belongs to this frame
         uint64_t seq;
-        { std::lock_guard<std::mutex> l(m); jobActive = true; seq = ++submitted; }
+        { ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m); jobActive = true; seq = ++submitted; }
         // The job's copies stay untouched until completeJob(seq) has run: the next submit()
         // waits for exactly that, so the one-slot discipline holds.
         r->renderFrameDetached(job.fp, job.drainTarget, [this, seq](std::exception_ptr e) { completeJob(seq, e); });
@@ -714,8 +714,12 @@ struct SwRenderWorker {
       // a Free slot, else the oldest Shown (already presented), else the older Ready
       // (superseded unpresented). A Presenting slot is never a target — main presents one
       // slot at a time, so a target always exists.
+      void drain() {  // Archie Phase 2: wait out the job in flight (in-process world load)
+        ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m);
+        cv.wait(l, [&] { return !jobActive; });
+      }
       void completeJob(uint64_t seq, std::exception_ptr err) {
-        std::lock_guard<std::mutex> l(m);
+        ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m);
         if (!err) {
           SoftwareFramebuffer& fb = r->framebuffer();
           SwFrameSlot* tgt = nullptr;
@@ -747,7 +751,7 @@ struct SwRenderWorker {
       // the last shown slot, and before the first completion it returns an empty
       // framebuffer — the caller's zero-size check skips the blit, as it does today.
       const SoftwareFramebuffer& acquirePresent() {
-        std::lock_guard<std::mutex> l(m);
+        ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m);
         presentIdx = -1;
         SwFrameSlot* best = nullptr;
         for (int i = 0; i < 2; ++i)
@@ -760,12 +764,12 @@ struct SwRenderWorker {
         return best->fb;
       }
       void releasePresent() {
-        std::lock_guard<std::mutex> l(m);
+        ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m);
         if (presentIdx >= 0 && slots[presentIdx].state == SwFrameSlot::Presenting) slots[presentIdx].state = SwFrameSlot::Shown;
         presentIdx = -1;
       }
       void stop() {  // main thread, shutdown: drain the in-flight job, land a trailing capture (B61-1)
-        { std::unique_lock<std::mutex> l(m); cv.wait(l, [&] { return !jobActive; }); }
+        { ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m); cv.wait(l, [&] { return !jobActive; }); }
         if (jobErr) {  // nowhere left to surface it: log and drop
           try { std::rethrow_exception(jobErr); }
           catch (const std::exception& e) { logError("threeway software: render job failed at shutdown: %s", e.what()); }
@@ -842,36 +846,8 @@ struct FrameCtx {
 // JD 2026-10-24: Settings > Graphics > Renderer. After the normal exit (world saved), start the
 // same exe again with the same arguments and --renderer <new>, then this process returns.
 static std::string g_relaunchBackend;
-static std::string g_expectSaveDir;  // 2026-10-31: --expect-save-dir (world relaunch check)
-static std::vector<std::string> g_worldSwitchArgs;  // 2026-10-30 (JD): world picker relaunch
-// 2026-10-31 (JD, relaunch fix): the world-picker relaunch keeps EVERY launch arg (--log, --cores,
-// bench dirs, ...; env flags are inherited) except the ones that select a world, which come from the
-// pick. --expect-save-dir tells the child which folder it must open so it can verify it.
-static std::vector<std::string> worldRelaunchArgs(int argc, char** argv, const std::vector<std::string>& pick,
-                                                  const std::string& defaultSaveDir) {
-  static const char* kWithValue[] = {"--save-dir", "--spawn", "--bench-scene", "--renderer", "--expect-save-dir"};
-  static const char* kFlag[] = {"--test-world", "--test-world-examples", "--flat-lab", "--bolt-lab"};
-  std::vector<std::string> out;
-  for (int i = 1; i < argc; ++i) {
-    bool skip = false;
-    for (const char* f : kWithValue) if (!std::strcmp(argv[i], f)) { skip = true; if (i + 1 < argc) ++i; break; }
-    if (!skip) for (const char* f : kFlag) if (!std::strcmp(argv[i], f)) { skip = true; break; }
-    if (!skip) out.emplace_back(argv[i]);
-  }
-  out.insert(out.end(), pick.begin(), pick.end());
-  std::string folder;
-  bool worldFlag = false;
-  for (size_t i = 0; i < pick.size(); ++i) {
-    if (pick[i] == "--save-dir" && i + 1 < pick.size()) folder = pick[i + 1];
-    for (const char* f : kFlag) if (pick[i] == f) worldFlag = true;
-    if (pick[i] == "--bench-scene") worldFlag = true;
-  }
-  if (folder.empty() && !worldFlag) folder = defaultSaveDir;  // "Default world" = the default save
-  if (folder.empty()) folder = "-";                            // built-in test world: no save folder
-  else folder = std::filesystem::absolute(folder).lexically_normal().string();
-  out.emplace_back("--expect-save-dir"); out.push_back(folder);
-  return out;
-}
+// Archie Phase 2 (JD 2026-11-04): a world load / save never relaunches the exe; the world-picker
+// relaunch, its argv plumbing and --expect-save-dir are gone (in-process load is the only path).
 static void relaunchWithRenderer(int argc, char** argv, const std::string& backend) {
   std::vector<std::string> args{argv[0]};
   for (int i = 1; i < argc; ++i) {
@@ -902,6 +878,7 @@ static void relaunchWithRenderer(int argc, char** argv, const std::string& backe
 #endif
 static bool lkStepFrame(FrameCtx& F);
 static void lkShutdownTail(FrameCtx& F);
+static void lkMcpStop(FrameCtx& F);
 #if defined(__wasm__)
 static void lkFrameThunk(void* p);
 #endif
@@ -1000,6 +977,7 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--tps-unlock")) tpsUnlock = true;
     else if (!std::strcmp(argv[i], "--scene-size")) cfg.sceneSize = int(num(16, 1024));
     else if (!std::strcmp(argv[i], "--scene-rows")) cfg.sceneRows = int(num(1, 64));
+    else if (!std::strcmp(argv[i], "--copies")) cfg.sceneCopies = int(num(1, 4096));  // 2026-11-05 alu32
     else if (!std::strcmp(argv[i], "--pattern") && i + 1 < argc) { cfg.pattern = argv[++i]; if (cfg.pattern != "checkers" && cfg.pattern != "circles") { std::fprintf(stderr, "--pattern: checkers|circles\n"); badArg = true; } }
     else if (!std::strcmp(argv[i], "--screen-orient") && i + 1 < argc) {
       const std::string o = argv[++i];
@@ -1103,7 +1081,14 @@ int main(int argc, char** argv) {
       else {
         backend = "vulkan"; rendererGiven = true;
         litholattice::setUnifiedMesher(true);
-        _putenv_s("LL_VERIFY_OFF", "1"); litholattice::setMeshVerify(false);
+        
+#ifdef _WIN32
+      _putenv_s("LL_VERIFY_OFF", "1");
+#else
+      setenv("LL_VERIFY_OFF", "1", 1);
+#endif
+      litholattice::setMeshVerify(false);  // 2026-11-04 (Elfie B3): thread_layout.h guard
+
         cfg.capture = true; noSave = true; benchPath = "showcase";
         if (benchSeconds <= 0) benchSeconds = 50;
         if (display0.width <= 0) { display0.width = 1920; display0.height = 1080; }
@@ -1113,11 +1098,17 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--ui-shot") && i + 1 < argc) uiShot = argv[++i];  // Cortana 2026-10-16
     else if (!std::strcmp(argv[i], "--ui-view") && i + 1 < argc) uiView = argv[++i];
     else if (!std::strcmp(argv[i], "--verify-mesh")) litholattice::setMeshVerify(true);  // Cortana 2026-10-15 1345
-    else if (!std::strcmp(argv[i], "--no-verify")) { _putenv_s("LL_VERIFY_OFF", "1"); litholattice::setMeshVerify(false); }  // verify-off switch (DebugOpt benchmarks)
+    else if (!std::strcmp(argv[i], "--no-verify")) {
+#ifdef _WIN32
+      _putenv_s("LL_VERIFY_OFF", "1");
+#else
+      setenv("LL_VERIFY_OFF", "1", 1);
+#endif
+      litholattice::setMeshVerify(false);  // 2026-11-04 (Elfie B3): thread_layout.h guard
+    }  // verify-off switch (DebugOpt benchmarks)
     else if (!std::strcmp(argv[i], "--unified-mesher")) litholattice::setUnifiedMesher(true);  // render pipeline M2
     else if (!std::strcmp(argv[i], "--legacy-mesher")) litholattice::setUnifiedMesher(false);  // render pipeline M2 (regression bisect)
     else if (!std::strcmp(argv[i], "--save-dir") && i + 1 < argc) saveDir = argv[++i];
-    else if (!std::strcmp(argv[i], "--expect-save-dir") && i + 1 < argc) g_expectSaveDir = argv[++i];  // 2026-10-31: relaunch check
     else if (!std::strcmp(argv[i], "--no-euv")) cfg.euv = false;
     else if (!std::strcmp(argv[i], "--timing-handshake")) { cfg.timingHandshake = true; hsGiven = true; }
     else if (!std::strcmp(argv[i], "--no-timing-handshake")) { cfg.timingHandshake = false; hsGiven = true; }
@@ -1201,7 +1192,7 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--perf-headless")) { runPerf = true; if (i + 1 < argc && argv[i + 1][0] != '-') perfJson = argv[++i]; }
     else if (!std::strcmp(argv[i], "--bench-scene") && i + 1 < argc) {
       cfg.benchScene = argv[++i];
-      if (cfg.benchScene != "default" && cfg.benchScene != "circuits" && cfg.benchScene != "display" && cfg.benchScene != "framebuffer" && cfg.benchScene != "redirector" && cfg.benchScene != "facings" && cfg.benchScene != "wall-pixel" && cfg.benchScene != "pattern-wall" && cfg.benchScene != "sawtooth" && cfg.benchScene != "wire-torture" && cfg.benchScene != "litho" && cfg.benchScene != "litho-wired" && cfg.benchScene != "testworld" && cfg.benchScene != "boltlab") { std::fprintf(stderr, "--bench-scene: default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld\n"); badArg = true; }
+      if (cfg.benchScene != "default" && cfg.benchScene != "circuits" && cfg.benchScene != "display" && cfg.benchScene != "framebuffer" && cfg.benchScene != "redirector" && cfg.benchScene != "facings" && cfg.benchScene != "wall-pixel" && cfg.benchScene != "pattern-wall" && cfg.benchScene != "sawtooth" && cfg.benchScene != "wire-torture" && cfg.benchScene != "litho" && cfg.benchScene != "litho-wired" && cfg.benchScene != "testworld" && cfg.benchScene != "boltlab" && cfg.benchScene != "alu32") { std::fprintf(stderr, "--bench-scene: ...|alu32\n"); badArg = true; }
     }
     else if (!std::strcmp(argv[i], "--version")) { std::printf("LithoKraft %s (LithoLattice engine)\n", LITHOKRAFT_VERSION); return 0; }
     else {
@@ -1279,7 +1270,7 @@ int main(int argc, char** argv) {
     radiusSource = "LL_SIM_TICK_RADIUS";
   }
   // JD 2026-10-16: render / stream distance (auto: Vulkan 64, software and GL 3.3 32; hard cap 64).
-  if (!streamGiven) cfg.streamRadius = settings.streamRadius > 0 ? settings.streamRadius : (backend == "vulkan" ? 64 : 32);
+  if (!streamGiven) cfg.streamRadius = settings.streamRadius > 0 ? settings.streamRadius : 16;  // PlayN (JD ruling 11-05): 16 chunks on software / GL / Vulkan
   cfg.streamRadius = std::clamp(cfg.streamRadius, 1, 64);
   cfg.streaming = streamingArg >= 0 ? streamingArg == 1 : settings.streaming;
   vsync = vsync || settings.vsync;
@@ -1355,6 +1346,7 @@ int main(int argc, char** argv) {
     bench.pattern = cfg.pattern;
     bench.timingHandshake = cfg.timingHandshake;
     bench.handshakePhases = cfg.handshakePhases;
+    bench.copies = cfg.sceneCopies;
     return runPerfHeadless(perfJson, bench);
   }
   if (runSelftest) return runSelfTests(cfg.scriptsDir, packStack(findAssetDirs(argv[0]), "pack_64", {}), cfg.timingHandshake);
@@ -1422,15 +1414,6 @@ int main(int argc, char** argv) {
       logError("save: world metadata in '%s' is unreadable (%s); falling back to %s seed %llu", cfg.saveDir.c_str(), seedErr.c_str(),
                seedGiven ? "the --seed" : "the default", (unsigned long long)cfg.seed);
     }
-  }
-  // 2026-10-31 (JD): the relaunched process verifies it opened the requested folder (moved after the log
-  // file opens, so the line lands in the --log file; bench runs have saves off and say so).
-  if (!g_expectSaveDir.empty() && benchSeconds > 0 && !soakSaves) logInfo("world relaunch check: bench run, saves off (requested '%s')", g_expectSaveDir.c_str());
-  else if (!g_expectSaveDir.empty()) {
-    const std::string got = cfg.saveDir.empty() ? std::string("-") : std::filesystem::absolute(cfg.saveDir).lexically_normal().string();
-    auto lower = [](std::string v) { for (char& c : v) c = char(std::tolower((unsigned char)c)); return v; };
-    if (lower(got) == lower(g_expectSaveDir)) logInfo("world relaunch check: OK, opened '%s'", got.c_str());
-    else logError("world relaunch check: MISMATCH, requested '%s' but opened '%s'", g_expectSaveDir.c_str(), got.c_str());
   }
   // Fix run 3 (2026-10-23): a saved world's area (level.json v3) WINS, like
   // its seed: the world keeps the sim/stream footprint it was played with.
@@ -1562,7 +1545,9 @@ int main(int argc, char** argv) {
     auto& mcpTransport = F.mcpTransport;
     auto& mcpSavedStdoutFd = F.mcpSavedStdoutFd;
 #endif
-    if (mcpStdio) {
+    // Archie Phase 2: the MCP server is (re)started per Game; an in-process world load stops it with
+    // the old Game and starts it again on the new one (the backends point into the Game).
+    auto mcpStart = [&](Game& game) {
       mcpServer = std::make_unique<litholattice::mcp::cMcpServer>(game.mcpBackends());
       mcpServer->setLogSink([](std::string_view line) {
         std::fprintf(stderr, "[mcp] %.*s\n", int(line.size()), line.data());
@@ -1592,7 +1577,8 @@ int main(int argc, char** argv) {
       mcpThread = std::thread([srv, done] { srv->runStdio(); done->store(true, std::memory_order_release); });
 #endif
       logWarn("mcp: stdio server running (agent starts with NO permissions; approve with `mcp grant <perm...>` in the console)");
-    }
+    };
+    if (mcpStdio) mcpStart(game);
     game.setClipboard(&clipboard);
     game.setDisplayModeApplier([window](DisplayMode mode) {
       DisplayDesc d = window->display();
@@ -1696,14 +1682,14 @@ int main(int argc, char** argv) {
     const bool& swThreewayOn = F.swThreewayOn;
     if (threewayOn) {
       rw.r = renderer;
-      rw.post = [&game] { game.capturePendingScreenshot(); };
-      rw.pending = [&game] { return game.screenshotPending(); };
+      rw.post = [&F] { if (F.game) F.game->capturePendingScreenshot(); };  // Phase 2: follows an in-process world load
+      rw.pending = [&F] { return F.game && F.game->screenshotPending(); };
       rw.th = std::thread([&rw] { rw.loop(); });
       logInfo("threeway: ON (LL_THREEWAY=1): main = window/input/game, render thread = GPU/memory + present, sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
     } else if (swThreewayOn) {
       sw.r = display.software;
-      sw.post = [&game] { game.capturePendingScreenshot(); };
-      sw.pending = [&game] { return game.screenshotPending(); };
+      sw.post = [&F] { if (F.game) F.game->capturePendingScreenshot(); };  // Phase 2: follows an in-process world load
+      sw.pending = [&F] { return F.game && F.game->screenshotPending(); };
       cSoftwareRenderer::setDetachedPoolMode(true);  // Design B Stage 1: the pool spawns its executor worker (band count unchanged)
       display.software->setUploadRingEnabled(true);  // Design B Stage 2: game uploads stage in the lock-free ring; the executor applies them at the frame seal
       logInfo("threeway: ON (LL_THREEWAY=1): software path, stage 2 async mailbox + upload ring: main = window/input/game + present (newest finished frame), frame job copied and rendered on the band-pool executor, pixels-only slots, uploads lock-free via the ring (no upload guard), sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
@@ -1741,29 +1727,30 @@ int main(int argc, char** argv) {
       // destructor writes the exit save to disk and joins the sim, streamer and jobs), the
       // renderer drops its chunk meshes, and the next Game is built on the same window,
       // renderer, pool, resources, audio and input. Threeway / MCP hold references into the
-      // Game, so those runs (and LL_WORLD_RELAUNCH=1) keep the relaunch path.
+      // Game: Archie Phase 2 (JD 2026-11-04) rebinds them (screenshot hooks follow F.game, the MCP
+      // server restarts on the new Game, the software ring clears in order), so no run relaunches.
       if (!(F.game && F.game->worldLoadRequested())) break;
       Game::WorldLoadRequest req = F.game->takeWorldLoadRequest();
-      std::vector<std::string> args = req.args;
-      if (!req.folder.empty()) { args.push_back("--save-dir"); args.push_back(req.folder); }
-#if !defined(__wasm__)
-      if (threewayOn || swThreewayOn || F.mcpServer || benchSeconds > 0) {
-        logInfo("world load '%s': threeway / mcp run, relaunching instead of loading in-process", req.label.c_str());
-        g_worldSwitchArgs = args; g_worldSwitchArgs.push_back("--renderer"); g_worldSwitchArgs.push_back(backend);
-        break;
-      }
-#endif
       std::string note;
       GameConfig next = cWorldConfigBuilder::build(worldLaunch, req.args, req.folder, &note);
       next.settings = F.game->settings();  // the player's live settings carry over
       logInfo("world load '%s': tearing down the current world%s%s", req.label.c_str(), note.empty() ? "" : " | ", note.c_str());
       const auto tl0 = Clock::now();
+      const bool hadMcp = F.mcpServer != nullptr;
+      if (hadMcp) lkMcpStop(F);     // its backends point into the old Game
+      if (swThreewayOn) F.sw.drain();  // the frame job in flight finishes on the executor first
       F.game.reset();               // exit save on disk; sim, streamer, jobs joined
-      renderer->clearChunkMeshes();  // no mesh of the old world survives into the new one
+      const auto tlSave = Clock::now();
+      // No mesh of the old world survives into the new one. Software threeway: the clear rides the
+      // upload ring behind the old world's tombstones; Vulkan threeway: under the renderer guard.
+      if (swThreewayOn) renderer->enqueueClearChunkMeshes();
+      else if (threewayOn) { litholattice::threeway::RendererGuard rg; renderer->clearChunkMeshes(); }
+      else renderer->clearChunkMeshes();
       const auto tl1 = Clock::now();
       F.game = std::make_unique<Game>(next, *renderer, pool, resources, audio, input);
       Game& ng = *F.game;
       if (!ng.ok()) { logError("world load '%s' FAILED: the new world did not build; exiting", req.label.c_str()); break; }
+      if (hadMcp) mcpStart(ng);
       ng.setClipboard(&clipboard);
       ng.setDisplayModeApplier([window](DisplayMode mode) {
         DisplayDesc d = window->display();
@@ -1774,38 +1761,28 @@ int main(int argc, char** argv) {
       if (!next.startSpawn.empty()) ng.startAt(next.startSpawn);
       else ng.enterPlay();
       F.tLast = Clock::now();
-      logInfo("world load '%s': done | teardown %.0f ms, build %.0f ms | save '%s'", req.label.c_str(),
+      logInfo("world load '%s': done | teardown %.0f ms (exit save + joins %.0f ms, mesh clear %.0f ms), build %.0f ms | save '%s'", req.label.c_str(),
               std::chrono::duration<double, std::milli>(tl1 - tl0).count(),
+              std::chrono::duration<double, std::milli>(tlSave - tl0).count(),
+              std::chrono::duration<double, std::milli>(tl1 - tlSave).count(),
               std::chrono::duration<double, std::milli>(F.tLast - tl1).count(), next.saveDir.empty() ? "(none)" : next.saveDir.c_str());
     }
     lkShutdownTail(F);
 #if !defined(__wasm__)
     if (F.game && F.game->restartRequested()) g_relaunchBackend = F.game->settings().renderer;
-    if (F.game && !F.game->worldSwitchArgs().empty()) { g_worldSwitchArgs = F.game->worldSwitchArgs(); g_worldSwitchArgs.push_back("--renderer"); g_worldSwitchArgs.push_back(backend); }  // JD 2026-10-30: keep the renderer this run used
 #endif
 #if !defined(__wasm__)
-    if (g_relaunchBackend.empty() && g_worldSwitchArgs.empty()) lithokraft::cExitWatchdog::arm("logs");  // 2026-10-31 close-hang: final exit only
+    if (g_relaunchBackend.empty()) lithokraft::cExitWatchdog::arm("logs");  // 2026-10-31 close-hang: final exit only
 #endif
     F.game.reset();   // game dies before the renderer and window, as at the old block-scope exit
     { const char* e = std::getenv("LL_SHUTDOWN_DRAIN_MS"); litholattice::cLfJobQueue::stopShared(e ? std::atol(e) : 10000L); }  // PlayM (JD 10:30): LF job queue stop step
     F.input.reset();
   }  // game (sim thread, mesh jobs) shuts down before the renderer and window
   display.renderer.reset();
-  if (!g_worldSwitchArgs.empty()) {  // 2026-10-31 (JD): say exactly which world folder the relaunch opens
-    const auto rargs = worldRelaunchArgs(argc, argv, g_worldSwitchArgs, (dataRoot(argv[0]) / "saves" / "world").string());
-    logInfo("world relaunch: opening folder '%s'", rargs.back().c_str());
-  }
   logInfo("exit");
   logCloseFile();
 #if !defined(__wasm__)
   if (!g_relaunchBackend.empty()) relaunchWithRenderer(argc, argv, g_relaunchBackend);
-  else if (!g_worldSwitchArgs.empty()) {
-    const auto rargs = worldRelaunchArgs(argc, argv, g_worldSwitchArgs, (dataRoot(argv[0]) / "saves" / "world").string());
-    std::string line;
-    for (const auto& a : rargs) line += " " + a;
-    std::fprintf(stderr, "world relaunch: opening folder '%s' | args:%s\n", rargs.back().c_str(), line.c_str());
-    cWorldCatalog::instance().launch(argv[0], rargs);
-  }
   // 2026-10-31 (JD close-hang): everything is saved and joined; skip static destructors (a pool or
   // census teardown that waits on a spinning worker kept the process alive at high CPU after the
   // window closed). The one atexit flush that matters runs first. LL_EXIT_FAST=0 kill switch.
@@ -2120,6 +2097,45 @@ static bool lkStepFrame(FrameCtx& F) {
   return true;
 }
 
+// MCP shutdown (P2c, F-M9; Archie Phase 2: also before an in-process world load): stop + join the
+// stdio thread and drop the server BEFORE the Game (and its adapters) is destroyed.
+static void lkMcpStop(FrameCtx& F) {
+  auto& mcpServer = F.mcpServer;
+  auto& mcpThread = F.mcpThread;
+#if !defined(_WIN32)
+  auto& mcpTransport = F.mcpTransport;
+  auto& mcpSavedStdoutFd = F.mcpSavedStdoutFd;
+#endif
+    if (mcpServer) {
+      if (F.game) F.game->setMcpServer(nullptr);
+#if !defined(_WIN32)
+      if (mcpTransport) mcpTransport->requestStop();
+      if (mcpThread.joinable()) mcpThread.join();
+#else
+      // Fix run 2 (2026-10-23, R-RACE-1): was detach() + reset(), a use-after-free
+      // while the thread sat in the blocking stdin read. Now: cancel the read,
+      // join, THEN free. If the read cannot be cancelled in time the server is
+      // leaked on purpose (the stop flag guarantees no further dispatch).
+      if (mcpThread.joinable() && F.mcpDone &&
+          !litholattice::mcp::stopStdioThread(mcpThread, *F.mcpDone, std::chrono::milliseconds(2000))) {
+        logError("mcp: stdin reader did not stop within 2 s; leaking the server instead of freeing it under a live thread");
+        mcpThread.detach();
+        (void)mcpServer.release();
+      }
+#endif
+      mcpServer.reset();
+#if !defined(_WIN32)
+      mcpTransport.reset();
+      if (mcpSavedStdoutFd >= 0) {
+        std::fflush(stdout);
+        ::dup2(mcpSavedStdoutFd, STDOUT_FILENO);
+        ::close(mcpSavedStdoutFd);
+        mcpSavedStdoutFd = -1;
+      }
+#endif
+    }
+}
+
 static void lkShutdownTail(FrameCtx& F) {
   Window* window = F.window;
   IRenderer* renderer = F.renderer;
@@ -2155,34 +2171,7 @@ static void lkShutdownTail(FrameCtx& F) {
     // MCP shutdown (P2c, F-M9): stop + join the stdio thread and drop the
     // server BEFORE the Game (and its adapters) is destroyed at scope
     // exit; restore the real stdout for the bench summary / exit path.
-    if (mcpServer) {
-      game.setMcpServer(nullptr);
-#if !defined(_WIN32)
-      if (mcpTransport) mcpTransport->requestStop();
-      if (mcpThread.joinable()) mcpThread.join();
-#else
-      // Fix run 2 (2026-10-23, R-RACE-1): was detach() + reset(), a use-after-free
-      // while the thread sat in the blocking stdin read. Now: cancel the read,
-      // join, THEN free. If the read cannot be cancelled in time the server is
-      // leaked on purpose (the stop flag guarantees no further dispatch).
-      if (mcpThread.joinable() && F.mcpDone &&
-          !litholattice::mcp::stopStdioThread(mcpThread, *F.mcpDone, std::chrono::milliseconds(2000))) {
-        logError("mcp: stdin reader did not stop within 2 s; leaking the server instead of freeing it under a live thread");
-        mcpThread.detach();
-        (void)mcpServer.release();
-      }
-#endif
-      mcpServer.reset();
-#if !defined(_WIN32)
-      mcpTransport.reset();
-      if (mcpSavedStdoutFd >= 0) {
-        std::fflush(stdout);
-        ::dup2(mcpSavedStdoutFd, STDOUT_FILENO);
-        ::close(mcpSavedStdoutFd);
-        mcpSavedStdoutFd = -1;
-      }
-#endif
-    }
+    lkMcpStop(F);  // Archie Phase 2: shared with the in-process world load
     if (benchSeconds > 0) {
       br.memEnd = processWorkingSetBytes();
       // Mega-draw smoothness bench (Direction JD, implementation Cortana 2026-10-25): LL_BENCH_FRAMES=<file> dumps

@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,6 +17,7 @@
 #include "litholattice/render/block_materials.h"
 #include "litholattice/ui/theme.h"
 #include "litholattice/world/column_generator.h"
+#include "litholattice/core/atomic_gate.h"
 
 namespace litholattice {
 class IRenderer;
@@ -82,7 +82,7 @@ class cResourceMgr {
   ui::Theme theme_ = ui::Theme::defaults();
   int themeRevision_ = 0;
   bool loaded_ = false;
-  mutable std::mutex mutex_;
+  mutable litholattice::cAtomicGate mutex_;
   std::shared_ptr<const BlockMaterials> materials_;
   std::vector<Image> icons_;  // by BlockId
   std::map<uint32_t, Image> itemIcons_;  // by non-block itemId (item registry)

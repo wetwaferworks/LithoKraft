@@ -1,0 +1,160 @@
+{
+  "format": "lithokraft_routor_voxel_v1",
+  "resolution": 32,
+  "lthm_level": 5,
+  "axes": "x=east, y=up, z=south; front/output z=0 (away from viewer), back z=31; left=west x=0, right=east x=31",
+  "engine_id": "lithokraft:routor",
+  "replaces_engine_id": "lithokraft:redirector_select",
+  "shape": "slab_3_16 + raised housing (redirector family)",
+  "logic": "2 in / 2 out, lanes never mix, 1 tick delay, Alt+RMB cycles mode 1->2->3->1",
+  "materials": {
+    "1": {
+      "name": "base",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#454D63",
+      "tint": false
+    },
+    "4": {
+      "name": "glow_seam",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "5": {
+      "name": "button_up",
+      "neutral_hex": "#9A9A9A",
+      "tint": true
+    },
+    "6": {
+      "name": "button_down",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "7": {
+      "name": "button_well",
+      "neutral_hex": "#161922",
+      "tint": false
+    },
+    "8": {
+      "name": "readout_window",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "9": {
+      "name": "housing",
+      "neutral_hex": "#1D165A",
+      "tint": false
+    },
+    "10": {
+      "name": "accent",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "11": {
+      "name": "pale",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "12": {
+      "name": "glyph",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "13": {
+      "name": "bezel",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "14": {
+      "name": "keycap",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "15": {
+      "name": "keywell",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "16": {
+      "name": "path_a",
+      "neutral_hex": "#5B3DB5",
+      "tint": true
+    },
+    "17": {
+      "name": "path_b",
+      "neutral_hex": "#5B3DB5",
+      "tint": true
+    },
+    "18": {
+      "name": "bridge_pier",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    }
+  },
+  "emissive_keys": {
+    "16": "routor_lane_a (lane that starts at BACK)",
+    "17": "routor_lane_b (other lane)"
+  },
+  "glow_rule": {
+    "direct_red_trace": "#FF514B",
+    "direct_blue_trace": "#2FB4FF",
+    "indirect": "#8B65DD",
+    "both_inputs_on": "slow pulse red<->blue on both lanes (GUESS: ~2 s period, shader time)",
+    "off": "base #5B3DB5 (no glow)"
+  },
+  "states": [
+    {
+      "state": "mode1",
+      "routing": "back in -> LEFT out ; RIGHT in -> FRONT out",
+      "lane_a": [
+        "back",
+        "left"
+      ],
+      "lane_b": [
+        "right",
+        "front"
+      ],
+      "lthm": "models/routor_mode1.lthm",
+      "voxels_json": "models/routor_mode1.voxels.json",
+      "cells": 6696
+    },
+    {
+      "state": "mode2",
+      "routing": "MIRROR: back in -> RIGHT out ; LEFT in -> FRONT out",
+      "lane_a": [
+        "back",
+        "right"
+      ],
+      "lane_b": [
+        "left",
+        "front"
+      ],
+      "lthm": "models/routor_mode2.lthm",
+      "voxels_json": "models/routor_mode2.voxels.json",
+      "cells": 6696
+    },
+    {
+      "state": "mode3",
+      "routing": "STRAIGHT CROSSOVER: back -> FRONT ; left <-> right (bridge)",
+      "lane_a": [
+        "back",
+        "front"
+      ],
+      "lane_b": [
+        "left",
+        "right"
+      ],
+      "lthm": "models/routor_mode3.lthm",
+      "voxels_json": "models/routor_mode3.voxels.json",
+      "cells": 6804
+    }
+  ]
+}

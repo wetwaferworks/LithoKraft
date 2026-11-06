@@ -51,6 +51,7 @@ GameSettings GameSettings::load(const std::string& path, const GameSettings& def
   if (!json.getBool("simDistanceV4", false) && s.tickRadius == 16) s.tickRadius = 8;
   s.streaming = json.getBool("streaming", s.streaming);
   s.streamRadius = clampInt(int(json.getNum("streamRadius", s.streamRadius)), 0, 64);
+  s.lodDetail = clampInt(int(json.getNum("lodDetail", s.lodDetail)), 0, 3);  // Archie Phase 1
   s.euv = json.getBool("euv", s.euv);
   s.mesher = clampInt(int(json.getNum("mesher", s.mesher)), 0, kSettingsMesherCount - 1);
   s.pbrTier = clampInt(int(json.getNum("pbrTier", s.pbrTier)), 0, 3);
@@ -93,6 +94,7 @@ bool GameSettings::save(const std::string& path) const {
   json.add("simDistanceV4", litholattice::Json::boolean(true));  // F56-10
   json.add("streaming", litholattice::Json::boolean(streaming));
   json.add("streamRadius", litholattice::Json::number(streamRadius));
+  json.add("lodDetail", litholattice::Json::number(lodDetail));  // Archie Phase 1
   json.add("euv", litholattice::Json::boolean(euv));
   json.add("mesher", litholattice::Json::number(mesher));
   json.add("pbrTier", litholattice::Json::number(pbrTier));

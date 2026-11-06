@@ -2,6 +2,7 @@
 // placement rules and sound cues (place / break / click), behind litholattice::IWorldSim.
 #pragma once
 #include "litholattice/core/tick_profile.h"  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -25,7 +26,18 @@ enum SimCommandCode : uint16_t {
                          ///< face neighbour is solid and canPlace allows it (Bedrock walk-bridging)
   // 2026-10-25 (JD, Posts):
   kCmdPostEdit = 6,      ///< post at (x, y, z) (either half): a = ASCII char, b = post::Control
+  kCmdLitho = 7,         ///< PlayM4 Trace-in-time: a = 1 compile box around (x, y, z), 2 stop, 3 cycle chip speed
 };
+
+/// PlayM4 (JD t4701u): Trace-in-time chip status for the HUD (written on the sim thread).
+/// state: 0 off, 1 chip running, 2 dropped by a block edit, 3 nothing to compile, 4 stopped by key.
+struct LithoHud {
+  std::atomic<int> state{0};
+  std::atomic<uint32_t> nodes{0}, links{0}, wires{0}, steps{1}, seq{0};
+  std::atomic<float> compileMs{0.f}, runUs{0.f};
+  std::atomic<uint64_t> ticks{0};
+};
+inline LithoHud& lithoHud() { static LithoHud h; return h; }
 
 /// SimEvent kinds above the SoundCue range (SoundCue is uint8_t).
 constexpr uint16_t kEvItemDrop = 0x0100;  ///< value = BlockId dropped; the game spawns an item entity
@@ -51,8 +63,10 @@ class cSignalWorldSim final : public IWorldSim {
   void tick(ChunkMap& world, const TickArea& area, const DirtyFn& dirty) override {
     signal_.setRoundArea(area.round);  // F56-7
     const int64_t tpS = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
-    if (!hsAuthority_) signal_.tick(world, area.pcx, area.pcz, area.radius, dirty);
-    else tickHandshake(world, area, dirty);
+    if (!(lithoOn_ && lithoTick(world, dirty))) {  // PlayM4: a running chip replaces the live signal tick
+      if (!hsAuthority_) signal_.tick(world, area.pcx, area.pcz, area.radius, dirty);
+      else tickHandshake(world, area, dirty);
+    }
     const int64_t tpR = tpS ? ::litholattice::tickprof::nowNs() : 0;
     // Playtest 2026-10-16: Pattern ROM screens advance once per world tick (empty in every
     // hash / selftest world, so those ticks are unchanged).
@@ -86,6 +100,10 @@ class cSignalWorldSim final : public IWorldSim {
  private:
   void tickHandshake(ChunkMap& world, const TickArea& area, const DirtyFn& dirty);
   void applyTortureGate(ChunkMap& world, const DirtyFn& dirty);
+  bool lithoTick(ChunkMap& world, const DirtyFn& dirty);  // PlayM4: true = chip ran (live skipped)
+  void lithoStop(int why);
+  bool lithoOn_ = false;
+  int lithoSteps_ = 1;
   bool gateSet_ = false, gateLit_ = false, gateSynced_ = false;
   int gateX_ = 0, gateY_ = 0, gateZ_ = 0;
   std::vector<GatedSource> gated_;

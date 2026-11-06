@@ -28,6 +28,7 @@ const Row kRows[] = {
     {"inventory", {Action::Inventory}},
     {"clear slot", {Action::Drop}},
     {"hide HUD", {Action::ToggleHUD}},
+    {"hide controls", {Action::ToggleControls}},  // 2026-11-05 (JD): F4 - panel only
     {"debug stats", {Action::ToggleDebug}},
     {"switch dimension", {Action::SwitchDim}},
     {"TPS 32/64/128/256/512", {Action::CycleTPS}},
@@ -36,6 +37,9 @@ const Row kRows[] = {
     {"reload textures + shaders", {Action::ReloadResources}},
     {"script editor (debug)", {Action::ScriptEditor}},
     {"screenshot", {Action::Screenshot}},
+    {"Trace-in-time: compile chip", {Action::LithoCompile}},  // PlayM4
+    {"Trace-in-time: stop chip", {Action::LithoStop}},
+    {"Trace-in-time: chip speed", {Action::LithoSpeed}},
     {"pause / release", {Action::Pause}},
 };
 

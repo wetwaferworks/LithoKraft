@@ -100,30 +100,17 @@ cWorldSave::cWorldSave(std::filesystem::path root, const litholattice::cMaterial
   sig.migrate[2] = [](const storage::Bytes& v2) -> std::optional<storage::Bytes> {
     return migrateSignalV2ToV3(v2);
   };
-  sig.save = [this](const ChunkColumn& c) {
-    if (lockFreeIo()) {  // LL_LF_SAVE/LOAD: this save job's export map rides the encode context
-      const auto* m = static_cast<const std::map<uint64_t, std::vector<uint8_t>>*>(storage::cLfWorldStore::tlsEncodeContext());
-      if (!m) return storage::Bytes{};
-      const auto it = m->find(ChunkKey::make(c.cx, c.cz));
-      return it == m->end() ? storage::Bytes{} : it->second;
-    }
-    std::lock_guard l(m_);
-    auto it = exporting_.find(ChunkKey::make(c.cx, c.cz));
-    return it == exporting_.end() ? storage::Bytes{} : it->second;
+  sig.save = [](const ChunkColumn& c) {
+    // Archie Phase 3c: SGNL export always rides the LF encode context (no exporting_ mutex).
+    const auto* m = static_cast<const std::map<uint64_t, std::vector<uint8_t>>*>(storage::cLfWorldStore::tlsEncodeContext());
+    if (!m) return storage::Bytes{};
+    const auto it = m->find(ChunkKey::make(c.cx, c.cz));
+    return it == m->end() ? storage::Bytes{} : it->second;
   };
-  sig.load = [this](const storage::Bytes& b, ChunkColumn&) {
-    if (lockFreeIo()) {  // LL_LF_SAVE/LOAD: per-request sink (decode context), no shared state
-      if (auto* sink = static_cast<std::vector<uint8_t>*>(storage::cLfWorldStore::tlsDecodeContext()))
-        sink->insert(sink->end(), b.begin(), b.end());
-      return true;
-    }
-    std::lock_guard l(m_);
-    // C-M4 per-call sink: append ONLY into the buffer the load call currently
-    // executing has armed (loadColumn's per-column payload, or loadDimension's
-    // blob). Self-delimiting entries: concatenation within one call is valid.
-    // No sink armed = no cWorldSave load is running this decode; drop the bytes
-    // rather than accumulating shared residue.
-    if (signalSink_) signalSink_->insert(signalSink_->end(), b.begin(), b.end());
+  sig.load = [](const storage::Bytes& b, ChunkColumn&) {
+    // Archie Phase 3c: per-request sink via TLS decode context (no signalSink_ mutex).
+    if (auto* sink = static_cast<std::vector<uint8_t>*>(storage::cLfWorldStore::tlsDecodeContext()))
+      sink->insert(sink->end(), b.begin(), b.end());
     return true;
   };
   payloads_.add(std::move(sig));
@@ -232,11 +219,11 @@ bool cWorldSave::writeWorldMeta(std::string* err) const {
     j.add("streamAreaShape", litholattice::Json::string(litholattice::areaShapeName(area_.stream)));
     j.add("tickRadius", litholattice::Json::number(double(area_.tickRadius)));
   }
-  {  // 2026-10-25 (JD): named /tp spots
-    std::lock_guard l(tpMutex_);
-    if (!tpMarks_.empty()) {
+  {  // 2026-10-25 (JD): named /tp spots — Archie Phase 3b: atomic snapshot, no tpMutex_
+    const auto marks = std::atomic_load_explicit(&tpMarks_, std::memory_order_acquire);
+    if (marks && !marks->empty()) {
       litholattice::Json arr = litholattice::Json::array();
-      for (const TpMark& m : tpMarks_) {
+      for (const TpMark& m : *marks) {
         litholattice::Json o = litholattice::Json::object();
         o.add("name", litholattice::Json::string(m.name));
         o.add("dim", litholattice::Json::string(m.dim));
@@ -365,265 +352,29 @@ std::optional<cWorldSave::WorldAreaMeta> cWorldSave::readWorldArea(const std::fi
   return a;
 }
 
-storage::cWorldStore& cWorldSave::store(const std::string& dim) {
-  std::lock_guard l(storesMutex_);
-  auto& s = stores_[dim];
-  if (!s) s = std::make_unique<storage::cWorldStore>(root_ / dim, payloads_);
-  return *s;
-}
-
+// Archie Phase 3c: legacy cWorldStore / mutex path removed. Public entry points always LF.
 cWorldSave::LoadedColumn cWorldSave::loadColumn(const std::string& dim, int cx, int cz) {
-  if (lockFreeIo()) return loadColumnLf(dim, cx, cz);  // 2026-11-01 LL_LF_LOAD / LL_LF_SAVE
-  LoadedColumn out;  // NotSaved until a saved column actually decodes
-  if (!std::filesystem::exists(root_ / dim)) return out;
-  // Serialise against loadDimension and other loadColumn calls so the SGNL
-  // decode sink armed below names exactly this call's payload buffer (C-M4).
-  std::lock_guard loadLock(loadMutex_);
-  {
-    std::lock_guard l(streamRemapMutex_);
-    if (!streamRemap_) {
-      std::string nerr;
-      auto remap = storage::readStableRemap(root_ / "blocks.names", blockRegistry(), &nerr);
-      if (!remap) {
-        // C-4 fail closed + B-M3: an unreadable table (after recovery) means
-        // saved columns must NOT be silently replaced by generated ones, and
-        // saveDimension will refuse to overwrite the world while the table
-        // stays unreadable. Report Unreadable PER COLUMN (no session latch:
-        // the read is re-attempted on the next call, so a repaired table
-        // heals in-session); the streamer leaves a hole and retries.
-        logError("save '%s': %s; FAIL CLOSED: streamed column %d,%d is UNREADABLE (name table unreadable; not generated over)", dim.c_str(), nerr.c_str(), cx, cz);
-        out.status = ColumnLoad::Unreadable;
-        return out;
-      }
-      if (remap->legacy) logInfo("save '%s': no block name table (pre-table save); streamed ids taken as the current order", dim.c_str());
-      // C-M5: the dimension path logs the unknown list; the streaming path
-      // must too — once, here, when the cached remap is built.
-      for (const std::string& u : remap->unknown) logError("save '%s': unknown block '%s' loads as air", dim.c_str(), u.c_str());
-      streamRemap_ = std::move(remap);
-    }
-  }
-  std::string err;
-  std::unique_ptr<ChunkColumn> col;
-  {  // Arm this call's private SGNL sink for exactly this decode (C-M4), so
-     // the payload comes back per column (SW-H1) instead of feeding a shared
-     // dimension-level accumulator.
-    std::lock_guard l(m_);
-    signalSink_ = &out.signal;
-  }
-  col = store(dim).load(cx, cz, &err);
-  {
-    std::lock_guard l(m_);
-    signalSink_ = nullptr;
-  }
-  if (!col) {
-    out.signal.clear();
-    if (!err.empty()) {  // a record exists but could not be read/decoded: NOT "never saved"
-      logError("save '%s': %s (column %d,%d UNREADABLE: not generated over)", dim.c_str(), err.c_str(), cx, cz);
-      out.status = ColumnLoad::Unreadable;
-    }
-    return out;  // err empty = the column was never saved
-  }
-  std::string rerr;
-  storage::StableRemap remapCopy;
-  { std::lock_guard l(streamRemapMutex_); remapCopy = *streamRemap_; }
-  if (!storage::remapColumn(*col, remapCopy, &rerr)) {
-    logError("save '%s': %s (column %d,%d UNREADABLE: not generated over)", dim.c_str(), rerr.c_str(), cx, cz);
-    out.signal.clear();
-    out.status = ColumnLoad::Unreadable;
-    return out;
-  }
-  out.status = ColumnLoad::Loaded;
-  out.column = std::move(col);
-  return out;
+  return loadColumnLf(dim, cx, cz);
 }
 
 size_t cWorldSave::saveDimension(const std::string& dim, const ChunkMap& world, const cSignalSim& signal, bool wait,
                                 const std::unordered_set<uint64_t>* dirty) {
-  // 2026-10-31 (JD, Save World): split into capture (the caller's sim-held window) + commit.
+  // Capture under caller's sim window, then LF commit (Archie Phase 3c).
   std::unique_ptr<cWorldSnapshot> snap = cWorldSnapshot::capture(dim, world, signal, dirty);
   return commit(*snap, wait);
 }
-
 size_t cWorldSave::commit(cWorldSnapshot& snap, bool wait) {
-  if (lockFreeIo()) return commitLf(snap, wait);  // 2026-11-01 LL_LF_SAVE / LL_LF_LOAD
-  const std::string dim = snap.dimension();
-  lastSaveOk_ = true;
-  lastSaveError_.clear();
-  // C-4 fail closed, BEFORE anything is written: a present-but-unreadable
-  // name table (readStableRemap already attempted crash recovery) plus
-  // region data for this dimension means this save would interpret — and
-  // overwrite — a world we cannot read back. Refuse it whole: no new table,
-  // no region writes, no metadata (Game::saveWorld also skips player.lat).
-  {
-    std::string nerr;
-    if (!storage::readStableRemap(root_ / "blocks.names", blockRegistry(), &nerr) && regionDataExists(root_, dim)) {
-      lastSaveOk_ = false;
-      lastSaveError_ = "refusing to overwrite '" + dim + "': block name table unreadable and region data exists: " + nerr;
-      logError("save: %s", lastSaveError_.c_str());
-      return 0;
-    }
-  }
-  auto state = snap.takeSignalState();  // captured by cWorldSnapshot (same copy rules as before)
-  std::vector<std::unique_ptr<ChunkColumn>> copies = snap.takeColumns();
-  const size_t n = copies.size();
-  std::string nerr;
-  if (!storage::writeBlockNames(root_ / "blocks.names", blockRegistry(), &nerr)) {
-    // The table interprets everything written below; saving regions under a
-    // table that did not land would strand them. Refuse the whole save.
-    lastSaveOk_ = false;
-    lastSaveError_ = nerr;
-    logError("save: %s (save refused: block name table not written)", nerr.c_str());
-    return 0;
-  }
-  // SV-H2: persist the world seed (+ format version) on every save, through
-  // the same contract. Hooked here (not only in Game::saveWorld) so every
-  // cWorldSave caller — game, tests, tools — leaves a self-describing world.
-  if (hasSeed_ && !writeWorldMeta(&nerr)) {
-    lastSaveOk_ = false;
-    lastSaveError_ = nerr;
-    logError("save: %s (save refused: world metadata not written)", nerr.c_str());
-    return 0;
-  }
-  storage::cWorldStore& s = store(dim);
-  // The SGNL source for the encodes that follow (the I/O thread runs jobs in order).
-  s.enqueue([this, state] { std::lock_guard l(m_); exporting_ = std::move(*state); });
-  for (auto& c : copies) s.saveAsync(std::move(c));
-  s.enqueue([this] { std::lock_guard l(m_); exporting_.clear(); });
-  if (wait) {
-    // SV-H1: a synchronous save must know whether the regions landed.
-    if (!s.flush()) {
-      lastSaveOk_ = false;
-      lastSaveError_ = "region flush failed for '" + dim + "' (" + std::to_string(s.lastFlushFailureCount()) +
-                       " region(s); pending records kept for retry)";
-      logError("save: %s", lastSaveError_.c_str());
-    }
-  } else s.flushAsync();
-  return n;
+  return commitLf(snap, wait);
 }
 
 size_t cWorldSave::saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
                               const cSignalSim& signal, bool wait) {
-  if (lockFreeIo()) return saveColumnsLf(dim, cols, signal, wait);  // 2026-11-01 LL_LF_SAVE / LL_LF_LOAD
-  // A2 / B-M1 save-on-evict: saveDimension's discipline, scoped to the
-  // eviction candidates. Same fail-closed name-table gate, same
-  // table/metadata-first ordering, same exporting_ enqueue protocol —
-  // a column is only reported saved when this whole path succeeded, and
-  // the caller must not evict a column this call did not save.
-  lastSaveOk_ = true;
-  lastSaveError_.clear();
-  {
-    std::string nerr;
-    if (!storage::readStableRemap(root_ / "blocks.names", blockRegistry(), &nerr) && regionDataExists(root_, dim)) {
-      lastSaveOk_ = false;
-      lastSaveError_ = "refusing to save eviction columns in '" + dim + "': block name table unreadable and region data exists: " + nerr;
-      logError("save: %s", lastSaveError_.c_str());
-      return 0;
-    }
-  }
-  // SGNL export happens NOW — before the caller unscans the columns —
-  // and is filtered to exactly the columns being saved.
-  auto state = std::make_shared<std::map<uint64_t, std::vector<uint8_t>>>();
-  {
-    const auto all = signal.exportState();
-    for (const ChunkColumn* col : cols) {
-      if (!col) continue;
-      const uint64_t key = ChunkKey::make(col->cx, col->cz);
-      if (const auto it = all.find(key); it != all.end()) state->emplace(key, it->second);
-    }
-  }
-  std::vector<std::unique_ptr<ChunkColumn>> copies;
-  for (const ChunkColumn* col : cols) {
-    if (!col || col->edgeShell) continue;  // Q12: never save a demoted shell over real data
-    auto c = std::make_unique<ChunkColumn>();
-    c->cx = col->cx; c->cz = col->cz;
-    for (size_t s = 0; s < col->subs.size(); ++s)
-      if (col->subs[s] && col->subs[s]->nonAir) c->subs[s] = std::make_unique<SubChunk>(*col->subs[s]);
-    c->materialPalette = col->materialPalette;  // interned handle: shared, not copied
-    c->cellText = col->cellText;  // 2026-10-25 Posts: panel text (PTXT payload)
-    copies.push_back(std::move(c));
-  }
-  const size_t n = copies.size();
-  if (n == 0) return 0;
-  std::string nerr;
-  if (!storage::writeBlockNames(root_ / "blocks.names", blockRegistry(), &nerr)) {
-    lastSaveOk_ = false;
-    lastSaveError_ = nerr;
-    logError("save: %s (eviction-column save refused: block name table not written)", nerr.c_str());
-    return 0;
-  }
-  if (hasSeed_ && !writeWorldMeta(&nerr)) {
-    lastSaveOk_ = false;
-    lastSaveError_ = nerr;
-    logError("save: %s (eviction-column save refused: world metadata not written)", nerr.c_str());
-    return 0;
-  }
-  storage::cWorldStore& s = store(dim);
-  s.enqueue([this, state] { std::lock_guard l(m_); exporting_ = std::move(*state); });
-  for (auto& c : copies) s.saveAsync(std::move(c));
-  s.enqueue([this] { std::lock_guard l(m_); exporting_.clear(); });
-  if (wait) {
-    if (!s.flush()) {
-      lastSaveOk_ = false;
-      lastSaveError_ = "region flush failed for '" + dim + "' (" + std::to_string(s.lastFlushFailureCount()) +
-                       " region(s); pending records kept for retry)";
-      logError("save: %s", lastSaveError_.c_str());
-    }
-  } else s.flushAsync();
-  return n;
+  return saveColumnsLf(dim, cols, signal, wait);
 }
 
 int cWorldSave::loadDimension(const std::string& dim, ChunkMap& world, std::vector<uint8_t>& signalState) {
-  if (lockFreeIo()) return loadDimensionLf(dim, world, signalState);  // 2026-11-01 LL_LF_LOAD / LL_LF_SAVE
-  if (!std::filesystem::exists(root_ / dim)) return 0;
-  // Serialise against streamed loadColumn calls for the whole load, so the
-  // SGNL sink armed below collects exactly this dimension's payloads (C-M4).
-  std::lock_guard loadLock(loadMutex_);
-  std::string nerr;
-  const auto remap = storage::readStableRemap(root_ / "blocks.names", blockRegistry(), &nerr);
-  if (!remap) {
-    // C-4 fail closed (recovery was already attempted inside the read):
-    // with region data present, refuse the load outright (-1) — the caller
-    // must not present generated terrain as this world, and saveDimension
-    // will refuse to overwrite it. With no region data there is nothing to
-    // lose, so an unreadable table alone does not block a fresh world.
-    if (regionDataExists(root_, dim)) {
-      logError("save '%s': %s; FAIL CLOSED: load refused (block name table unreadable, region data present; nothing loaded, nothing will be overwritten)", dim.c_str(), nerr.c_str());
-      return -1;
-    }
-    logError("save '%s': %s; not loading (no region data present)", dim.c_str(), nerr.c_str());
-    return 0;
-  }
-  if (remap->legacy) logInfo("save '%s': no block name table (pre-table save); ids taken as the current order, table written on the next save", dim.c_str());
-  for (const std::string& u : remap->unknown) logError("save '%s': unknown block '%s' loads as air", dim.c_str(), u.c_str());
-  std::vector<uint8_t> imported;  // this call's private SGNL sink (C-M4)
-  { std::lock_guard l(m_); signalSink_ = &imported; }
-  storage::cWorldStore& s = store(dim);
-  std::mutex got;
-  std::vector<std::unique_ptr<ChunkColumn>> loaded;
-  int bad = 0;
-  for (const auto& [k, col] : world.columns())
-    s.loadAsync(col->cx, col->cz, [&](std::unique_ptr<ChunkColumn> c, std::string err) {
-      std::lock_guard l(got);
-      if (c) loaded.push_back(std::move(c));
-      else if (!err.empty()) { ++bad; logError("save '%s': %s (column keeps generated terrain)", dim.c_str(), err.c_str()); }
-    });
-  s.flush();  // waits for the I/O thread (the loads above)
-  int inserted = 0;
-  for (auto& c : loaded) {
-    std::string rerr;
-    if (!storage::remapColumn(*c, *remap, &rerr)) {
-      logError("save '%s': %s (column dropped, generated terrain kept)", dim.c_str(), rerr.c_str());
-      continue;
-    }
-    world.insert(std::move(c));
-    ++inserted;  // L6: count only columns actually inserted, never remap-dropped ones
-  }
-  { std::lock_guard l(m_); signalState = std::move(imported); signalSink_ = nullptr; }
-  if (bad) logError("save '%s': %d columns unreadable", dim.c_str(), bad);
-  return inserted;
+  return loadDimensionLf(dim, world, signalState);
 }
-
-// ---- 2026-11-01 (JD): LL_LF_SAVE / LL_LF_LOAD lock-free asynchronous I/O ----------------------
 
 storage::cLfWorldStore& cWorldSave::lfStore(const std::string& dim) {
   for (auto& e : lfStores_.slot) {
@@ -863,12 +614,8 @@ int cWorldSave::loadDimensionLf(const std::string& dim, ChunkMap& world, std::ve
 
 bool cWorldSave::flush() {
   bool ok = true;
-  if (lockFreeIo()) {  // 2026-11-01: the lock-free stores
-    for (auto& e : lfStores_.slot)
-      if (LfStoreEntry* p = e.load(std::memory_order_acquire)) ok = p->store->flush() && ok;
-    return ok;
-  }
-  for (auto& [d, s] : stores_) ok = s->flush() && ok;
+  for (auto& e : lfStores_.slot)
+    if (LfStoreEntry* p = e.load(std::memory_order_acquire)) ok = p->store->flush() && ok;
   return ok;
 }
 

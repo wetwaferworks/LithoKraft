@@ -3,9 +3,10 @@
 namespace lithokraft {
 /// Config for --bench-scene when used with --perf-headless.
 struct BenchSceneConfig {
-  std::string scene = "circuits";  ///< circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture
+  std::string scene = "circuits";  ///< circuits|display|...|alu32
   int size = 64;                   ///< --scene-size
   int rows = 16;                   ///< --scene-rows
+  int copies = 256;                 ///< --copies (alu32 tile count)
   std::string pattern = "circles"; ///< --pattern (checkers|circles)
   bool timingHandshake = true;     ///< bench mode A/B: default follows the standard (handshake ON since 2026-10-14); --no-timing-handshake selects legacy
   int handshakePhases = 4;         ///< --handshake-phases

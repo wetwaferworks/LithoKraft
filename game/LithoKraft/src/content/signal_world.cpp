@@ -4,6 +4,8 @@
 #include "lithokraft/content/item_use.h"
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215
 #include "litholattice/core/log.h"
+#include <chrono>
+#include <cstdlib>
 #include "litholattice/procgen/ramp_shape.h"  // Cortana 2026-10-16: Aluminum Ramp snapping
 
 namespace lithokraft {
@@ -210,12 +212,56 @@ bool cSignalWorldSim::use(ChunkMap& w, int x, int y, int z, const DirtyFn& dirty
   return true;
 }
 
+// ===== PlayM4 (JD t4701u): Trace-in-time in game (numpad 7 compile / 8 stop / 9 speed) =====
+void cSignalWorldSim::lithoStop(int why) {
+  signal_.lithoCommit(); signal_.lithoReset(); lithoOn_ = false;
+  auto& h = lithoHud(); h.state = why; h.seq.fetch_add(1);
+}
+bool cSignalWorldSim::lithoTick(ChunkMap& w, const DirtyFn& dirty) {
+  auto& h = lithoHud();
+  if (!signal_.lithoValid()) { lithoStop(2); ::litholattice::logInfo("litho: chip dropped (block edit) - live sim resumes"); return false; }
+  const auto t0 = std::chrono::steady_clock::now();
+  const int r = signal_.lithoRun(lithoSteps_);
+  if (r < 0) { lithoStop(2); return false; }
+  h.runUs = float(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count());
+  h.ticks.fetch_add(uint64_t(r));
+  signal_.lithoWriteBack(w, dirty);
+  return true;
+}
+
 void cSignalWorldSim::command(ChunkMap& w, const SimCommand& c, const DirtyFn& dirty) {
+  if (c.code == kCmdLitho) {
+    auto& h = lithoHud();
+    if (c.a == 1) {
+      if (lithoOn_) lithoStop(4);
+      static const int kR = [] { const char* e = std::getenv("LL_LITHO_R"); const int v = e ? std::atoi(e) : 96; return v < 4 ? 4 : v; }();
+      static const int kH = [] { const char* e = std::getenv("LL_LITHO_H"); const int v = e ? std::atoi(e) : 32; return v < 2 ? 2 : v; }();
+      cSignalSim::LithoStats st;
+      const bool ok = signal_.lithoCompile(w, c.x - kR, c.y - kH, c.z - kR, c.x + kR, c.y + kH, c.z + kR, &st);
+      h.nodes = uint32_t(st.nodes); h.links = uint32_t(st.links); h.wires = uint32_t(st.wires); h.compileMs = float(st.compileMs);
+      h.ticks = 0; h.runUs = 0.f; h.steps = uint32_t(lithoSteps_);
+      if (ok && st.nodes > 0) { lithoOn_ = true; h.state = 1; }
+      else { signal_.lithoReset(); h.state = 3; }
+      h.seq.fetch_add(1);
+      ::litholattice::logInfo("litho: compile box (%d,%d,%d)+-%d/%d -> %s nodes=%zu links=%zu wires=%zu %.2f ms", c.x, c.y, c.z, kR, kH,
+                              lithoOn_ ? "chip ON" : "empty", st.nodes, st.links, st.wires, st.compileMs);
+    } else if (c.a == 2) {
+      if (lithoOn_) { lithoStop(4); ::litholattice::logInfo("litho: chip stopped by key - live sim resumes"); }
+    } else if (c.a == 3) {
+      static constexpr int kSteps[] = {1, 2, 4, 8, 16, 64};
+      int i = 0; while (i < 6 && kSteps[i] != lithoSteps_) ++i;
+      lithoSteps_ = kSteps[(i + 1) % 6]; h.steps = uint32_t(lithoSteps_); h.seq.fetch_add(1);
+      ::litholattice::logInfo("litho: chip speed x%d ticks per world tick", lithoSteps_);
+    }
+    return;
+  }
   if (c.code == kCmdKeyPulse) signal_.keyPulse(c.x, c.y, c.z, c.a, c.b);
   else if (c.code == kCmdAltUse) {
     // 2026-10-31 (JD, Alt+wheel): `a` = how many secondary steps (0 = 1). The 1..64 settings wrap
     // through 64 states, so 63 steps is one step back (Alt + wheel down).
     const int n = (c.a >= 1 && c.a <= 63) ? c.a : 1;
+    // PlayB (JD t4347u): the Routor's modes are Alt + click only; Alt + wheel does nothing on it.
+    if (c.a != 0 && w.get(c.x, c.y, c.z) == kRedirectorSelect) return;
     bool any = false;
     for (int i = 0; i < n; ++i) any = signal_.use(w, c.x, c.y, c.z, dirty, true) || any;
     if (any) sounds_.push_back({SoundCue::Click, 0, c.x, c.y, c.z});

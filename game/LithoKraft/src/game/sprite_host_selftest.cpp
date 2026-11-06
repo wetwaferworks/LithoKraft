@@ -107,6 +107,20 @@ int runSpriteHostSelfTest(const std::vector<std::filesystem::path>& packDirs) {
     check(packs == 0 || found == packs * 6, "item icons: CloudAtlas <name>_item.png present for every pack (32/64/128)");
     check(kHudIconPx == 16, "item icons: HUD icon size is one constant (kHudIconPx, still 16 until JD confirms)");
   }
+  // -- 2026-11-05 (JD): the Dividor is in the creative palette and has an icon, like the Fusor --
+  {
+    bool inPalette = false, fusorInPalette = false;
+    for (BlockId b : paletteBlocksGrouped()) { inPalette = inPalette || b == kDividor; fusorInPalette = fusorInPalette || b == kFusorSum; }
+    check(inPalette && fusorInPalette, "DIVIDOR palette: lithokraft:dividor is listed in the creative block palette (with the Fusor)");
+    const Image* di = rm.icon(kDividor);
+    const Image* fi = rm.icon(kFusorSum);
+    const auto plain = rm.bestPlainIcon(cResourceMgr::iconName(kDividor));
+    const auto item = rm.bestItemIcon(cResourceMgr::iconName(kDividor));
+    std::printf("  [info] DIVIDOR icon: name '%s', loaded %dpx (Fusor %dpx), pack icon %dpx, item_icons %dpx\n", cResourceMgr::iconName(kDividor).c_str(),
+                di ? int(di->width()) : 0, fi ? int(fi->width()) : 0, plain ? int(plain->width()) : 0, item ? int(item->width()) : 0);
+    check(di != nullptr && di->width() >= 32, "DIVIDOR icon: the Dividor has a loaded palette / hotbar icon (>= 32 px)");
+    check(plain && plain->width() >= 32, "DIVIDOR icon: textures/ui/icons/dividor.png ships in the packs like fusor_sum.png");
+  }
 
   // -- PNG entry points against the real pack file --------------------------
   {

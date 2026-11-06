@@ -155,8 +155,10 @@ cDimensionReg createDimensions(const WorldgenSettings& settings) {
   auto lab = std::make_unique<Dimension>();
   lab->id = "flatlab"; lab->name = "Flat Lab"; lab->biomes = {"flat_lab"};
   lab->generator = makeGenerator(settings, lab->id); lab->belowWorldFill = kStone;
-  lab->setup = [](ChunkMap& w, int size) -> Spawn {
-    const int c = std::min(size * 16 / 2, 288);  // fixed origin: the Examples grid runs +x/+z from here
+  lab->setup = [](ChunkMap& w, int /*size*/) -> Spawn {
+    // Archie PlayG: spawn stays at block 288 even when loadRadius pre-bakes a smaller disk;
+    // the Examples grid still runs +x/+z from here (extent comes from worldChunks).
+    const int c = 288;
     const int h = std::max(0, w.surfaceY(c, c));
     return {float(c), float(h) + 1.f, float(c), 0.785f, -0.35f};
   };

@@ -10,6 +10,7 @@ namespace {
 /// Right-click toggles a steady 64 on every side.
 class cSwitch final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 2; }  // 2026-11-04 (JD t4304u)
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory&) const override {
     const int out = stOn(st) ? kMaxSignal : 0;
     return {out, 0, withAttach(makeState(out, stFacing(st), 0, stOn(st)), stAttach(st))};  // facing kept (2026-10-24)
@@ -27,6 +28,7 @@ class cSwitch final : public cCompBehavior {
 /// Right-click gives a kButtonTicks-long 64 pulse on every side.
 class cInputButton final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 2; }  // 2026-11-04 (JD t4304u)
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory& m) const override {
     const int out = m.timer > 0 ? kMaxSignal : 0;
     if (m.timer) --m.timer;
@@ -47,6 +49,7 @@ class cInputButton final : public cCompBehavior {
 /// SIXBIT code + 1 out the front, control codes (Enter 1, Backspace 2) out the right side.
 class Keyboard final : public cCompBehavior {
  public:
+  int delayTicks(CellState, int64_t, uint64_t) const override { return 6; }  // 2026-11-04 (JD t4304u)
   ComponentStep tick(const ComponentInputs&, CellState st, ComponentMemory& m) const override {
     int out = 0, out2 = 0;
     if (!m.keys.empty()) {

@@ -317,6 +317,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       }
     }
   check(lamps == 9 && lit == 7, "wafer demo: 9 plain lamps, 7 lit at launch (repeator, comparator, redirector rows included)");
+  std::printf("  wafer demo: color lamps %d, lit %d (want 35 / 33)\n", clamps, clit);  // 2026-11-04 (Elfie F4 instrumentation)
   check(clamps == 35 && clit == 33, "wafer demo: lamp wall (32) + color lamps lit at launch");
   check(surfaceSy >= 15 && crustSubs <= 36 * 3 && subs <= 36 * 4,
         "wafer: surface near layer 256 of 768, only the crust is generated (empty sections skipped; feature spires may add a 4th section)");

@@ -63,7 +63,6 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <vector>
 
 #include "litholattice/ai/ai_world.h"
@@ -71,6 +70,7 @@
 #include "litholattice/core/threading.h"  // JobPool
 #include "litholattice/world/block.h"    // cBlockReg
 #include "litholattice/world/chunk_map.h"
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 
@@ -97,7 +97,7 @@ class cAiHost {
   /// drain. Provably 0 at all times while the gate is off (posts are
   /// dropped at the sink), and 0 again after every advance() drain.
   size_t pendingInvalidations() const {
-    std::lock_guard l(invMutex_);
+    litholattice::cGateGuard l(invMutex_);
     return pendingCols_.size();
   }
   /// True when an cAiWorld actually exists (bound + enabled).
@@ -138,7 +138,7 @@ class cAiHost {
   std::atomic<bool> enabled_ = false;  // ai.enabled gate (default OFF)
   bool observerSet_ = false;
   litholattice::ai::Cell observer_{};
-  mutable std::mutex invMutex_;
+  mutable litholattice::cAtomicGate invMutex_;
   std::vector<uint64_t> pendingCols_;  // packed column keys from the edit listener
 };
 

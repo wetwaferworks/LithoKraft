@@ -1,4 +1,5 @@
 #include "lithokraft/game/bench_stream.h"
+#include "litholattice/core/atomic_gate.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -165,7 +166,7 @@ void cBenchStreamer::submitMesh(int cx, int sy, int cz, int lod, uint32_t gen, c
     const auto t0 = Clock::now();
     std::shared_ptr<MeshInput> in;
     {
-      std::shared_lock lock(*mu);
+      litholattice::cGateGuard lock(*mu);
       if (map->column(cx, cz)) in = snapshotForMeshing(*map, blockRegistry(), cx, sy, cz, 0, 0, below);
     }
     MeshOut o;
@@ -238,7 +239,7 @@ size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const Bloc
     genMs.add(g.ms); ++sec_.generated; ++totalGenerated;
     const int cx = g.col->cx, cz = g.col->cz;
     {
-      std::unique_lock lock(*mapMu_);  // [C53-2] exclusive only for the map change
+      litholattice::cGateGuard lock(*mapMu_);  // [C53-2] exclusive only for the map change
       map_.insert(std::move(g.col));
     }
     const ChunkColumn* col = map_.column(cx, cz);
@@ -344,7 +345,7 @@ size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const Bloc
     lod_.erase(key);  // [C54-1]
     requested_.erase(key);
     {
-      std::unique_lock lock(*mapMu_);  // [C53-2]
+      litholattice::cGateGuard lock(*mapMu_);  // [C53-2]
       map_.columns().erase(key);
     }
     ++sec_.dropped;

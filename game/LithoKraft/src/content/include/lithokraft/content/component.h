@@ -19,6 +19,7 @@
 #include "lithokraft/engine.h"
 #include "lithokraft/content/blocks.h"
 #include "litholattice/sim/tick_rate.h"
+#include "lithokraft/content/behavior_traits.h"
 
 namespace lithokraft {
 
@@ -34,6 +35,7 @@ struct ComponentMemory {
   uint8_t channel = 1;         ///< radio channel for the transmittor / receivor (1..64; 0 = the Daemon, reserved)
   bool jammer = false;         ///< cOverclockor: jammer item installed (v1: toggled by use; item UI later)
   bool beacon = false;         ///< transmittor: generate its own signal instead of reading the wire
+  uint8_t lastIn = 0;          ///< PlayN (JD 11-05): Repeator fresh-edge detector, last back value (not saved; 0 after load)
 };
 
 /// Signal arriving at a component this tick, by absolute direction (0 N, 1 E, 2 S, 3 W).
@@ -78,6 +80,9 @@ class cBlockBehavior {
 
   /// One-line HUD readout of a cell, e.g. "Repeator | delay 4 | out 64 | facing E".
   virtual std::string describe(const BlockDef& def, CellState /*state*/) const { return std::string(def.name); }
+  /// Colour this block passes to neighbouring components (0 = none, 1 red, 2 blue).
+  /// Trace (cWire) and LEDs (cTorch) return BlockDef::channel; default none.
+  virtual int colour(const BlockDef& /*def*/) const { return 0; }
 };
 
 /// Logic of one signal component type.
@@ -119,6 +124,13 @@ class cCompBehavior : public cBlockBehavior {
   virtual int readLevel(CellState /*state*/, const ComponentMemory& /*mem*/) const { return -1; }
   /// Sneak + use (secondary setting, e.g. a Catchor's match value). Default: nothing.
   virtual std::optional<CellState> useAlt(CellState /*state*/, ComponentMemory& /*mem*/) const { return std::nullopt; }
+  /// 2026-11-04 (JD t4304u / t4306u): this class's delay, ticks from input change to output change.
+  /// The class decides it (state = the cell's new state, key / tick for seeded per-event delays); the
+  /// sim's thin shared queue (cScheduledOutput) only releases the output on that tick. 0 = immediate.
+  virtual int delayTicks(CellState /*state*/, int64_t /*cellKey*/, uint64_t /*tick*/) const { return 0; }
+  /// false: the class's tick() already times its output (the Repeator's settable line); the queue
+  /// passes it straight through and delayTicks() is informational.
+  virtual bool queuedOutput() const { return true; }
 };
 
 /// Name -> behaviour table, and BlockId -> behaviour resolved through the block registry.
@@ -131,10 +143,20 @@ class cBehaviorCatalog {
   const cBlockBehavior& behavior(BlockId b) const;
   /// Component logic of block `b`, or nullptr if it is not a ticking component.
   const cCompBehavior* component(BlockId b) const { return b < components_.size() ? components_[b] : nullptr; }
+  /// Archie Phase 4: POD traits for block `b` (empty traits for non-components).
+  const cCompTraits& traits(BlockId b) const {
+    static const cCompTraits kEmpty{};
+    return b < traits_.size() ? traits_[b] : kEmpty;
+  }
   /// Behaviour registered under `name`, or nullptr.
   const cBlockBehavior* byName(std::string_view name) const;
   /// HUD readout of a cell: the block's behaviour describes its state.
   std::string describe(BlockId b, CellState state) const { return behavior(b).describe(blockRegistry().def(b), state); }
+  /// Colour a block def passes to components (via its behaviour class). Same path for Trace and LEDs.
+  int colour(const BlockDef& def) const {
+    if (const cBlockBehavior* b = byName(def.behavior)) return b->colour(def);
+    return 0;
+  }
 
  private:
   cBehaviorCatalog();
@@ -144,6 +166,7 @@ class cBehaviorCatalog {
   std::vector<std::pair<std::string_view, std::unique_ptr<cBlockBehavior>>> named_;
   std::vector<const cBlockBehavior*> behaviors_;
   std::vector<const cCompBehavior*> components_;
+  std::vector<cCompTraits> traits_;  ///< Archie Phase 4: parallel to components_
 };
 
 /// 2026-10-25 (JD): does block `b` have a secondary (sneak / Alt + right click) setting in

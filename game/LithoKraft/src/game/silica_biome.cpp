@@ -2,7 +2,8 @@
 #include "lithokraft/game/silica_biome.h"
 
 #include <array>
-#include <mutex>
+#include <atomic>
+#include <memory>
 #include <unordered_map>
 #include "lithokraft/game/wafer_biomes.h"
 #include "litholattice/procgen/pipeline.h"
@@ -19,8 +20,9 @@ int64_t chunkKey(int cx, int cz) {
 
 struct SilicaShadeCache::Impl {
   std::shared_ptr<const litholattice::cColumnGen> gen;
-  std::mutex mutex;
-  std::unordered_map<int64_t, SilicaShade> cache;  // chunkKey -> blended shade
+  // Archie Phase 3c: COW map, atomic publish (mesher hot path, no mutex).
+  using Map = std::unordered_map<int64_t, SilicaShade>;
+  std::atomic<std::shared_ptr<const Map>> cache_{std::make_shared<const Map>()};
 
   SilicaShade blend(int cx, int cz) {
     // The sanctioned sibling query: regenerate the chunk's column maps
@@ -51,23 +53,19 @@ SilicaShadeCache::~SilicaShadeCache() = default;
 
 SilicaShade SilicaShadeCache::shade(int cx, int cz) {
   const int64_t k = chunkKey(cx, cz);
-  bool hit = false;
-  SilicaShade v{};
-  {
-    std::lock_guard<std::mutex> lk(impl_->mutex);
-    if (const auto it = impl_->cache.find(k); it != impl_->cache.end()) {
-      v = it->second;
-      hit = true;
-    }
-  }
-  if (!hit) {
-    // Cache miss: blend without holding the lock; a duplicate miss on another
-    // worker just blends twice and emplaces once (emplace keeps the first).
+  for (;;) {
+    auto snap = std::atomic_load_explicit(&impl_->cache_, std::memory_order_acquire);
+    if (const auto it = snap->find(k); it != snap->end()) return it->second;
     const SilicaShade fresh = impl_->blend(cx, cz);
-    std::lock_guard<std::mutex> lk(impl_->mutex);
-    v = impl_->cache.emplace(k, fresh).first->second;
+    auto next = std::make_shared<Impl::Map>(*snap);
+    const auto [it, inserted] = next->emplace(k, fresh);
+    (void)inserted;
+    std::shared_ptr<const Impl::Map> expected = snap;
+    if (std::atomic_compare_exchange_weak_explicit(
+            &impl_->cache_, &expected, std::shared_ptr<const Impl::Map>(std::move(next)),
+            std::memory_order_release, std::memory_order_acquire))
+      return it->second;
   }
-  return v;
 }
 
 float silicaScatterDensity(const litholattice::procgen::ColumnMaps& maps, size_t column) {

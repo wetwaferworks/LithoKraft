@@ -71,7 +71,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -83,6 +82,7 @@
 #include "litholattice/render/software_renderer.h"
 #include "lithokraft/game/camera_controller.h"  // cPilotCameraRig (engine pilot cameras)
 #include "lithokraft/game/mcp_player_control.h"  // cMcpPlayerView::GameState
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 
@@ -166,22 +166,22 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   std::function<uint64_t()> tick_;
   std::shared_ptr<cPilotCameraRig> rig_;  ///< per-pilot engine cameras (own mutex inside)
 
-  mutable std::mutex mutex_;  ///< guards meshes_, cvars_, spriteVerts_
+  mutable litholattice::cAtomicGate mutex_;  ///< guards meshes_, cvars_, spriteVerts_
   std::unordered_map<int64_t, std::shared_ptr<const CachedMesh>> meshes_;
   CvarState cvars_;
   std::vector<litholattice::PackedVertex> spriteVerts_;  ///< latest sprite frame (software form)
   litholattice::Vec3 spriteOrigin_{};                    ///< world origin spriteVerts_ are relative to
 
-  std::mutex renderMutex_;  ///< serializes the cSoftwareRenderer (MCP thread)
+  litholattice::cAtomicGate renderMutex_;  ///< serializes the cSoftwareRenderer (MCP thread)
   litholattice::cSoftwareRenderer sw_;
 
   // Culling-cache prototype state, one per pilot camera (JD 2026-10-11).
   // Guarded by its own mutex: only the MCP thread touches it, so the game
   // thread is never blocked by culling decisions.
-  std::mutex protoMutex_;
+  litholattice::cAtomicGate protoMutex_;
   std::unordered_map<std::string, litholattice::CullProtoState> protoStates_;
 
-  std::mutex audioMutex_;  ///< drainTap() is the tap's single reader
+  litholattice::cAtomicGate audioMutex_;  ///< drainTap() is the tap's single reader
   std::vector<float> tapScratch_;  ///< 6144 floats: 1024 frames @ 48kHz for tier 0
 };
 

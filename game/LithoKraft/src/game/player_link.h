@@ -6,13 +6,12 @@
 // pair and lerps by alpha = time since the tick / tick duration, and
 // extrapolates by velocity for at most one tick when the sim runs late.
 // Input goes the other way through a second SeqLock; the rare commands
-// (place / mode) through a small queue (its own mutex, never the sim's).
+// (place / mode) through a small SPSC ring (Archie Phase 3c; no mutex).
 #include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <mutex>
 #include <vector>
 
 #include "litholattice/entity/locomotion.h"
@@ -74,28 +73,53 @@ struct Cmd {
   uint64_t seq = 0;
 };
 
+/// Archie Phase 3c: SPSC cmd ring (frame pushes, sim drains). No mutex.
 struct Link {
   SeqLock<Snap> snap;
   SeqLock<InputMsg> input;
-  std::mutex cmdMu;
-  std::vector<Cmd> cmds;
+  static constexpr uint32_t kCmdCap = 64;
+  std::array<Cmd, kCmdCap> cmdSlot_{};
+  std::atomic<uint32_t> cmdHead_{0};  // producer (frame)
+  std::atomic<uint32_t> cmdTail_{0};  // consumer (sim)
   std::atomic<bool> hasCmd{false};
   uint64_t placeSeq = 0;  // frame thread: last place request issued
+  // PlayM (JD collision bug): Place is latest-wins, never queued. The ring used to
+  // drop places when full (64) -- e.g. the menu cinematic reseats every frame while
+  // the sim is paused -- so the newest placeSeq was lost and the frame thread held
+  // the body forever (sn.placeSeq < placeSeq): WASD/Space dead, look still worked.
+  SeqLock<Cmd> lastPlace;           // producer (frame) writes; consumer reads
+  uint64_t drainedPlaceSeq_ = 0;    // consumer (sim) only
 
   static int64_t nowNs() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
                std::chrono::steady_clock::now().time_since_epoch()).count();
   }
   void push(const Cmd& c) {
-    std::lock_guard<std::mutex> g(cmdMu);
-    cmds.push_back(c);
+    if (c.kind == Cmd::Place) {
+      lastPlace.store(c);
+      hasCmd.store(true, std::memory_order_release);
+      return;
+    }
+    const uint32_t h = cmdHead_.load(std::memory_order_relaxed);
+    const uint32_t t = cmdTail_.load(std::memory_order_acquire);
+    if (h - t >= kCmdCap) return;  // rare overflow: drop (place/mode are idempotent enough)
+    cmdSlot_[h % kCmdCap] = c;
+    cmdHead_.store(h + 1, std::memory_order_release);
     hasCmd.store(true, std::memory_order_release);
   }
   std::vector<Cmd> drain() {
     std::vector<Cmd> out;
-    if (!hasCmd.load(std::memory_order_acquire)) return out;
-    std::lock_guard<std::mutex> g(cmdMu);
-    out.swap(cmds);
+    const Cmd lp = lastPlace.load();
+    if (lp.seq > drainedPlaceSeq_) { drainedPlaceSeq_ = lp.seq; out.push_back(lp); }
+    uint32_t t = cmdTail_.load(std::memory_order_relaxed);
+    const uint32_t h = cmdHead_.load(std::memory_order_acquire);
+    if (t == h) return out;  // head/tail, not hasCmd: no lost-wakeup race
+    out.reserve(out.size() + (h - t));
+    while (t != h) {
+      out.push_back(cmdSlot_[t % kCmdCap]);
+      ++t;
+    }
+    cmdTail_.store(t, std::memory_order_release);
     hasCmd.store(false, std::memory_order_relaxed);
     return out;
   }

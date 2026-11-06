@@ -18,7 +18,8 @@ namespace lithokraft {
   X(ToggleEUV) X(ReloadResources) X(ScriptEditor) X(SaveWorld) X(Pause) X(Look)                       \
   X(Secondary) /* Cortana 2026-10-15 2215: Alt (+ right click = secondary setting); appended: ids stable */ \
   X(Hotbar10)  /* 2026-10-24 (JD): 16-slot hotbar, key 0 = slot 10; appended: ids stable */ \
-  X(Screenshot) /* 2026-10-25 (JD): F2 screenshot key; appended: ids stable */
+  X(Screenshot) /* 2026-10-25 (JD): F2 screenshot key; appended: ids stable */ \
+  X(LithoCompile) X(LithoStop) X(LithoSpeed) /* PlayM4 (JD t4701u): numpad 7/8/9 Trace-in-time; appended */
 
 #define LITHOKRAFT_INPUT_ENUMERATOR(n) n,
 /// Jump / Sneak double as fly up / down in Fly locomotion mode. Crawl asks the

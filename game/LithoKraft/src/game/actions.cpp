@@ -22,7 +22,7 @@ constexpr A kUiText[] = {A::Look};
 constexpr A kTyping[] = {A::Pause, A::Look};
 // Debug keys (function keys / pad Back, which never produce text) work in every mode.
 constexpr A kDebug[] = {A::ToggleHUD, A::ToggleDebug, A::CycleTPS, A::SwitchDim, A::ToggleEUV, A::ReloadResources, A::SaveWorld,
-                         A::ScriptEditor, A::Screenshot};
+                         A::ScriptEditor, A::Screenshot, A::LithoCompile, A::LithoStop, A::LithoSpeed};
 
 ContextRules rules(const char* name, bool opaque, bool wantsText, bool atStart, std::span<const Action> actions) {
   ContextRules r{name, opaque, wantsText, atStart, {}};
@@ -68,13 +68,16 @@ ActionMap defaultActionMap() {
   bind(A::HotbarPrev, {B::wheelUp(), B::pad(GB::LeftBumper)});
   bind(A::ToggleHUD, {B::key(Key::F1)});
   bind(A::ToggleDebug, {B::key(Key::F3), B::pad(GB::Back)});
-  bind(A::ToggleControls, {B::key(Key::H), B::pad(GB::DpadLeft)});
+  bind(A::ToggleControls, {B::key(Key::F4), B::pad(GB::DpadLeft)});  // 2026-11-05 (JD): F4 hides controls panel only (F1 = whole HUD)
   bind(A::CycleTPS, {B::key(Key::F7)});
   bind(A::SwitchDim, {B::key(Key::F6)});
   bind(A::ToggleEUV, {B::key(Key::F8)});
   bind(A::SaveWorld, {B::key(Key::F5)});
   bind(A::ReloadResources, {B::key(Key::F9)});
   bind(A::ScriptEditor, {B::key(Key::F10)});
+  bind(A::LithoCompile, {B::key(Key::Kp7)});  // PlayM4 (JD t4701u): Trace-in-time compile around the player
+  bind(A::LithoStop, {B::key(Key::Kp8)});
+  bind(A::LithoSpeed, {B::key(Key::Kp9)});
   bind(A::Screenshot, {B::key(Key::F2)});  // 2026-10-25 (JD): screenshot key, every renderer
   bind(A::Pause, {B::key(Key::Escape), B::pad(GB::Start)});
   bind(A::Look, {B::mouseMotion(), B::stick(Stick::Right)});

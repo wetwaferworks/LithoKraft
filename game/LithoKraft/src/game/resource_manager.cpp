@@ -9,6 +9,7 @@
 #include "litholattice/core/log.h"
 #include "litholattice/render/renderer.h"
 #include "litholattice/render/texture_array.h"
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 
@@ -151,7 +152,7 @@ void cResourceMgr::reload() {
   theme_ = std::move(theme);
   ++themeRevision_;
   loaded_ = true;
-  std::lock_guard lock(mutex_);
+  litholattice::cGateGuard lock(mutex_);
   materials_ = std::move(materials);
 }
 
@@ -169,7 +170,7 @@ WorldgenSettings cResourceMgr::worldgen(uint64_t seed) const {
 }
 
 std::shared_ptr<const BlockMaterials> cResourceMgr::materials() const {
-  std::lock_guard lock(mutex_);
+  litholattice::cGateGuard lock(mutex_);
   return materials_;
 }
 

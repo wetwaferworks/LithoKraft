@@ -11,12 +11,12 @@
 #include <algorithm>
 #include <atomic>
 #include <map>
-#include <mutex>
 #include <set>
 #include <string>
 
 #include "litholattice/core/log.h"
 #include "model.h"
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft::model {
 namespace {
@@ -84,13 +84,13 @@ void setLithoStampModelStubEnabled(bool on) {
 bool lithoStampModelStubEnabled() { return g_stubEnabled.load(std::memory_order_acquire); }
 
 std::optional<litholattice::procgen::LithoStampModel> loadLithoStampModel(std::string_view name) {
-  static std::mutex mutex;
+  static litholattice::cAtomicGate mutex;
   static std::map<std::string, std::optional<litholattice::procgen::LithoStampModel>, std::less<>>
       cache;
   static std::set<std::string> stubLogged;  // names whose stub substitution was logged (under mutex)
   const std::string key(name);
   {
-    std::lock_guard<std::mutex> lock(mutex);
+    litholattice::cGateGuard<litholattice::cAtomicGate> lock(mutex);
     const auto it = cache.find(key);
     if (it != cache.end()) return it->second;
   }
@@ -98,7 +98,7 @@ std::optional<litholattice::procgen::LithoStampModel> loadLithoStampModel(std::s
   const bool stubbed = !m && lithoStampModelStubEnabled();
   if (stubbed) m = stubModel();
   {
-    std::lock_guard<std::mutex> lock(mutex);
+    litholattice::cGateGuard<litholattice::cAtomicGate> lock(mutex);
     cache[key] = m;
     // Log inside the lock, once per name: the cached stub means this
     // branch runs only on the name's first resolution anyway, and the

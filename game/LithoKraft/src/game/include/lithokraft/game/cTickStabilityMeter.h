@@ -13,7 +13,10 @@ namespace lithokraft {
 
 class cTickStabilityMeter {
  public:
-  enum class Level : int { Green = 0, Yellow = 1, Red = 2 };
+  enum class Level : int { Green = 0, Yellow = 1, Red = 2, Neutral = 3 };  // Neutral = paused / tick-frozen
+  void reset() { count_ = 0; t0_ = -1; frozen_.store(false, std::memory_order_relaxed); }
+  void setFrozen(bool f);
+  bool frozen() const { return frozen_.load(std::memory_order_relaxed); }
   void sample(uint64_t worldTick, uint64_t droppedTicks, int targetTps, std::chrono::steady_clock::time_point now);
   double tps1s() const { return tps1_.load(std::memory_order_relaxed); }
   double tps5s() const { return tps5_.load(std::memory_order_relaxed); }
@@ -33,6 +36,7 @@ class cTickStabilityMeter {
   std::atomic<double> tps1_{0}, tps5_{0};
   std::atomic<uint64_t> drop1_{0}, drop5_{0}, dropTotal_{0};
   std::atomic<int> target_{0}, level_{0};
+  std::atomic<bool> frozen_{false};
   const Sample* findBack(double age) const;
 };
 

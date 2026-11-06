@@ -1,7 +1,7 @@
 // Per-item use dispatch: registry + the handlers whose behavior is
 // already defined in code/docs (A3 wiring, 2026-10-13). See item_use.h.
 #include "lithokraft/content/item_use.h"
-#include <mutex>
+#include "litholattice/core/once_gate.h"
 #include <unordered_map>
 #include "litholattice/core/log.h"
 #include "lithokraft/content/items.h"
@@ -49,8 +49,8 @@ void registerDefaults() {
 }
 
 void ensureDefaults() {
-  static std::once_flag once;
-  std::call_once(once, registerDefaults);
+  static ::litholattice::cOnceGate once;
+  once.call(registerDefaults);
 }
 
 }  // namespace

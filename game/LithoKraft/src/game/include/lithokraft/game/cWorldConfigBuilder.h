@@ -4,7 +4,7 @@
 // launch path in main.cpp applies to those flags: test world / bolt lab rebuild fresh (no save),
 // the default world saves to <data root>/saves/world (playtest builds: saves/playtest), and a
 // saved world's level.json seed and sim/stream area win over the launch configuration.
-// LL_WORLD_RELAUNCH=1 restores the old relaunch-the-exe picker.
+// Archie Phase 2 (JD 2026-11-04): in-process is the only path (LL_WORLD_RELAUNCH is gone).
 #pragma once
 #include <string>
 #include <vector>
@@ -22,7 +22,6 @@ class cWorldConfigBuilder final {
     int romScreen = 32;           ///< --rom-screen at launch
     std::string dataRoot;         ///< <data root> (saves/, logs/, config/)
   };
-  static bool inProcess();  ///< LL_WORLD_RELAUNCH != "1" (default: in-process)
   /// `args`: catalog flags (+ --spawn); `folder`: a world folder ("" = use the args).
   static GameConfig build(const Launch& l, const std::vector<std::string>& args, const std::string& folder,
                           std::string* note);

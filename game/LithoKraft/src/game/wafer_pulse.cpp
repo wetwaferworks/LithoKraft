@@ -3,7 +3,8 @@
 #include "lithokraft/game/wafer_pulse.h"
 
 #include <array>
-#include <mutex>
+#include <atomic>
+#include <memory>
 #include <unordered_map>
 #include "lithokraft/game/wafer_biomes.h"
 #include "litholattice/render/ground_pulse.h"
@@ -37,11 +38,9 @@ int64_t chunkKey(int cx, int cz) {
 
 struct WaferPulseCache::Impl {
   std::shared_ptr<const litholattice::cColumnGen> gen;
-  std::mutex mutex;
-  // chunkKey -> blended pulse (freq, sharp, amp, tintR, G, B) followed by
-  // blended traces (density, speed, amp, dirMix, tintR, G, B): one weight
-  // blend feeds both effects (P1-RENDER H1 wired the trace half).
-  std::unordered_map<int64_t, std::array<float, 13>> cache;
+  // Archie Phase 3c: COW map published by atomic shared_ptr (mesher hot path, no mutex).
+  using Map = std::unordered_map<int64_t, std::array<float, 13>>;
+  std::atomic<std::shared_ptr<const Map>> cache_{std::make_shared<const Map>()};
 
   std::array<float, 13> blend(int cx, int cz) {
     // The sanctioned sibling query: regenerate the chunk's column maps
@@ -70,17 +69,22 @@ struct WaferPulseCache::Impl {
 
   std::array<float, 13> lookup(int cx, int cz) {
     const int64_t k = chunkKey(cx, cz);
-    {
-      std::lock_guard<std::mutex> lk(mutex);
-      if (const auto it = cache.find(k); it != cache.end()) return it->second;
+    for (;;) {
+      auto snap = std::atomic_load_explicit(&cache_, std::memory_order_acquire);
+      if (const auto it = snap->find(k); it != snap->end()) return it->second;
+      const std::array<float, 13> fresh = blend(cx, cz);
+      auto next = std::make_shared<Map>(*snap);
+      const auto [it, inserted] = next->emplace(k, fresh);
+      (void)inserted;
+      std::shared_ptr<const Map> expected = snap;
+      if (std::atomic_compare_exchange_weak_explicit(
+              &cache_, &expected, std::shared_ptr<const Map>(std::move(next)),
+              std::memory_order_release, std::memory_order_acquire))
+        return it->second;
+      // lost the race: retry (winner's value or ours on the next snap)
     }
-    // Cache miss: regenerate the chunk's column maps (deterministic) and
-    // blend. Done without holding the lock; a duplicate miss on another
-    // worker just blends twice and emplaces once (emplace keeps the first).
-    const std::array<float, 13> fresh = blend(cx, cz);
-    std::lock_guard<std::mutex> lk(mutex);
-    return cache.emplace(k, fresh).first->second;
   }
+
 };
 
 WaferPulseCache::WaferPulseCache(std::shared_ptr<const litholattice::cColumnGen> waferGen)

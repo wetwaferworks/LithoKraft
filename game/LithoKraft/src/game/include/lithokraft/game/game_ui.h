@@ -30,7 +30,7 @@ struct HudModel {
   bool visible = true;                     ///< F1 hides everything
   std::vector<std::string> debugLines;     ///< empty: no debug panel (F3)
   std::string tickLine;                    ///< 2026-10-31 (JD): tick stability readout (empty: hidden)
-  int tickLevel = 0;                       ///< 0 green (holding), 1 yellow (dipping), 2 red (dropping)
+  int tickLevel = 0;                       ///< 0 green, 1 yellow, 2 red, 3 neutral (TPS paused)
   std::vector<std::string> controlLines;   ///< controls panel (H)
   std::vector<std::string> bannerLines;    ///< keyboard capture banner (empty: none)
   std::vector<std::string> postViewLines;  ///< 2026-10-25 Post viewer: title, 16 rows, hint (empty: hidden)

@@ -81,4 +81,23 @@ FramebufferLayout buildWireTorture(ChunkMap& world, int x0, int y, int z0);
 constexpr int kSawtoothRun = 8;
 FramebufferLayout buildSawtoothWall(ChunkMap& world, int x0, int y, int z0, int width, int rows, std::string_view pattern);
 FramebufferLayout buildPatternWall(ChunkMap& world, int x0, int y, int zw, int size, std::string_view pattern);
+
+/// 2026-11-05 (JD): tiled 32+32 random-adder stress scene (--bench-scene alu32, --copies N).
+/// Each copy: clock -> two Randors (range N=32) -> Fusor (sum, cap 64) -> Thresholdor subtract
+/// (back = sum, side = third Randor 0..32). Tile 0 is a golden Memor(32)+Memor(32) adder so
+/// 32+32 -> 64 is checked deterministically. Fixed world seed for Randor rolls.
+/// Stack: 4x4-chunk footprint (64x64). Each ALU layer is 2 blocks tall (support + components)
+/// with one empty layer between -> pitch 3. Pack 8x5 tiles per floor, then stack floors.
+struct Alu32Layout {
+  int x0 = 0, y = 0, z0 = 0;
+  int copies = 0, cols = 0, rows = 0, layers = 0;
+  int tileW = 8, tileD = 5;
+  int pitch = 3;       // support at y+layer*pitch, components at +1, empty at +2
+  int footprint = 64;  // 4 chunks
+  int blocks = 0;
+  uint64_t seed = 0;
+};
+/// Place `copies` tiles (default 256) stacked in a 64x64 footprint starting at (x0,y,z0).
+Alu32Layout buildAlu32Scene(ChunkMap& world, int x0, int y, int z0, int copies = 256, uint64_t seed = 0xA11A32ull);
+
 }  // namespace lithokraft

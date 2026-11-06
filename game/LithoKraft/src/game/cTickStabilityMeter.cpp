@@ -53,7 +53,17 @@ void cTickStabilityMeter::sample(uint64_t worldTick, uint64_t droppedTicks, int 
   level_.store(int(lv), std::memory_order_relaxed);
 }
 
+void cTickStabilityMeter::setFrozen(bool f) {
+  const bool was = frozen_.exchange(f, std::memory_order_relaxed);
+  if (f) {
+    level_.store(int(Level::Neutral), std::memory_order_relaxed);
+  } else if (was) {
+    count_ = 0; t0_ = -1;  // 2026-11-05 (JD #6): resume without counting paused wall-time as a TPS dip
+  }
+}
+
 std::string cTickStabilityMeter::line() const {
+  if (frozen_.load(std::memory_order_relaxed)) return "TPS paused";
   char b[160];
   std::snprintf(b, sizeof b, "TPS %.0f (1s)  %.0f (5s) / %d  dropped %llu in 5s (%llu total)", tps1s(), tps5s(), target(),
                 (unsigned long long)dropped5s(), (unsigned long long)droppedTotal());

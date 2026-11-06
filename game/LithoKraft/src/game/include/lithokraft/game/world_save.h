@@ -10,7 +10,6 @@
 #include <filesystem>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <unordered_set>
 #include <string>
@@ -186,7 +185,11 @@ class cWorldSave {
   /// 2026-10-25 (JD): named /tp spots of this world (optional "tpMarks" array in level.json:
   /// [{name, dim, x, y, z}]). Absent key = none (older files load unchanged).
   struct TpMark { std::string name, dim; float x = 0, y = 0, z = 0; };
-  void setTpMarks(std::vector<TpMark> m) { std::lock_guard l(tpMutex_); tpMarks_ = std::move(m); }
+  /// Archie Phase 3b: lock-free publish (game thread writes, save reads a snapshot). No tpMutex_.
+  void setTpMarks(std::vector<TpMark> m) {
+    std::atomic_store_explicit(&tpMarks_, std::make_shared<const std::vector<TpMark>>(std::move(m)),
+                               std::memory_order_release);
+  }
   static std::vector<TpMark> readTpMarks(const std::filesystem::path& root, std::string* err);
   /// The persisted seed for the save at `root`, or nullopt when there is no
   /// level.json (pre-metadata save: the caller's seed stands). A level.json
@@ -209,10 +212,7 @@ class cWorldSave {
     std::vector<uint8_t> signal;
   };
   /// Streaming load (chunk streaming): one saved column, remapped to the live
-  /// registry, with its SGNL payload. Thread-safe: callable from job-pool
-  /// workers while saves run on the store's I/O thread (loads serialise
-  /// against each other and against loadDimension on loadMutex_, so the SGNL
-  /// decode sink always names exactly one call's buffer — C-M4).
+  /// registry, with its SGNL payload. Thread-safe LF path (Archie Phase 3c): callable from job-pool workers; SGNL sink is per-request TLS decode context (C-M4).
   LoadedColumn loadColumn(const std::string& dim, int cx, int cz);
 
   /// v1 -> v2 signal state migration (adds channel=1, beacon=0). Exposed for tests.
@@ -238,16 +238,10 @@ class cWorldSave {
 
   const storage::cPayloadReg& payloads() const { return payloads_; }
 
-  /// 2026-11-01 (JD, LL_LF_SAVE=1 / LL_LF_LOAD=1, default off): lock-free asynchronous save and
-  /// load. Either switch moves ALL of this save's region I/O onto cLfWorldStore (one store per
-  /// dimension directory: two store types on the same files would fight), so:
-  ///   - loadColumn / loadDimension: no loadMutex_, no storesMutex_, no streamRemapMutex_; the
-  ///     SGNL sink is per request (thread_local decode context); a load waits for itself only.
-  ///   - commit / saveColumns: no exporting_ mutex; the SGNL export rides each save job as its
-  ///     encode context; wait=true waits for this save's own flush job only.
-  /// Same region files and records: on-disk format unchanged. Call before any I/O.
-  void setLockFreeIo(bool save, bool load) { lfSave_ = save; lfLoad_ = load; }
-  bool lockFreeIo() const { return lfSave_ || lfLoad_; }
+  /// Archie Phase 3c (PlayH): save/load I/O is ALWAYS lock-free (cLfWorldStore). Legacy mutex
+  /// path removed. setLockFreeIo kept as a no-op for callers; lockFreeIo() always true.
+  void setLockFreeIo(bool /*save*/, bool /*load*/) {}
+  bool lockFreeIo() const { return true; }
   uint64_t lfLoadsJumped();  ///< loads that skipped the save FIFO (all LF stores)
 
  private:
@@ -256,42 +250,19 @@ class cWorldSave {
   int loadDimensionLf(const std::string& dim, ChunkMap& world, std::vector<uint8_t>& signalState);
   LoadedColumn loadColumnLf(const std::string& dim, int cx, int cz);
   storage::cLfWorldStore& lfStore(const std::string& dim);
-  storage::cWorldStore& store(const std::string& dim);
   std::filesystem::path root_;
   storage::cPayloadReg payloads_;
-  std::mutex m_;
-  std::map<uint64_t, std::vector<uint8_t>> exporting_;  // SGNL save source (caller's thread)
-  // SGNL load sink (C-M4): NOT a shared accumulator any more. The decode
-  // lambda appends only into the buffer the currently-executing load call has
-  // armed here (guarded by m_); loads are serialised by loadMutex_, so a
-  // streamed decode can never leak into a dimension load's blob (or vice
-  // versa), and no residue accumulates between calls. A decode with no sink
-  // armed drops its bytes (no load path does that: every decode runs under
-  // a cWorldSave load call).
-  std::vector<uint8_t>* signalSink_ = nullptr;
-  std::mutex loadMutex_;  ///< serialises loadColumn vs loadDimension (and loadColumn vs itself)
-  std::map<std::string, std::unique_ptr<storage::cWorldStore>> stores_;
-  std::mutex storesMutex_;  ///< guards stores_ (loadColumn runs on job threads)
   uint64_t seed_ = 0;       ///< world seed for level.json (SV-H2); set by Game from cfg.seed
   bool hasSeed_ = false;
   std::atomic<uint64_t> clockTick_{0}, clockTime_{0};  ///< Cortana 2026-10-16: world clock for level.json v2
   std::atomic<bool> hasClock_{false};
   WorldAreaMeta area_;    ///< Fix run 3: level.json v3 area (set once by Game before any save)
   bool hasArea_ = false;
-  mutable std::mutex tpMutex_;      ///< guards tpMarks_ (set on the game thread, written by the save)
-  std::vector<TpMark> tpMarks_;     ///< 2026-10-25: level.json "tpMarks"
+  /// Archie Phase 3b: published snapshot; setTpMarks CAS-publishes, writeWorldMeta loads.
+  std::shared_ptr<const std::vector<TpMark>> tpMarks_{std::make_shared<const std::vector<TpMark>>()};
   bool lastSaveOk_ = true;  ///< outcome of the last saveDimension (see above)
   std::string lastSaveError_;
-  // Cached block-name remap for loadColumn (the table is written by the first
-  // save and only ever rewritten with the same live registry afterwards).
-  // Only a SUCCESS is cached (B-M3): a failed read is reported per column as
-  // ColumnLoad::Unreadable and re-attempted on the next call, so a repaired
-  // table heals in-session instead of latching a session-wide downgrade.
-  std::optional<storage::StableRemap> streamRemap_;
-  std::mutex streamRemapMutex_;
-  // ---- 2026-11-01 LL_LF_SAVE / LL_LF_LOAD (declared last: destroyed first, before payloads_)
-  bool lfSave_ = [] { const char* e = std::getenv("LL_LF_SAVE"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
-  bool lfLoad_ = [] { const char* e = std::getenv("LL_LF_LOAD"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
+  // ---- Archie Phase 3c: LF stores only (declared last: destroyed first, before payloads_)
   struct LfStoreEntry { std::string dim; std::unique_ptr<storage::cLfWorldStore> store; };
   struct LfStores {  // published once per dimension by CAS; freed at destruction
     std::array<std::atomic<LfStoreEntry*>, 32> slot{};

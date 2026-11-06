@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 namespace {
@@ -32,7 +33,7 @@ cMcpPlayerController::cMcpPlayerController(litholattice::cInputSystem& input,
 }
 
 std::vector<std::string> cMcpPlayerController::pilotIds() const {
-  std::lock_guard<std::mutex> lk(mutex_);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
   return pilotIds_;
 }
 
@@ -74,7 +75,7 @@ bool cMcpPlayerController::submitFrame(std::string_view pilot, const ControlFram
   std::vector<InputEvent> ev;
   ev.reserve(16);
   {
-    std::lock_guard<std::mutex> lk(mutex_);
+    litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
     auto it = pilots_.find(pilot);
     if (it == pilots_.end()) return false;  // unknown pilot (tool layer rejects first)
     PilotState& st = it->second;
@@ -104,7 +105,7 @@ bool cMcpPlayerController::submitFrame(std::string_view pilot, const ControlFram
 void cMcpPlayerController::releaseAll(std::string_view pilot) {
   std::vector<InputEvent> ev;
   {
-    std::lock_guard<std::mutex> lk(mutex_);
+    litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
     auto it = pilots_.find(pilot);
     if (it == pilots_.end()) return;
     PilotState& st = it->second;
@@ -120,7 +121,7 @@ void cMcpPlayerController::releaseAll(std::string_view pilot) {
 }
 
 uint64_t cMcpPlayerController::droppedUnbound() const {
-  std::lock_guard<std::mutex> lk(mutex_);
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
   return droppedUnbound_;
 }
 

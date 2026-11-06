@@ -297,14 +297,15 @@ size_t mergeCoplanar(std::vector<Quad>& qs) {
   return before - qs.size();
 }
 
-Mesh meshModels(const std::vector<model::Model>& blocks) {
+Mesh meshModels(const std::vector<model::Model>& blocks, int lodLevel) {
   Mesh out;
   std::vector<litholattice::micro::MicroQuad> mq;
+  const int lod = lodLevel < 0 ? 4 : lodLevel;
   for (size_t b = 0; b < blocks.size(); ++b) {
     mq.clear();
     litholattice::micro::MicroMeshParams p;
     p.originY = float(b);
-    litholattice::micro::meshOctreeLOD(blocks[b].geometry, 4, p, mq);
+    litholattice::micro::meshOctreeLOD(blocks[b].geometry, lod, p, mq);
     for (const auto& m : mq) out.quads.push_back(toQuad(m));
     out.octreeBytes += blocks[b].geometry.memoryBytes();
     out.leafCells += blocks[b].geometry.leafCount();

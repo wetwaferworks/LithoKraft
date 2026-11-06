@@ -21,6 +21,7 @@
 
 #include "litholattice/world/chunk.h"
 #include "litholattice/world/chunk_map.h"
+#include "litholattice/core/block_gate.h"
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/game/actions.h"
 #include "lithokraft/game/player.h"
@@ -225,6 +226,36 @@ int runLocomotionSelfTest() {
     for (int i = 0; i < 8192; ++i) e.tickVitals(1, true, false, 512);
     check(e.oxygen() == b.oxygen(),
           "vitals (PLY-1): per-tick calls at 512 TPS accumulate to the same drain (no fractional loss)");
+  }
+
+  // --- BlockGate-reentrant walk / jump (PlayL, JD WASD/stuck proof) ----------
+  // Mirrors cSimThread::getBlock during the player hook: the sim already holds
+  // blockMutex_, then isSolid locks again (reentrant). A broken owner token
+  // deadlocks here; a working gate lets forward move X/Z and jump raise Y.
+  {
+    ChunkMap gateMap = makeTestWorld();
+    litholattice::cBlockGate gate;
+    const auto gateIsSolid = [&gateMap, &gate](int x, int y, int z) {
+      gate.lock();  // re-enter while the "sim" hold below is live
+      const bool s = blockRegistry().has(gateMap.get(x, y, z), kSolid);
+      gate.unlock();
+      return s;
+    };
+    gate.lock();  // outer hold = mutation window
+    PlayerLocomotion loco;
+    loco.place({4.5, kFloorTop, 4.5});
+    const double x0 = loco.body().x, z0 = loco.body().z, y0 = loco.body().y;
+    LocomotionInput walk{};
+    walk.wishX = 1.0;
+    for (int i = 0; i < 64; ++i) loco.tick(walk, gateIsSolid, kDt);
+    check(loco.body().x > x0 + 0.5 && near(loco.body().z, z0, 0.05) && loco.onGround(),
+          "blockGateWalkJump: forward under reentrant BlockGate moves +X on flat ground");
+    LocomotionInput hop{};
+    hop.jump = true;
+    for (int i = 0; i < 8; ++i) loco.tick(hop, gateIsSolid, kDt);
+    check(loco.body().y > y0 + 0.4,
+          "blockGateWalkJump: jump under reentrant BlockGate raises Y");
+    gate.unlock();
   }
 
   // --- Crawl action (the actions system's own pattern) ---------------------

@@ -110,6 +110,7 @@ struct GameSettings {
   float vkBloomStrength = 1.f;
   float vkHeartbeatGlow = 1.75f;
   bool vkFarLod = true;  ///< 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): far LOD for the 33-64 ring (render-only, live)  ///< 0.0.1.53 [C53-3] (Proposed by JD, Built by Cortana): wafer heartbeat bloom gain (0..4)
+  int lodDetail = 2;  ///< Archie Phase 1 (JD 2026-11-04): render.lod_detail far-LOD slider 0 off / 1 high / 2 balanced (default) / 3 fast; live
   int streamRadius = 8;   ///< 2026-10-24 (JD, 4:31 PM): default 8. render / stream distance in chunks, 0 = auto (Vulkan 64, others 32), max 64; boot-only
   bool bulbShellSolid = false;  ///< 2026-10-16 1551 (JD): render.bulb_shell - Trace Bulb shell Ghostly (false, default) / Solid (true); render-only, saved
   bool emissiveLight = false;  ///< Cortana 2026-10-16: render.emissive_light - software local light from emitters (live). Default OFF: ~2x frame cost on the Trace-dense test world.

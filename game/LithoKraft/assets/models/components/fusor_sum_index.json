@@ -1,0 +1,115 @@
+{
+  "format": "lithokraft_fusor_sum_voxel_v1",
+  "resolution": 32,
+  "lthm_level": 5,
+  "axes": "x=east, y=up, z=south(front/output); rotated 180 (JD 2026-11-01): back input at z=31, front output at z=0, matching the Repeator approved top orientation",
+  "materials": {
+    "1": {
+      "name": "base",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#454D63",
+      "tint": false
+    },
+    "4": {
+      "name": "glow_seam",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "5": {
+      "name": "button_up",
+      "neutral_hex": "#9A9A9A",
+      "tint": true
+    },
+    "6": {
+      "name": "button_down",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "7": {
+      "name": "button_well",
+      "neutral_hex": "#161922",
+      "tint": false
+    },
+    "8": {
+      "name": "readout_window",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "9": {
+      "name": "breaker_body",
+      "neutral_hex": "#1D165A",
+      "tint": false
+    },
+    "10": {
+      "name": "lever",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "11": {
+      "name": "trip_flag",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "12": {
+      "name": "plus_glyph",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "13": {
+      "name": "bezel",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    }
+  },
+  "tint_colors": {
+    "red": {
+      "off": "#5A5556",
+      "on": "#FF514B"
+    },
+    "blue": {
+      "off": "#535659",
+      "on": "#2FB4FF"
+    }
+  },
+  "logic": "output(front) = min(64, back + west + east)",
+  "readout": {
+    "window_cells_xz": [
+      8,
+      23,
+      8,
+      15
+    ],
+    "window_px_128": [
+      32,
+      32,
+      95,
+      63
+    ],
+    "digits": 2,
+    "digit_atlas": "textures/top_value/fusor_digit_atlas.png (= approved repeator atlas, 10 x 5x7 glyphs, 6 px pitch)",
+    "digit_px": "each atlas pixel = 2x2 px at 128; digits 10x14, 4 px gap, centered in window",
+    "colors": {
+      "segment": "#9F77EC",
+      "ghost_88": "#1D165A",
+      "glow": "#8B65DD"
+    }
+  },
+  "states": [
+    {
+      "state": "fusor",
+      "lthm": "models/fusor_sum.lthm",
+      "note": "one model; powered/unpowered is tint, sum is shader readout"
+    }
+  ],
+  "engine_id": "lithokraft:fusor_sum",
+  "display_name": "Fusor"
+}

@@ -11,9 +11,11 @@ class cWire final : public cBlockBehavior {
   std::string describe(const BlockDef& d, CellState s) const override {
     return std::format("{} | strength {}", d.name, stValue(s));
   }
+  /// 2026-11-05 (JD): Trace colour property (same path LEDs use via cTorch).
+  int colour(const BlockDef& def) const override { return int(def.channel); }
 };
 
-/// Torches and plain lamps: state 1 = lit.
+/// Plain lamps (LEDs use cTorch): state 1 = lit.
 class cOnOff final : public cBlockBehavior {
  public:
   std::string describe(const BlockDef& d, CellState s) const override {

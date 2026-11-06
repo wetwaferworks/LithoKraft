@@ -4,10 +4,10 @@
 #include <algorithm>
 #include <cstring>
 #include <map>
-#include <mutex>
 #include <string>
 #include "lithokraft/content/blocks.h"
 #include "model.h"  // workstream 3: .lthm loadModel (lithokraft_model)
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft::chipor {
 namespace {
@@ -60,11 +60,11 @@ std::vector<MicroCell> demoModelCells() {
 std::vector<MicroCell> loadModelCells(std::string_view name) {
   // Mutex-guarded cache: the mesher calls this on worker threads and the
   // .lthm load does file I/O, so each distinct model loads exactly once.
-  static std::mutex mutex;
+  static litholattice::cAtomicGate mutex;
   static std::map<std::string, std::vector<MicroCell>, std::less<>> cache;
   const std::string key(name);
   {
-    std::lock_guard<std::mutex> lock(mutex);
+    litholattice::cGateGuard<litholattice::cAtomicGate> lock(mutex);
     const auto it = cache.find(key);
     if (it != cache.end()) return it->second;
   }
@@ -82,7 +82,7 @@ std::vector<MicroCell> loadModelCells(std::string_view name) {
     if (cells.empty() && key == kDefaultModel) cells = demoModelCells();
   }
   {
-    std::lock_guard<std::mutex> lock(mutex);
+    litholattice::cGateGuard<litholattice::cAtomicGate> lock(mutex);
     cache[key] = cells;
   }
   return cells;

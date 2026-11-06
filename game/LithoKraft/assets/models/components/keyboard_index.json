@@ -1,0 +1,104 @@
+{
+  "format": "lithokraft_keyboard_voxel_v1",
+  "resolution": 32,
+  "lthm_level": 5,
+  "axes": "x=east, y=up, z=south; flow back z=31 -> front z=0 (points away from viewer, same as flipped Breakor/Fusor)",
+  "engine_id": "lithokraft:keyboard",
+  "shape": "slab_3_16",
+  "materials": {
+    "1": {
+      "name": "base",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#454D63",
+      "tint": false
+    },
+    "4": {
+      "name": "glow_seam",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "5": {
+      "name": "button_up",
+      "neutral_hex": "#9A9A9A",
+      "tint": true
+    },
+    "6": {
+      "name": "button_down",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "7": {
+      "name": "button_well",
+      "neutral_hex": "#161922",
+      "tint": false
+    },
+    "8": {
+      "name": "readout_window",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "9": {
+      "name": "housing",
+      "neutral_hex": "#1D165A",
+      "tint": false
+    },
+    "10": {
+      "name": "accent",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "11": {
+      "name": "pale",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "12": {
+      "name": "glyph",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "13": {
+      "name": "bezel",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "14": {
+      "name": "keycap",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "15": {
+      "name": "keywell",
+      "neutral_hex": "#090724",
+      "tint": false
+    }
+  },
+  "tint_colors": {
+    "red": {
+      "off": "#5A5556",
+      "on": "#FF514B"
+    },
+    "blue": {
+      "off": "#535659",
+      "on": "#2FB4FF"
+    }
+  },
+  "note": "typing terminal slab; original key legends kept exactly as top decal; front out + east ctrl",
+  "states": [
+    {
+      "state": "idle",
+      "lthm": "models/keyboard_idle.lthm",
+      "voxels_json": "models/keyboard_idle.voxels.json",
+      "cells": 6788
+    }
+  ]
+}

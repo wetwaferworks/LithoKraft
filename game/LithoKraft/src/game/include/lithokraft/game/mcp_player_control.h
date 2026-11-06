@@ -22,7 +22,6 @@
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -30,6 +29,7 @@
 #include "litholattice/input/input_system.h"
 #include "litholattice/mcp/server.h"
 #include "lithokraft/game/actions.h"
+#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 
@@ -63,7 +63,7 @@ class cMcpPlayerController : public litholattice::mcp::IPlayerController {
   litholattice::cInputSystem& input_;
   std::vector<std::string> pilotIds_;
   std::function<bool()> controllable_;
-  mutable std::mutex mutex_;
+  mutable litholattice::cAtomicGate mutex_;
   std::map<std::string, PilotState, std::less<>> pilots_;
   uint64_t droppedUnbound_ = 0;
 };

@@ -8,7 +8,7 @@
 #include <deque>
 #include <cstdint>
 #include <memory>
-#include <shared_mutex>
+#include "litholattice/core/atomic_gate.h"
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -80,7 +80,7 @@ class cBenchStreamer {
   ChunkMap map_;
   /// [C53-2] workers read map_ (snapshot) under a shared lock; the main thread takes it
   /// exclusively only to insert / erase columns (its own reads need no lock).
-  std::shared_ptr<std::shared_mutex> mapMu_ = std::make_shared<std::shared_mutex>();
+  std::shared_ptr<litholattice::cAtomicGate> mapMu_ = std::make_shared<litholattice::cAtomicGate>();  // PlayL: was shared_mutex
   std::unordered_set<uint64_t> requested_;                      // generating or loaded
   std::unordered_map<uint64_t, std::vector<int>> meshedSubs_;
   struct ColStat { int cx = 0, cz = 0; size_t verts = 0; int draws = 0; std::vector<uint32_t> sv; };  // [C54-1] sv = per-sub verts

@@ -28,7 +28,9 @@ extern const BlockId kRedirector;
 extern const BlockId kPulsor;
 extern const BlockId kMemor;
 extern const BlockId kLatchor;
+extern const BlockId kDividor;  ///< 2026-11-05 (JD): Dividor, front = floor(back / 2)
 extern const BlockId kFusorSum;  ///< PlayN (JD): Fusor adder (old Fusor id = kFusor = Breakor)
+extern const BlockId kRedirectorSelect;  ///< 2026-11-04 (JD t4302u): Redirector (selected input -> front); kRedirector = Multiplexor
 extern const BlockId kRandor;  ///< 2026-10-31 (JD): random range block
 extern const BlockId kSwitch;
 extern const BlockId kButton;
@@ -163,7 +165,7 @@ enum class SimRole : uint16_t {
   None, Wire, Torch, Lamp, ColorLamp,
   Repeator, Thresholdor, Redirector, Pulsor, Memor, Latchor, Switch, cButton, Keyboard, Tone, Catchor,
   cSignalTransmittor, cSignalReceivor, cDish, cOverclockor, Lithographor, Chipor, cPortor, cFusor,
-  Etchor, Randor, cFusorSum,  // cFusorSum appended PlayN; Randor appended 2026-10-31; Etchor appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
+  Etchor, Randor, cFusorSum, Dividor,  // Dividor appended 2026-11-05 (JD); cFusorSum appended PlayN; Randor appended 2026-10-31; Etchor appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
 };
 constexpr SimRole roleOf(const BlockDef& d) { return SimRole(d.role); }
 /// Lets content code compare the engine's raw BlockDef::role with a SimRole (found by ADL).
@@ -193,6 +195,10 @@ constexpr int kJammerRadiusViolet = 128; ///< Violet cOverclockor
 
 /// The LithoKraft block registry (built once, thread-safe to read).
 const cBlockReg& blockRegistry();
+/// 2026-11-04 (JD t4305u): the ONE right-click gate (game.cpp Use and the selftests): a block takes Use
+/// only when it is flagged kInteractive. The Thresholdor lacked the flag, so its subtract toggle
+/// worked in the selftest (sim.use direct) but never in game.
+inline bool playerUsable(const cBlockReg& reg, BlockId b) { return reg.has(b, kInteractive); }
 /// Mutable registry handle for the seal/hot-swap system. Call single-threaded:
 /// seal() at boot after mods load, stageBlockUpdate()/refreshStaged() via the
 /// debug hot-swap path (cSimThread::runBetweenTicks). Never while sealed.
@@ -247,5 +253,6 @@ template <class Map> bool wireSupported(const Map& w, int x, int y, int z) {
 inline bool isComponent(BlockId b) { return roleOf(b) != SimRole::None; }
 /// Wire channel of a wire / torch (1 = red, 2 = blue; channels never connect).
 inline int wireChannel(const BlockDef& d) { return d.channel; }
+/// Colour a neighbour passes to components: cBehaviorCatalog::colour(def) (cWire / cTorch).
 
 }  // namespace lithokraft

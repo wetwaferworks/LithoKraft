@@ -5,7 +5,9 @@
 #include <array>
 #include <string>
 #include "lithokraft/content/blocks.h"
+#include "lithokraft/content/component.h"  // 2026-11-05 (JD): cBehaviorCatalog::colour
 #include "lithokraft/content/chipor_viewport.h"
+#include "lithokraft/content/component_models.h"  // 2026-11-04 CloudAtlas components-v2
 #include "lithokraft/content/foliage.h"  // Cortana 2026-10-15 2010 [GAME]
 #include "lithokraft/content/post.h"  // 2026-10-25 Posts
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215 [GAME]
@@ -189,12 +191,33 @@ FaceLook machineTintLook(const CustomBlock& cell, const FaceMaterial& fm, bool o
   // 2026-10-24 (JD 6:13 PM: red flash when a blue-fed Repeator depowers): when the back source is
   // gone or colourless (LED lifted / off), keep the colour of the Trace it drives instead of
   // falling back to red for the delay ticks it stays on.
-  int ch = nb.channel;
+  int ch = cBehaviorCatalog::get().colour(nb);  // 2026-11-05: Trace + LED colour (JD)
   // 2026-10-31 (JD t3680u): a Repeator fed by a Repeator carries the chain's colour in its state.
   if (ch == 0 && roleOf(cell.def()) == SimRole::Repeator && repeator::colourOf(cell.state) > 1) ch = repeator::colourOf(cell.state);
   if (ch == 0) {
     const int fd = stFacing(cell.state);
-    ch = cell.blocks.def(cell.neighbor(kDirX[fd], 0, kDirZ[fd])).channel;
+    ch = cBehaviorCatalog::get().colour(cell.blocks.def(cell.neighbor(kDirX[fd], 0, kDirZ[fd])));
+  }
+  // PlayB (JD t4341u / t4342u): glow by power source. Live red Trace on an input side -> red, blue ->
+  // blue, both -> 0x60 (the shader pulses red <-> blue, ~2 s, frame time: render only, no sim state);
+  // powered with no live Trace input (soft / hard powered block, another component) -> purple.
+  // Read from the mesh neighbourhood (published sim state), so sim hashes are untouched. LL_GLOW_SOURCE=0: old.
+  static const bool kGlowSource = [] { const char* e = std::getenv("LL_GLOW_SOURCE"); return !(e && e[0] == '0'); }();
+  if (kGlowSource && on) {
+    bool red = false, blue = false;
+    const int fd = stFacing(cell.state);
+    for (int d = 0; d < 4; ++d) {
+      if (d == fd) continue;  // the front is the output
+      const BlockDef w = cell.blocks.def(cell.neighbor(kDirX[d], 0, kDirZ[d]));
+      const int sc = cBehaviorCatalog::get().colour(w);
+      if (sc == 0 || stValue(cell.neighborState(kDirX[d], 0, kDirZ[d])) <= 0) continue;  // 2026-11-05: LED+Trace
+      red = red || sc == 1; blue = blue || sc == 2;
+    }
+    if (!red && !blue && roleOf(cell.def()) == SimRole::Repeator && repeator::colourOf(cell.state) > 1) {  // chain colour
+      const int cc = repeator::colourOf(cell.state); red = cc == 1; blue = cc == 2;
+    }
+    const uint8_t src = red && blue ? 0x60 : blue ? 0x40 : red ? 0x00 : 0x20;
+    return {kShadeTraceTint, uint8_t(((ts - 1) & 31) | src | 0x80)};
   }
   // 0x20 = purple (Switch-fed Repeator chain, 2026-10-31); tint slots stay below 32.
   return {kShadeTraceTint, uint8_t(((ts - 1) & 31) | (ch == 2 ? 0x40 : 0) | (ch == 3 ? 0x20 : 0) | (on ? 0x80 : 0))};
@@ -208,6 +231,7 @@ bool tracePortFaces(const BlockDef& nd, CellState s, int side) {
   const int f = stFacing(s);
   switch (roleOf(nd)) {
     case SimRole::Repeator:
+    case SimRole::Dividor:  // 2026-11-05: back in, front out
     case SimRole::Latchor: return side == f || side == dirBack(f);
     case SimRole::Keyboard: return side == f || side == dirRight(f);
     case SimRole::Catchor: {
@@ -249,6 +273,109 @@ void machineBox(const CustomBlock& cell, MeshWriter& out, const int lo[3], const
 // and the sim are untouched; neighbours no longer hide their faces against these cells (mesher).
 // The Redirector lane overlays and the Catchor readout are drawn on the slab top (y = 2).
 } // namespace
+namespace {
+// 2026-11-04 (JD, CloudAtlas components-v2): the v2 voxel models (assets/models/components) with
+// their per-face / per-state base + tint-mask art, and the value readouts as kShadeReadout overlays
+// (seven-segment masks <tex>_v2_readout_mask, digits at CloudAtlas's readout windows; GL, Vulkan and
+// software all draw kShadeReadout). LL_COMPONENTS_V2=0: the old slab look. Missing model -> old look.
+bool componentsV2() { static const bool v = [] { const char* e = std::getenv("LL_COMPONENTS_V2"); return !(e && e[0] == '0'); }(); return v; }
+struct V2Look {
+  const char* tex = nullptr;    // texture prefix (pack folder)
+  std::string model;            // model asset name
+  const char* state = nullptr;  // texture state tag (nullptr = none)
+  const char* state0 = nullptr; // default state (textures that exist only there)
+  int roX = -1, roY = -1;       // readout tens-digit origin, 128 space (-1 = none)
+  int value = 0; bool lit = false;
+  int turns = -1;               // quarter turns (-1 = the cell facing)
+};
+bool v2LookOf(const CustomBlock& cell, const BlockDef& def, V2Look& L) {
+  const SimRole r = roleOf(def);
+  const CellState s = cell.state;
+  const bool on = stOn(s);
+  auto set = [&](const char* tex, const char* model, const char* st, const char* st0) {
+    L.tex = tex; L.model = std::string(model) + (st ? std::string("_") + st : std::string()); L.state = st; L.state0 = st0;
+  };
+  switch (r) {
+    case SimRole::cFusor: set("breakor", "breakor", (stAux(s) & 1) ? "tripped" : "closed", "closed");
+      L.roX = 28; L.roY = 57; L.value = stValue(s) > 0 ? stValue(s) : 64; L.lit = true; break;  // trip point 1..64
+    case SimRole::Dividor: set("dividor", "dividor", nullptr, nullptr); break;  // 2026-11-05 (JD): CloudAtlas v2 Dividor (no readout)
+    case SimRole::cFusorSum: set("fusor_sum", "fusor_sum", nullptr, nullptr); L.roX = 52; L.roY = 41; L.value = stValue(s); L.lit = on; break;
+    case SimRole::Memor: set("memor", "memor", "idle", "idle"); L.roX = 52; L.roY = 61; L.value = stValue(s); L.lit = stValue(s) > 0; break;
+    case SimRole::Thresholdor: set("thresholdor", "thresholdor", (stAux(s) & 1) ? "subtract" : "compare", "compare");
+      L.roX = 52; L.roY = 49; L.value = stValue(s); L.lit = on; break;
+    case SimRole::Redirector:
+      if (cell.id == kRedirectorSelect) {  // PlayB: Routor, CloudAtlas routor_modeN art (textures routor_modeN_<face>_base)
+        static constexpr const char* kMode[3] = {"routor_mode1", "routor_mode2", "routor_mode3"};
+        const int md = int(stAux(s) & 3);
+        set(kMode[md > 2 ? 0 : md], kMode[md > 2 ? 0 : md], nullptr, nullptr);
+      } else {
+        set("multiplexor", "multiplexor", (s & (1u << 15)) ? "sel_blue" : "sel_red", "sel_red");
+      }
+      break;
+    case SimRole::Pulsor: set("pulsor", "pulsor", on ? "firing" : "idle", "idle"); break;
+    case SimRole::Latchor: set("fast_latch", "latchor", on ? "on" : "off", "off");
+      L.model = std::string("latchor_") + (on ? "on" : "off");
+      L.roX = 52; L.roY = 37; L.value = stValue(s) > 0 && stValue(s) <= kMaxSignal ? stValue(s) : kMaxSignal; L.lit = on; break;
+    case SimRole::Randor: set("randor", "randor", on ? "rolling" : "idle", "idle");
+      L.roX = 52; L.roY = 57; L.value = stValue(s) > 0 && stValue(s) <= kMaxSignal ? stValue(s) : 1; L.lit = true; break;
+    case SimRole::Catchor: set("catchor", "catchor", on ? "firing" : "idle", "idle"); L.roX = 52; L.roY = 53; L.value = stValue(s); L.lit = on; break;
+    case SimRole::Keyboard: set("keyboard", "keyboard", "idle", "idle"); break;
+    // PlayB (JD t4338u, CloudAtlas option B): the v2 Switch / Button models with their matched art.
+    // Floor mounts only (attach 0 / 1); walls and ceilings keep the box models (boxModel below).
+    case SimRole::Switch: if (stAttach(s) > 1) return false; set("switch", "switch", on ? "on" : "off", "off"); L.turns = stFacing(s); break;
+    case SimRole::cButton: if (stAttach(s) > 1) return false; set("button", "button", on ? "pressed" : "up", "up"); L.turns = stFacing(s); break;
+    default: return false;
+  }
+  return true;
+}
+const FaceMaterial* v2Material(const CustomBlock& cell, const V2Look& L, const char* face) {
+  const std::string t(L.tex);
+  if (L.state) {
+    if (const FaceMaterial* m = cell.materials.named(t + "_" + face + "_" + L.state + "_base")) return m;
+    if (L.state0) if (const FaceMaterial* m = cell.materials.named(t + "_" + face + "_" + L.state0 + "_base")) return m;
+  }
+  return cell.materials.named(t + "_" + face + "_base");
+}
+bool meshComponentV2(const CustomBlock& cell, const BlockDef& def, MeshWriter& out) {
+  if (!componentsV2()) return false;
+  V2Look L;
+  if (!v2LookOf(cell, def, L)) return false;
+  const foliage::Mesh* mesh = cComponentModels::instance().find(L.model);
+  if (!mesh) return false;
+  const bool on = stOn(cell.state);
+  const int facing = L.turns >= 0 ? L.turns : stFacing(cell.state);
+  const FaceMaterial* fTop = v2Material(cell, L, "top");
+  const FaceMaterial* fFront = v2Material(cell, L, "front");
+  const FaceMaterial* fBack = v2Material(cell, L, "back");
+  const FaceMaterial* fSide = v2Material(cell, L, "side");
+  for (const foliage::Quad& q : mesh->quads) {
+    const FaceMaterial* pick = q.face == 2 ? fTop : q.face == 5 ? fFront : q.face == 4 ? fBack : fSide;
+    const FaceMaterial fm = pick ? *pick : cell.materials.face(cell.id, localSlot(q.face), on);
+    const foliage::Quad rq = foliage::rotated(q, facing);
+    const int l[3] = {rq.lo[0], rq.lo[1], rq.lo[2]}, h[3] = {rq.hi[0], rq.hi[1], rq.hi[2]};
+    out.face(cell, rq.face, l, h, fm, machineTintLook(cell, fm, on), (q.face == 2 || q.face == 3) ? facing : 0);
+  }
+  if (L.roX >= 0) {
+    const FaceMaterial* mask = cell.materials.named(std::string(def.tex) + "_v2_readout_mask");
+    if (mask) {
+      // Window footprint in 1/16 (128-space px / 8; image row = local z), one texel above the model top there.
+      const int x0 = L.roX / 8, x1 = (L.roX + 24 + 7) / 8, z0 = L.roY / 8, z1 = (L.roY + 14 + 7) / 8;
+      const int top = cComponentModels::topAt(*mesh, (x0 + x1) / 2, (z0 + z1) / 2);
+      if (top >= 0 && top < 16) {
+        foliage::Quad q{};
+        q.lo[0] = int16_t(x0); q.hi[0] = int16_t(x1); q.lo[1] = int16_t(top); q.hi[1] = int16_t(top + 1);
+        q.lo[2] = int16_t(z0); q.hi[2] = int16_t(z1); q.face = 2;
+        const foliage::Quad rq = foliage::rotated(q, facing);
+        const int l[3] = {rq.lo[0], rq.lo[1], rq.lo[2]}, h[3] = {rq.hi[0], rq.hi[1], rq.hi[2]};
+        out.face(cell, 2, l, h, *mask, {kShadeReadout, uint8_t((std::clamp(L.value, 0, 99) & 127) | (L.lit ? 128 : 0))}, facing);
+      }
+    }
+  }
+  static std::atomic<bool> logged{false};
+  if (!logged.exchange(true)) ::litholattice::logInfo("components-v2: CloudAtlas v2 component models in the render path (%s)", cComponentModels::instance().report().empty() ? "all loaded" : cComponentModels::instance().report().c_str());
+  return true;
+}
+} // namespace
 // 2026-11-01 (JD, CloudAtlas lithokraft-fusor SPEC): Fusor = 2/16 slab + 4 side pads + fuse housing. LL_FUSOR_SLAB=0: cube.
 static bool fusorSlab() { static const bool v = [] { const char* e = std::getenv("LL_FUSOR_SLAB"); return !(e && e[0] == '0'); }(); return v; }
 bool cLithoKraftAppearance::shapedRender(const BlockDef& def) const {
@@ -256,12 +383,14 @@ bool cLithoKraftAppearance::shapedRender(const BlockDef& def) const {
   return def.shape == Shape::Cube &&
          (r == SimRole::Redirector || r == SimRole::Thresholdor || r == SimRole::Pulsor || r == SimRole::Catchor ||
           r == SimRole::Keyboard || r == SimRole::Memor ||  // 2026-10-24 7:25 PM (JD approved): CloudAtlas Memor partial block
-          r == SimRole::Latchor || r == SimRole::Randor || r == SimRole::cFusorSum ||
-          (r == SimRole::cFusor && fusorSlab()));  // 2026-10-24 (JD approved placeholder): CloudAtlas fastlatch.json, out N + in S pads  // 2026-10-24 (JD): Keyboard = repeater-size slab (CloudAtlas keyboard.json)
+          r == SimRole::Latchor || r == SimRole::Randor || r == SimRole::cFusorSum || r == SimRole::Dividor ||
+          (r == SimRole::cFusor && fusorSlab()) ||
+          ((r == SimRole::Switch || r == SimRole::cButton) && componentsV2()));  // PlayB: v2 Switch / Button (floor)  // 2026-10-24 (JD approved placeholder): CloudAtlas fastlatch.json, out N + in S pads  // 2026-10-24 (JD): Keyboard = repeater-size slab (CloudAtlas keyboard.json)
 }
 bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out) const {
   const BlockDef def = cell.def();
   if (!shapedRender(def)) return false;
+  if (meshComponentV2(cell, def, out)) return true;  // 2026-11-04 CloudAtlas components-v2
   const SimRole r = roleOf(def);
   const bool on = active(def, cell.state);
   const int f = stFacing(cell.state);
@@ -892,6 +1021,11 @@ const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def) const {
 }
 
 const BoxModel* cLithoKraftAppearance::boxModel(const BlockDef& def, CellState st) const {
+  // PlayB (JD t4338u): a floor Switch / Button draws the v2 model (meshShaped); walls / ceilings keep the box.
+  if ((roleOf(def) == SimRole::Switch || roleOf(def) == SimRole::cButton) && stAttach(st) <= 1 && componentsV2() &&
+      cComponentModels::instance().find(roleOf(def) == SimRole::Switch ? (stOn(st) ? "switch_on" : "switch_off")
+                                                                       : (stOn(st) ? "button_pressed" : "button_up")))
+    return nullptr;
   if (roleOf(def) == SimRole::cButton && stOn(st)) {
     // 2026-10-24 pressed state (render only): the cap sinks to 1/16; the top slot's active
     // material is button_top_pressed in every pack.

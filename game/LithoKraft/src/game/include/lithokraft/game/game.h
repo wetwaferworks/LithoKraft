@@ -3,17 +3,18 @@
 // registry, the active dimension's sim thread, the mesh pipeline, creative placement,
 // hotbar and debug commands.
 #pragma once
+#include "litholattice/render/sw_lod_rings.h"  // PlayB: far-LOD rings clamped to view
 #include "lithokraft/content/circuit_scene.h"
 #include <atomic>
 #include <chrono>  // Cortana 2026-10-15 2215
 #include <cstdint>
 #include <cstdlib>
 #include <cmath>
-#include <mutex>
 #include <optional>
 #include <unordered_set>
 #include "lithokraft/game/engine.h"
 #include "lithokraft/game/prayer.h"  // Cortana 2026-10-15 2255
+#include "lithokraft/game/view_mesh_gate.h"  // Archie Phase 1
 #include "lithokraft/game/world_clock.h"  // Cortana 2026-10-16
 #include <array>
 #include <deque>
@@ -102,6 +103,7 @@ struct GameConfig {
   std::string benchScene = "default";  // "circuits" / "display": stress scenes built next to the spawn
   int sceneSize = 120;
   int sceneRows = 16;
+  int sceneCopies = 256;  ///< 2026-11-05 (JD): --copies for alu32 tiles
   bool worldPicker = false;  // 2026-10-30 (JD): menu Play opens the world picker (interactive launches; harness/tests keep direct Play)
   std::string startSpawn;    // 2026-10-30: --spawn <name>: skip the menu and start at this named spawn
   bool testWorldExamples = false;  // 2026-10-24 (JD): playtest builds add the Examples section to the test world
@@ -217,8 +219,6 @@ class Game {
   void enterPlay();
   /// 2026-10-30 (JD): --spawn: enter play at a named spawn (tp mark), skipping the menu.
   void startAt(const std::string& spawn);
-  /// 2026-10-30: the world picker chose another world: relaunch with these args after the exit save.
-  const std::vector<std::string>& worldSwitchArgs() const { return worldSwitchArgs_; }
   /// 2026-10-31 (JD, Load World): an in-process world load. The picker / console sets it; the
   /// app loop (main.cpp) sees it, destroys this Game (exit save on disk, sim + streamer + jobs
   /// drained) and builds the next one on the same window, renderer, pool and resources.
@@ -415,6 +415,7 @@ class Game {
   /// Per-frame chunk streaming: request columns around the player and insert
   /// finished ones into the active dimension (sim stopped for the insert).
   void pumpStreaming(float frameDtMs);
+  void pumpViewGate();  ///< Archie Phase 1: retire columns leaving the view, mesh columns entering it
   void pumpSwLod();  ///< software far-LOD ring re-mesh (2026-10-25)
   int swLodLevel(int d) const;
   int swLodFor(int cx, int cz) const;
@@ -432,7 +433,7 @@ class Game {
   /// entries (cleared again if the column re-streams and re-inserts),
   /// and uploads empty meshes so the renderer and the MCP vision cache
   /// drop theirs. Game thread, sim stopped (eviction window).
-  void retireColumnMeshes(int cx, int cz);
+  void retireColumnMeshes(int cx, int cz, bool force = false);
   void initScripts();
   std::string targetText() const;
   void beginTyping(int x, int y, int z);
@@ -546,10 +547,6 @@ class Game {
   std::vector<BenchBox> benchExamples_;
   int benchFloorY_ = 0;
   cWorldPicker worldPicker_;                  ///< 2026-10-30 (JD): menu Play -> world + spawn
-  std::string relaunchNotice_;   ///< 2026-10-31 (JD): "Loading <world>, restarting..." banner before the relaunch
-  int relaunchFrames_ = 0;       ///< frames left showing the notice; quit_ is set when it reaches 0
-  void beginRelaunch(const std::string& what);
-  std::vector<std::string> worldSwitchArgs_;  ///< non-empty: relaunch into another world on exit
   std::optional<WorldLoadRequest> worldLoad_;  ///< 2026-10-31: in-process Load World request (main.cpp acts on it)
   cAsyncSaver saver_;                          ///< 2026-10-31: Save World (lock-free async save)
   cWorldLoadSoak soak_;                        ///< 2026-10-31: LL_WORLD_LOAD_SOAK test hook (default off)
@@ -597,10 +594,14 @@ class Game {
   // and broke immersion (his word: jarring). Rings 2/3 keep the old
   // structure scaled x16 ({32, 64, 96}); JD named the 32, the rest
   // is the same ladder stretched... retune here if he calls it.
-  int swLodRing_[3] = {32, 64, 96};  // LL_SW_LOD_RINGS=a,b,c overrides
+  int swLodRing_[3] = {32, 64, 96};  // LL_SW_LOD_RINGS=a,b,c overrides (designed edges)
+  // PlayB (JD 2026-11-04): effective edges clamped to the view radius (cSwLodRings::shared()).
+  litholattice::cSwLodRings& swLodRings_ = litholattice::cSwLodRings::shared();
   std::atomic<int> swLodPcx_{0}, swLodPcz_{0};
-  std::mutex swLodMu_;
-  std::unordered_map<uint64_t, int> swLodMeshed_;  // column key -> LOD level meshed
+  std::unordered_map<uint64_t, int> swLodMeshed_;  // Archie Phase 3a: game thread only (was swLodMu_)
+  cViewMeshGate viewGate_;          ///< Archie Phase 1: nothing beyond the view radius meshes
+  bool viewGateBacklog_ = false;    ///< entering columns left over from a bounded sweep
+  uint64_t viewGateRetired_ = 0, viewGateEntered_ = 0;  ///< Phase 1 counters (log)  // column key -> LOD level meshed
   bool useBinaryMesher_ = false;  // mesher option, boot-applied from settings_.mesher
   // Design B Stage 2: ring spill. When the renderer's lock-free upload ring
   // is momentarily full, an upload the ring refused waits here — in order,
@@ -729,8 +730,8 @@ class Game {
   litholattice::cProjectileMgr projectiles_;
   std::atomic<bool> mcpControllable_{false};  ///< set per frame in update()
   std::atomic<uint64_t> mcpWorldTick_{0};  ///< Cortana 2026-10-15 1658: F-2 [GAME] sim tick copy for MCP threads, set per frame in update()
-  mutable std::mutex mcpStateMutex_;
-  cMcpPlayerView::GameState mcpPlayerState_;  ///< refreshed per frame in update()
+  // Archie PlayI: lock-free COW MCP player snapshot (atomic shared_ptr); no mutex.
+  mutable std::shared_ptr<cMcpPlayerView::GameState> mcpPlayerState_;
   cMcpPlayerView::GameState snapshotMcpPlayer() const;
   MenuState menuState_ = MenuState::cMenu;
   GameSettings settings_;
@@ -756,7 +757,7 @@ class Game {
   PauseState pauseState_ = PauseState::Playing;
   bool hsFreezeLogged_ = false;  ///< the current HsFrozen episode was reported once
   uint64_t lastEntitiesTick_ = 0;  ///< sim worldTick the live entities last advanced to (ENT-3)
-  bool showControls_ = true;   // H: controls panel
+  bool showControls_ = true;   // F4: controls panel (ToggleControls)
   bool showHud_ = true;        // F1: hide all HUD (like Minecraft)
   bool showDebug_ = true;      // F3: stats overlay
   bool inventoryOpen_ = false; // E: creative block palette
