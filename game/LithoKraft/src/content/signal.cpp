@@ -1086,6 +1086,26 @@ void cSignalSim::hsMark(ChunkMap& w) {
     }
     forEachMarkedNet([&](int32_t id) { dirtyLampsInsertRange(netLamps_[size_t(id)].begin(), netLamps_[size_t(id)].end()); });
     dirtyLampsInsertRange(extraLamps_.begin(), extraLamps_.end());
+    // N4: lamps on solids beside marked-net wires must re-eval soft/hard even when the
+    // lamp is not 6-adjacent to a wire (common: lamp on copper next to Trace). Cached
+    // srcReach_/netLamps_ miss that pattern until a full remount (cull reload).
+    {
+      const auto& reg = blockRegistry();
+      forEachMarkedNet([&](int32_t id) {
+        if (size_t(id) >= nets_.size()) return;
+        for (int64_t wk : nets_[size_t(id)]) {
+          int x, y, z; unpackPos(wk, x, y, z);
+          for (auto& d : k6) {
+            const int bx = x + d[0], by = y + d[1], bz = z + d[2];
+            if (!reg.hasAll(w.get(bx, by, bz), kSolid | kOpaque | kPowerable)) continue;
+            for (auto& e : k6) {
+              const int64_t lk = packPos(bx + e[0], by + e[1], bz + e[2]);
+              if (lamps_.contains(lk)) dirtyLampsInsert(lk);
+            }
+          }
+        }
+      });
+    }
   }
   // Canonical work lists for this cycle (hs-design Ã‚Â§3.2/Ã‚Â§9.6): marked nets
   // ascending by id; lamp keys sorted ascending (legacy iterated the
@@ -2011,7 +2031,39 @@ void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
   // apply; changed outputs re-flood (hard + soft too) and the loop repeats until nothing changes.
   // Delays are kept because a delaying component's output comes from its memory, not this tick's input.
   // A combinational loop with no delay stops at LL_SETTLE_MAX (deterministic, counted in settleCapHits).
-  if (!sameTick_ || hsSkip_) return;
+  if (hsSkip_) return;
+  // N7: hard power is virtual (mountPowered_, or a torch below), so a changed
+  // solid may have no CellState write to invalidate its render neighborhood.
+  // hsMark has already recomputed mounts; forward that change to every reader
+  // NOW, including unchanged-state neighbors and torch -> solid -> component.
+  auto publishHardChanges = [&] {
+    std::vector<int64_t> solids;
+    const auto& reg = blockRegistry();
+    auto add = [&](int x, int y, int z) {
+      if (reg.hasAll(w.get(x, y, z), kSolid | kOpaque | kPowerable)) solids.push_back(packPos(x, y, z));
+    };
+    for (int64_t k : changedSrc_) {
+      int x, y, z; unpackPos(k, x, y, z); add(x, y, z);
+      if (reg.def(w.get(x, y, z)).role == SimRole::Torch) add(x, y + 1, z);
+    }
+    std::sort(solids.begin(), solids.end());
+    solids.erase(std::unique(solids.begin(), solids.end()), solids.end());
+    for (int64_t k : solids) {
+      int x, y, z; unpackPos(k, x, y, z);
+      if (std::find(changedSrc_.begin(), changedSrc_.end(), k) == changedSrc_.end()) changedSrc_.push_back(k);
+      w.noteStateEdit(x, y, z); dirty(x, y, z);
+      for (const auto& d : k6) {
+        const int nx = x + d[0], ny = y + d[1], nz = z + d[2];
+        w.noteStateEdit(nx, ny, nz); dirty(nx, ny, nz);
+        const int64_t n = packPos(nx, ny, nz);
+        if (lamps_.contains(n)) hsLampKeys_.push_back(n);
+      }
+    }
+    std::sort(hsLampKeys_.begin(), hsLampKeys_.end());
+    hsLampKeys_.erase(std::unique(hsLampKeys_.begin(), hsLampKeys_.end()), hsLampKeys_.end());
+  };
+  publishHardChanges();
+  if (!sameTick_) return;
   static const int kMax = [] { const char* e = std::getenv("LL_SETTLE_MAX"); const int v = e ? std::atoi(e) : 16; return v < 1 ? 1 : v; }();
   std::vector<int64_t> allSrc = changedSrc_;  // pass-0 sources, restored at the end
   std::vector<int64_t> iterSrc = changedSrc_;
@@ -2102,6 +2154,7 @@ void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
       if (!allAwake_) awakeBefore = awakeKeys_;
       changedSrc_ = newSrc;
       hsMark(w);  // marks the reached nets / lamps, diffs hard power (appends mount changes to changedSrc_)
+      publishHardChanges();  // outputs may change hard power during this same settle
       if (!allAwake_) for (int64_t ak : awakeBefore) awakeInsert(ak);
       if (!hsSkip_) {
         hsPrepIncremental(w);
@@ -2173,6 +2226,7 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
     int x, y, z; unpackPos(k, x, y, z);
     const uint8_t ch = reg.def(w.get(x, y, z)).channel;  // red torch -> red trace only
     for (auto& d : kH) seed(x + d[0], y, z + d[1], kMaxSignal, ch);
+    seed(x, y - 1, z, kMaxSignal, ch);  // JD 2026-11-06: floating LED powers Trace beneath it too.
     if (strongPowered(w, x, y + 1, z))  // torch-powered block: colourless power to all 6 sides
       for (auto& d : k6) seed(x + d[0], y + 1 + d[1], z + d[2], kMaxSignal, 0);
   }
@@ -2215,7 +2269,12 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
            reg.def(w.get(x, y, z)).role == SimRole::Repeator ? (kDirX[d] ? 1 : 2) : 0);  // Repeator feeds a side via end-on
       // Hard-powered block in front of a Repeator: colourless power to its other five faces.
       if (mountPowered_.contains(packPos(x + kDirX[d], y, z + kDirZ[d])) && (cPulseRules::hardAnyComponent() || reg.def(w.get(x, y, z)).role == SimRole::Repeator || reg.def(w.get(x, y, z)).role == SimRole::Pulsor || w.get(x, y, z) == kRedirectorSelect))
-        for (auto& e : k6) if (!(e[1] == 0 && e[0] == -kDirX[d] && e[2] == -kDirZ[d])) seed(x + kDirX[d] + e[0], y + e[1], z + kDirZ[d] + e[2], s, 0);  // not back into the source face
+        for (auto& e : k6) if (!(e[1] == 0 && e[0] == -kDirX[d] && e[2] == -kDirZ[d])) {
+          const int nx = x + kDirX[d] + e[0], ny = y + e[1], nz = z + kDirZ[d] + e[2];
+          seed(nx, ny, nz, s, 0);  // not back into the source face
+          // N8: a solid relays the same Pulsor packet, not an attenuating DC seed.
+          if (c.mem.pulse) pulses.push_back({packPos(nx, ny, nz), s});
+        }
     }
   }
   // PlayN (JD hard-power): seed every face of each hard-powered block (torch semantics).
@@ -2375,6 +2434,7 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
     int x, y, z; unpackPos(k, x, y, z);
     const uint8_t ch = reg.def(w.get(x, y, z)).channel;  // red torch -> red trace only
     for (auto& d : kH) seed(x + d[0], y, z + d[1], kMaxSignal, ch);
+    seed(x, y - 1, z, kMaxSignal, ch);  // JD 2026-11-06: floating LED powers Trace beneath it too.
     if (strongPowered(w, x, y + 1, z))  // torch-powered block: colourless power to all 6 sides
       for (auto& d : k6) seed(x + d[0], y + 1 + d[1], z + d[2], kMaxSignal, 0);
   }
@@ -2427,7 +2487,17 @@ void cSignalSim::hsPrepIncremental(ChunkMap& w) {
            reg.def(w.get(x, y, z)).role == SimRole::Repeator ? (kDirX[d] ? 1 : 2) : 0);  // Repeator feeds a side via end-on
       // Hard-powered block in front of a Repeator: colourless power to its other five faces.
       if (mountPowered_.contains(packPos(x + kDirX[d], y, z + kDirZ[d])) && (cPulseRules::hardAnyComponent() || reg.def(w.get(x, y, z)).role == SimRole::Repeator || reg.def(w.get(x, y, z)).role == SimRole::Pulsor || w.get(x, y, z) == kRedirectorSelect))
-        for (auto& e : k6) if (!(e[1] == 0 && e[0] == -kDirX[d] && e[2] == -kDirZ[d])) seed(x + kDirX[d] + e[0], y + e[1], z + kDirZ[d] + e[2], s, 0);  // not back into the source face
+        for (auto& e : k6) if (!(e[1] == 0 && e[0] == -kDirX[d] && e[2] == -kDirZ[d])) {
+          const int nx = x + kDirX[d] + e[0], ny = y + e[1], nz = z + kDirZ[d] + e[2];
+          seed(nx, ny, nz, s, 0);  // not back into the source face
+          // N8: preserve pulse transport through the solid in THIS tick's flood.
+          if (c.mem.pulse) {
+            const auto wi = wireLoc_.find(packPos(nx, ny, nz));
+            if (wi != wireLoc_.end() && isNetMarked(wi->second.first) &&
+                !netArr_[size_t(wi->second.first)].via[size_t(wi->second.second)])
+              hsNetWork_[size_t(wi->second.first)].pulses.push_back({wi->second.second, s});
+          }
+        }
     }
   }
   // PlayN (JD hard-power): seed every face of each hard-powered block (torch semantics).
@@ -2637,8 +2707,8 @@ void cSignalSim::hsLampsBatch(const std::vector<int64_t>& keys, ChunkMap& w, con
     if (!fullPass_) if (const auto it = lampFast_.find(k); it != lampFast_.end()) fast = &it->second;
     if (fast) {  // 2026-11-01 PlayL fix: fast wires, soft and hard combine by max; v is never reset
       for (const CellState* p : fast->wires) v = std::max(v, int(stValue(*p)));
-      if (!softPowered_.empty() || !mountPowered_.empty())
-        for (auto& d : k6) v = std::max({v, softPower(x + d[0], y + d[1], z + d[2]), hardPower(w, x + d[0], y + d[1], z + d[2])});
+      // N4: always sample soft/hard neighbours (maps may refill mid-tick; empty-gate skipped lamp updates)
+      for (auto& d : k6) v = std::max({v, softPower(x + d[0], y + d[1], z + d[2]), hardPower(w, x + d[0], y + d[1], z + d[2])});
     } else {
     v = hardPower(w, x, y, z);
     for (auto& d : k6) {
@@ -2666,7 +2736,14 @@ void cSignalSim::hsLampsBatch(const std::vector<int64_t>& keys, ChunkMap& w, con
       if (!fast->color && (*fast->self & 0x0180) && reg.has(w.get(x, y, z), kDirectional))
         ns = CellState(ns | (*fast->self & 0x0180));
       const CellState shown = delayed(k, *fast->self, ns);
-      if (*fast->self != shown) { *fast->self = shown; dirty(x, y, z); }
+      if (*fast->self != shown) {
+        *fast->self = shown;
+        // N5: cached writes must invalidate CoW state immediately, like setState().
+        // A fresh pin (including another sub's apron) must not wait for the render
+        // divider/view-cull to rebuild this lamp's mesh. noteStateEdit is pull-safe.
+        w.noteStateEdit(x, y, z);
+        dirty(x, y, z);
+      }
       return;
     }
     const bool color = reg.def(w.get(x, y, z)).role == SimRole::ColorLamp;

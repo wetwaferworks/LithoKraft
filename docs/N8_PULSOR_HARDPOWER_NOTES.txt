@@ -1,0 +1,102 @@
+N8 PULSOR HARD-POWER PACKET FIX - CORTANA WORKBENCH
+Prepared 2026-11-06 19:27:23 America/New_York (ET)
+Scope: D:\scratch\wk-2026-11-09 only, based on N7 as requested. M4/s2-PlayM untouched.
+
+ROOT CAUSE - PROVEN LIVE-STATE FAILURE
+The solid path dropped Pulsor packet semantics: it converted the output into an ordinary attenuating
+wire seed, while direct wire received a lossless Pulsor packet. The short one-tick pulse reached the solid
+and FIRST adjacent wire immediately, but died/changed strength along the return run; the directly fed
+wire/lamp retained it. This is a real propagation mismatch, NOT a CoW-only problem or a late mount pass.
+For a strength-1 Pulsor packet, the N7 direct 64-wire route carried 1 throughout, but the solid route's
+ordinary seed became 0 after its first wire. A full-strength packet similarly decayed from 64 to 1 over
+64 wires instead of retaining 64. This explains why a wire-only path worked but the solid branch did not.
+
+WHY N5/N7 TESTS MISSED IT
+Earlier long layouts drove a full-strength packet, then sampled two lamps after the SAME attenuated
+return and a Memor. The checks required returnPeak > 0, not equality to the Pulsor's data strength.
+The old return peak of 1 therefore passed, and Memor held the sampled value, hiding the transient loss.
+N7's asymmetric output paths were downstream of that already-lossy return, so they agreed with each
+other without proving direct-packet equivalence across the original solid boundary.
+N8 removes the Memor/hold and compares against the component's actual PUBLISHED out, not its animation
+state (the raw CellState animation can differ from delayed scheduled output).
+
+ONE FOCUSED PRODUCTION CHANGE
+Only signal.cpp changed relative to the N7 production baseline, in the two equivalent seed gatherers:
+- cSignalSim::hsPropagateFull
+- cSignalSim::hsPrepIncremental
+When a pulse-emitting source faces a hard-powered solid, each eligible outgoing Trace face now receives
+the existing Pulsor packet record as well as the pre-existing ordinary seed. It runs in THIS SAME tick's
+existing flood. The existing packet algorithm carries data strength without decay for its existing
+64-wire reach; the pulse disappears on the next tick normally. No pulse widening or new transport delay.
+The source-facing back side remains excluded as before; incremental packets require a marked, flat-wire
+net, matching direct-wire packet handling. Continuous/non-pulse hard power retains normal attenuation.
+No new cache, fullPass_, tick-order rewrite, global scan, engine/render edit, or placement change.
+N7's existing hard-neighbor publication and inspector fixes remain; N6 dependency changes remain absent.
+Soft still requires custom Alt-scroll connections. Hard power remains colorless. Render culling and mesh
+throttles remain render-only and were not changed.
+
+FAILING TEST FIRST - EXACT 1-TICK PACKET
+New signal_selftest.cpp regression was built/run against UNCHANGED N7 solver before applying the fix.
+Clock -> 64 red input wires -> two equal-input Pulsors. One drives direct Trace, the other faces INTO a
+solid with Trace BESIDE it. Output runs are independently 1 and 64 wires; each feeds a color lamp across
+the y=15/16 subchunk seam. No Memor, no afterglow, no external state injection.
+1024 clock cycles per case, exactly one published Pulsor tick per cycle, period 8 ticks (4 on / 4 off).
+12 cases = nominal TPS 20/512 x legacy incremental / 4-worker handshake / forced full-flood control x
+1/64 output wires. Handshake Signal phase budgets are configured as 1 second / TPS / 4. Tests run
+accelerated, not wall-clock paced; this is correctness coverage, not a claimed 512-TPS performance profile.
+Total: 12,288 clock cycles and 98,400 simulation ticks, with 24 new assertions.
+Every tick checks published outputs, solid hardPower, first AND last wire, exact one-tick lamp delay,
+matching falling edges, no widened pulse, and real MeshInput snapshots via
+pinForMeshingInto(republishOwnMask=0) + gatherPinned. No mesh flush or remount is used.
+
+BEFORE / AFTER
+N7 baseline: all six 64-wire cases FAIL (20 and 512, all three execution modes).
+Each: exactly 1024 one-tick outputs, hard-map mismatches 0, adjacent-wire mismatches 0,
+but 1024 far-wire mismatches, 2048 lamp/oracle mismatch counts, and 1024 rendered-wire oracle mismatches.
+The six 1-wire cases already passed: this disproves the presumed refresh/tick-order delay at first contact.
+The failing render checks reflect wrong LIVE propagated power faithfully reaching the snapshot, not
+additional proof of stale CoW data.
+N8: all 12 cases PASS. Every case has 1024 pulses, width violations 0, source mismatch 0, hard mismatch 0,
+near/far wire mismatch 0, lamp mismatch 0, and render mismatch 0.
+Concrete 64-wire tick trace:
+             Pulsor A/B  solid  first A/B  far A/B  lamps A/B
+N7 tick 4       1/1        1       1/1       1/0      0/0
+N7 tick 5       0/0        0       0/0       0/0      1/0
+N8 tick 4       1/1        1       1/1       1/1      0/0
+N8 tick 5       0/0        0       0/0       0/0      1/1
+N8 tick 6       0/0        0       0/0       0/0      0/0
+The lamps' pre-existing one-tick delay is kept and identical on both paths.
+Old N5 long-layout return peak is now 64 instead of 1; hard/custom-soft/auto-soft-negative still pass.
+All 36 N7 fixed/random clock and determinism checks still PASS, as do all seven N5 assertions.
+Before log: lithokraft\build\PlayWorkbench_selftest_n8_before.log
+After/full-suite log: lithokraft\build\PlayWorkbench_selftest_n8.log
+Full suite completed: exit 1 (known baseline), N7 50 failures, N8 50 failures, EXACT ORDERED FAIL LIST
+IDENTICAL. Zero new failures; no golden values changed. New N8 assertions: 24/24 PASS.
+Source git diff --check passed (existing line-ending notices only).
+
+BACKUPS / BUILD / DELIVERY
+Adjacent signal.cpp.pre-n8.bak and signal_selftest.cpp.pre-n8.bak retain N7 source; older backups kept.
+Original N7 executable and sources copied BEFORE overwrite to:
+D:\scratch\wk-2026-11-09\N8_backups\20261106-192012
+Original exe SHA256: 15783C6E0D77E4BA6CCAB32F26CAC555DED4B8D163001FC834AD584544753D13
+The interim baseline test executable was also backed up before the final build to:
+D:\scratch\wk-2026-11-09\N8_backups\20261106-192359
+PlayWorkbench DebugOpt LithoKraft build SUCCESS, exit 0.
+Build log: lithokraft\build\PlayWorkbench_build_n8.log
+Stable executable: D:\scratch\wk-2026-11-09\lithokraft\build\PlayWorkbench\DebugOpt\LithoKraft.exe
+Name stays LithoKraft.exe for OBS. No LithoKraftN8.exe was created.
+Exe mtime: 2026-11-06 19:24:22 ET; bytes 19501568
+SHA256: 4AE293AD59C9BEB32B9376AE5EAC35B5EB2FD067A764953F5D170AAE5CF392A0
+Desktop shortcut: C:\Users\jdwetwork\OneDrive\Desktop\Play N8.lnk
+Mirror shortcut: C:\Users\jdwetwork\Desktop\Play N8.lnk
+Both target stable DebugOpt\LithoKraft.exe, cwd DebugOpt, no arguments. Older shortcuts not replaced.
+M4 remains its untouched s2-PlayM\DebugOpt\LithoKraft.exe. Tests used isolated LL_DATA_ROOT, not JD's save.
+
+JD RETEST
+Use Play N8. Repeat the same continuous clock / long red-cyan runs / far Pulsor facing INTO solid /
+wire BESIDE solid setup. Compare wire-only lamp to through-solid lamp over many edges and at both
+20 and 512 TPS; compare actual strength/color, not only whether either eventually lights. Repeat after
+looking away/back while staying in sim radius. One-tick pulses must survive intact without a remount.
+This build fixes a deterministic, before-failing LIVE pulse-propagation defect. JD's exact saved world
+has not been interactively retested by this agent; please validate it rather than claiming video proof.
+No build/test blockers.

@@ -798,7 +798,17 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
   if (swLodOn_) logInfo("software far LOD: rings %d/%d/%d chunks, view %d -> %s (effective %d/%d/%d; LL_SW_LOD=0 off)", swLodRing_[0], swLodRing_[1], swLodRing_[2],
                         swLodRings_.view(), lodLive ? "live" : "off (view inside the full-fidelity core)", swLodRings_.edge(0), swLodRings_.edge(1), swLodRings_.edge(2));
   submitMesh_ = [this](std::shared_ptr<MeshInput> in) {
-    if (!viewGate_.inView(in->cx, in->cz)) return;  // Archie Phase 1: re-meshes from scratch when it re-enters the view
+    if (!viewGate_.inView(in->cx, in->cz)) {
+      // A culled member still completes its publish batch. Dropping it silently stranded
+      // every visible wire/lamp in that batch forever (batchSize included this member).
+      if (in->batch && in->batchSize > 1 && in->batchSize <= 64) {  // matches kAtomicBatchMax at ingress
+        ChunkMesh done; done.cx = in->cx; done.sy = in->sy; done.cz = in->cz;
+        done.epoch = in->epoch; done.seq = 0;  // completion only, never upload geometry
+        done.batch = in->batch; done.batchSize = in->batchSize;
+        ++meshInFlight_; meshOut_.push(std::move(done));
+      }
+      return;  // still no mesh work beyond view distance
+    }
     ++meshInFlight_;  // P8 quiescence
     litholattice::workTrace("submit", in->cx, in->sy, in->cz, in->seq);  // duplicate-work trace (LL_WORK_TRACE)
     submitMeshJob(pool_, [this, in, mats = resources_.materials(), binary = useBinaryMesher_] { meshOne(in, mats, binary); });
@@ -4563,7 +4573,7 @@ void Game::uploadMeshes() {
   // kAtomicBatchMax (remesh-all, big loads) keep the budgeted path below.
   constexpr uint32_t kAtomicBatchMax = 64;
   auto land = [this](ChunkMesh& m) -> bool {
-    if (m.epoch != epoch_) return false;  // from an unloaded dimension
+    if (m.seq == 0 || m.epoch != epoch_) return false;  // culled batch completion / unloaded dimension
     uint64_t& seq = meshSeq_[packPos(m.cx, m.sy, m.cz)];
     if (seq != 0 && seq >= m.seq) { litholattice::workTrace("drop", m.cx, m.sy, m.cz, m.seq); return false; }  // a newer mesh already landed
     litholattice::workTrace("land", m.cx, m.sy, m.cz, m.seq);  // duplicate-work trace (LL_WORK_TRACE)

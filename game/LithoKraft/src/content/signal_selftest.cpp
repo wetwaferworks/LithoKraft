@@ -52,6 +52,299 @@ int runSignalSelfTest() {
   auto val = [&](int x, int yy, int z) { return stValue(w.getState(x, yy, z)); };
 
   std::printf("LithoLattice sim self-test\n");
+  // N5: JD's 64-out/Pulsor-into-solid/64-back/Memor/two-lamp repro.
+  // Start with a relay Pulsor so the outbound 64 links receive a full-strength pulse.
+  // The return is the other Trace colour to avoid shorting parallel adjacent runs.
+  for (int soft = 0; soft < 3; ++soft) {
+    using namespace litholattice;
+    ChunkMap q; q.setRegistry(&blockRegistry());
+    for (int cz = 0; cz < 3; ++cz) for (int cx = 0; cx < 8; ++cx) {
+      auto c = std::make_unique<ChunkColumn>(); c->cx = cx; c->cz = cz; q.insert(std::move(c));
+    }
+    constexpr int X = 32, Y = 20, Z = 15;
+    int east = 0, west = 0;
+    for (int d = 0; d < 4; ++d) { if (kDirX[d] == 1) east = d; if (kDirX[d] == -1) west = d; }
+    auto p = [&](int x, int z, BlockId b, CellState st = 0) { q.set(X+x,Y,Z+z,b); q.setState(X+x,Y,Z+z,st); };
+    p(-1,0,kSwitch,withAttach(makeState(0,east),1)); q.set(X-1,Y-1,Z,kWaferSilicon);
+    p(0,0,kPulsor,makeState(0,east));
+    for (int x = 1; x <= 64; ++x) p(x,0,kRedTrace);
+    p(65,0,kPulsor,makeState(0,east)); p(66,0,kWaferSilicon);
+    for (int x = 3; x <= 66; ++x) p(x,1,kBlueTrace);
+    p(2,1,kMemor,makeState(0,west)); p(1,1,kBlueTrace);
+    p(0,1,kColorLamp64); p(1,2,kColorLamp64);
+    int ax=0, ay=Y, az=1, bx=1, by=Y, bz=2;
+    if (soft) {
+      p(0,1,kWaferSilicon);p(1,2,kAir);p(0,2,kColorLamp64);
+      q.set(X,Y+1,Z+1,kColorLamp64);
+      if(soft==1) q.setState(X+1,Y,Z+1,cTraceConn::withIndex(0,3)); // Alt-scroll +X/-X sides
+      ax=0;az=2;bx=0;by=Y+1;bz=1;
+    }
+    cSignalSim s; s.scan(q);
+    int simMismatch = 0, snapshotMismatch = 0, litTicks = 0, farPeak = 0, returnPeak = 0;
+    auto snapshot = [&](int x, int yy, int z) {
+      const int wx=X+x,wz=Z+z;
+      auto pin=q.cowTable().pin(q,blockRegistry(),wx>>4,yy>>4,wz>>4,kAir,MeshEdge::Air);
+      const auto& sub=pin->cols[4]->subs[yy>>4];
+      return sub ? sub->data.state[SubChunk::index(wx&15,yy&15,wz&15)] : CellState(0);
+    };
+    const auto t0=std::chrono::steady_clock::now();
+    for (int t=0;t<192;++t) {
+      if (t==4 || t==64 || t==96) s.use(q,X-1,Y,Z,none);
+      // Deliberately no mesh flush: circuitry and fresh snapshot reads cannot wait for LL_RENDER_DIV.
+      s.tick(q,2,1,8,none);
+      const auto a=q.getState(X+ax,ay,Z+az),b=q.getState(X+bx,by,Z+bz);
+      simMismatch += a!=b; litTicks += stValue(a)>0;
+      farPeak=std::max(farPeak,stValue(q.getState(X+65,Y,Z)));
+      returnPeak=std::max(returnPeak,stValue(q.getState(X+3,Y,Z+1)));
+      snapshotMismatch += snapshot(ax,ay,az)!=a; snapshotMismatch += snapshot(bx,by,bz)!=b;
+    }
+    const double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t0).count()/192;
+    std::printf("  N5 repro mode %d: far peak %d return peak %d lit ticks %d sim mismatch %d snapshot mismatch %d %.3f ms/tick\n",soft,farPeak,returnPeak,litTicks,simMismatch,snapshotMismatch,ms);
+    check(farPeak>0 && returnPeak>0 && (soft==2 ? litTicks==0 : litTicks>0) && simMismatch==0,
+          soft==0 ? "N5 REPRO HARD: 64 out -> Pulsor into solid -> adjacent 64 return -> Memor paired lamps stay synced without remount" : soft==1 ? "N5 REPRO SOFT: connected Trace -> solid -> paired lamps stay synced" : "N5 REPRO SOFT NEGATIVE: auto Trace never soft-powers the solid/lamps");
+    check(snapshotMismatch==0,"N5 SNAPSHOT: lamp state reaches fresh CoW pins without a mesh flush/render divider");
+  }
+  // N8: no Memor/hold may hide the actual one-tick Pulsor packet. Equal-input
+  // twin Pulsors drive direct Trace versus solid -> adjacent Trace, lengths 1/64.
+  // Both routes must reproduce the PUBLISHED pulse this tick, not animation bits.
+  for(int tps:{20,512}) for(int path=0;path<3;++path) for(int length:{1,64}) {
+    using namespace litholattice;
+    ChunkMap q;q.setRegistry(&blockRegistry());
+    for(int cz=0;cz<3;++cz)for(int cx=0;cx<11;++cx){auto c=std::make_unique<ChunkColumn>();c->cx=cx;c->cz=cz;q.insert(std::move(c));}
+    constexpr int Y=15,Z=15;
+    int east=0,south=0;for(int d=0;d<4;++d){if(kDirX[d]==1)east=d;if(kDirZ[d]==1)south=d;}
+    auto p=[&](int x,int yy,int z,BlockId b,CellState st=0){q.set(x,yy,z,b);q.setState(x,yy,z,st);};
+    p(16,Y-1,Z,kWaferSilicon);p(16,Y,Z,kSwitch,withAttach(makeState(0,east),1));
+    for(int x=17;x<=80;++x)p(x,Y,Z,kRedTrace);
+    p(81,Y,Z,kPulsor,makeState(0,east));p(80,Y,Z+1,kPulsor,makeState(0,south));p(80,Y,Z+2,kWaferSilicon);
+    for(int i=0;i<length;++i){p(82+i,Y,Z,kRedTrace);p(81+i,Y,Z+2,kBlueTrace);}
+    const int ax=81+length,bx=80+length;
+    p(ax,Y+1,Z,kColorLamp64);p(bx,Y+1,Z+2,kColorLamp64);
+    cSignalWorldSim ws;ws.scan(q);auto& sim=ws.signal();sim.setLampHoldTicks(0);
+    cTimingHandshakeAuthority::Config hc;hc.workerThreads=4;hc.phaseBudgetGroup1=std::chrono::nanoseconds(1000000000ll/tps/4);
+    cTimingHandshakeAuthority authority(hc);if(path==1){ws.registerHandshake(authority);authority.start();}
+    auto output=[&](int x,int z){const auto text=sim.inspect(q,x,Y,z);const auto pos=text.find(" | out ");int out=-1;
+      if(pos!=std::string::npos)std::sscanf(text.c_str()+pos," | out %d",&out);return out;};
+    auto rendered=[&](int x,int yy,int z){auto in=std::make_unique<MeshInput>();pinForMeshingInto(q,blockRegistry(),x>>4,yy>>4,z>>4,1,1,kAir,*in,MeshEdge::Air,0);gatherPinned(*in);return in->st[meshPadIndex((x&15)+1,(yy&15)+1,(z&15)+1)];};
+    constexpr int cycles=1024,period=8,total=cycles*period+8;
+    int pulses=0,wide=0,sourceMismatch=0,hardMismatch=0,nearMismatch=0,farMismatch=0,lampMismatch=0,stale=0,prev=0;
+    for(int t=0;t<total;++t){
+      if(t<cycles*period&&(t%period==0||t%period==4))sim.use(q,16,Y,Z,none);
+      if(path==2)sim.invalidateNetwork(); // full flood control, not a production change
+      if(path==1)ws.tick(q,TickArea{5,1,8},none);else sim.tick(q,5,1,8,none);
+      const int a=output(81,Z),b=output(80,Z+1);sourceMismatch+=a!=b||a<0||b<0;
+      pulses+=b>0;wide+=b>0&&prev>0;
+      hardMismatch+=sim.hardPower(q,80,Y,Z+2)!=b;
+      nearMismatch+=(stValue(q.getState(82,Y,Z))!=a)+(stValue(q.getState(81,Y,Z+2))!=b);
+      farMismatch+=(stValue(q.getState(ax,Y,Z))!=a)+(stValue(q.getState(bx,Y,Z+2))!=b);
+      const auto la=q.getState(ax,Y+1,Z),lb=q.getState(bx,Y+1,Z+2);
+      lampMismatch+=(la!=lb)+(stValue(la)!=prev)+(stValue(lb)!=prev);
+      stale+=(rendered(ax,Y+1,Z)!=la)+(rendered(bx,Y+1,Z+2)!=lb);
+      stale+=(stValue(rendered(ax,Y,Z))!=a)+(stValue(rendered(bx,Y,Z+2))!=b);
+      if(t<20&&length==64&&path==0&&tps==20)
+        std::printf("  N8 tick %d out %d/%d hard %d near %d/%d far %d/%d lamps %d/%d\n",t,a,b,sim.hardPower(q,80,Y,Z+2),stValue(q.getState(82,Y,Z)),stValue(q.getState(81,Y,Z+2)),stValue(q.getState(ax,Y,Z)),stValue(q.getState(bx,Y,Z+2)),stValue(la),stValue(lb));
+      prev=b;
+    }
+    authority.stop();std::printf("  N8 PULSE tps %d path %d length %d cycles %d pulses %d wide %d source %d hard %d near %d far %d lamp %d render %d\n",tps,path,length,cycles,pulses,wide,sourceMismatch,hardMismatch,nearMismatch,farMismatch,lampMismatch,stale);
+    check(pulses==cycles&&wide==0&&sourceMismatch==0&&hardMismatch==0&&nearMismatch==0,
+      "N8 ONE TICK: Pulsor publishes exactly one tick; solid and adjacent wire receive it in THAT tick");
+    check(farMismatch==0&&lampMismatch==0&&stale==0,
+      "N8 PULSE EQUIVALENCE: direct wire and through-solid wire/lamp preserve every pulse, strength, edge and render snapshot");
+  }
+  if(std::getenv("LL_N8_ONLY"))return fails;
+  // JD's clocked asymmetric paths: left lamp on wire, right lamp on a solid.
+  // Two equal-delay Memors read the SAME return wire, so the block is the only
+  // output-path difference. Fixed 1 Hz/20-TPS clock first, random clock second.
+  for(int hs=0;hs<2;++hs) for(int mode=0;mode<3;++mode) {
+    using namespace litholattice;
+    ChunkMap q;q.setRegistry(&blockRegistry());
+    for(int cz=0;cz<3;++cz)for(int cx=0;cx<8;++cx){auto c=std::make_unique<ChunkColumn>();c->cx=cx;c->cz=cz;q.insert(std::move(c));}
+    constexpr int X=32,Y=15,Z=15;
+    int east=0,west=0,south=0;for(int d=0;d<4;++d){if(kDirX[d]==1)east=d;if(kDirX[d]==-1)west=d;if(kDirZ[d]==1)south=d;}
+    auto p=[&](int x,int yy,int z,BlockId b,CellState st=0){q.set(X+x,yy,Z+z,b);q.setState(X+x,yy,Z+z,st);};
+    p(-1,Y-1,0,kWaferSilicon);p(-1,Y,0,kSwitch,withAttach(makeState(0,east),1));p(0,Y,0,kPulsor,makeState(0,east));
+    // X-only red connections prevent the adjacent outbound run from clearing only one Memor.
+    for(int x=1;x<=64;++x)p(x,Y,0,kRedTrace,cTraceConn::withIndex(0,3));
+    p(65,Y,0,kPulsor,makeState(0,east));p(66,Y,0,kWaferSilicon);
+    for(int x=3;x<=66;++x)p(x,Y,1,kBlueTrace);
+    p(2,Y,1,kMemor,makeState(0,west));p(1,Y,1,kBlueTrace);p(1,Y-1,1,kColorLamp64);
+    p(3,Y,2,kMemor,makeState(0,south));
+    int rightZ=3;
+    if(mode==0)p(3,Y,3,kBlueTrace);
+    if(mode==1)p(3,Y,3,kWaferSilicon);
+    if(mode==2){p(3,Y,3,kBlueTrace,cTraceConn::withIndex(0,48));p(3,Y,4,kWaferSilicon);rightZ=4;}
+    p(3,Y+1,rightZ,kColorLamp64);
+    p(2,Y,2,kWaferSilicon);p(2,Y+1,2,kSwitch,withAttach(makeState(0,east),1));
+    cSignalWorldSim ws;ws.scan(q);auto& sim=ws.signal();sim.setLampHoldTicks(0);
+    cTimingHandshakeAuthority::Config hc;hc.workerThreads=4;cTimingHandshakeAuthority authority(hc);
+    if(hs){ws.registerHandshake(authority);authority.start();}
+    uint32_t rng=0x716f1234u;int next=4,resetOff=-1,edges=0,desync=0,stale=0,flicker=0,lit=0,transitions=0,previous=0,wantPrevious=0;
+    auto rendered=[&](int x,int yy,int z){auto in=std::make_unique<MeshInput>();pinForMeshingInto(q,blockRegistry(),(X+x)>>4,yy>>4,(Z+z)>>4,1,1,kAir,*in,MeshEdge::Air,0);gatherPinned(*in);return in->st[meshPadIndex(((X+x)&15)+1,(yy&15)+1,((Z+z)&15)+1)];};
+    for(int t=0;t<1024;++t){
+      if(t==next){sim.use(q,X-1,Y,Z,none);++edges;rng^=rng<<13;rng^=rng>>17;rng^=rng<<5;next+=t<512?10:3+int(rng%18);}
+      if(t%40==23){sim.use(q,X+2,Y+1,Z+2,none);resetOff=t+1;}
+      if(t==resetOff)sim.use(q,X+2,Y+1,Z+2,none);
+      if(hs)ws.tick(q,TickArea{2,1,8},none);else sim.tick(q,2,1,8,none);
+      const auto a=q.getState(X+1,Y-1,Z+1),b=q.getState(X+3,Y+1,Z+rightZ);
+      desync+=a!=b;stale+=(rendered(1,Y-1,1)!=a)+(rendered(3,Y+1,rightZ)!=b);
+      const int value=stValue(a);flicker+=value!=wantPrevious;wantPrevious=stValue(q.getState(X+1,Y,Z+1));
+      lit+=value>0;transitions+=value!=previous;previous=value;
+    }
+    authority.stop();
+    std::printf("  N7 CLOCK left-wire/right-path %d hs %d: edges %d desync %d stale %d flicker %d lit %d transitions %d\n",mode,hs,edges,desync,stale,flicker,lit,transitions);
+    check(edges>80&&transitions>24&&lit>0&&desync==0&&stale==0&&flicker==0,
+      mode==0?"N7 CLOCK WIRE CONTROL: repeating clock keeps both wire lamps and mesh snapshots synchronized":
+      mode==1?"N7 CLOCK HARD: left wire lamp matches right solid lamp over fixed and random clock cycles":
+      "N7 CLOCK SOFT: left wire lamp matches right custom-soft solid lamp over fixed and random clock cycles");
+  }
+  // N7: repeatable randomized input and Memor clear edges. Validate the actual
+  // mesh inputs, exact one-tick lamp transfer, and hard-block neighborhood dirties.
+  for(int hs=0;hs<2;++hs) for(int mode=0;mode<3;++mode) {
+    uint64_t replayHash=0;
+    for(int replay=0;replay<2;++replay) {
+      using namespace litholattice;
+      ChunkMap q;q.setRegistry(&blockRegistry());
+      for(int cz=0;cz<3;++cz)for(int cx=0;cx<8;++cx){auto c=std::make_unique<ChunkColumn>();c->cx=cx;c->cz=cz;q.insert(std::move(c));}
+      constexpr int X=32,Y=15,Z=15;
+      int east=0,west=0;for(int d=0;d<4;++d){if(kDirX[d]==1)east=d;if(kDirX[d]==-1)west=d;}
+      auto p=[&](int x,int yy,int z,BlockId b,CellState st=0){q.set(X+x,yy,Z+z,b);q.setState(X+x,yy,Z+z,st);};
+      p(-1,Y-1,0,kWaferSilicon);p(-1,Y,0,kSwitch,withAttach(makeState(0,east),1));p(0,Y,0,kPulsor,makeState(0,east));
+      for(int x=1;x<=64;++x)p(x,Y,0,kRedTrace);
+      p(65,Y,0,kPulsor,makeState(0,east));p(66,Y,0,kWaferSilicon);
+      for(int x=3;x<=66;++x)p(x,Y,1,kBlueTrace);
+      p(2,Y,1,kMemor,makeState(0,west));
+      int out=1;
+      if(mode==0)p(1,Y,1,kBlueTrace);
+      if(mode==1)p(1,Y,1,kWaferSilicon);
+      if(mode==2){p(1,Y,1,kBlueTrace,cTraceConn::withIndex(0,3));p(0,Y,1,kWaferSilicon);out=0;}
+      p(out,Y-1,1,kColorLamp64);p(out,Y+1,1,kColorLamp64);
+      // Attached reset switch powers only its support beside the Memor, not the lamps.
+      p(2,Y,2,kWaferSilicon);p(2,Y+1,2,kSwitch,withAttach(makeState(0,east),1));
+      cSignalWorldSim ws;ws.scan(q);auto& sim=ws.signal();sim.setLampHoldTicks(0);
+      cTimingHandshakeAuthority::Config hc;hc.workerThreads=4;cTimingHandshakeAuthority authority(hc);
+      if(hs){ws.registerHandshake(authority);authority.start();}
+      constexpr int k6[6][3]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+      bool dirtyFar[7]={};
+      const cSignalSim::DirtyFn dirty=[&](int x,int yy,int z){
+        if(x==X+66&&yy==Y&&z==Z)dirtyFar[0]=true;
+        for(int j=0;j<6;++j)if(x==X+66+k6[j][0]&&yy==Y+k6[j][1]&&z==Z+k6[j][2])dirtyFar[j+1]=true;
+      };
+      uint32_t rng=0x751d1234u;auto random=[&](){rng^=rng<<13;rng^=rng>>17;rng^=rng<<5;return rng;};
+      int nextToggle=4,nextReset=71,resetOff=-1,toggles=0,resets=0;
+      int desync=0,stale=0,flicker=0,missing=0,hardEdges=0,lit=0,transitions=0,previousLamp=0,previousWant=0,previousHard=0;
+      uint64_t hash=1469598103934665603ull;
+      auto rendered=[&](int x,int yy,int z){auto in=std::make_unique<MeshInput>();
+        pinForMeshingInto(q,blockRegistry(),(X+x)>>4,yy>>4,(Z+z)>>4,1,1,kAir,*in,MeshEdge::Air,0);gatherPinned(*in);
+        return in->st[meshPadIndex(((X+x)&15)+1,(yy&15)+1,((Z+z)&15)+1)];};
+      for(int t=0;t<1024;++t){
+        std::fill(std::begin(dirtyFar),std::end(dirtyFar),false);
+        if(t==nextToggle){sim.use(q,X-1,Y,Z,dirty);++toggles;nextToggle+=17+int(random()%61);}
+        if(t==nextReset){sim.use(q,X+2,Y+1,Z+2,dirty);++resets;resetOff=t+1;nextReset+=83+int(random()%67);}
+        if(t==resetOff)sim.use(q,X+2,Y+1,Z+2,dirty);
+        if(hs)ws.tick(q,TickArea{2,1,8},dirty);else sim.tick(q,2,1,8,dirty);
+        const auto a=q.getState(X+out,Y-1,Z+1),b=q.getState(X+out,Y+1,Z+1);
+        desync+=a!=b;stale+=(rendered(out,Y-1,1)!=a)+(rendered(out,Y+1,1)!=b);
+        stale+=rendered(3,Y,1)!=q.getState(X+3,Y,Z+1);
+        const int value=stValue(a);lit+=value>0;transitions+=value!=previousLamp;previousLamp=value;
+        flicker+=value!=previousWant;
+        previousWant=mode==1?sim.hardPower(q,X+out,Y,Z+1):stValue(q.getState(X+1,Y,Z+1));
+        const int hard=sim.hardPower(q,X+66,Y,Z);
+        if(hard!=previousHard){++hardEdges;for(bool d:dirtyFar)missing+=!d;}previousHard=hard;
+        hash=(hash^uint64_t(a)^uint64_t(q.getState(X+65,Y,Z))<<16)*1099511628211ull;
+      }
+      authority.stop();
+      std::printf("  N7 random mode %d hs %d replay %d: toggles %d resets %d hardEdges %d missingDirty %d desync %d stale %d flicker %d lit %d transitions %d hash %llu\n",mode,hs,replay,toggles,resets,hardEdges,missing,desync,stale,flicker,lit,transitions,(unsigned long long)hash);
+      check(toggles>16&&resets>5&&lit>0&&transitions>8&&desync==0&&stale==0&&flicker==0,
+        mode==0?"N7 WIRE: random toggles/clears keep paired lamp mesh snapshots exact, without flicker":
+        mode==1?"N7 HARD SOLID: random toggles/clears keep paired lamp mesh snapshots exact, without flicker":
+        "N7 CUSTOM SOFT SOLID: random toggles/clears preserve semantics and paired render state without flicker");
+      check(hardEdges>12&&missing==0,"N7 HARD INVALIDATION: every hard-power edge dirties the solid and all six neighbors in the same tick");
+      if(replay)check(hash==replayHash,"N7 DETERMINISM: identical random timing produces identical per-tick output hashes");else replayHash=hash;
+    }
+  }
+  // Isolate the cached lamp writer in a different vertical sub from its driver.
+  // A pin may happen while mesh coalescing is still waiting: it must see the live lamp.
+  {
+    using namespace litholattice;
+    ChunkMap q; q.setRegistry(&blockRegistry());
+    auto c=std::make_unique<ChunkColumn>(); c->cx=0;c->cz=0;q.insert(std::move(c));
+    q.set(5,15,5,kBlueTrace);q.set(5,16,5,kColorLamp64);
+    q.set(4,15,5,kMemor);q.setState(4,15,5,makeState(15,1));
+    cSignalSim s;s.scan(q);
+    int stale=0,lit=0;
+    for(int t=0;t<40;++t) {
+      s.tick(q,0,0,4,none);
+      auto pin=q.cowTable().pin(q,blockRegistry(),0,1,0,kAir,MeshEdge::Air);
+      const auto sub=pin->cols[4]->subs[1];
+      const auto shown=sub->data.state[SubChunk::index(5,0,5)];
+      stale+=shown!=q.getState(5,16,5);lit+=stValue(q.getState(5,16,5))>0;
+    }
+    std::printf("  N5 isolated fast-lamp: stale pins %d lit ticks %d\n",stale,lit);
+    check(lit>0 && stale==0,"N5 FAST LAMP: cached upper-sub lamp publishes its delayed state without waiting for a remesh");
+  }  if (std::getenv("LL_N5_ONLY")) return fails;
+  // JD 2026-11-06: floating LEDs feed same-colour dust BENEATH them, in full and cached floods.
+  {
+    ChunkMap q; q.setRegistry(&blockRegistry());
+    auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; q.insert(std::move(col));
+    cSignalSim s;
+    auto p = [&](int x, int yy, BlockId b) { q.set(x, yy, 2, b); s.onBlockChanged(x, yy, 2, b); };
+    p(2, 10, kRedTrace); p(2, 11, kRedTorch);
+    p(6, 10, kBlueTrace); p(6, 11, kBlueTorch);
+    p(10, 10, kBlueTrace); p(10, 11, kRedTorch);
+    p(13, 10, kRedTrace); p(14, 11, kWaferSilicon); p(13, 11, kRedTorch);
+    q.setState(13, 11, 2, withAttach(CellState(0), 6));  // wall-mounted, support east (JD screenshot)
+    s.tick(q, 0, 0, 4, none);
+    check(stValue(q.getState(2, 10, 2)) == kMaxSignal && stValue(q.getState(6, 10, 2)) == kMaxSignal,
+          "LED BELOW: floating red/blue LEDs power same-colour Trace beneath (full flood)");
+    check(stValue(q.getState(13, 10, 2)) == kMaxSignal,
+          "LED BELOW: wall-mounted red LED powers ground Trace directly beneath its cell");
+    bool stable = true;
+    for (int i = 0; i < 8; ++i) {
+      s.tick(q, 0, 0, 4, none);
+      stable &= stValue(q.getState(2, 10, 2)) == kMaxSignal && stValue(q.getState(6, 10, 2)) == kMaxSignal &&
+                stValue(q.getState(13, 10, 2)) == kMaxSignal;
+    }
+    check(stable && stValue(q.getState(10, 10, 2)) == 0,
+          "LED BELOW: cached flood stays powered without feedback; opposite colour stays dark");
+    p(2, 11, kAir); p(6, 11, kAir); s.tick(q, 0, 0, 4, none);
+    check(stValue(q.getState(2, 10, 2)) == 0 && stValue(q.getState(6, 10, 2)) == 0,
+          "LED BELOW: removing floating LEDs clears their lower wires");
+  }
+  // Exercise the real sim-thread dirty flush: active signal cells bypass view culling,
+  // ordinary terrain retains it. No solver or mesh policy is duplicated in this test.
+  {
+    struct Blinker final : litholattice::IWorldSim {
+      int ticks = 0;
+      void scan(const ChunkMap&) override {}
+      void onBlockChanged(ChunkMap&, int, int, int, BlockId) override {}
+      void tick(ChunkMap& m, const litholattice::TickArea&, const DirtyFn& dirty) override {
+        m.setState(40, 10, 2, CellState((++ticks) & 1)); dirty(40, 10, 2);
+      }
+    };
+    auto behind = [&](BlockId block) {
+      ChunkMap q; q.setRegistry(&blockRegistry());
+      auto col = std::make_unique<ChunkColumn>(); col->cx = 2; col->cz = 0; q.insert(std::move(col));
+      q.set(40, 10, 2, block);
+      std::atomic<int> submitted{0}; std::atomic<uint64_t> worldTicks{0};
+      litholattice::SimConfig cfg; cfg.tickRate = 64; cfg.radiusChunks = 4;
+      cfg.randomTicksPerSection = 0; cfg.timingHandshake = false;
+      litholattice::cSimThread th(q, blockRegistry(), std::make_unique<Blinker>(), cfg,
+        [&](std::shared_ptr<litholattice::MeshInput> in) { if (in->cx == 2 && in->sy == 0) ++submitted; });
+      th.setPlayerChunk(0, 0); th.setRay({0.f, 10.f, 2.f, -1.f, 0.f, 0.f});
+      th.setTickHook([&](uint64_t) { ++worldTicks; }); th.start();
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+      const auto settledAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+      while ((worldTicks.load() < 8 || std::chrono::steady_clock::now() < settledAt ||
+              (block == kLamp && submitted.load() == 0)) && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::yield();
+      th.stop(); return std::pair{worldTicks.load(), submitted.load()};
+    };
+    const auto signal = behind(kLamp), terrain = behind(kWaferSilicon);
+    check(signal.first >= 8 && signal.second > 0,
+          "OFF-CAMERA: changing signal meshes flush behind eye without turning camera");
+    check(terrain.first >= 8 && terrain.second == 0,
+          "OFF-CAMERA: ordinary terrain retains behind-eye mesh culling");
+  }
   // A) torch -> 10 red trace -> lamp, plus an unpowered blue trace alongside.
   put(0, y, 0, kRedTorch);
   for (int x = 1; x <= 10; ++x) { put(x, y, 0, kRedTrace); put(x, y, 1, kBlueTrace); }
