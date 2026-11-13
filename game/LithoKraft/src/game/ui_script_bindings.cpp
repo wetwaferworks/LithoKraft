@@ -2,11 +2,9 @@
 #include <string>
 #include "litholattice/core/log.h"
 #include "litholattice/script/script_generic.h"
-#include "litholattice/ui/controls.h"
-#include "litholattice/ui/lists.h"
-#include "litholattice/ui/text_edit.h"
-#include "litholattice/ui/widget_factory.h"
-#include "litholattice/ui/mod_ui.h"
+#include "lithokraft/game/ui_mod.h"
+#include "lithokraft/game/ui_textedit.h"
+#include "lithokraft/game/ui_widgets.h"
 
 namespace lithokraft {
 namespace {
@@ -94,7 +92,7 @@ bool uiShow(const std::string& json, cUiScriptBindings* b) {
 
 void uiClose(const std::string& id, cUiScriptBindings* b) {
   ui::cWidget* w = find(b, id);
-  if (w && w->parent()) b->ui().destroyLater(w->parent()->removeChild(*w));  // may be closing itself
+  if (w && w->parentW()) b->ui().destroyLater(w->parentW()->removeChild(*w));  // may be closing itself
 }
 
 }  // namespace

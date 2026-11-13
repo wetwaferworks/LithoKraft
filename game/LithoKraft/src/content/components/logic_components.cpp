@@ -6,6 +6,11 @@
 #include "latchor.h"
 #include "fusor_sum.h"  // PlayN (JD)
 #include "dividor.h"  // 2026-11-05 (JD)
+#include "dialor.h"  // 2026-11-11 (JD)
+#include "watchor.h"  // B9 2026-11-12 (JD)
+#include "bitor.h"  // B9 2026-11-12 (JD)
+#include "pushor.h"  // B9 2026-11-12 (JD)
+#include "swivelor.h"  // B9 2026-11-12 (JD)
 #include "routor.h"  // PlayB (JD t4343u): the Redirector became the Routor
 #include "randor.h"  // 2026-10-31 (JD): Randor  // 2026-10-31: cLatchor (was cFastLatch)
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215
@@ -193,14 +198,17 @@ class cTimerBuffer final : public cCompBehavior {
   }
 };
 
-/// Linked (default): strongest of back / left / right / wire on top, out the front, any colour.
-/// Using it cycles the front N -> E -> S -> W.
-/// Output is always colourless: it drives red and blue Trace alike, so a cRedirector transfers
-/// between colours (red in, blue out and vice versa).
+/// Multiplexor (block id lithokraft:multiplexor / kRedirector). Output is always colourless: it
+/// drives red and blue Trace alike, so it transfers between colours (red in, blue out and vice versa).
+/// Unsplit (2026-11-11 JD t5252u): 2:1 mux. North-facing reference: output=north (front), A=south
+/// (back), B=east (right), control=west (left); other facings rotate that layout. Control off
+/// (strength 0) selects A; any source with strength > 0 on the control face selects B. Front and
+/// top are ignored. No mutex / lock / CV.
 /// Split (aux bit 2): red and blue Trace inputs are routed independently. The facing bits are the
 /// red lane's front, aux bits 0-1 the blue lane's; either lane can be switched off (state bits 13 /
 /// 14). A colourless input (cCatchor) feeds both lanes. Using an adjacent red / blue trace switches
-/// to split and cycles that colour's front; using the block then cycles the red front.
+/// to split and cycles that colour's front; using the block then cycles the red front (disabled
+/// when muxNoUse, the default).
 class cRedirector final : public cCompBehavior {
  public:
   int delayTicks(CellState, int64_t, uint64_t) const override { return 4; }  // 2026-11-04 (JD t4304u)  // Multiplexor
@@ -215,22 +223,17 @@ class cRedirector final : public cCompBehavior {
   static bool muxNoUse() { static const bool v = [] { const char* e = std::getenv("LL_MUX_NOUSE"); return !(e && e[0] == '0'); }(); return v; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory&) const override {
     const int f = stFacing(st);
-    // 2026-10-31 (JD mux): a Repeator feeding the left or right side selects the colour, level-held:
-    // Repeator off = red mode (red inputs pass), on = blue mode (blue inputs pass). Plain Trace or any
-    // other component on a side never switches it. Output is colourless out the front, as in linked.
-    if (in.muxSides != 0) {
-      int red = 0, blue = 0;
-      for (int d = 0; d < 4; ++d) {
-        if (d == f || (in.muxSides & (1u << d))) continue;
-        if (in.ch[d] == 1 || in.ch[d] == 0) red = std::max(red, in.side[d]);
-        if (in.ch[d] == 2 || in.ch[d] == 0) blue = std::max(blue, in.side[d]);
-      }
-      const int out = std::min(in.muxOn ? blue : red, kMaxSignal);
-      // 2026-11-04 (CloudAtlas v2 art): bit 15 = blue selected (render only: multiplexor_*_sel_blue).
-      return {out, 0, CellState(makeState(out, f, stAux(st), out > 0) | keep(st) | (in.muxOn ? kMuxBlue : 0))};
-    }
+    // 2026-11-11 (JD t5252u drawing): unsplit Multiplexor is a 2:1 mux. North-facing
+    // reference: output=north (front), A=south (back), B=east (right), control=west (left).
+    // Other facings are that layout rotated. Control off (strength 0) selects A; any source
+    // with strength > 0 on the control face selects B. Front and top are ignored. This swaps
+    // B and control versus the earlier east=control / west=input2 pass. Split mode (aux bit 2)
+    // keeps the independent red/blue lane routing used by the redirector scene.
     if (!split(st)) {
-      const int out = std::min(std::max({in.back(f), in.left(f), in.right(f), in.top}), kMaxSignal);  // SW-H2 clamp
+      const int a = in.back(f);
+      const int b = in.right(f);
+      const int ctrl = in.left(f);
+      const int out = std::min(ctrl > 0 ? b : a, kMaxSignal);
       return {out, 0, makeState(out, f, stAux(st), out > 0)};
     }
     const int bf = blueFront(st);
@@ -339,9 +342,10 @@ class cMemor final : public cCompBehavior {
   }
 };
 
-/// cCatchor (per-pixel address decoder). Wiring: while unwired it auto-connects to the FIRST wire
-/// (red or blue) that touches one of its sides; that side becomes its input and that colour the
-/// one it catches. Output: left, right or centre (straight through) relative to the input, never
+/// cCatchor (per-pixel address decoder). Wiring: binds ONCE at placement (2026-11-07, JD:
+/// cSignalSim::applyPlacementBinds) to the first wire (red or blue) touching one of its sides
+/// at that moment; that side becomes its input and that colour the one it catches. It NEVER
+/// rebinds on power/unpower afterwards; player use is the only later modification. Output: left, right or centre (straight through) relative to the input, never
 /// up or down. The tick its input becomes exactly its match value (steady or pulse) it sends the
 /// caught value as a one-tick pulse out of the output side (a colour lamp shows it; a cRedirector
 /// there takes it as its input). The line itself is never driven, so the signal carries on.
@@ -361,9 +365,10 @@ class cCatchor final : public cCompBehavior {
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     int f = stFacing(st), aux = stAux(st);
     const int match = stValue(st);
-    if ((aux & 3) == 3)
-      for (int d = 0; d < 4; ++d)
-        if (in.ch[d] == 1 || in.ch[d] == 2 || ((in.repSides >> d) & 1)) { f = (d + 2) & 3; aux = in.ch[d] == 2 ? 4 : 0; break; }
+    // 2026-11-07 (JD ruling): NO binding here. The tick-time auto-bind is
+    // retired: an unwired Catchor binds exactly once, at placement, in
+    // cSignalSim::applyPlacementBinds. Power/unpower can never bind or
+    // rebind it; only player use modifies it afterwards.
     int v = 0;
     if ((aux & 3) != 3) {
       const int inDir = (f + 2) & 3;
@@ -393,7 +398,7 @@ class cCatchor final : public cCompBehavior {
     return makeState(stValue(st) % kMaxSignal + 1, stFacing(st), stAux(st), false);
   }
   std::string describe(const BlockDef& d, CellState s) const override {
-    if (!wired(s)) return std::format("{} | catches {} | not wired (touch a Trace to a side, sneak+use to set)", d.name, stValue(s));
+    if (!wired(s)) return std::format("{} | catches {} | not wired (place it beside a Trace to bind, sneak+use to set)", d.name, stValue(s));
     static constexpr const char* kOut[3] = {"centre", "left", "right"};
     return std::format("{} | catches {} on {} | in from {} | out {} ({})", d.name, stValue(s), (stAux(s) & 4) ? "blue" : "red",
                        facingName((stFacing(s) + 2) & 3), kOut[stAux(s) & 3], facingName(outDir(s)));
@@ -403,7 +408,8 @@ class cCatchor final : public cCompBehavior {
 
 
 /// Wireless signal source: trace in, radio out. use() toggles input/beacon mode;
-/// sneak+use cycles the radio channel. First trace touching a side binds the input colour.
+/// sneak+use cycles the radio channel. Binds its input colour once at placement
+/// (2026-11-07, JD: cSignalSim::applyPlacementBinds); never rebinds on power.
 /// Broadcasts (mem.out = strength, mem.out2 = colour); the sim publishes after the tick.
 /// Never drives wire (emitToward = 0).
 class cSignalTransmittor final : public cCompBehavior {
@@ -411,9 +417,8 @@ class cSignalTransmittor final : public cCompBehavior {
   static bool wired(CellState s) { return (stAux(s) & 3) != 3; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override {
     int f = stFacing(st), aux = stAux(st);
-    if ((aux & 3) == 3)
-      for (int d = 0; d < 4; ++d)
-        if (in.ch[d] == 1 || in.ch[d] == 2) { f = (d + 2) & 3; aux = in.ch[d] == 2 ? 4 : 0; break; }
+    // 2026-11-07 (JD ruling): no tick-time binding (retired with the Catchor's);
+    // the input colour binds once at placement in cSignalSim::applyPlacementBinds.
     int v = 0, col = 0;
     if (m.beacon) {
       v = kMaxSignal;
@@ -436,7 +441,7 @@ class cSignalTransmittor final : public cCompBehavior {
     return st;
   }
   std::string describe(const BlockDef& d, CellState s) const override {
-    if (!wired(s)) return std::format("{} | not wired (touch a Trace to a side)", d.name);
+    if (!wired(s)) return std::format("{} | not wired (place it beside a Trace to bind)", d.name);
     return std::format("{} | {} | {}", d.name, (stAux(s) & 4) ? "blue" : "red",
                        stOn(s) ? "broadcasting" : "idle");
   }
@@ -615,6 +620,11 @@ void registerLogic(const Registrar& add) {
   add("timer_buffer", std::make_unique<cTimerBuffer>());
   add("fusor_sum", std::make_unique<cFusorSum>());  // PlayN (JD)
   add("dividor", std::make_unique<cDividor>());  // 2026-11-05 (JD)
+  add("dialor", std::make_unique<cDialor>());  // 2026-11-11 (JD)
+  add("watchor", std::make_unique<cWatchor>());  // B9 2026-11-12 (JD): Watchor, row B
+  add("bitor", std::make_unique<cBitor>());  // B9 2026-11-12 (JD): Bitor, row B (AND at 0 only)
+  add("pushor", std::make_unique<cPushor>());  // B9 2026-11-12 (JD): Pushor, row B (power + quasi only; distance OPEN)
+  add("swivelor", std::make_unique<cSwivelor>());  // B9 2026-11-12 (JD): Swivelor, row B (no control port: wells OPEN)
   add("randor", std::make_unique<cRandor>());
   add("routor", std::make_unique<cRoutor>());  // PlayB (JD t4343u): was redirector_select  // 2026-11-04 (JD t4302u)  // 2026-10-31 (JD): random range block  // 2026-10-25 roadmap 7
 }

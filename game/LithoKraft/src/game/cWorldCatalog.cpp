@@ -1,5 +1,6 @@
 // World catalog: see cWorldCatalog.h. 2026-10-30 (JD).
 #include "lithokraft/game/cWorldCatalog.h"
+#include "lithokraft/content/component_test_world.h"  // 2026-11-12 (JD): Component Test spawns
 
 namespace lithokraft {
 
@@ -18,6 +19,8 @@ cWorldCatalog::cWorldCatalog() {
       {"wire-torture", "Wire Torture", {"--bench-scene", "wire-torture"}, {"spawn"}},
       {"flatlab", "Flat Lab (Trace)", {"--flat-lab"}, examples},
       {"boltlab", "Bolt PCHIE Lab", {"--bolt-lab"}, bolt},
+      // 2026-11-12 (JD t5296u): "call it component test, and put it in the menu". One spawn per pad.
+      {"component-test", "Component Test", {"--component-test"}, cComponentTestWorld::spawnIds()},
   };
 }
 
@@ -29,6 +32,7 @@ const cWorldCatalog& cWorldCatalog::instance() {
 int cWorldCatalog::indexFor(const std::string& benchScene, const std::string& dimension, bool examples) const {
   std::string id;
   if (benchScene == "boltlab") id = "boltlab";
+  else if (benchScene == "componenttest") id = "component-test";
   else if (benchScene == "testworld" && dimension == "flatlab") id = "flatlab";
   else if (benchScene == "testworld") id = examples ? "testworld-examples" : "testworld";
   else if (benchScene == "wire-torture") id = "wire-torture";

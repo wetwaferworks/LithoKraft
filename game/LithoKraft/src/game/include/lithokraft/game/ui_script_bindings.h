@@ -11,7 +11,7 @@
 #include "lithokraft/game/engine.h"
 #include <string_view>
 #include "litholattice/script/script_engine.h"
-#include "litholattice/ui/ui_root.h"
+#include "lithokraft/game/ui_facade.h"
 
 namespace lithokraft {
 

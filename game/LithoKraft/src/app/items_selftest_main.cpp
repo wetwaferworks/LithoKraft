@@ -39,7 +39,7 @@ int main() {
       ok = ok && isItemId(d.itemId);
     }
     check(ok, "registry: ids/string ids unique, defs complete, lookups round-trip");
-    check(itemRegistry().size() == 31, "registry: 31 items (seed, Fragment, 6 armory, Firewall, Ping, Callback, Debuggor, Sniffor, Atlas, Titanium Oxide, 15 JD materials, Chipor)");
+    check(itemRegistry().size() == 32, "registry: 32 items (seed, Fragment, 6 armory, Firewall, Ping, Callback, Debuggor, Sniffor, Atlas, Titanium Oxide, 15 JD materials, Resin, Chipor)");  // B9 2026-11-12: + Resin
   }
 
   // 1b. Unified cContentReg: every item is also registered under the
@@ -55,7 +55,7 @@ int main() {
     const auto chip = content.findItem("lithokraft:chipor");
     ok = ok && chip && content.itemDef(*chip).placesBlock == content.blockStableId(kChipor) &&
          content.itemDef(*chip).placesBlock != 0;
-    check(ok, "unified registry: all 31 items registered as engine items; Chipor placesBlock = Chipor block stable id");
+    check(ok, "unified registry: all 32 items registered as engine items; Chipor placesBlock = Chipor block stable id");
   }
 
   // 2. Append-only ids are exactly the assigned offsets (never renumbered).
@@ -73,8 +73,9 @@ int main() {
             kItemDioxide == kFirstItemId + 22 && kItemSiliconDioxide == kFirstItemId + 23 &&
             kItemCopper == kFirstItemId + 24 && kItemSiliconCopper == kFirstItemId + 25 &&
             kItemAluminum == kFirstItemId + 26 && kItemSiliconAluminum == kFirstItemId + 27 &&
-            kItemPhotoresist == kFirstItemId + 28 && kItemResist == kFirstItemId + 29,
-        "ids: append-only offsets stable (seed +0 .. resist +29, all above the BlockId range)");
+            kItemPhotoresist == kFirstItemId + 28 && kItemResist == kFirstItemId + 29 &&
+            kItemResin == kFirstItemId + 30,  // B9 2026-11-12: Resin appended
+        "ids: append-only offsets stable (seed +0 .. resist +29, resin +30, all above the BlockId range)");
   check(!isItemId(0) && !isItemId(kFirstItemId + 99) && isItemId(kWaferSilicon),
         "ids: 0 and unregistered offsets rejected; live BlockIds are block items");
 
@@ -197,7 +198,7 @@ int main() {
         all = false;
       }
     }
-    check(all, "acceptance: fresh inventory can hold every lore tool / item (31 defs)");
+    check(all, "acceptance: fresh inventory can hold every lore tool / item (32 defs)");
     check(inv.addItem(kItemSilicaSeed, 512) == 0 && inv.countOf(kItemSilicaSeed) == 513,
           "acceptance: materials still stack (seed x512 on top of the held one)");
   }

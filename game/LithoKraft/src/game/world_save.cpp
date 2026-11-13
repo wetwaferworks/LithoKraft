@@ -821,7 +821,8 @@ std::optional<PlayerMeta> cWorldSave::readPlayer(std::string* err) const {
       if (playerLatNameOk(b.ok(), nm)) m.vitals[std::string(nm.begin(), nm.end())] = value;
     }
   }
-  bool legacyLayout = false;  // 2026-10-24: inventory written with the 8-slot hotbar
+  int writtenSlots = 0;  // B9 four-row: the inventory block's written length (names its layout; 0 = no block)
+  std::vector<std::pair<int, int>> overflowMoved;  // C9: B9 main 32..63 raw flat -> the C9 flat it landed on
   if (v >= 4) {
     // Inventory block: (string id, count) per slot in the canonical flat
     // order. Unknown ids drop ONLY their own stack (logged); slots past
@@ -830,9 +831,28 @@ std::optional<PlayerMeta> cWorldSave::readPlayer(std::string* err) const {
     const uint16_t nSlots = b.u16();
     const auto slots = m.inventory.allSlots();
     // 2026-10-24: a block written with the 8-slot hotbar (50 slots) is remapped into the 16-slot layout.
-    legacyLayout = nSlots == uint16_t(kLegacyTotalSlots) && kTotalSlots != kLegacyTotalSlots;
+    // B9 four-row (2026-11-12): a block written with the 4x8 main grid (58 slots) is remapped too:
+    // hotbar, hands and main keep their positions, the gear block moves up past the 64-slot grid.
+    // C9 (2026-11-12, JD: four rows of eight): the live layout is A9's 58 again. A B9 block (90: 4x16 main,
+    // gear 82..89) keeps hotbar / hands / main 0..31 in place, moves gear to 50..57, and spills main 32..63
+    // into free C9 slots (policy below); the untouched B9 file is kept as player.lat.b9-90slot.bak.
+    writtenSlots = nSlots;
+    if (nSlots != uint16_t(kTotalSlots) && (nSlots == uint16_t(kLegacyTotalSlots) || nSlots == uint16_t(kB9TotalSlots)))
+      logInfo("player.lat: inventory written with %u slots; remapped into this build's %d-slot layout", unsigned(nSlots), kTotalSlots);
+    if (nSlots == uint16_t(kB9TotalSlots)) {
+      std::filesystem::path bak = path;
+      bak += ".b9-90slot.bak";
+      std::error_code ec;
+      if (!std::filesystem::exists(bak, ec)) {
+        std::filesystem::copy_file(path, bak, ec);
+        if (ec) logWarn("player.lat: could not keep the B9 90-slot copy %s (%s)", bak.string().c_str(), ec.message().c_str());
+        else logInfo("player.lat: B9 90-slot inventory; the untouched file is kept as %s", bak.string().c_str());
+      }
+    }
+    std::vector<std::pair<int, ItemStack>> overflow;  // C9: (raw flat, stack) of B9 main slots 32..63
     for (uint16_t i0 = 0; i0 < nSlots; ++i0) {
-      const uint16_t i = legacyLayout ? uint16_t(legacyFlatToCurrent(i0)) : i0;
+      const int mapped = savedFlatToCurrent(int(nSlots), int(i0));
+      const uint16_t i = uint16_t(mapped < 0 ? int(i0) : mapped);
       const storage::Bytes s = b.bytes();
       const uint16_t count = b.u16();
       if (!b.ok() || count == 0) continue;  // empty slot (explicit in v4)
@@ -847,10 +867,37 @@ std::optional<PlayerMeta> cWorldSave::readPlayer(std::string* err) const {
       const uint16_t cap = stackCapFor(*id);
       if (count > cap)
         logWarn("player.lat: slot %u '%s' count %u exceeds its stack cap %u; clamped", unsigned(i), sid.c_str(), unsigned(count), unsigned(cap));
+      if (mapped == kSavedOverflow) { overflow.emplace_back(int(i0), ItemStack{*id, count > cap ? cap : count}); continue; }
       if (i < slots.size()) *slots[i] = ItemStack{*id, count > cap ? cap : count};
       else
         logError("player.lat: inventory slot %u ('%s' x%u) is beyond this build's layout; dropped",
                  unsigned(i), sid.c_str(), unsigned(count));
+    }
+    if (!overflow.empty()) {
+      // C9 overflow policy (recorded in the notes): each B9 main 32..63 stack, in B9 slot order, takes the
+      // first FREE C9 slot: main 18..49, then hotbar 0..15, then Left / Right Hand (16, 17). Nothing is
+      // merged or overwritten. A stack with no free slot is logged and stays in player.lat.b9-90slot.bak.
+      std::vector<int> order;
+      for (int f = kMainFlatBase; f < kCarrySlots; ++f) order.push_back(f);
+      for (int f = 0; f < kInvHotbarSlots; ++f) order.push_back(f);
+      order.push_back(kInvHotbarSlots);
+      order.push_back(kInvHotbarSlots + 1);
+      size_t oi = 0;
+      int moved = 0, lost = 0;
+      for (auto& [raw, st] : overflow) {
+        while (oi < order.size() && !slots[size_t(order[oi])]->empty()) ++oi;
+        if (oi < order.size()) {
+          *slots[size_t(order[oi])] = std::move(st);
+          overflowMoved.emplace_back(raw, order[oi]);
+          ++oi;
+          ++moved;
+        } else {
+          ++lost;
+          logError("player.lat: B9 main slot %d (item %u x%u) has no free C9 slot; not loaded (kept in player.lat.b9-90slot.bak)",
+                   raw - kMainFlatBase, unsigned(st.itemId), unsigned(st.count));
+        }
+      }
+      logInfo("player.lat: C9 32-slot main grid: %d B9 overflow stack(s) moved to free slots, %d without room", moved, lost);
     }
     m.hasInventory = true;
   }
@@ -862,7 +909,14 @@ std::optional<PlayerMeta> cWorldSave::readPlayer(std::string* err) const {
     const uint16_t nData = b.u16();
     const auto dataSlots = m.inventory.allSlots();
     for (uint16_t i = 0; i < nData; ++i) {
-      const uint16_t flat = legacyLayout ? uint16_t(legacyFlatToCurrent(b.u16())) : b.u16();
+      const uint16_t rawFlat = b.u16();
+      int mappedD = writtenSlots > 0 ? savedFlatToCurrent(writtenSlots, int(rawFlat)) : int(rawFlat);
+      if (mappedD == kSavedOverflow) {  // C9: data follows its overflow stack to the slot it landed on
+        mappedD = -1;
+        for (const auto& mv : overflowMoved)
+          if (mv.first == int(rawFlat)) mappedD = mv.second;
+      }
+      const uint16_t flat = mappedD < 0 ? uint16_t(0xFFFF) : uint16_t(mappedD);
       const storage::Bytes nm = b.bytes();
       const uint16_t nCerts = b.u16();
       std::vector<std::string> certs;

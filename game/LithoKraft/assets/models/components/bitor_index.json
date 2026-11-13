@@ -1,0 +1,258 @@
+{
+  "format": "lithokraft_bitor_voxel_v1",
+  "version": "v1",
+  "concept": "B Op readout",
+  "status": "APPROVED by JD (concept B), 2026-11-11 10:28 PM ET",
+  "engine_id": "lithokraft:bitor",
+  "resolution": 32,
+  "lthm_level": 5,
+  "shape": "slab_3_16 + raised housing (repeator/dividor family)",
+  "axes": "x=east, y=up, z=south; FRONT/output z=0 (north, away from viewer, rot180); BACK/control z=31; WEST x=0 / EAST x=31 operands",
+  "ports": {
+    "front_north": "output (over-range saturates at 64, ruled)",
+    "back_south": "control: strength selects op",
+    "west": "operand input",
+    "east": "operand input"
+  },
+  "control_mapping": {
+    "0": "AND (LOCKED, default)",
+    "16": "OR (READ-BACK, unconfirmed)",
+    "32": "XOR (READ-BACK, unconfirmed)",
+    "64": "NOR (READ-BACK, unconfirmed)"
+  },
+  "materials": {
+    "1": {
+      "name": "base",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#454D63",
+      "tint": false
+    },
+    "4": {
+      "name": "glow_seam",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "5": {
+      "name": "button_up",
+      "neutral_hex": "#9A9A9A",
+      "tint": true
+    },
+    "6": {
+      "name": "button_down",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "7": {
+      "name": "button_well",
+      "neutral_hex": "#161922",
+      "tint": false
+    },
+    "8": {
+      "name": "readout_window",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "9": {
+      "name": "housing",
+      "neutral_hex": "#1D165A",
+      "tint": false
+    },
+    "10": {
+      "name": "accent",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "11": {
+      "name": "pale",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "12": {
+      "name": "glyph",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "13": {
+      "name": "bezel",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "14": {
+      "name": "rotor",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "15": {
+      "name": "well",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "16": {
+      "name": "channel",
+      "neutral_hex": "#5B3DB5",
+      "tint": true
+    },
+    "17": {
+      "name": "port_b",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "18": {
+      "name": "purple_glow",
+      "neutral_hex": "#8B65DD",
+      "tint": false
+    },
+    "19": {
+      "name": "port_c",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "20": {
+      "name": "purple_dim",
+      "neutral_hex": "#2A1F6E",
+      "tint": false
+    },
+    "21": {
+      "name": "sclera",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "22": {
+      "name": "iris_out",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "23": {
+      "name": "iris_in",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "24": {
+      "name": "pupil",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "25": {
+      "name": "glint",
+      "neutral_hex": "#FFFFFF",
+      "tint": false
+    },
+    "26": {
+      "name": "lid",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "30": {
+      "name": "resin_deep",
+      "neutral_hex": "#6A3510",
+      "tint": false
+    },
+    "31": {
+      "name": "resin",
+      "neutral_hex": "#B5651B",
+      "tint": false
+    },
+    "32": {
+      "name": "resin_mid",
+      "neutral_hex": "#DE8A2A",
+      "tint": false
+    },
+    "33": {
+      "name": "resin_hi",
+      "neutral_hex": "#F4B24A",
+      "tint": false
+    },
+    "34": {
+      "name": "resin_spec",
+      "neutral_hex": "#FFE2A0",
+      "tint": false
+    },
+    "35": {
+      "name": "casing",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "36": {
+      "name": "casing_rail",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    }
+  },
+  "tint_colors": {
+    "red": {
+      "off": "#5A5556",
+      "on": "#FF514B"
+    },
+    "blue": {
+      "off": "#535659",
+      "on": "#2FB4FF"
+    }
+  },
+  "tint_channels": {
+    "output": {
+      "mats": [
+        4,
+        12,
+        16
+      ],
+      "mask": "*_tintmask.png"
+    },
+    "input": {
+      "mats": [
+        17
+      ],
+      "mask": "*_input_tintmask.png"
+    },
+    "control": {
+      "mats": [
+        19
+      ],
+      "mask": "*_control_tintmask.png",
+      "lit_when": "control strength > 0"
+    }
+  },
+  "armed_op_display": "purple #8B65DD (lit) / #2A1F6E (unlit), not Trace-tinted, like Breakor",
+  "states": [
+    {
+      "state": "op_and",
+      "control_strength": 0,
+      "mapping_status": "LOCKED",
+      "lthm": "models/bitor_B_and.lthm",
+      "voxels_json": "models/bitor_B_and.voxels.json",
+      "cells": 6888
+    },
+    {
+      "state": "op_or",
+      "control_strength": 16,
+      "mapping_status": "READ-BACK (unconfirmed)",
+      "lthm": "models/bitor_B_or.lthm",
+      "voxels_json": "models/bitor_B_or.voxels.json",
+      "cells": 6888
+    },
+    {
+      "state": "op_xor",
+      "control_strength": 32,
+      "mapping_status": "READ-BACK (unconfirmed)",
+      "lthm": "models/bitor_B_xor.lthm",
+      "voxels_json": "models/bitor_B_xor.voxels.json",
+      "cells": 6888
+    },
+    {
+      "state": "op_nor",
+      "control_strength": 64,
+      "mapping_status": "READ-BACK (unconfirmed)",
+      "lthm": "models/bitor_B_nor.lthm",
+      "voxels_json": "models/bitor_B_nor.voxels.json",
+      "cells": 6888
+    }
+  ]
+}

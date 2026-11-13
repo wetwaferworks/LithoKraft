@@ -7,6 +7,16 @@
 // Sides (mask bit): +X 0, -X 1, +Y 2, -Y 3, +Z 4, -Z 5. A stair link (horizontal + up/down) uses its
 // horizontal side. States: index 0 = auto, 1..63 = mask (64 states, so Alt+wheel's 63 steps = one back).
 // LL_TRACE_CONN=0: every Trace reads as auto (feature off).
+// 2026-11-08 (wire job Phase 2): a wire's SHAPE is a pure derived function of
+// geometry + this mask -- per direction, conn[d] in {none, side, up, down}
+// comes from the one derivation in trace_link.h (traceLinkDirs), read alike
+// by the nets, both floods and the mesher. Nothing stores shape; there are
+// no free state bits to store it in, and derivation is what keeps saves and
+// goldens stable. JD's policies on record: an isolated wire stays a DOT
+// (2026-11-08 ruling 4 -- no cross default, no toggle), and redirection
+// NOTIFIES: any topology change re-floods and components re-read on the
+// settle (ruling 5 -- Java's no-notify quirk is not adopted; the Signal
+// Propagation Law argues the same way).
 #include <cstdlib>
 #include "lithokraft/content/blocks.h"
 

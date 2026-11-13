@@ -2,6 +2,7 @@
 // Injects fake events through cReplayInputBackend and checks what LithoKraft sees: its actions,
 // default bindings and contexts on the engine input SDK.
 #include "ui_input_bridge.h"
+#include "lithokraft/game/game_ui.h"
 #include "lithokraft/game/input_selftest.h"
 #include <cmath>
 #include <cstdio>
@@ -216,6 +217,47 @@ int runGameInputSelfTest() {
     bool names = true;  // every key name round-trips (the letter X once came out as the macro name)
     for (int k = 0; k < int(Key::Count); ++k) names = names && keyFromName(inputName(Key(k))) == Key(k);
     check(names && inputName(Key::X) == "X", "names: every key name round-trips (incl. X)");
+  }
+  {
+    // Menu click chain (Elfie, 2026-11-07): the exact production path a
+    // real click travels — cInputSystem frames -> translateUiEvents ->
+    // cGameUi menu — driven with synthetic GLFW-shaped events. A shipped
+    // build booted to the menu but its buttons never fired; the facade
+    // click test alone (direct UiEvents) could not see a break upstream
+    // of it. The coordinates are the Play button's center as painted on
+    // screen at 1280x720 (verified visually), NOT center(play->rect()):
+    // computing the click point from the rect under test would make the
+    // check tautological if placement and hit-test ever disagree.
+    Rig r;
+    bool played = false;
+    cGameUi gui({{}, {}, {}, {}, {}, [&] { played = true; }, {}, {}, {}});
+    HudModel m;
+    m.visible = false;
+    gui.openMenu("probe");
+    gui.update(m, {1280, 720}, 0.016f);
+    auto routeFrame = [&](std::initializer_list<InputEvent> events) {
+      r.frame(events);
+      std::vector<ui::UiEvent> evs;
+      translateUiEvents(r.input.frameEvents(), r.input.devices(), evs);
+      for (const ui::UiEvent& e : evs) gui.root().handleEvent(e);
+    };
+    routeFrame({InputEvent::cursor(640.f, 325.f, 0)});
+    routeFrame({InputEvent::mouse(T::MouseDown, MouseButton::Left, 0)});
+    routeFrame({InputEvent::mouse(T::MouseUp, MouseButton::Left, 0)});
+    check(played, "menu chain: synthetic click at Play's painted center (input system + bridge + facade) fires play");
+    bool enterPlayed = false;
+    cGameUi gui2({{}, {}, {}, {}, {}, [&] { enterPlayed = true; }, {}, {}, {}});
+    gui2.openMenu("probe");
+    gui2.update(m, {1280, 720}, 0.016f);
+    Rig r2;
+    auto routeFrame2 = [&](std::initializer_list<InputEvent> events) {
+      r2.frame(events);
+      std::vector<ui::UiEvent> evs;
+      translateUiEvents(r2.input.frameEvents(), r2.input.devices(), evs);
+      for (const ui::UiEvent& e : evs) gui2.root().handleEvent(e);
+    };
+    routeFrame2({Rig::down(Key::Enter)});
+    check(enterPlayed, "menu chain: synthetic Enter key (input system + bridge + facade) fires play on the focused button");
   }
   std::printf(fails ? "INPUT SELFTEST FAILED (%d)\n" : "INPUT SELFTEST OK\n", fails);
   return fails;

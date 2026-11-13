@@ -15,7 +15,7 @@
 #include "litholattice/assets/resource_loader.h"
 #include "litholattice/assets/shader_library.h"
 #include "litholattice/render/block_materials.h"
-#include "litholattice/ui/theme.h"
+#include "lithokraft/game/ui_facade.h"
 #include "litholattice/world/column_generator.h"
 #include "litholattice/core/atomic_gate.h"
 

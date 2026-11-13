@@ -8,6 +8,7 @@
 #include "lithokraft/content/component.h"  // 2026-11-05 (JD): cBehaviorCatalog::colour
 #include "lithokraft/content/chipor_viewport.h"
 #include "lithokraft/content/component_models.h"  // 2026-11-04 CloudAtlas components-v2
+#include "components/swivelor_detent.h"  // B9 2026-11-12: Swivelor detent stills
 #include "lithokraft/content/foliage.h"  // Cortana 2026-10-15 2010 [GAME]
 #include "lithokraft/content/post.h"  // 2026-10-25 Posts
 #include "lithokraft/content/repeator.h"  // Cortana 2026-10-15 2215 [GAME]
@@ -232,7 +233,11 @@ bool tracePortFaces(const BlockDef& nd, CellState s, int side) {
   switch (roleOf(nd)) {
     case SimRole::Repeator:
     case SimRole::Dividor:  // 2026-11-05: back in, front out
+    case SimRole::Dialor:   // 2026-11-11: front out, back inhibit; east/west inert
     case SimRole::Latchor: return side == f || side == dirBack(f);
+    case SimRole::Swivelor: return false;  // B9 2026-11-12: no port decided (side wells reserved, OPEN)
+    case SimRole::Pushor: return side != f;  // B9 2026-11-12: every face but the front (resin pushing face)
+    case SimRole::Watchor: return side == dirBack(f);  // B9 2026-11-12: back out only (front = eye, not a Trace port); sides none
     case SimRole::Keyboard: return side == f || side == dirRight(f);
     case SimRole::Catchor: {
       const int m = stAux(s) & 3;
@@ -273,6 +278,23 @@ void machineBox(const CustomBlock& cell, MeshWriter& out, const int lo[3], const
 // and the sim are untouched; neighbours no longer hide their faces against these cells (mesher).
 // The Redirector lane overlays and the Catchor readout are drawn on the slab top (y = 2).
 } // namespace
+DialorTopLook dialorTopLook(CellState s) {
+  // FLAG (8): the pointer snaps among the three shipped concept C stills (1-16 -> v01, 17-48 ->
+  // v32, 49-64 -> v64). The exact strength is the two-digit readout, which the A9 build never
+  // drew: its readout mask carried no segment ids (R = 255 everywhere -> the shader discarded
+  // every fragment) and its origin (72, 48) was the window bezel, not the digit cells.
+  // C9 2026-11-12 (JD): 0 is a dial position; 0..16 -> v01 (the pointer's lowest still; no new still).
+  const int dial = stValue(s) >= 0 && stValue(s) <= kMaxSignal ? stValue(s) : 0;
+  return {dial <= 16 ? "v01" : dial <= 48 ? "v32" : "v64", dial, 76, 57};
+}
+const char* bitorStillOf(CellState s) {
+  static constexpr const char* kStill[4] = {"and", "or", "xor", "nor"};
+  return kStill[(stAux(s) >> 1) & 3];
+}
+void v2ReadoutFootprint(int roX, int roY, int& x0, int& x1, int& z0, int& z1) {
+  // Window footprint in 1/16 (128-space px / 8; image row = local z).
+  x0 = roX / 8; x1 = (roX + 24 + 7) / 8; z0 = roY / 8; z1 = (roY + 14 + 7) / 8;
+}
 namespace {
 // 2026-11-04 (JD, CloudAtlas components-v2): the v2 voxel models (assets/models/components) with
 // their per-face / per-state base + tint-mask art, and the value readouts as kShadeReadout overlays
@@ -299,6 +321,28 @@ bool v2LookOf(const CustomBlock& cell, const BlockDef& def, V2Look& L) {
     case SimRole::cFusor: set("breakor", "breakor", (stAux(s) & 1) ? "tripped" : "closed", "closed");
       L.roX = 28; L.roY = 57; L.value = stValue(s) > 0 ? stValue(s) : 64; L.lit = true; break;  // trip point 1..64
     case SimRole::Dividor: set("dividor", "dividor", nullptr, nullptr); break;  // 2026-11-05 (JD): CloudAtlas v2 Dividor (no readout)
+    case SimRole::Watchor: set("watchor", "watchor", nullptr, nullptr); break;  // B9 2026-11-12 (JD): row B eye cube (no readout in the pack)
+    // C9 2026-11-12 (JD 6:39 AM ET): Bitor row B, one approved still per op in force (and / or / xor / nor;
+    // ranges 0-15 / 16-31 / 32-47 / 48-64). Op word + lamps are baked in the pack top art (#8B65DD, not recoloured).
+    case SimRole::Bitor: set("bitor", "bitor", bitorStillOf(s), "and"); break;
+    // B9 2026-11-12 (JD): Pushor row B, retracted only. The extended base + head stills are ILLUSTRATIVE (distance OPEN): not installed.
+    case SimRole::Pushor: set("pushor", "pushor", "retracted", "retracted"); break;
+    case SimRole::Swivelor: {  // B9 2026-11-12 (JD): row B, one still per STATED detent (0 / 16 / 32 / 64); no Trace tint
+      static constexpr const char* kDet[4] = {"d00", "d16", "d32", "d64"};
+      const int q = components::swivelorDetentQuarter(stValue(s));
+      set("swivelor", "swivelor", kDet[q < 0 ? 0 : q], "d00");  // not a stated detent (OPEN): home still
+      break;
+    }
+    case SimRole::Dialor: {
+      // FLAG (8): live pointer snaps among the three shipped stills (v01 / v32 / v64).
+      // 1-16 -> v01, 17-48 -> v32, 49-64 -> v64. Exact value is the two-digit readout.
+      // Not shader rotation, and no invented 64-step models.
+      // B9 2026-11-11: shared with the selftest (dialorTopLook); readout at the ghost-88 digit cells.
+      const DialorTopLook dl = dialorTopLook(s);
+      set("dialor", "dialor", dl.still, "v01");
+      L.roX = dl.readoutX; L.roY = dl.readoutY; L.value = dl.value; L.lit = true;  // FLAG (6): readout keeps showing the set value when inhibited
+      break;
+    }
     case SimRole::cFusorSum: set("fusor_sum", "fusor_sum", nullptr, nullptr); L.roX = 52; L.roY = 41; L.value = stValue(s); L.lit = on; break;
     case SimRole::Memor: set("memor", "memor", "idle", "idle"); L.roX = 52; L.roY = 61; L.value = stValue(s); L.lit = stValue(s) > 0; break;
     case SimRole::Thresholdor: set("thresholdor", "thresholdor", (stAux(s) & 1) ? "subtract" : "compare", "compare");
@@ -348,18 +392,36 @@ bool meshComponentV2(const CustomBlock& cell, const BlockDef& def, MeshWriter& o
   const FaceMaterial* fFront = v2Material(cell, L, "front");
   const FaceMaterial* fBack = v2Material(cell, L, "back");
   const FaceMaterial* fSide = v2Material(cell, L, "side");
+  // B9 2026-11-12 (Watchor row B): packs that ship per-face east / west / bottom art use it; every
+  // other component has no such keys and keeps the shared side art (unchanged).
+  const FaceMaterial* fEast = v2Material(cell, L, "east");
+  const FaceMaterial* fWest = v2Material(cell, L, "west");
+  const FaceMaterial* fBottom = v2Material(cell, L, "bottom");
+  if (!fEast) fEast = fSide;
+  if (!fWest) fWest = fSide;
+  if (!fBottom) fBottom = fSide;
   for (const foliage::Quad& q : mesh->quads) {
-    const FaceMaterial* pick = q.face == 2 ? fTop : q.face == 5 ? fFront : q.face == 4 ? fBack : fSide;
+    const FaceMaterial* pick = q.face == 2 ? fTop : q.face == 5 ? fFront : q.face == 4 ? fBack :
+                               q.face == 0 ? fEast : q.face == 1 ? fWest : q.face == 3 ? fBottom : fSide;
     const FaceMaterial fm = pick ? *pick : cell.materials.face(cell.id, localSlot(q.face), on);
     const foliage::Quad rq = foliage::rotated(q, facing);
     const int l[3] = {rq.lo[0], rq.lo[1], rq.lo[2]}, h[3] = {rq.hi[0], rq.hi[1], rq.hi[2]};
-    out.face(cell, rq.face, l, h, fm, machineTintLook(cell, fm, on), (q.face == 2 || q.face == 3) ? facing : 0);
+    // Dialor: output tint (front / top) lit when uninhibited (stOn); inhibit tint (back) lit when the back is powered.
+    // FLAG (5): front/back still take the machineTintLook Trace colour; dial/readout stay purple via the base + readout.
+    // FLAG (7): family glow may still light east/west edges of the output ring; side tintmasks are empty.
+    bool tintOn = on;
+    if (roleOf(def) == SimRole::Dialor) tintOn = (q.face == 4) ? (stAux(cell.state) & 1) != 0 : on;  // C9: back = inhibited (aux), so dial 0 is not shown as inhibited
+    // Bitor (CloudAtlas art): back control tint lit when control > 0 (aux bit 0); output tint (front / top)
+    // lit with the output. Operand (east / west) tint: lit condition not specified -> left unlit (OPEN).
+    if (roleOf(def) == SimRole::Bitor) tintOn = q.face == 4 ? (stAux(cell.state) & 1) != 0 : (q.face == 0 || q.face == 1) ? false : on;
+    out.face(cell, rq.face, l, h, fm, machineTintLook(cell, fm, tintOn), (q.face == 2 || q.face == 3) ? facing : 0);
   }
   if (L.roX >= 0) {
     const FaceMaterial* mask = cell.materials.named(std::string(def.tex) + "_v2_readout_mask");
     if (mask) {
       // Window footprint in 1/16 (128-space px / 8; image row = local z), one texel above the model top there.
-      const int x0 = L.roX / 8, x1 = (L.roX + 24 + 7) / 8, z0 = L.roY / 8, z1 = (L.roY + 14 + 7) / 8;
+      int x0 = 0, x1 = 0, z0 = 0, z1 = 0;
+      v2ReadoutFootprint(L.roX, L.roY, x0, x1, z0, z1);
       const int top = cComponentModels::topAt(*mesh, (x0 + x1) / 2, (z0 + z1) / 2);
       if (top >= 0 && top < 16) {
         foliage::Quad q{};
@@ -375,6 +437,60 @@ bool meshComponentV2(const CustomBlock& cell, const BlockDef& def, MeshWriter& o
   if (!logged.exchange(true)) ::litholattice::logInfo("components-v2: CloudAtlas v2 component models in the render path (%s)", cComponentModels::instance().report().empty() ? "all loaded" : cComponentModels::instance().report().c_str());
   return true;
 }
+// B9 2026-11-12 (JD Via B): the lattice-cage via from the CloudAtlas models (straight single / top /
+// bottom / mid, elbow single / upjoint / sidejoint / mid), turned by viaRotated, per-face art
+// via_v2_[elbow_]<face>_<state>. Tint = the cube path's rule (mesher.cpp): own channel, lit while the
+// cell carries signal; no strength-to-glow curve (OPEN). Missing model / art -> false (old cube look).
+bool meshVia(const CustomBlock& cell, const BlockDef& def, MeshWriter& out) {
+  if (!componentsV2()) return false;
+  const ViaLook L = viaLook(cell.id, cell.state, [&](int dx, int dy, int dz) { return cell.neighbor(dx, dy, dz); },
+                            [&](int dx, int dy, int dz) { return cell.neighborState(dx, dy, dz); });
+  if (!L.model) return false;
+  const foliage::Mesh* mesh = cComponentModels::instance().find(L.model);
+  if (!mesh) return false;
+  static constexpr const char* kStraight[6] = {"side", "side", "top", "bottom", "side", "side"};
+  static constexpr const char* kElbow[6] = {"east", "west", "up", "down", "south", "north"};
+  const FaceMaterial* mat[6];
+  for (int f = 0; f < 6; ++f) {
+    mat[f] = cell.materials.named(std::string(L.elbow ? "via_v2_elbow_" : "via_v2_") + (L.elbow ? kElbow[f] : kStraight[f]) + "_" + L.state);
+    if (!mat[f]) return false;
+  }
+  const bool lit = def.channel != 0 && (cell.state & 0x7f) != 0;
+  static const int kN[6][3] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+  for (const foliage::Quad& q : mesh->quads) {
+    const foliage::Quad r = viaRotated(q, L.up, L.south);
+    const bool flush = (r.face == 0 && r.hi[0] == 16) || (r.face == 1 && r.lo[0] == 0) || (r.face == 2 && r.hi[1] == 16) ||
+                       (r.face == 3 && r.lo[1] == 0) || (r.face == 4 && r.hi[2] == 16) || (r.face == 5 && r.lo[2] == 0);
+    if (flush && cell.blocks.has(cell.neighbor(kN[r.face][0], kN[r.face][1], kN[r.face][2]), kOpaque)) continue;
+    const FaceMaterial& fm = *mat[q.face < 6 ? q.face : 0];
+    FaceLook look{};
+    if (const uint8_t ts = cell.materials.tintSlot(fm.layer)) look = {kShadeTraceTint, uint8_t((ts - 1) | (def.channel == 2 ? 0x40 : 0) | (lit ? 0x80 : 0))};
+    const int l[3] = {r.lo[0], r.lo[1], r.lo[2]}, h[3] = {r.hi[0], r.hi[1], r.hi[2]};
+    out.face(cell, r.face, l, h, fm, look, 0);
+  }
+  return true;
+}
+bool viaShaped(const BlockDef& def) { return def.shape == Shape::Cube && roleOf(def) == SimRole::Wire && (std::string_view(def.tex) == "red_via" || std::string_view(def.tex) == "blue_via"); }
+} // namespace
+foliage::Quad viaRotated(const foliage::Quad& q, int up, int south) {
+  // Columns of the rotation: canonical X -> up x south, Y -> up, Z -> south.
+  const int* u = kViaFace[up];
+  const int* s = kViaFace[south];
+  const int c0[3] = {u[1] * s[2] - u[2] * s[1], u[2] * s[0] - u[0] * s[2], u[0] * s[1] - u[1] * s[0]};
+  const int* col[3] = {c0, u, s};
+  foliage::Quad r = q;
+  for (int k = 0; k < 3; ++k) {
+    int a = 0, b = 0;
+    for (int j = 0; j < 3; ++j) { a += col[j][k] * (q.lo[j] - 8); b += col[j][k] * (q.hi[j] - 8); }
+    r.lo[k] = int16_t(8 + std::min(a, b)); r.hi[k] = int16_t(8 + std::max(a, b));
+  }
+  const int* n = kViaFace[q.face < 6 ? q.face : 0];
+  int v[3] = {0, 0, 0};
+  for (int k = 0; k < 3; ++k) for (int j = 0; j < 3; ++j) v[k] += col[j][k] * n[j];
+  for (int f = 0; f < 6; ++f) if (kViaFace[f][0] == v[0] && kViaFace[f][1] == v[1] && kViaFace[f][2] == v[2]) r.face = uint8_t(f);
+  return r;
+}
+namespace {
 } // namespace
 // 2026-11-01 (JD, CloudAtlas lithokraft-fusor SPEC): Fusor = 2/16 slab + 4 side pads + fuse housing. LL_FUSOR_SLAB=0: cube.
 static bool fusorSlab() { static const bool v = [] { const char* e = std::getenv("LL_FUSOR_SLAB"); return !(e && e[0] == '0'); }(); return v; }
@@ -383,13 +499,19 @@ bool cLithoKraftAppearance::shapedRender(const BlockDef& def) const {
   return def.shape == Shape::Cube &&
          (r == SimRole::Redirector || r == SimRole::Thresholdor || r == SimRole::Pulsor || r == SimRole::Catchor ||
           r == SimRole::Keyboard || r == SimRole::Memor ||  // 2026-10-24 7:25 PM (JD approved): CloudAtlas Memor partial block
-          r == SimRole::Latchor || r == SimRole::Randor || r == SimRole::cFusorSum || r == SimRole::Dividor ||
+          r == SimRole::Latchor || r == SimRole::Randor || r == SimRole::cFusorSum || r == SimRole::Dividor || r == SimRole::Dialor ||
+          r == SimRole::Watchor ||  // B9 2026-11-12 (JD): row B eye cube v2 model
+          r == SimRole::Bitor ||  // B9 2026-11-12 (JD): row B op readout v2 model
+          r == SimRole::Pushor ||  // B9 2026-11-12 (JD): row B honeycomb face v2 model (retracted)
+          r == SimRole::Swivelor ||  // B9 2026-11-12 (JD): row B gear ring + resin mount v2 model
+          (viaShaped(def) && componentsV2()) ||  // B9 2026-11-12 (JD): Via B lattice cage + auto-elbow
           (r == SimRole::cFusor && fusorSlab()) ||
           ((r == SimRole::Switch || r == SimRole::cButton) && componentsV2()));  // PlayB: v2 Switch / Button (floor)  // 2026-10-24 (JD approved placeholder): CloudAtlas fastlatch.json, out N + in S pads  // 2026-10-24 (JD): Keyboard = repeater-size slab (CloudAtlas keyboard.json)
 }
 bool cLithoKraftAppearance::meshShaped(const CustomBlock& cell, MeshWriter& out) const {
   const BlockDef def = cell.def();
   if (!shapedRender(def)) return false;
+  if (isVia(cell.id)) return meshVia(cell, def, out);  // B9 2026-11-12: Via B (false -> the old cube)
   if (meshComponentV2(cell, def, out)) return true;  // 2026-11-04 CloudAtlas components-v2
   const SimRole r = roleOf(def);
   const bool on = active(def, cell.state);
@@ -1074,6 +1196,7 @@ int pickShapeBoxes(const litholattice::ChunkMap& w, const litholattice::cBlockRe
     return n;
   }
   const int f = stFacing(st);
+  if (isVia(b)) return -1;  // B9 2026-11-12: Via B keeps the full-cell pick it had
   if (look.shapedRender(def)) {  // mirrors meshShaped: 2/16 slab + 1/16 pads
     const bool on = look.active(def, st);
     add(0, 0, 0, 16, 2, 16, f);

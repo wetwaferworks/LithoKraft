@@ -1,6 +1,8 @@
-// LithoKraft inventory: 42 carry slots + 8 gear slots.
-// 42 = 8 hotbar + 2 offhands (L/R) + 32 main (4x8). 42 = 101010 in binary.
-// Gear (worn, not counted in 42): head, chest, legs, feet, arms, face, heart, mind.
+// LithoKraft inventory: 50 carry slots + 8 gear slots (58 flat slots).
+// 50 = 16 hotbar + 2 offhands (L/R) + 32 main (C9 2026-11-12, JD 6:17 AM ET: four rows of EIGHT;
+// B9 had 4 rows of 16 = 64). The original design was 42 = 8 + 2 + 32 (101010 in binary).
+// C9's flat map is A9's 58-slot map: hotbar 0-15, hands 16-17, main 18-49, gear 50-57.
+// Gear (worn, not counted in the carry slots): head, chest, legs, feet, arms, face, heart, mind.
 // Max stack: 512 (= tick rate).
 #pragma once
 #include <array>
@@ -19,14 +21,51 @@ constexpr int kMaxStack = 512;       ///< max items per stack (= tick rate)
 constexpr int kInvHotbarSlots = 16;  // 2026-10-24 (JD): was 8 (saves with the 8-slot layout are remapped on load)
 constexpr int kLegacyInvHotbarSlots = 8;
 constexpr int kMainRows = 4;
-constexpr int kMainCols = 8;
-constexpr int kMainSlots = kMainRows * kMainCols;  // 32
-constexpr int kCarrySlots = kInvHotbarSlots + 2 + kMainSlots;  // 50 (42 before the 16-slot hotbar)
+constexpr int kMainCols = 8;  // C9 2026-11-12 (JD): four rows of EIGHT = 32 (B9 had 16 columns = 64)
+constexpr int kMainSlots = kMainRows * kMainCols;  // 32 (64 in B9)
+constexpr int kMainFlatBase = kInvHotbarSlots + 2;  // 18: flat index of main slot 0
+constexpr int kCarrySlots = kInvHotbarSlots + 2 + kMainSlots;  // 50 (82 in B9, 42 before the 16-slot hotbar)
 constexpr int kGearSlots = 8;
-constexpr int kTotalSlots = kCarrySlots + kGearSlots;  // 58: every slot, gear included
-/// The 8-slot-hotbar layout's total (saves written before 2026-10-24): flat index >= 8 moves up by 8.
-constexpr int kLegacyTotalSlots = kLegacyInvHotbarSlots + 2 + kMainSlots + kGearSlots;  // 50
-constexpr int legacyFlatToCurrent(int i) { return i < kLegacyInvHotbarSlots ? i : i + (kInvHotbarSlots - kLegacyInvHotbarSlots); }
+constexpr int kTotalSlots = kCarrySlots + kGearSlots;  // 58: every slot, gear included (90 in B9)
+/// Saved inventory layouts (player.lat v4+ writes kTotalSlots entries in the canonical flat
+/// order, so the block's slot count names the layout it was written with):
+///   50 = 8-slot hotbar (saves before 2026-10-24): 8 + 2 + 32 main + 8 gear
+///   58 = 16-slot hotbar, 4x8 main (2026-10-24 .. A9, and C9 again): 16 + 2 + 32 main + 8 gear
+///   90 = B9 four-row (4x16): 16 + 2 + 64 main + 8 gear (gear at 82..89)
+constexpr int kLegacyMainSlots = 32;
+constexpr int kLegacyTotalSlots = kLegacyInvHotbarSlots + 2 + kLegacyMainSlots + kGearSlots;  // 50
+constexpr int kPreFourRowTotalSlots = kInvHotbarSlots + 2 + kLegacyMainSlots + kGearSlots;   // 58 (= C9's own layout)
+constexpr int kB9MainSlots = 64;
+constexpr int kB9TotalSlots = kInvHotbarSlots + 2 + kB9MainSlots + kGearSlots;               // 90
+static_assert(kTotalSlots == kPreFourRowTotalSlots, "C9: the live layout is A9's 58-slot map again");
+/// savedFlatToCurrent result for a B9 main slot past this build's 32 (B9 main 32..63): the loader
+/// spills those stacks into free C9 slots (world_save.cpp), never silently drops them.
+constexpr int kSavedOverflow = -2;
+/// Maps flat index `i` of an inventory block written with `writtenSlots` entries into this
+/// build's flat order, section by section (hotbar, hands, main, gear keep their own section and
+/// position; gear moves to this build's gear block). 58 (this layout) and any other length are
+/// taken as written. B9 (90): main 0..31 keep their place, main 32..63 -> kSavedOverflow.
+constexpr int savedFlatToCurrent(int writtenSlots, int i) {
+  int hot = 0, mainN = 0;
+  if (writtenSlots == kLegacyTotalSlots) { hot = kLegacyInvHotbarSlots; mainN = kLegacyMainSlots; }
+  else if (writtenSlots == kB9TotalSlots) { hot = kInvHotbarSlots; mainN = kB9MainSlots; }
+  else return i;
+  if (i < 0) return i;
+  if (i < hot) return i;
+  if (i < hot + 2) return kInvHotbarSlots + (i - hot);
+  if (i < hot + 2 + mainN) return (i - hot - 2) < kMainSlots ? kMainFlatBase + (i - hot - 2) : kSavedOverflow;
+  return kCarrySlots + (i - hot - 2 - mainN);
+}
+/// The 8-slot-hotbar remap (2026-10-24), kept for callers; now section-aware via savedFlatToCurrent.
+constexpr int legacyFlatToCurrent(int i) { return savedFlatToCurrent(kLegacyTotalSlots, i); }
+static_assert(savedFlatToCurrent(kPreFourRowTotalSlots, 50) == kCarrySlots, "C9: an A9 58-slot save is this layout (gear 50)");
+static_assert(savedFlatToCurrent(kLegacyTotalSlots, 49) == kTotalSlots - 1, "an 8-hotbar save's last gear slot lands on this build's last gear slot");
+static_assert(savedFlatToCurrent(kPreFourRowTotalSlots, 49) == kMainFlatBase + 31, "a 58-slot save's main slots keep their positions");
+static_assert(savedFlatToCurrent(kB9TotalSlots, 82) == kCarrySlots && savedFlatToCurrent(kB9TotalSlots, 89) == kTotalSlots - 1,
+              "C9: a B9 90-slot save's gear (82..89) lands on 50..57");
+static_assert(savedFlatToCurrent(kB9TotalSlots, 49) == kMainFlatBase + 31 && savedFlatToCurrent(kB9TotalSlots, 50) == kSavedOverflow &&
+              savedFlatToCurrent(kB9TotalSlots, 81) == kSavedOverflow && savedFlatToCurrent(kB9TotalSlots, 17) == 17,
+              "C9: a B9 save keeps hotbar / hands / main 0..31; main 32..63 overflow");
 
 /// Gear slot indices.
 enum GearSlot : uint8_t {
@@ -130,7 +169,7 @@ class Inventory {
   const std::array<ItemStack, kGearSlots>& gear() const { return gear_; }
 
   /// Every slot in the CANONICAL FLAT ORDER (P2b-1): hotbar 0..15, offhand
-  /// L, offhand R, main 0..31, gear 0..7 — 50 slots. This is the order the
+  /// L, offhand R, main 0..63 (B9 four-row; was 0..31), gear 0..7 — 50 slots. This is the order the
   /// player.lat v4 inventory block is written in; never reorder it.
   std::array<ItemStack*, kTotalSlots> allSlots() {
     std::array<ItemStack*, kTotalSlots> out{};
@@ -211,7 +250,7 @@ class Inventory {
   }
 
  private:
-  // All 42 carry slots in fill order: hotbar, offhands, main.
+  // All kCarrySlots (82) carry slots in fill order: hotbar, offhands, main.
   std::vector<ItemStack*> carrySlots() {
     std::vector<ItemStack*> out;
     out.reserve(kCarrySlots);
@@ -228,6 +267,16 @@ class Inventory {
   std::array<ItemStack, kGearSlots> gear_{};
   uint64_t version_ = 0;
 };
+
+/// C9 2026-11-12 (JD): placing a block takes one from the selected stack in SURVIVAL only.
+/// Creative items are infinite: the stack is left as it is (from 1, from a full 512, any count).
+/// Returns true when one was taken.
+inline bool consumePlacedOne(ItemStack& s, bool creative) {
+  if (creative || s.empty()) return false;
+  if (s.count > 1) --s.count;
+  else s.clear();
+  return true;
+}
 
 /// Display name of a stack: the Etchor name field value when the stack
 /// carries one (it OVERWRITES the chip's def name, per the locked design),

@@ -84,13 +84,13 @@ void setLithoStampModelStubEnabled(bool on) {
 bool lithoStampModelStubEnabled() { return g_stubEnabled.load(std::memory_order_acquire); }
 
 std::optional<litholattice::procgen::LithoStampModel> loadLithoStampModel(std::string_view name) {
-  static litholattice::cAtomicGate mutex;
-  static std::map<std::string, std::optional<litholattice::procgen::LithoStampModel>, std::less<>>
+  // MUTEX-FREE (scratch, 2026-11-11, JD t5192u): single-owner per thread (thread_local cache);
+  // no entry is shared across threads, so the gate is gone. Loads are deterministic per name.
+  thread_local std::map<std::string, std::optional<litholattice::procgen::LithoStampModel>, std::less<>>
       cache;
-  static std::set<std::string> stubLogged;  // names whose stub substitution was logged (under mutex)
+  thread_local std::set<std::string> stubLogged;  // names whose stub substitution was logged (this thread)
   const std::string key(name);
   {
-    litholattice::cGateGuard<litholattice::cAtomicGate> lock(mutex);
     const auto it = cache.find(key);
     if (it != cache.end()) return it->second;
   }
@@ -98,7 +98,6 @@ std::optional<litholattice::procgen::LithoStampModel> loadLithoStampModel(std::s
   const bool stubbed = !m && lithoStampModelStubEnabled();
   if (stubbed) m = stubModel();
   {
-    litholattice::cGateGuard<litholattice::cAtomicGate> lock(mutex);
     cache[key] = m;
     // Log inside the lock, once per name: the cached stub means this
     // branch runs only on the name's first resolution anyway, and the

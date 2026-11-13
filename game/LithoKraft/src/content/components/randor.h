@@ -12,6 +12,11 @@ class cRandor final : public cCompBehavior {
   /// PlayB (JD t4331u): fixed 8 ticks input -> output (was a random 2..64 per event). The RNG still
   /// decides the rolled value (tick()); only the delay is fixed.
   int delayTicks(CellState, int64_t, uint64_t) const override { return 8; }
+  /// Pure in inputs + edges (the cMemor / cPulsor pattern): the roll happens only on a clock
+  /// edge, prevClk persists in memory, and every input change revives it — a changed neighbour
+  /// output wakes its neighbours, marked nets wake their readers, soft-power changes wake the
+  /// components around the block — while a pending scheduled output is never skipped.
+  bool quiescent(CellState, const ComponentMemory&) const override { return true; }
   ComponentStep tick(const ComponentInputs& in, CellState st, ComponentMemory& m) const override;
   std::string describe(const BlockDef& d, CellState s) const override;
 };

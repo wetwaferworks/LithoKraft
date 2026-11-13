@@ -83,6 +83,7 @@
 #include "lithokraft/game/camera_controller.h"  // cPilotCameraRig (engine pilot cameras)
 #include "lithokraft/game/mcp_player_control.h"  // cMcpPlayerView::GameState
 #include "litholattice/core/atomic_gate.h"
+#include "litholattice/core/single_owner.h"
 
 namespace lithokraft {
 
@@ -148,6 +149,9 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   bool trackPlayer(std::string_view pilot) override;
   bool cameraPose(std::string_view pilot,
                   litholattice::mcp::CameraPose& out) const override;
+  /// SCRATCH vulkfb (LL_MCP_DISPLAY_VISION=1): next display-renderer frame (cMcpDisplayVision).
+  bool captureDisplayFrame(std::string_view pilot, int width, int height,
+                           litholattice::mcp::VisionFrame& out) override;
 
   // -- IAudioCapture (MCP thread) -------------------------------------------
   /// One 1024-frame chunk at the tier rate (tier clamped 0..3). Returns
@@ -172,16 +176,16 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   std::vector<litholattice::PackedVertex> spriteVerts_;  ///< latest sprite frame (software form)
   litholattice::Vec3 spriteOrigin_{};                    ///< world origin spriteVerts_ are relative to
 
-  litholattice::cAtomicGate renderMutex_;  ///< serializes the cSoftwareRenderer (MCP thread)
+  // mutexfree pass 2b: renderMutex_/protoMutex_/audioMutex_ removed. sw_, protoStates_ and tapScratch_ (and the tap's
+  // single-reader side) are owned by the single MCP owner thread; owner_ checks it.
+  litholattice::cSingleOwner owner_{"cMcpSensesAdapter render/cull/audio (MCP owner thread)"};
   litholattice::cSoftwareRenderer sw_;
 
   // Culling-cache prototype state, one per pilot camera (JD 2026-10-11).
   // Guarded by its own mutex: only the MCP thread touches it, so the game
   // thread is never blocked by culling decisions.
-  litholattice::cAtomicGate protoMutex_;
   std::unordered_map<std::string, litholattice::CullProtoState> protoStates_;
 
-  litholattice::cAtomicGate audioMutex_;  ///< drainTap() is the tap's single reader
   std::vector<float> tapScratch_;  ///< 6144 floats: 1024 frames @ 48kHz for tier 0
 };
 

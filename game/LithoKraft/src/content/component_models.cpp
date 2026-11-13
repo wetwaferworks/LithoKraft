@@ -14,7 +14,11 @@ constexpr const char* kModels[] = {
     "multiplexor_sel_red", "multiplexor_sel_blue", "redirector_straight", "redirector_left", "redirector_right",
     "pulsor_idle", "pulsor_firing", "latchor_off", "latchor_on", "randor_idle", "randor_rolling",
     "catchor_idle", "catchor_firing", "keyboard_idle", "switch_off", "switch_on", "button_up", "button_pressed",
-    "routor_mode1", "routor_mode2", "routor_mode3", "dividor"};  // 2026-11-05: CloudAtlas Dividor  // PlayB: CloudAtlas Routor
+    "routor_mode1", "routor_mode2", "routor_mode3", "dividor",
+    "dialor_v01", "dialor_v32", "dialor_v64", "watchor", "bitor_and", "bitor_or", "bitor_xor", "bitor_nor", "pushor_retracted", "swivelor_d00", "swivelor_d16", "swivelor_d32", "swivelor_d64",
+    "via_single", "via_top", "via_bottom", "via_mid", "via_elbow_single", "via_elbow_upjoint", "via_elbow_sidejoint", "via_elbow_mid"};  // B9 2026-11-12: CloudAtlas Via B lattice cage + elbows  // B9 2026-11-12: CloudAtlas Swivelor row B detent stills
+    //  // B9 2026-11-12: CloudAtlas Pushor row B retracted (extended stills illustrative, not installed)
+    //  // C9 2026-11-12: CloudAtlas Bitor row B AND / OR / XOR / NOR stills (JD 6:39 AM ET ranges)  // B9 2026-11-12: CloudAtlas Watchor row B (eye cube)  // 2026-11-11: CloudAtlas Dialor concept C stills  // 2026-11-05: CloudAtlas Dividor  // PlayB: CloudAtlas Routor
 }  // namespace
 
 const cComponentModels& cComponentModels::instance() {

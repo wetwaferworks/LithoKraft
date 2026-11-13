@@ -1,11 +1,19 @@
 // Headless checks of every signal block's logic (run by --selftest).
 #include "lithokraft/content/trace_conn.h"  // 2026-11-01 PlayL
+#include "lithokraft/content/trace_link.h"  // 2026-11-08 wire job Phase 0/2: the shared link derivation, unit-checked below
 #include "litholattice/storage/storage.h"  // 2026-11-01 PlayL: column codec roundtrip
 #include "lithokraft/content/pulse_rules.h"  // 2026-11-01 PlayK
 #include <cstdlib>
 #include <algorithm>
 #include "lithokraft/content/randor_rng.h"
 #include "lithokraft/content/scheduled_output.h"  // 2026-11-04 delays
+#include "components/bitor.h"  // B9 2026-11-12: Bitor AND helper
+#include "components/pushor.h"  // B9 2026-11-12: Pushor constants
+#include "components/swivelor_detent.h"  // B9 2026-11-12: Swivelor detents
+#include "lithokraft/content/component_models.h"  // B9 2026-11-12: Via B
+#include <cctype>  // B9 2026-11-12: Resin checks
+#include <filesystem>
+#include "lithokraft/content/items.h"
 #include "components/routor.h"  // PlayB: Routor (was the Redirector)  // Randor selftest
 #include <chrono>
 #include <format>
@@ -17,6 +25,9 @@
 #include "lithokraft/content/compiled_comp_table.h"
 #include "lithokraft/content/signal.h"
 #include "lithokraft/content/appearance.h"
+#include "litholattice/assets/image.h"  // B9 2026-11-11: Dialor readout mask check
+#include <fstream>  // B9 2026-11-12: readout purple shader check
+#include <sstream>
 #include "lithokraft/content/component_models.h"  // 2026-11-05 E2 lever v2
 #include "lithokraft/content/blocks.h"
 #include "lithokraft/content/circuit_scene.h"
@@ -366,6 +377,10 @@ int runSignalSelfTest() {
   put(0, y, 14, kRedTorch);
   put(1, y, 14, kRedTrace); put(1, y + 1, 14, kWaferSilicon);  // cut: block above the low wire
   put(2, y, 14, kWaferSilicon); put(2, y + 1, 14, kRedTrace);
+  // D2) the same overhang in glass: glass does NOT cut (JD 2026-11-08) -- the stair climbs through it.
+  put(0, y, 16, kRedTorch);
+  put(1, y, 16, kRedTrace); put(1, y + 1, 16, kGlass);  // glass above the low wire: no cut
+  put(2, y, 16, kWaferSilicon); put(2, y + 1, 16, kRedTrace);
 
   run(3);
   check(w.getState(0, y, 0) == 1, "torch on unpowered block is lit");
@@ -389,6 +404,7 @@ int runSignalSelfTest() {
   check(w.getState(9, y + 1, 8) == 1, "after re-opening gap: lamp back on");
   check(w.getState(2, y + 1, 12) == 63, "wire climbs a staircase (63 one block up)");
   check(w.getState(2, y + 1, 14) == 0, "staircase cut by a block above the lower wire");
+  check(w.getState(2, y + 1, 16) == 63, "staircase through glass: glass above the lower wire does not cut the climb (63 one block up)");
   put(10, y, 0, kAir);
   run(1);
   check(w.getState(11, y, 0) == 0, "breaking the last wire turns the lamp off");
@@ -612,40 +628,12 @@ int runSignalSelfTest() {
     check(hi > lo && period >= 2, "thresholder subtract comparator clock oscillates with a steady period");
   }
 
-  // I) Redirector: any side in, front out.
-  putF(20, y, 46, kRedirector, E); put(20, y, 45, kBlueTrace); put(21, y, 46, kRedTrace); put(19, y, 46, kRedTrace);
-  setW(20, y, 45, 25); run(1);
-  check(val(20, y, 46) == 25 && val(21, y, 46) == 25, "redirector: side input 25 comes out the front");
-  setW(21, y, 46, 30); run(1);
-  check(val(20, y, 46) == 0, "redirector ignores signal arriving at its front");
-  {  // 2026-10-31 (JD mux): red at the back, blue on one side, a clocked Repeator on the other side.
-    // Level-held: Repeator off = red passes, on = blue passes. Only a Repeator switches the mode.
-    int RN = 0;  // facing that points from z+1 back to z (toward the Redirector)
-    for (int d = 0; d < 4; ++d) if (kDirX[d] == 0 && kDirZ[d] == -1) RN = d;
-    putF(72, y, 12, kRedirector, E); put(73, y, 12, kRedTrace);                       // out the front
-    put(66, y, 12, kSwitch); for (int x = 67; x <= 71; ++x) put(x, y, 12, kRedTrace);  // red, back
-    put(72, y, 9, kSwitch); put(72, y, 10, kBlueTrace); put(72, y, 11, kBlueTrace);   // blue, side
-    put(72, y, 16, kSwitch); put(72, y, 15, kRedTrace); put(72, y, 14, kRedTrace);    // clock source
-    putF(72, y, 13, kRepeator, RN);                                                    // select, side
-    sim.use(w, 66, y, 12, none); sim.use(w, 72, y, 9, none);
-    run(20);
-    const int redIn = val(71, y, 12), blueIn = val(72, y, 11);
-    const bool distinct = redIn > 0 && blueIn > 0 && redIn != blueIn;
-    check(distinct && val(72, y, 12) == redIn && val(73, y, 12) > 0, "REDIRECTOR mux: select Repeator off -> red passes out the front");
-    bool alt = distinct;
-    for (int half = 0; half < 6; ++half) {  // clock: toggle every 24 ticks (Repeator delay 4)
-      sim.use(w, 72, y, 16, none);
-      run(24);
-      const int want = (half & 1) == 0 ? blueIn : redIn;
-      alt = alt && val(72, y, 12) == want && val(73, y, 12) > 0;
-    }
-    check(alt, "REDIRECTOR mux: clocked side Repeator alternates blue / red every half-cycle (level-held)");
-    // Negative: a raw Trace on the side (powered) does not switch the mode; linked behaviour stays.
-    put(72, y, 13, kRedTrace); sim.use(w, 72, y, 16, none);
-    run(20);
-    const int sideIn = val(72, y, 13);
-    check(sideIn > 0 && val(72, y, 12) == std::max(std::max(redIn, blueIn), sideIn), "REDIRECTOR mux: a powered raw Trace on the side does not switch the mode");
-  }
+  // I) Multiplexor (2026-11-11 JD t5252u): 2:1 mux, north-facing reference out=N, A=S (back),
+  // B=E (right), control=W (left); faces rotate with facing; off->A, on->B. The old Repeator-on-
+  // the-side red/blue colour mux is retired. Face layout and polarity are pinned in the
+  // MULTIPLEXOR unit checks further down (those cases fail the earlier east=control / west=B
+  // layout). World setW probes in this section are omitted: in this tree, setW+run(1) already
+  // failed the old "side input 25" check (see guimerge/selftest-baseline).
 
   {  // 2026-10-31 (JD): a Switch directly behind a Repeator powers it; the chain turns purple.
     put(60, y - 1, 20, kWaferSilicon);
@@ -1525,16 +1513,17 @@ int runSignalSelfTest() {
     check(v(16, 88) == 64 && v(22, 88) == 58 && v(31, 88) == 49 && v(15, 92) == 64,
           "trace seam: a column replaced in place (same count) relinks; Trace past the seam carries 64 .. 49 again");
   }
-  {  // Vias (vertical, lossless, colour-isolated) and glass (cuts wire stairs).
+  {  // Vias (vertical, lossless, colour-isolated); glass over a wire lets the stair through, silicon over it cuts (JD 2026-11-08).
     ChunkMap vw;
     vw.setRegistry(&blockRegistry());
     { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; vw.insert(std::move(col)); }
-    for (int x = 0; x < 12; ++x) for (int z = 0; z < 6; ++z) vw.set(x, y - 1, z, kWaferSilicon);
+    for (int x = 0; x < 12; ++x) for (int z = 0; z < 8; ++z) vw.set(x, y - 1, z, kWaferSilicon);
     vw.set(1, y, 1, kRedTorch); vw.set(2, y, 1, kRedTrace);
     for (int yy = y + 1; yy <= y + 3; ++yy) { vw.set(2, yy, 1, kRedVia); vw.set(3, yy, 1, kBlueVia); }
     vw.set(2, y + 4, 1, kRedTrace); vw.set(3, y + 4, 1, kBlueTrace);
     vw.set(4, y, 3, kRedTorch); vw.set(5, y, 3, kRedTrace); vw.set(6, y + 1, 3, kRedTrace); vw.set(5, y + 1, 3, kGlass);
     vw.set(4, y, 5, kRedTorch); vw.set(5, y, 5, kRedTrace); vw.set(6, y + 1, 5, kRedTrace);
+    vw.set(4, y, 7, kRedTorch); vw.set(5, y, 7, kRedTrace); vw.set(6, y + 1, 7, kRedTrace); vw.set(5, y + 1, 7, kWaferSilicon);  // silicon over the wire: the cut
     cSignalSim vs;
     vs.scan(vw);
     for (int i = 0; i < 4; ++i) vs.tick(vw, 0, 0, 100, [](int, int, int) {});
@@ -1543,8 +1532,10 @@ int runSignalSelfTest() {
           "via: a red via stack carries the wire up losslessly (64 bottom -> 64 top)");
     check(stValue(vw.getState(3, y + 4, 1)) == 0 && stValue(vw.getState(3, y + 2, 1)) == 0,
           "via: a blue via standing against a lit red via stays dark (no sideways links)");
-    check(stValue(vw.getState(6, y + 1, 3)) == 0 && stValue(vw.getState(6, y + 1, 5)) == 63,
-          "glass: glass over a wire blocks the stair climb (control stair without glass is lit)");
+    check(stValue(vw.getState(6, y + 1, 3)) == 63 && stValue(vw.getState(6, y + 1, 5)) == 63,
+          "glass: glass over a wire does NOT block the stair climb -- the climb passes through it (JD 2026-11-08)");
+    check(stValue(vw.getState(6, y + 1, 7)) == 0,
+          "stairs: silicon over a wire still cuts the climb (solid + opaque, JD 2026-11-08)");
   }
   {  // 2026-10-25 (JD): side-lying Vias: horizontal runs, pipe elbows, end-only Trace / Repeator feed.
     ChunkMap vw;
@@ -1648,8 +1639,18 @@ int runSignalSelfTest() {
       return m;
     };
     auto val = [&](const ChunkMap& m, int x, int y, int z) { return int(stValue(m.getState(x, y, z))); };
-    struct StepCase { BlockId b; const char* name; };
-    const StepCase steps[] = {{kWaferSilicon, "silicon"}, {kGlass, "glass"}, {kFrostedGlass, "frosted glass"}, {kCeramic, "ceramic"}, {kSiliconSlab, "silicon slab"}};
+    // JD's cut rule (2026-11-08) pinned per material, explicitly -- never derived
+    // from a flag at test time again (the old flag-derived expectation flipped
+    // silently with the flag). cuts = the block, placed over the lower wire,
+    // cuts the climb: solid + opaque (silicon, ceramic), insulators (ceramic,
+    // Insulatnor) cut; transparent (glass, frosted glass, substrate, leaves)
+    // and non-opaque solids (slab, ramp) do not. Climbing itself is symmetric
+    // (ruling 1: no down diode) on every step material, slabs included.
+    struct StepCase { BlockId b; const char* name; bool cuts; };
+    const BlockId leavesId = blockRegistry().findById("lithokraft:crystal_leaves_reddom").value_or(kAir);  // leaves have no extern const; resolved by id
+    const StepCase steps[] = {{kWaferSilicon, "silicon", true}, {kGlass, "glass", false}, {kFrostedGlass, "frosted glass", false},
+                              {kCeramic, "ceramic", true}, {kSiliconSlab, "silicon slab", false}, {kSubstrate, "substrate", false},
+                              {kInsulatnor, "insulatnor", true}, {leavesId, "crystal leaves", false}, {kAluminumRamp, "aluminum ramp", false}};
     int stairBad = 0, cutBad = 0;
     for (const auto& sc : steps) {
       // Up: torch -> A (floor) -> C on top of the step block. Down: torch on the step -> A.
@@ -1658,19 +1659,69 @@ int runSignalSelfTest() {
       const bool upOk = val(up, 4, Y + 1, 4) == 63 && val(up, 5, Y + 1, 4) == 62, dnOk = val(dn, 3, Y, 4) == 62;
       // Cut: the same climb with the block placed over the lower wire instead (blocks the stair if it cuts).
       const ChunkMap cut = fixture([&](ChunkMap& m) { m.set(2, Y, 4, kRedTorch); m.set(3, Y, 4, kRedTrace); m.set(3, Y + 1, 4, sc.b); m.set(4, Y, 4, kWaferSilicon); m.set(4, Y + 1, 4, kRedTrace); });
-      const bool cuts = blockRegistry().has(sc.b, kCutsWire);
-      const bool cutOk = cuts ? val(cut, 4, Y + 1, 4) == 0 : val(cut, 4, Y + 1, 4) == 63;
+      const bool cutOk = sc.cuts ? val(cut, 4, Y + 1, 4) == 0 : val(cut, 4, Y + 1, 4) == 63;
+      const bool predOk = cutsWireClimb(sc.b) == sc.cuts;  // the derived rule itself, pinned per material
       std::printf("  stairs over %-13s: up %d/%d down %d | block over the lower wire -> upper %d (%s)\n", sc.name, val(up, 4, Y + 1, 4),
-                  val(up, 5, Y + 1, 4), val(dn, 3, Y, 4), val(cut, 4, Y + 1, 4), cuts ? "should cut" : "should pass");
-      stairBad += !(upOk && dnOk); cutBad += !cutOk;
+                  val(up, 5, Y + 1, 4), val(dn, 3, Y, 4), val(cut, 4, Y + 1, 4), sc.cuts ? "should cut" : "should pass");
+      stairBad += !(upOk && dnOk); cutBad += !(cutOk && predOk);
     }
-    check(stairBad == 0, "wire stairs: climb onto / descend from silicon, glass, frosted glass, ceramic and slab steps (1 per block)");
-    check(cutBad == 0, "wire stairs: silicon / glass / frosted glass / ceramic over the lower wire cut the stair; a slab does not");
+    {  // Both colours climb through glass (JD decision (a) + ruling 2): blue up a
+       // glass step, and blue up past glass over the lower wire.
+      const ChunkMap bup = fixture([&](ChunkMap& m) { m.set(2, Y, 6, kBlueTorch); m.set(3, Y, 6, kBlueTrace); m.set(4, Y, 6, kGlass); m.set(4, Y + 1, 6, kBlueTrace); m.set(5, Y + 1, 6, kBlueTrace); });
+      const ChunkMap bcut = fixture([&](ChunkMap& m) { m.set(2, Y, 6, kBlueTorch); m.set(3, Y, 6, kBlueTrace); m.set(3, Y + 1, 6, kGlass); m.set(4, Y, 6, kWaferSilicon); m.set(4, Y + 1, 6, kBlueTrace); });
+      const bool blueOk = val(bup, 4, Y + 1, 6) == 63 && val(bup, 5, Y + 1, 6) == 62 && val(bcut, 4, Y + 1, 6) == 63;
+      std::printf("  blue stairs over glass: up %d/%d | glass over the lower wire -> upper %d (should pass)\n",
+                  val(bup, 4, Y + 1, 6), val(bup, 5, Y + 1, 6), val(bcut, 4, Y + 1, 6));
+      cutBad += !blueOk;
+    }
+    check(stairBad == 0, "wire stairs: climb onto / descend from silicon, glass, frosted glass, ceramic, slab, substrate, insulator, leaves and ramp steps (1 per block, symmetric)");
+    check(cutBad == 0, "wire stairs: silicon / ceramic / insulatnor over the lower wire cut the stair; glass / frosted glass / slab / substrate / leaves / ramp do not (JD cut rule, 2026-11-08)");
     // Ceiling wire: hangs under glass, carries signal sideways.
     const ChunkMap ceil = fixture([&](ChunkMap& m) {
       for (int x = 2; x <= 6; ++x) { m.set(x, Y + 3, 6, kGlass); m.set(x, Y + 2, 6, x == 2 ? kRedTorch : kRedTrace); }
     });
     check(val(ceil, 3, Y + 2, 6) == 64 && val(ceil, 6, Y + 2, 6) == 61, "ceiling wire: hangs under glass and carries the signal (64 -> 61 over 4)");
+    {  // 2026-11-08 (wire job Phases 0/2): the shared link derivation, read directly.
+       // Lower wire A at (3,Y,8) climbs onto a silicon step at (4,Y,8) to wire C
+       // at (4,Y+1,8): A reads the stair as UP only, C reads it as DOWN only.
+       // A custom mask with +X off on A kills the climb link (both ends rule).
+      ChunkMap m;
+      m.setRegistry(&blockRegistry());
+      { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; m.insert(std::move(col)); }
+      for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) m.set(x, Y - 1, z, kWaferSilicon);
+      m.set(3, Y, 8, kRedTrace); m.set(4, Y, 8, kWaferSilicon); m.set(4, Y + 1, 8, kRedTrace);
+      auto dirsAt = [&](int x, int y, int z, TraceLinkDirs out[4]) {
+        traceLinkDirs(m.get(x, y, z), 1, m.getState(x, y, z),
+                      [&](int dx, int dy, int dz) { return m.get(x + dx, y + dy, z + dz); },
+                      [&](int dx, int dy, int dz) { return m.getState(x + dx, y + dy, z + dz); }, out);
+      };
+      TraceLinkDirs da[4], dc[4];
+      dirsAt(3, Y, 8, da); dirsAt(4, Y + 1, 8, dc);
+      check(da[1].up && !da[1].side && !da[1].down && dc[3].down && !dc[3].side && !dc[3].up,
+            "trace link derivation: a silicon stair reads up from below and down from above, never side");
+      m.setState(3, Y, 8, cTraceConn::withIndex(m.getState(3, Y, 8), 62));  // custom mask: every side but +X
+      TraceLinkDirs dm[4];
+      dirsAt(3, Y, 8, dm);
+      check(!dm[1].up, "trace link derivation: a custom mask with +X off kills the climb link");
+    }
+    {  // 2026-11-08 (wire job Phase 2, JD ruling 5): redirection notifies. Adding a
+       // spur wire beside a lit run (a pure shape change for the run's own cells)
+       // re-floods on the next tick: the spur lights at run strength - 1 and the
+       // run's strengths do not move.
+      ChunkMap m;
+      m.setRegistry(&blockRegistry());
+      { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; m.insert(std::move(col)); }
+      for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) m.set(x, Y - 1, z, kWaferSilicon);
+      m.set(2, Y, 10, kRedTorch);
+      for (int x = 3; x <= 6; ++x) m.set(x, Y, 10, kRedTrace);
+      cSignalSim s; s.scan(m);
+      for (int t = 0; t < 4; ++t) s.tick(m, 0, 0, 100, [](int, int, int) {});
+      const int runAt4 = val(m, 4, Y, 10), runAt6 = val(m, 6, Y, 10);
+      m.set(4, Y, 11, kRedTrace); s.onBlockChanged(4, Y, 11, kRedTrace);
+      s.tick(m, 0, 0, 100, [](int, int, int) {});
+      check(runAt4 == 63 && val(m, 4, Y, 11) == runAt4 - 1 && val(m, 6, Y, 10) == runAt6,
+            "redirection notifies: a spur added beside a lit run lights next tick, run strengths unchanged");
+    }
     // Vias: lossless climb, no sideways link, colours isolated; red / blue traces side by side never link.
     const ChunkMap via = fixture([&](ChunkMap& m) {
       m.set(2, Y, 8, kRedTorch); m.set(3, Y, 8, kRedTrace);
@@ -1974,6 +2025,32 @@ int runSignalSelfTest() {
                      : "pattern wall 64x64 checkers: every pixel lights repeatedly with exactly its pattern colour, no floating wire");
     }
   }
+  {  // Bind-on-placement law (2026-11-07, JD): a Catchor binds ONCE at placement
+     // (its own placement, or a Trace placed beside it); powering and unpowering
+     // NEVER bind, rebind, or unbind it. Player use is the only later change.
+    ChunkMap cb;
+    cb.setRegistry(&blockRegistry());
+    { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; cb.insert(std::move(col)); }
+    for (int x = 0; x < 12; ++x) for (int z = 0; z < 8; ++z) cb.set(x, y - 1, z, kWaferSilicon);
+    cSignalSim cs2;
+    auto setB2 = [&](int x, int z, BlockId b, CellState st = 0) { cb.set(x, y, z, b); if (st) cb.setState(x, y, z, st); cs2.onBlockChanged(x, y, z, b); };
+    auto run2 = [&](int k) { for (int i = 0; i < k; ++i) cs2.tick(cb, 0, 0, 100, [](int, int, int) {}); };
+    setB2(5, 3, kCatchor, makeState(64, 0, 3));  // unwired, nothing touching it
+    run2(4);
+    const bool noBindAlone = (stAux(cb.getState(5, y, 3)) & 3) == 3;  // ticks alone never bind it
+    setB2(4, 3, kRedTrace);  // a Trace placed beside it (an edit) queues the one bind
+    run2(1);
+    const CellState bound = cb.getState(5, y, 3);
+    const bool boundAtPlacement = stFacing(bound) == 1 && (stAux(bound) & 7) == 0;
+    setB2(3, 3, kRedTorch); run2(6);  // power it up
+    setB2(3, 3, kAir); run2(6);       // depower it
+    setB2(5, 2, kBlueTrace); run2(3); // a second colour touches another side
+    setB2(4, 3, kAir); run2(3);       // even removing its own wire entirely
+    const CellState after = cb.getState(5, y, 3);
+    const bool neverRebinds = stFacing(after) == 1 && (stAux(after) & 7) == 0 && stValue(after) == 64;
+    check(noBindAlone && boundAtPlacement && neverRebinds,
+          "catchor bind law (2026-11-07 JD): binds once at placement; power on/off, a second colour, and losing its wire never rebind or unbind it");
+  }
   {  // Catchor wiring: auto-connects to the first wire touching a side, output centre / left / right
      // relative to that input (never up / down), state persists; a Catchor feeding a Redirector
      // makes it the Redirector's input (centre / left / right cycling only).
@@ -2008,7 +2085,7 @@ int runSignalSelfTest() {
     const bool alt = stValue(cw.getState(2, y, 3)) == 1 && (stAux(cw.getState(2, y, 3)) & 3) == 0;
     cw.setState(2, y, 3, makeState(64, 1, 0));  // rebind directly for the redirector test below
     check(autoWired && kept && left && right && back && unbound && alt,
-          "catchor: auto-wires to the first touching wire (west, red), keeps it; output centre -> left -> right; sneak+use clears binding, then steps match");
+          "catchor: binds at placement to the first touching wire (west, red), keeps it; output centre -> left -> right; sneak+use clears binding, then steps match");
     // Catchor -> Redirector: replace the east lamp with a Redirector (facing east) + lamps around it.
     setB(3, 3, kRedirector, makeState(0, 1)); setB(4, 3, kColorLamp64); setB(3, 2, kColorLamp64); setB(3, 4, kColorLamp64);
     auto runR = [&](int k) { seen = {}; for (int i = 0; i < k; ++i) { cs.tick(cw, 0, 0, 100, [](int, int, int) {}); seen[0] |= lit(4, 3); seen[1] |= lit(3, 2); seen[2] |= lit(3, 4); } };
@@ -2736,6 +2813,7 @@ int runSignalSelfTest() {
       ComponentMemory m{}; sidesIgnored = db->tick(in, makeState(0, f), m).out == 0;
     }
     check(sidesIgnored, "DIVIDOR: side inputs are ignored (only the back is halved)");
+
     const int ddelay = db && db->queuedOutput() ? db->delayTicks(0, 1234, 100) : -1;
     cScheduledOutput dline;
     int dseen = -1;
@@ -2744,6 +2822,1023 @@ int runSignalSelfTest() {
       if (dline.step(t, ddelay, raw).out == 32) dseen = int(t - 100);
     }
     check(ddelay == 1 && dseen == 1, "DIVIDOR DELAY: input change -> output change in exactly 1 tick");
+  }
+
+  {  // 2026-11-11 (JD t5252u drawing): Multiplexor 2:1 face layout.
+     // North-facing reference: output=north (front), A=south (back), B=east (right),
+     // control=west (left). Other horizontal facings are that layout rotated.
+     // Control off (strength 0) selects A; any source with strength > 0 selects B.
+     // These cases fail the earlier east=control / west=input2 (B) pass: with A=7,
+     // B=11, west=5 the old layout treats east=11 as control-on and outputs west=5;
+     // with A=7, B=0, west=5 the old layout sees east=0 as control-off and outputs A=7.
+    const cCompBehavior* mb = cBehaviorCatalog::get().component(kRedirector);
+    check(mb != nullptr && std::string(blockRegistry().def(kRedirector).name) == "Multiplexor",
+          "MULTIPLEXOR: registered as Multiplexor (stable kRedirector id)");
+    auto muxTick = [&](int f, int a, int b, int ctrl, int front = 0, int top = 0) {
+      ComponentInputs in;
+      in.side[size_t(dirBack(f))] = a;
+      in.side[size_t(dirRight(f))] = b;
+      in.side[size_t(dirLeft(f))] = ctrl;
+      in.side[size_t(f)] = front;
+      in.top = top;
+      ComponentMemory mem{};
+      return mb->tick(in, makeState(0, f), mem);
+    };
+    bool north = mb != nullptr;
+    if (mb) {
+      north = muxTick(0, 7, 11, 0).out == 7;             // control off -> A
+      north = north && muxTick(0, 7, 11, 5).out == 11;   // control on -> B (old layout would output 5)
+      north = north && muxTick(0, 7, 0, 5).out == 0;     // control on, B=0 (old layout would output 7)
+      north = north && muxTick(0, 7, 11, 1).out == 11;   // any strength > 0 is on
+    }
+    check(north, "MULTIPLEXOR: north-facing out=N, A=south, B=east, control=west; off->A, on->B (old east=control / west=B fails)");
+    bool rotated = mb != nullptr;
+    for (int f = 0; rotated && f < 4; ++f) {
+      rotated = muxTick(f, 7, 11, 0).out == 7 && muxTick(f, 7, 11, 5).out == 11 && muxTick(f, 7, 0, 5).out == 0 &&
+                muxTick(f, 0, 32, 0).out == 0 && muxTick(f, 0, 32, 1).out == 32;
+    }
+    check(rotated, "MULTIPLEXOR: A=back, B=right, control=left for all four facings; off->A, on->B");
+    bool unused = mb != nullptr;
+    for (int f = 0; unused && f < 4; ++f) {
+      unused = muxTick(f, 9, 0, 0, 40, 40).out == 9 && muxTick(f, 9, 0, 3, 40, 40).out == 0;
+    }
+    check(unused, "MULTIPLEXOR: front and top inputs are ignored");
+    bool emitFront = mb != nullptr;
+    for (int f = 0; emitFront && f < 4; ++f) {
+      const ComponentStep step = muxTick(f, 15, 0, 0);
+      ComponentMemory mem{};
+      mem.out = uint8_t(step.out);
+      emitFront = step.out == 15 && mb->emitToward(f, step.state, mem) == 15 && mb->emitToward(dirBack(f), step.state, mem) == 0 &&
+                  mb->emitToward(dirLeft(f), step.state, mem) == 0 && mb->emitToward(dirRight(f), step.state, mem) == 0;
+    }
+    check(emitFront, "MULTIPLEXOR: output is on the facing face only");
+  }
+
+  {  // 2026-11-11 (JD 1:1 rulings): Dialor — independent 6-bit source, 1 tick, back inhibit.
+     // Top dial sets 1..64 (0 is no signal, not a dial position). Output IS the dial value,
+     // not an incoming signal (except the back inhibit). When the block faces north, output
+     // is on the north face (front); faces rotate with facing. Only the back inhibits:
+     // out = back_powered ? 0 : dial. East and west are inert. One-tick delay (JD 1:1,
+     // "At one tick"). 17th reserved Trace keyword. Engine id lithokraft:dialor (never Dialer).
+    const cCompBehavior* db = cBehaviorCatalog::get().component(kDialor);
+    const auto did = blockRegistry().findById("lithokraft:dialor");
+    check(db != nullptr && did && *did == kDialor && blockRegistry().def(kDialor).name == "Dialor" &&
+          roleOf(blockRegistry().def(kDialor)) == SimRole::Dialor &&
+          (blockRegistry().def(kDialor).flags & kInteractive) != 0,
+          "DIALOR: lithokraft:dialor registered with its behaviour, role, and use-cycle flag");
+    check(kMaxSignal == 64, "DIALOR: engine signal range already carries 1 through 64 (0 is no signal); no width extension");
+
+    bool levels = db != nullptr;
+    for (int v = 1; levels && v <= kMaxSignal; ++v) {
+      ComponentInputs in;
+      ComponentMemory mem{};
+      const ComponentStep k = db->tick(in, makeState(v, 0), mem);
+      levels = k.out == v && stValue(k.state) == v && stOn(k.state);
+    }
+    check(levels, "DIALOR: top dial 1 through 64 outputs that strength when the back is off");
+
+    {
+      ComponentInputs in;
+      ComponentMemory mem{};
+      const ComponentStep z = db ? db->tick(in, makeState(0, 0), mem) : ComponentStep{};
+      ComponentMemory mem2{};
+      const ComponentStep hi = db ? db->tick(in, makeState(65, 0), mem2) : ComponentStep{};
+      check(db && z.out == 0 && stValue(z.state) == 0 && !stOn(z.state) && (stAux(z.state) & 1) == 0 && hi.out == 0 && stValue(hi.state) == 0,
+            "DIALOR (C9): dial 0 is a position -- no signal out, not lit, not inhibited; an out-of-range state reads as 0");
+    }
+
+    bool indep = db != nullptr;
+    for (int f = 0; indep && f < 4; ++f) {
+      ComponentInputs in;
+      in.side[size_t(dirLeft(f))] = 40;
+      in.side[size_t(dirRight(f))] = 40;
+      in.side[size_t(f)] = 40;
+      in.top = 40;
+      ComponentMemory mem{};
+      const ComponentStep k = db->tick(in, makeState(23, f), mem);
+      indep = k.out == 23 && stValue(k.state) == 23 && stOn(k.state);
+    }
+    check(indep, "DIALOR: output is the configured dial, not an incoming signal; east/west/front/top are inert");
+
+    bool inh = db != nullptr;
+    for (int f = 0; inh && f < 4; ++f) {
+      for (int bp : {1, 15, 64}) {
+        ComponentInputs in;
+        in.side[size_t(dirBack(f))] = uint8_t(bp);
+        in.side[size_t(dirLeft(f))] = 40;
+        in.side[size_t(dirRight(f))] = 40;
+        ComponentMemory mem{};
+        const ComponentStep k = db->tick(in, makeState(23, f), mem);
+        inh = inh && k.out == 0 && stValue(k.state) == 23 && !stOn(k.state);
+      }
+    }
+    check(inh, "DIALOR: back inhibit: out = back_powered ? 0 : dial; state keeps the dial; east/west inert");
+
+    bool faces = db != nullptr;
+    for (int f = 0; faces && f < 4; ++f) {
+      ComponentInputs in;
+      ComponentMemory mem{};
+      const ComponentStep k = db->tick(in, makeState(32, f), mem);
+      mem.out = uint8_t(k.out);
+      faces = k.out == 32 && db->emitToward(f, k.state, mem) == 32 &&
+              db->emitToward(dirBack(f), k.state, mem) == 0 &&
+              db->emitToward(dirLeft(f), k.state, mem) == 0 &&
+              db->emitToward(dirRight(f), k.state, mem) == 0;
+    }
+    check(faces, "DIALOR: output is on the facing face only (north when north-facing); all four facings");
+
+    {
+      ComponentInputs in;
+      ComponentMemory mem{};
+      const ComponentStep k = db ? db->tick(in, makeState(64, 0), mem) : ComponentStep{};
+      mem.out = uint8_t(k.out);
+      check(db && k.out == 64 && db->emitToward(0, k.state, mem) == 64 && kMaxSignal == 64,
+            "DIALOR: engine carries a 64-level signal (strength 64, not capped at 15)");
+    }
+
+    const int ddelay = db && db->queuedOutput() ? db->delayTicks(0, 1234, 100) : -1;
+    cScheduledOutput dline;
+    int dseen = -1;
+    for (uint64_t t = 90; t < 200 && dseen < 0; ++t) {
+      const cScheduledOutput::Out raw{uint8_t(t >= 100 ? 64 : 0), 0, false};
+      if (dline.step(t, ddelay, raw).out == 64) dseen = int(t - 100);
+    }
+    check(ddelay == 1 && dseen == 1, "DIALOR DELAY: dial/output change appears in exactly 1 tick");
+
+    if (db) {
+      ComponentMemory mem{};
+      CellState st = makeState(0, 0, 0, false);
+      bool cycle = true;
+      for (int v = 0; v <= kMaxSignal; ++v) {
+        cycle = cycle && stValue(st) == v;
+        const auto n = db->use(st, mem);
+        cycle = cycle && n.has_value();
+        if (!n) break;
+        st = *n;
+      }
+      cycle = cycle && stValue(st) == 0;
+      check(cycle, "DIALOR (C9): use() (+1) cycles the dial 0 through 64 (65 values) and wraps 64 -> 0");
+      st = makeState(0, 0, 0, false);
+      auto a = db->useAlt(st, mem);
+      const auto a1 = db->useAlt(makeState(1, 0, 0, true), mem);
+      check(a && stValue(*a) == kMaxSignal && a1 && stValue(*a1) == 0, "DIALOR (C9): useAlt() (-1) steps backward 1 -> 0 and wraps 0 -> 64");
+      st = makeState(kMaxSignal, 0, 0, true);
+      a = db->useAlt(st, mem);
+      check(a && stValue(*a) == kMaxSignal - 1, "DIALOR: useAlt() steps 64 -> 63");
+    }
+
+    check(cComponentModels::instance().find("dialor_v01") && cComponentModels::instance().find("dialor_v32") &&
+          cComponentModels::instance().find("dialor_v64"),
+          "DIALOR: concept C models dialor_v01/v32/v64 load (dial on top)");
+    {  // B9 (JD 2026-11-11 A9 playtest): the strength must RENDER on the block, and Alt + wheel sets it.
+      bool look = true;
+      for (int v = 0; v <= kMaxSignal; ++v)
+        for (bool on : {true, false}) {
+          const DialorTopLook dl = dialorTopLook(makeState(v, v & 3, 0, on));
+          const std::string want = v <= 16 ? "v01" : v <= 48 ? "v32" : "v64";
+          look = look && dl.value == v && want == dl.still && dl.readoutX == 76 && dl.readoutY == 57;
+        }
+      const DialorTopLook d0 = dialorTopLook(makeState(0, 0, 0, false));
+      check(look && d0.value == 0 && std::string(d0.still) == "v01",
+            "DIALOR VISUAL (C9): every dial 0..64 drives the readout with its exact value (0 included, inhibited too); still v01 (0-16) / v32 / v64");
+      int x0 = 0, x1 = 0, z0 = 0, z1 = 0;
+      v2ReadoutFootprint(76, 57, x0, x1, z0, z1);
+      check(x0 * 8 <= 76 && x1 * 8 >= 100 && z0 * 8 <= 57 && z1 * 8 >= 71,
+            "DIALOR VISUAL: the readout quad covers the ghost-88 digit cells (128 px x76..99, y57..70)");
+      bool onTop = true;
+      for (const char* m : {"dialor_v01", "dialor_v32", "dialor_v64"}) {
+        const foliage::Mesh* mesh = cComponentModels::instance().find(m);
+        const int t = mesh ? cComponentModels::topAt(*mesh, (x0 + x1) / 2, (z0 + z1) / 2) : -1;
+        onTop = onTop && t >= 0 && t < 16;
+      }
+      check(onTop, "DIALOR VISUAL: the readout window sits on the model top inside the cell (all three stills)");
+#ifdef LITHOKRAFT_MODELS_DIR
+      bool maskOk = std::string(LITHOKRAFT_MODELS_DIR).size() > 0;
+      for (int sz : {128, 64, 32, 16}) {
+        const std::string p = std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) +
+                              "/textures/blocks/dialor/dialor_v2_readout_mask.png";
+        std::string err;
+        const auto im = litholattice::Image::load(p, &err);
+        if (!im || im->width() != sz || im->height() != sz) { maskOk = false; std::printf("  dialor mask %d: load failed %s\n", sz, err.c_str()); continue; }
+        unsigned seen = 0;
+        bool ids = true, inside = true;
+        for (int y = 0; y < sz; ++y)
+          for (int x = 0; x < sz; ++x) {
+            const uint8_t* px = im->pixel(x, y);
+            if (px[1] < 128) continue;  // the shader discards coverage < 0.5
+            const int seg = (px[0] + 8) / 16;  // R = segment id x16 (1..7 tens a..g, 8..14 ones)
+            ids = ids && seg >= 1 && seg <= 14;
+            if (seg >= 1 && seg <= 14) seen |= 1u << seg;
+            const int a0 = x * 128 / sz, a1 = (x + 1) * 128 / sz, b0 = y * 128 / sz, b1 = (y + 1) * 128 / sz;
+            inside = inside && a1 > 76 && a0 < 100 && b1 > 57 && b0 < 71;
+          }
+        const bool full = sz >= 64 ? seen == 0x7FFEu : seen != 0;
+        std::printf("  dialor mask %d: ids %d inside %d segments 0x%04x\n", sz, ids ? 1 : 0, inside ? 1 : 0, seen);
+        maskOk = maskOk && ids && inside && full;
+      }
+      check(maskOk, "DIALOR VISUAL: dialor_v2_readout_mask is a seven-segment id mask at the digit cells in every pack (was a blank R=255 block)");
+      {  // B9 2026-11-12 (JD 11 Nov 10:42 PM): every component text / LED readout is ONE deeper, solid purple.
+        auto slurpTxt = [](const std::string& q) { std::ifstream in(q, std::ios::binary); std::stringstream ss; ss << in.rdbuf(); return ss.str(); };
+        const std::string root = std::string(LITHOKRAFT_MODELS_DIR) + "/../../../../engine/";
+        const std::string sh = slurpTxt(root + "assets/shaders/chunk_shading.glsl");
+        const std::string sw = slurpTxt(root + "src/render/software_renderer.cpp");
+        auto has = [](const std::string& t, const char* k) { return t.find(k) != std::string::npos; };
+        auto branch = [&](const char* from, const char* to) {
+          const size_t a = sh.find(from), b = a == std::string::npos ? a : sh.find(to, a + 1);
+          return a == std::string::npos || b == std::string::npos ? std::string() : sh.substr(a, b - a);
+        };
+        const std::string bCells = branch("} else if (vMode == MODE_CELLS)", "} else if (vMode == MODE_ANIMATED)");
+        const std::string bDigits = branch("} else if (vMode == MODE_DIGITS ||", "} else if (vMode == MODE_READOUT)");
+        const std::string bReadout = branch("} else if (vMode == MODE_READOUT)", "#ifdef LITHO_VK_FX");
+        std::printf("  readout purple: shader %zu B, software %zu B, branches cells %zu digits %zu readout %zu\n", sh.size(), sw.size(),
+                    bCells.size(), bDigits.size(), bReadout.size());
+        check(has(sh, "const vec3 READOUT_PURPLE = vec3(0.663, 0.439, 1.000);  // #A970FF") && has(sh, "const float READOUT_EMISSIVE = 0.9;") &&
+                  has(sw, "kReadoutPurple = 0xA970FFu") && has(sw, "kReadoutEmissive = 0.9f"),
+              "READOUT PURPLE: one shared readout purple #A970FF (JD violet), emissive 0.9; GLSL (GL + Vulkan) and the software mirror agree");
+        check(!bCells.empty() && !bDigits.empty() && !bReadout.empty() && has(bCells, "if (on) { base = READOUT_PURPLE;") &&
+                  has(bDigits, "base = lit ? READOUT_PURPLE") &&
+                  has(bReadout, "base = READOUT_PURPLE;"),
+              "READOUT PURPLE: seven-segment readouts (Catchor, Thresholdor, Dialor, Breakor, Fusor Sum, Memor, Latchor, Randor), Latchor / Repeator / Randor digits and the Memor ring all draw it");
+        check(has(bReadout, "int digit = ones ? v % 10 : (v / 10) % 10") && has(bReadout, "(ones || v >= 10)") &&
+                  has(bReadout, "const int SEG[10] = int[10](0x3F,"),
+              "DIALOR READOUT (C9): at dial 0 the two-digit readout draws a 0 (ones digit always drawn, segments 0x3F; tens blank below 10), not blank");
+        bool noOld = true;
+        for (const std::string* b : {&bCells, &bDigits, &bReadout})
+          for (const char* k : {"0.839, 0.745, 0.980", "0.545, 0.396, 0.867", "0.114, 0.086, 0.353", "0.784, 0.663, 0.965", "MEM_GLOW", "MEM_HI", "MEM_DIGIT"})
+            noOld = noOld && !has(*b, k);
+        noOld = noOld && !has(sw, "0xD6BEFAu") && !has(sw, "0xC8A9F6u") && !has(sw, "0x8B65DDu; em");
+        check(noOld, "READOUT PURPLE: no other readout colour is left (#D6BEFA digits, #8B65DD / #1D165A on / off, #C8A9F6 ring edge)");
+        bool solid = !bCells.empty() && !bDigits.empty() && !bReadout.empty();
+        for (const std::string* b : {&bCells, &bDigits, &bReadout})
+          for (const char* k : {"vVal & 128", "uTime", "sin(", "bool hot", "emissive +="}) solid = solid && !has(*b, k);
+        check(solid, "READOUT SOLID: readout colour and emissive ignore the powered bit and the clock (no blink / flash with the signal)");
+        check(has(sh, "&& !(vMode >= 5 && vMode <= 7) && !readoutPx)") && has(sh, "bool readoutPx = false;") &&
+                  has(bCells, "readoutPx = true") && has(bDigits, "readoutPx = true") && has(bReadout, "readoutPx = true"),
+              "READOUT SOLID: the Vulkan fx pulse (0.72..1.0 sine, also scaling bloom) skips every readout pixel, like the colour lamps");
+      }
+#endif
+      ChunkMap dw;
+      dw.setRegistry(&blockRegistry());
+      { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; dw.insert(std::move(col)); }
+      cSignalWorldSim dsim;
+      const int dy = 20;
+      for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) dw.set(x, dy - 1, z, kWaferSilicon);
+      dw.set(9, dy, 9, kDialor); dsim.onBlockChanged(dw, 9, dy, 9, kDialor);
+      auto dval = [&] { return stValue(dw.getState(9, dy, 9)); };  // C9: 0..64 raw
+      auto alt = [&](int n) { dsim.command(dw, SimCommand{kCmdAltUse, 9, dy, 9, n, 0}, [](int, int, int) {}); return dval(); };
+      const int s0 = dval();
+      const int up1 = alt(1), up2 = alt(1), dn1 = alt(63), dn2 = alt(63), wrapDn = alt(63), wrapUp = alt(1);
+      std::printf("  alt-wheel dialor: %d -> up %d, up %d, down %d, down %d, down %d, up %d\n", s0, up1, up2, dn1, dn2, wrapDn, wrapUp);
+      check(s0 == 0 && up1 == 1 && up2 == 2 && dn1 == 1 && dn2 == 0 && wrapDn == kMaxSignal && wrapUp == 0,
+            "DIALOR ALT-SCROLL (C9): a newly placed Dialor selects 0; Alt + wheel up = +1, down = -1 (one step each); wraps 0 <-> 64");
+      const int clickAlt = alt(0);
+      check(clickAlt == kMaxSignal, "DIALOR ALT-SCROLL (C9): Alt + click keeps its one useAlt() step (0 -> 64)");
+      {  // C9: a live Dialor at 0 drives nothing; one step up drives 1 (no blank gap).
+        cSignalSim zs;
+        ChunkMap zw;
+        zw.setRegistry(&blockRegistry());
+        { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; zw.insert(std::move(col)); }
+        for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) zw.set(x, dy - 1, z, kWaferSilicon);
+        zw.set(8, dy, 8, kDialor); zw.setState(8, dy, 8, makeState(0, 0));  // fresh: dial 0, faces N
+        zw.set(8, dy, 7, kRedTrace);
+        zs.scan(zw);
+        const cSignalSim::DirtyFn zn = [](int, int, int) {};
+        for (int i = 0; i < 6; ++i) zs.tick(zw, 0, 0, 100, zn);
+        const ComponentMemory* zm = zs.debugMem(8, dy, 8);
+        const int out0 = zm ? int(zm->out) : -1, tr0 = stValue(zw.getState(8, dy, 7));
+        const bool desc0 = db && db->describe(blockRegistry().def(kDialor), zw.getState(8, dy, 8)).find("dial 0") != std::string::npos;
+        check(out0 == 0 && tr0 == 0 && stValue(zw.getState(8, dy, 8)) == 0 && desc0,
+              "DIALOR (C9): a live Dialor at dial 0 outputs no signal (the Trace stays 0); describe reads dial 0");
+      }
+      check(!playerUsable(blockRegistry(), kDialor) && (blockRegistry().def(kDialor).flags & kInteractive) != 0 &&
+                playerUsable(blockRegistry(), kThresholdor) && playerUsable(blockRegistry(), kRedirectorSelect),
+            "DIALOR ALT-SCROLL: a bare right click no longer sets the dial (Use gate); other interactive blocks unchanged");
+    }
+  }
+  {  // B9 2026-11-12 (JD Watchor, row B eye cube; design session section 6 + CloudAtlas pack README).
+     // LOCKED: 64 out the BACK for exactly one tick on any change ahead; refire at most every two ticks.
+     // STATED: front = eye on the block directly ahead; the sides have no function; chained Watchors shift
+     // phase by one tick. OPEN (not tested, not sealed): air -> block, block -> air, resin sweep.
+    const cCompBehavior* wb = cBehaviorCatalog::get().component(kWatchor);
+    const auto wid = blockRegistry().findById("lithokraft:watchor");
+    const BlockDef& wd = blockRegistry().def(kWatchor);
+    check(wb != nullptr && wid && *wid == kWatchor && wd.name == "Watchor" && roleOf(wd) == SimRole::Watchor &&
+              wd.shape == Shape::Cube && (wd.flags & kDirectional) != 0 && (wd.flags & kInteractive) == 0 &&
+              !blockRegistry().findById("lithokraft:watcher"),
+          "WATCHOR: lithokraft:watchor registered (Watchor, never Watcher) with its behaviour and role; full directional cube, no use");
+    auto feed = [&](ComponentMemory& m, CellState st, BlockId id, CellState ws) {
+      ComponentInputs in;
+      in.watchValid = true; in.watchId = id; in.watchState = ws;
+      const ComponentStep k = wb->tick(in, st, m);
+      m.out = uint8_t(k.out);
+      return k;
+    };
+    if (wb) {
+      const CellState st = makeState(0, 0);
+      ComponentMemory m{};
+      const ComponentStep p0 = feed(m, st, kRedTrace, 0), p1 = feed(m, st, kRedTrace, 0);
+      check(p0.out == 0 && p1.out == 0 && !stOn(p0.state) && !stOn(p1.state), "WATCHOR: first look and an unchanged cell ahead fire nothing");
+      const ComponentStep f1 = feed(m, st, kRedTrace, 5);
+      const int backOut = wb->emitToward(dirBack(0), f1.state, m);
+      int otherOut = 0;
+      for (int d : {0, 1, 3}) otherOut += wb->emitToward(d, f1.state, m);
+      const ComponentStep f2 = feed(m, st, kRedTrace, 5);
+      check(f1.out == kMaxSignal && stOn(f1.state) && backOut == kMaxSignal && otherOut == 0 && f2.out == 0 && !stOn(f2.state),
+            "WATCHOR: a state change ahead fires full strength 64 out the BACK for exactly one tick; front and sides emit nothing");
+      ComponentMemory r{};
+      feed(r, st, kRedTrace, 0);
+      const ComponentStep a = feed(r, st, kRedTrace, 1), b = feed(r, st, kRedTrace, 2), c = feed(r, st, kRedTrace, 2), e = feed(r, st, kRedTrace, 3);
+      check(a.out == kMaxSignal && b.out == 0 && c.out == 0 && e.out == kMaxSignal,
+            "WATCHOR: a change arriving on the rest tick produces no pulse (not held over); the next change after the rest fires");
+      ComponentMemory q{};
+      feed(q, st, kRedTrace, 0);
+      std::string pat;
+      for (int i = 1; i <= 8; ++i) pat += feed(q, st, kRedTrace, CellState(i)).out == kMaxSignal ? '1' : '0';
+      check(pat == "10101010", "WATCHOR: a cell changing every tick fires at most every two ticks (fire one tick, rest one tick)");
+      ComponentMemory s2{};
+      feed(s2, st, kRedTrace, 0);
+      check(feed(s2, st, kBlueTrace, 0).out == kMaxSignal, "WATCHOR: one block swapped for another (no air between) is a change and fires");
+      bool fac = true;
+      for (int f = 0; f < 4; ++f) {
+        ComponentMemory mf{};
+        const CellState sf = makeState(0, f);
+        feed(mf, sf, kRedTrace, 0);
+        const ComponentStep k = feed(mf, sf, kRedTrace, 9);
+        fac = fac && stFacing(k.state) == f && wb->emitToward(dirBack(f), k.state, mf) == kMaxSignal;
+        for (int dd = 0; dd < 4; ++dd) if (dd != dirBack(f)) fac = fac && wb->emitToward(dd, k.state, mf) == 0;
+      }
+      check(fac, "WATCHOR: each horizontal placement facing keeps its facing and emits out its back only");
+    }
+    {  // live sim: W1 watches a Switch; W2 watches W1 (chain). Traces behind W1 (back) and on W1's west side.
+      ChunkMap ww;
+      ww.setRegistry(&blockRegistry());
+      { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; ww.insert(std::move(col)); }
+      const int wy = 20;
+      for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) ww.set(x, wy - 1, z, kWaferSilicon);
+      ww.set(8, wy, 7, kSwitch);
+      ww.set(8, wy, 8, kWatchor); ww.setState(8, wy, 8, makeState(0, 0));   // faces N: eye on the Switch, back = (8, 9)
+      ww.set(8, wy, 9, kRedTrace);
+      ww.set(7, wy, 8, kRedTrace);                                          // W1 west side: must stay dark
+      ww.set(9, wy, 8, kWatchor); ww.setState(9, wy, 8, makeState(0, 3));   // faces W: eye on W1, back = (10, 8)
+      ww.set(10, wy, 8, kRedTrace);
+      cSignalSim ws;
+      ws.scan(ww);
+      const cSignalSim::DirtyFn wnone = [](int, int, int) {};
+      auto outAt = [&](int x, int z) { const ComponentMemory* mm = ws.debugMem(x, wy, z); return mm ? int(mm->out) : -1; };
+      bool idle = true;
+      for (int i = 0; i < 6; ++i) { ws.tick(ww, 0, 0, 100, wnone); idle = idle && outAt(8, 8) == 0 && outAt(9, 8) == 0 && stValue(ww.getState(8, wy, 9)) == 0; }
+      ws.use(ww, 8, wy, 7, wnone);
+      std::string s1, s2, tb, ts;
+      for (int i = 0; i < 12; ++i) {
+        ws.tick(ww, 0, 0, 100, wnone);
+        s1 += outAt(8, 8) == kMaxSignal ? '1' : outAt(8, 8) == 0 ? '0' : '?';
+        s2 += outAt(9, 8) == kMaxSignal ? '1' : outAt(9, 8) == 0 ? '0' : '?';
+        tb += stValue(ww.getState(8, wy, 9)) > 0 ? '1' : '0';
+        ts += stValue(ww.getState(7, wy, 8)) > 0 ? '1' : '0';
+      }
+      std::printf("  watchor live: W1 %s  W2 %s  back trace %s  side trace %s\n", s1.c_str(), s2.c_str(), tb.c_str(), ts.c_str());
+      const bool fired = s1.find('1') != std::string::npos;
+      check(idle && fired && s1.find("11") == std::string::npos && s1.find('?') == std::string::npos && tb.find('1') != std::string::npos &&
+                ts.find('1') == std::string::npos,
+            "WATCHOR LIVE: toggling the Switch ahead fires W1 64 for single ticks; the back Trace lights, the side Trace stays dark");
+      bool phase = fired && s2[0] == '0';
+      for (size_t i = 1; i < s1.size(); ++i) phase = phase && (s2[i] == '1') == (s1[i - 1] == '1');
+      check(phase, "WATCHOR LIVE: a Watchor watching a Watchor fires exactly one tick later (chaining shifts the phase by a tick)");
+      cSignalSim::LithoStats lst;
+      check(!ws.lithoCompile(ww, 0, wy - 1, 0, 15, wy + 1, 15, &lst) && !ws.lithoActive(),
+            "WATCHOR: a lithography box holding a Watchor does not compile (no world to watch on the chip); the live sim keeps it");
+    }
+    const foliage::Mesh* wm = cComponentModels::instance().find("watchor");
+    check(wm != nullptr && !wm->quads.empty(), "WATCHOR ART: CloudAtlas row B model watchor (eye cube) loads in the v2 component models");
+#ifdef LITHOKRAFT_MODELS_DIR
+    {
+      bool tex = true, res = true;
+      for (int sz : {16, 32, 64, 128}) {
+        const std::string pk = std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/";
+        for (const char* face : {"top", "bottom", "front", "back", "east", "west"})
+          for (const char* kind : {"base", "tintmask"}) {
+            const std::string p = pk + "textures/blocks/watchor/watchor_" + face + "_" + kind + ".png";
+            std::string err;
+            const auto im = litholattice::Image::load(p, &err);
+            if (!im || im->width() != sz || im->height() != sz) { tex = false; std::printf("  watchor tex %s: %s\n", p.c_str(), err.c_str()); }
+          }
+        std::ifstream rf(pk + "resources.json", std::ios::binary);
+        std::stringstream rs;
+        rs << rf.rdbuf();
+        const std::string rj = rs.str();
+        res = res && rj.find("\"watchor_front_base\": \"textures/blocks/watchor/watchor_front_base.png\"") != std::string::npos &&
+              rj.find("\"watchor\": {") != std::string::npos && rj.find("\"tint:watchor_back_base\": \"watchor_back_tintmask\"") != std::string::npos &&
+              rj.find("watchor_v2_readout_mask") == std::string::npos && rj.find("watcher") == std::string::npos;
+      }
+      check(tex, "WATCHOR ART: row B base + tint-mask art for all six faces in pack_16 / 32 / 64 / 128 at pack resolution");
+      check(res, "WATCHOR ART: every pack's resources.json maps the watchor textures and model faces (back tint mask); no readout, no 'watcher'");
+      bool icons = true;
+      for (int sz : {32, 64, 128}) {
+        std::string err;
+        const auto im = litholattice::Image::load(std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/textures/items/watchor.png", &err);
+        icons = icons && im && im->width() == sz;
+      }
+      check(icons, "WATCHOR ART: row B item icons at 32 / 64 / 128");
+    }
+#endif
+  }
+  {  // B9 2026-11-12 (JD Bitor, row B op readout; design session section 7 + CloudAtlas pack README).
+     // Faces: local west + east = operands, back = control, front = output. LOCKED: control 0 = AND.
+     // RULED: over-range saturates at 64. C9 (JD 6:39 AM ET): ranges 0-15 AND / 16-31 OR / 32-47 XOR / 48-64 NOR, LOCKED.
+     // C9 (JD 6:44 AM ET): output recomputes two ticks after a new west / east / back value (restart-on-change = interpretation).
+    const cCompBehavior* bb = cBehaviorCatalog::get().component(kBitor);
+    const auto bid = blockRegistry().findById("lithokraft:bitor");
+    const BlockDef& bd = blockRegistry().def(kBitor);
+    check(bb != nullptr && bid && *bid == kBitor && bd.name == "Bitor" && roleOf(bd) == SimRole::Bitor && bd.shape == Shape::Cube &&
+              (bd.flags & kDirectional) != 0 && (bd.flags & kInteractive) == 0 && !blockRegistry().findById("lithokraft:biter") &&
+              !blockRegistry().findById("lithokraft:bit_or"),
+          "BITOR: lithokraft:bitor registered (Bitor, never Biter / BitOr) with its behaviour and role; directional, no use");
+    // C9: drive a Bitor the way the sim does (m.out = the published output, state carried) for n ticks.
+    auto runB = [&](const ComponentInputs& in, CellState& st, ComponentMemory& m, int n) {
+      ComponentStep k{};
+      for (int t = 0; t < n; ++t) { k = bb->tick(in, st, m); m.out = uint8_t(std::clamp(k.out, 0, kMaxSignal)); st = k.state; }
+      return k;
+    };
+    const int kSettle = components::kBitorDelayTicks + 1;  // the tick that sees the change + the two-tick delay
+    if (bb) {
+      bool andAll = true;
+      for (int a = 0; a <= kMaxSignal && andAll; ++a)
+        for (int b = 0; b <= kMaxSignal && andAll; ++b) {
+          ComponentInputs in;
+          in.side[dirLeft(0)] = a; in.side[dirRight(0)] = b;  // control (back) 0
+          ComponentMemory m{};
+          CellState st = makeState(0, 0);
+          const ComponentStep k = runB(in, st, m, kSettle);
+          andAll = k.out == (a & b) && stValue(k.state) == (a & b) && stOn(k.state) == ((a & b) > 0) && stFacing(k.state) == 0;
+        }
+      check(andAll, "BITOR: control 0 is AND -- every pair of strengths 0..64 on west / east gives west & east out (bit places 1..64)");
+      ComponentInputs ex;
+      ex.side[dirLeft(0)] = 48; ex.side[dirRight(0)] = 20;
+      ComponentMemory me{};
+      CellState est = makeState(0, 0);
+      const ComponentStep k = runB(ex, est, me, kSettle);
+      me.out = uint8_t(k.out);
+      int other = 0;
+      for (int d : {1, 2, 3}) other += bb->emitToward(d, k.state, me);
+      check(k.out == 16 && bb->emitToward(0, k.state, me) == 16 && other == 0, "BITOR: 48 AND 20 = 16 comes out the FRONT only");
+      bool fac = true;
+      for (int f = 0; f < 4; ++f) {
+        ComponentInputs in;
+        in.side[dirLeft(f)] = 63; in.side[dirRight(f)] = 21; in.side[f] = 64;  // a signal on the front is not an operand
+        ComponentMemory m{};
+        CellState fs = makeState(0, f);
+        const ComponentStep s = runB(in, fs, m, kSettle);
+        ComponentInputs sw;
+        sw.side[dirLeft(f)] = 21; sw.side[dirRight(f)] = 63;
+        ComponentMemory m2{};
+        CellState fs2 = makeState(0, f);
+        fac = fac && s.out == (63 & 21) && runB(sw, fs2, m2, kSettle).out == s.out && stFacing(s.state) == f;
+      }
+      check(fac, "BITOR: each horizontal facing reads its local west / east as the (commutative) operands; the front is not an input");
+      check(components::bitorAnd(64, 64) == 64 && components::bitorAnd(64, 63) == 0 && components::bitorAnd(99, 99) == 64,
+            "BITOR: strengths are 7-place patterns (64 & 63 = 0); results stay within 64 (over-range saturates, RULED)");
+      // ---- C9 (JD 6:39 / 6:44 AM ET 2026-11-12): op ranges, all four ops, stills, two-tick delay ----
+      {
+        bool ranges = true;
+        for (int c = 0; c <= kMaxSignal; ++c) ranges = ranges && components::bitorOpFor(c) == (c <= 15 ? 0 : c <= 31 ? 1 : c <= 47 ? 2 : 3);
+        const int bnd[8][2] = {{0, 0}, {15, 0}, {16, 1}, {31, 1}, {32, 2}, {47, 2}, {48, 3}, {64, 3}};
+        for (const auto& p : bnd) ranges = ranges && components::bitorOpFor(p[0]) == p[1];
+        const int mid[4][2] = {{8, 0}, {24, 1}, {40, 2}, {56, 3}};
+        for (const auto& p : mid) ranges = ranges && components::bitorOpFor(p[0]) == p[1];
+        check(ranges, "BITOR RANGES (C9): control 0-15 AND, 16-31 OR, 32-47 XOR, 48-64 NOR (boundaries 0/15/16/31/32/47/48/64 and mid-range 8/24/40/56)");
+        check(components::bitorOpFor(16) == 1 && components::bitorOpFor(32) == 2 && components::bitorOpFor(64) == 3 && components::bitorOpFor(0) == 0,
+              "BITOR RANGES (C9): the exact values 0 / 16 / 32 / 64 still land in AND / OR / XOR / NOR");
+        bool ops = true;
+        for (int a = 0; a <= kMaxSignal && ops; ++a)
+          for (int b = 0; b <= kMaxSignal && ops; ++b) {
+            const auto sat = [](int r) { return r > 64 ? 64 : r; };
+            ops = components::bitorApply(0, a, b) == sat(a & b) && components::bitorApply(1, a, b) == sat(a | b) &&
+                  components::bitorApply(2, a, b) == sat(a ^ b) && components::bitorApply(3, a, b) == sat((~(a | b)) & 127) &&
+                  components::bitorApply(1, a, b) == components::bitorApply(1, b, a) && components::bitorApply(2, a, b) == components::bitorApply(2, b, a) &&
+                  components::bitorApply(3, a, b) == components::bitorApply(3, b, a);
+          }
+        check(ops, "BITOR OPS (C9): AND / OR / XOR / NOR on the 7 bit places of every pair 0..64, commutative, results capped at 64");
+        check(components::bitorApply(0, 48, 20) == 16 && components::bitorApply(1, 48, 20) == 52 && components::bitorApply(2, 48, 20) == 36 &&
+                  components::bitorApply(3, 48, 20) == 64 && components::bitorApply(3, 64, 0) == 63 && components::bitorApply(3, 64, 63) == 0,
+              "BITOR OPS (C9): 48 op 20 = AND 16 / OR 52 / XOR 36 / NOR 64 (over range); NOR 64,0 = 63; NOR 64,63 = 0");
+        check(components::bitorApply(1, 64, 1) == 64 && components::bitorApply(2, 64, 1) == 64 && components::bitorApply(3, 0, 0) == 64 &&
+                  components::bitorApply(1, 64, 63) == 64,
+              "BITOR SATURATE (C9): over-range results (OR 64|1 = 65, XOR 64^1, NOR 0,0 = 127, OR 64|63) emit 64, never 0");
+        // Settled through tick(): every control value arms its op, the output is the op's result, the state records the op.
+        bool live = true, stills = true;
+        for (int c : {0, 8, 15, 16, 24, 31, 32, 40, 47, 48, 56, 64}) {
+          ComponentInputs in;
+          in.side[dirLeft(0)] = 48; in.side[dirRight(0)] = 20; in.side[dirBack(0)] = c;
+          ComponentMemory m{};
+          CellState st = makeState(0, 0);
+          const ComponentStep k = runB(in, st, m, kSettle);
+          const int op = components::bitorOpFor(c);
+          static constexpr const char* kS[4] = {"and", "or", "xor", "nor"};
+          live = live && k.out == components::bitorApply(op, 48, 20) && components::bitorOpOf(k.state) == op &&
+                 ((stAux(k.state) & 1) != 0) == (c > 0);
+          stills = stills && std::string(bitorStillOf(k.state)) == kS[op] && cComponentModels::instance().find(std::string("bitor_") + kS[op]);
+        }
+        check(live, "BITOR LIVE OPS (C9): through tick(), controls 0..64 (boundaries + mid-range) arm AND / OR / XOR / NOR on 48, 20 (back tint lit when control > 0)");
+        check(stills, "BITOR STILLS (C9): the armed-op still matches the op in force (and / or / xor / nor), and that still's model loads");
+        ComponentMemory m0{};
+        CellState s0 = makeState(0, 0);
+        const ComponentStep k0 = runB(ComponentInputs{}, s0, m0, 4);
+        check(components::bitorOpOf(makeState(0, 0)) == 0 && std::string(bitorStillOf(makeState(0, 0))) == "and" && components::bitorOpOf(k0.state) == 0 && k0.out == 0,
+              "BITOR DEFAULT (C9): a fresh Bitor (control 0) is AND, shows the AND still, and outputs 0 with nothing in");
+        // Two-tick delay: a change seen at tick T publishes at T + 2 on each of the three input faces; the op display follows.
+        auto delayOn = [&](int face, int v0, int v1, int& seenAt, int& opAt) {
+          ComponentInputs in;
+          in.side[dirLeft(0)] = 63; in.side[dirRight(0)] = 21; in.side[dirBack(0)] = 0;
+          ComponentMemory m{};
+          CellState st = makeState(0, 0);
+          in.side[face] = v0;
+          runB(in, st, m, 6);  // settled before
+          const int before = m.out, opBefore = components::bitorOpOf(st);
+          in.side[face] = v1;
+          seenAt = -1; opAt = -1;
+          for (int t = 0; t < 8; ++t) {  // t = 0 is tick T (the tick that first sees the new value)
+            const ComponentStep k = runB(in, st, m, 1);
+            if (seenAt < 0 && k.out != before) seenAt = t;
+            if (opAt < 0 && components::bitorOpOf(k.state) != opBefore) opAt = t;
+          }
+          return m.out;
+        };
+        int sw = 0, ow = 0, se = 0, oe = 0, sb = 0, ob = 0;
+        const int ow1 = delayOn(dirLeft(0), 63, 7, sw, ow);    // west 63 -> 7: AND 21 -> 5
+        const int oe1 = delayOn(dirRight(0), 21, 1, se, oe);   // east 21 -> 1: AND 21 -> 1
+        const int ob1 = delayOn(dirBack(0), 0, 20, sb, ob);    // back 0 -> 20: AND 21 -> OR 63
+        std::printf("  bitor delay: west at T+%d (out %d), east at T+%d (out %d), back at T+%d (out %d, op display at T+%d)\n", sw, ow1, se, oe1, sb, ob1, ob);
+        check(sw == 2 && ow1 == (7 & 21), "BITOR DELAY (C9): a new WEST value changes the output exactly two ticks later");
+        check(se == 2 && oe1 == (63 & 1), "BITOR DELAY (C9): a new EAST value changes the output exactly two ticks later");
+        check(sb == 2 && ob1 == (63 | 21) && ob == 2, "BITOR DELAY (C9): a new BACK (control) value changes the output and the armed-op still exactly two ticks later");
+        {  // restart: change at T and again at T+1 -> output at T+3 (from the most recent change), the latest inputs win.
+          ComponentInputs in;
+          in.side[dirLeft(0)] = 63; in.side[dirRight(0)] = 21;
+          ComponentMemory m{};
+          CellState st = makeState(0, 0);
+          runB(in, st, m, 6);
+          const int before = m.out;  // 21
+          std::vector<int> outs;
+          in.side[dirLeft(0)] = 7;  outs.push_back(runB(in, st, m, 1).out);   // T
+          in.side[dirLeft(0)] = 3;  outs.push_back(runB(in, st, m, 1).out);   // T+1: another change
+          for (int t = 0; t < 4; ++t) outs.push_back(runB(in, st, m, 1).out);  // T+2 .. T+5
+          std::printf("  bitor restart: %d -> T %d, T+1 %d, T+2 %d, T+3 %d, T+4 %d\n", before, outs[0], outs[1], outs[2], outs[3], outs[4]);
+          check(before == 21 && outs[0] == 21 && outs[1] == 21 && outs[2] == 21 && outs[3] == (3 & 21) && outs[4] == (3 & 21),
+                "BITOR DELAY (C9, interpretation): a change at T then another at T+1 updates at T+3 (timer from the most recent change); the latest inputs win");
+        }
+        check(bb->delayTicks(0, 0, 0) == components::kBitorDelayTicks && !bb->queuedOutput(),
+              "BITOR DELAY (C9): the class reports a 2-tick delay and times it itself (no shared release queue on top)");
+      }
+    }
+    {  // live sim: two Dialors drive the operands (48 on the west, 20 on the east); Trace on the front.
+      ChunkMap bw;
+      bw.setRegistry(&blockRegistry());
+      { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; bw.insert(std::move(col)); }
+      const int by = 20;
+      for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) bw.set(x, by - 1, z, kWaferSilicon);
+      bw.set(8, by, 8, kBitor); bw.setState(8, by, 8, makeState(0, 0));
+      bw.set(7, by, 8, kDialor); bw.setState(7, by, 8, makeState(48, 1));  // faces E into the Bitor's west
+      bw.set(9, by, 8, kDialor); bw.setState(9, by, 8, makeState(20, 3));  // faces W into the Bitor's east
+      bw.set(8, by, 7, kRedTrace);
+      cSignalSim bs;
+      bs.scan(bw);
+      const cSignalSim::DirtyFn bnone = [](int, int, int) {};
+      for (int i = 0; i < 8; ++i) bs.tick(bw, 0, 0, 100, bnone);
+      const ComponentMemory* bm = bs.debugMem(8, by, 8);
+      const int liveOut = bm ? int(bm->out) : -1, tr = stValue(bw.getState(8, by, 7));
+      std::printf("  bitor live: 48 AND 20 -> out %d, front Trace %d, state value %d\n", liveOut, tr, stValue(bw.getState(8, by, 8)));
+      check(liveOut == 16 && tr > 0 && stValue(bw.getState(8, by, 8)) == 16,
+            "BITOR LIVE: Dialor 48 (west) AND Dialor 20 (east), nothing on the back -> 16 out the front into the Trace");
+    }
+    check(cComponentModels::instance().find("bitor_and") != nullptr && !cComponentModels::instance().find("bitor_and")->quads.empty(),
+          "BITOR ART: CloudAtlas row B AND still (bitor_and, op readout) loads in the v2 component models");
+    check(cComponentModels::instance().find("bitor_or") && cComponentModels::instance().find("bitor_xor") && cComponentModels::instance().find("bitor_nor") &&
+              !cComponentModels::instance().find("bitor_or")->quads.empty() && !cComponentModels::instance().find("bitor_nor")->quads.empty(),
+          "BITOR ART (C9): the approved row B OR / XOR / NOR stills load beside AND (JD 6:39 AM ET ranges)");
+#ifdef LITHOKRAFT_MODELS_DIR
+    {
+      bool tex = true, res = true;
+      for (int sz : {16, 32, 64, 128}) {
+        const std::string pk = std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/";
+        for (const char* face : {"front", "back", "east", "west", "bottom", "top_and", "top_or", "top_xor", "top_nor"})
+          for (const char* kind : {"base", "tintmask", "input_tintmask", "control_tintmask"}) {
+            const std::string p = pk + "textures/blocks/bitor/bitor_" + face + "_" + kind + ".png";
+            std::string err;
+            const auto im = litholattice::Image::load(p, &err);
+            if (!im || im->width() != sz || im->height() != sz) { tex = false; std::printf("  bitor tex %s: %s\n", p.c_str(), err.c_str()); }
+          }
+        std::ifstream rf(pk + "resources.json", std::ios::binary);
+        std::stringstream rs;
+        rs << rf.rdbuf();
+        const std::string rj = rs.str();
+        res = res && rj.find("\"bitor_top_and_base\": \"textures/blocks/bitor/bitor_top_and_base.png\"") != std::string::npos &&
+              rj.find("\"bitor\": {") != std::string::npos && rj.find("\"tint:bitor_back_base\": \"bitor_back_control_tintmask\"") != std::string::npos &&
+              rj.find("biter") == std::string::npos;
+        for (const char* op : {"or", "xor", "nor"}) {
+          const std::string o(op);
+          res = res && rj.find("\"bitor_top_" + o + "_base\": \"textures/blocks/bitor/bitor_top_" + o + "_base.png\"") != std::string::npos &&
+                rj.find("\"bitor_top_" + o + "_base_tint\": \"textures/blocks/bitor/bitor_top_" + o + "_tintmask.png\"") != std::string::npos &&
+                rj.find("\"tint:bitor_top_" + o + "_base\": \"bitor_top_" + o + "_base_tint\"") != std::string::npos &&
+                rj.find("bitor_B_") == std::string::npos;
+        }
+      }
+      check(tex, "BITOR ART (C9): row B front / back / east / west / bottom and AND / OR / XOR / NOR tops (base + 3 tint masks) in pack_16 / 32 / 64 / 128");
+      check(res, "BITOR ART (C9): every pack's resources.json maps the bitor textures, model faces (back = control mask) and the or / xor / nor tops with their tint masks; no _B duplicates, no 'biter'");
+      bool icons = true;
+      for (int sz : {32, 64, 128}) {
+        std::string err;
+        const auto im = litholattice::Image::load(std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/textures/items/bitor.png", &err);
+        icons = icons && im && im->width() == sz;
+      }
+      check(icons, "BITOR ART: row B item icons at 32 / 64 / 128 (the pack has no 16 icon)");
+    }
+#endif
+  }
+  {  // B9 2026-11-12 (JD Pushor, row B honeycomb face; design session section 8 + CloudAtlas pack README).
+     // STATED: front = resin pushing face (no wire, reads nothing); back / east / west / top / bottom read soft + hard
+     // power; quasi: a hard-powered Pushor soft-powers adjacent Pushors (6 sides); push limit 32.
+     // OPEN (not tested, not sealed): extension distance, spit / push / retract, immovable blocks, resin assemblies.
+    const cCompBehavior* pb = cBehaviorCatalog::get().component(kPushor);
+    const auto pid = blockRegistry().findById("lithokraft:pushor");
+    const BlockDef& pd = blockRegistry().def(kPushor);
+    check(pb != nullptr && pid && *pid == kPushor && pd.name == "Pushor" && roleOf(pd) == SimRole::Pushor && pd.shape == Shape::Cube &&
+              (pd.flags & kDirectional) != 0 && (pd.flags & kInteractive) == 0 && !blockRegistry().findById("lithokraft:pusher") &&
+              !blockRegistry().findById("lithokraft:pistor"),
+          "PUSHOR: lithokraft:pushor registered (Pushor, never Pusher / Pistor) with its behaviour and role; full directional cube, no use");
+    check(components::kPushorPushLimit == 32, "PUSHOR: the stated push limit (32 blocks) is recorded");
+    if (pb) {
+      bool faces = true;
+      for (int f = 0; f < 4; ++f) {
+        auto run = [&](const ComponentInputs& in) { ComponentMemory m{}; return pb->tick(in, makeState(0, f), m); };
+        ComponentInputs none;
+        const ComponentStep k0 = run(none);
+        faces = faces && !stOn(k0.state) && k0.out == 0 && stFacing(k0.state) == f;
+        for (int d : {dirBack(f), dirLeft(f), dirRight(f)}) { ComponentInputs in; in.side[d] = 5; faces = faces && stOn(run(in).state); }
+        ComponentInputs fr; fr.side[f] = kMaxSignal;
+        faces = faces && !stOn(run(fr).state);
+        ComponentInputs tp; tp.top = 3; ComponentInputs vt; vt.pushVert = 9;
+        faces = faces && stOn(run(tp).state) && stOn(run(vt).state);
+      }
+      check(faces, "PUSHOR: back, east, west, top (wire / block above) and bottom (block below) power it; the front pushing face reads nothing");
+      ComponentInputs q; q.pushQuasi = true;
+      ComponentInputs h; h.side[dirBack(0)] = 64; h.pushHard = true;
+      ComponentMemory mq{}, mh{};
+      const ComponentStep kq = pb->tick(q, makeState(0, 0), mq), kh = pb->tick(h, makeState(0, 0), mh);
+      int emits = 0;
+      for (int d = 0; d < 4; ++d) emits += pb->emitToward(d, kh.state, mh);
+      check(stOn(kq.state) && !(stAux(kq.state) & components::kPushorAuxHard) && stOn(kh.state) && (stAux(kh.state) & components::kPushorAuxHard) &&
+                kh.out == 0 && emits == 0,
+            "PUSHOR: quasi power turns it on without making it hard powered; it emits no signal on any side");
+    }
+    {  // live sim: a Dialor drives P1's west face (hard). P2 (east of P1) and P3 (above P1) follow by quasi; P4 (east of P2) does
+       // not (no chain). P5 is fed by a Trace (soft): it powers, but its neighbour P6 stays off.
+      ChunkMap pw;
+      pw.setRegistry(&blockRegistry());
+      { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; pw.insert(std::move(col)); }
+      const int py = 20;
+      for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) pw.set(x, py - 1, z, kWaferSilicon);
+      auto put = [&](int x, int y, int z, BlockId b, CellState s) { pw.set(x, y, z, b); pw.setState(x, y, z, s); };
+      put(7, py, 4, kDialor, makeState(40, 1));   // faces E into P1
+      put(8, py, 4, kPushor, makeState(0, 0));    // P1
+      put(9, py, 4, kPushor, makeState(0, 0));    // P2
+      put(8, py + 1, 4, kPushor, makeState(0, 0)); // P3 (above P1)
+      put(10, py, 4, kPushor, makeState(0, 0));   // P4
+      put(6, py, 10, kDialor, makeState(40, 1));  // faces E into the Trace
+      pw.set(7, py, 10, kRedTrace);
+      put(8, py, 10, kPushor, makeState(0, 0));   // P5
+      put(9, py, 10, kPushor, makeState(0, 0));   // P6
+      put(8, py, 9, kCeramic, 0);                 // the block in front of P5 (front = north)
+      cSignalSim ps;
+      ps.scan(pw);
+      const cSignalSim::DirtyFn pnone = [](int, int, int) {};
+      for (int i = 0; i < 10; ++i) ps.tick(pw, 0, 0, 100, pnone);
+      auto on = [&](int x, int y, int z) { return stOn(pw.getState(x, y, z)); };
+      auto hard = [&](int x, int y, int z) { return (stAux(pw.getState(x, y, z)) & components::kPushorAuxHard) != 0; };
+      std::printf("  pushor live: P1 %d/%d P2 %d/%d P3 %d/%d P4 %d  P5 %d/%d P6 %d (on/hard)\n", on(8, py, 4), hard(8, py, 4), on(9, py, 4), hard(9, py, 4),
+                  on(8, py + 1, 4), hard(8, py + 1, 4), on(10, py, 4), on(8, py, 10), hard(8, py, 10), on(9, py, 10));
+      check(on(8, py, 4) && hard(8, py, 4) && on(9, py, 4) && !hard(9, py, 4) && on(8, py + 1, 4) && !hard(8, py + 1, 4) && !on(10, py, 4),
+            "PUSHOR LIVE: a component driving a Trace face hard-powers it; adjacent Pushors (side and above) follow by quasi, one step only");
+      check(on(8, py, 10) && !hard(8, py, 10) && !on(9, py, 10), "PUSHOR LIVE: a Trace soft-powers a Pushor; a soft-powered Pushor gives no quasi power");
+      check(pw.get(8, py, 9) == kCeramic && pw.get(8, py, 8) == kAir && pw.get(8, py, 10) == kPushor,
+            "PUSHOR LIVE: nothing moves while powered (extension distance is OPEN; no extend / spit / retract in this build)");
+      cSignalSim::LithoStats lst;
+      check(!ps.lithoCompile(pw, 0, py - 1, 0, 15, py + 2, 15, &lst) && !ps.lithoActive(),
+            "PUSHOR: a lithography box holding a Pushor does not compile (vertical / quasi inputs are not on the chip); the live sim keeps it");
+    }
+    check(cComponentModels::instance().find("pushor_retracted") != nullptr && !cComponentModels::instance().find("pushor_retracted")->quads.empty(),
+          "PUSHOR ART: CloudAtlas row B retracted model (honeycomb face) loads in the v2 component models");
+    check(!cComponentModels::instance().find("pushor_extended_base") && !cComponentModels::instance().find("pushor_head"),
+          "PUSHOR ART: the illustrative extended base + head stills are not wired (extension distance OPEN)");
+#ifdef LITHOKRAFT_MODELS_DIR
+    {
+      bool tex = true, res = true;
+      for (int sz : {16, 32, 64, 128}) {
+        const std::string pk = std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/";
+        for (const char* face : {"top", "bottom", "front", "back", "east", "west"})
+          for (const char* kind : {"base", "tintmask"}) {
+            const std::string p = pk + "textures/blocks/pushor/pushor_" + face + "_" + kind + ".png";
+            std::string err;
+            const auto im = litholattice::Image::load(p, &err);
+            if (!im || im->width() != sz || im->height() != sz) { tex = false; std::printf("  pushor tex %s: %s\n", p.c_str(), err.c_str()); }
+          }
+        std::ifstream rf(pk + "resources.json", std::ios::binary);
+        std::stringstream rs;
+        rs << rf.rdbuf();
+        const std::string rj = rs.str();
+        res = res && rj.find("\"pushor_front_base\": \"textures/blocks/pushor/pushor_front_base.png\"") != std::string::npos &&
+              rj.find("\"pushor\": {") != std::string::npos && rj.find("\"tint:pushor_back_base\": \"pushor_back_tintmask\"") != std::string::npos &&
+              rj.find("pushor_extended_") == std::string::npos && rj.find("pushor_head_") == std::string::npos && rj.find("pusher") == std::string::npos;
+      }
+      check(tex, "PUSHOR ART: row B base + tint-mask art for all six faces in pack_16 / 32 / 64 / 128 at pack resolution");
+      check(res, "PUSHOR ART: every pack's resources.json maps the pushor textures and model faces (power tint masks); no extended / head art, no 'pusher'");
+      bool icons = true;
+      for (int sz : {32, 64, 128}) {
+        std::string err;
+        const auto im = litholattice::Image::load(std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/textures/items/pushor.png", &err);
+        icons = icons && im && im->width() == sz;
+      }
+      check(icons, "PUSHOR ART: row B item icons at 32 / 64 / 128 (the pack has no 16 icon)");
+    }
+#endif
+  }
+  {  // B9 2026-11-12 (JD revised Swivelor, row B gear ring + resin mount; design session section 4 + CloudAtlas pack README).
+     // STATED: detents 0 / 16 / 32 / 64, a quarter turn each, 0 = home. OPEN: the detent control face (NO control port;
+     // the four side wells are reserved), connection cap, fine-aim relation. READ-BACK: clockwise wrap of lower targets.
+     // Not tested, not sealed: any turn, control scheme, clearance, collision or assembly behaviour.
+    const cCompBehavior* sb = cBehaviorCatalog::get().component(kSwivelor);
+    const auto sid = blockRegistry().findById("lithokraft:swivelor");
+    const BlockDef& sd = blockRegistry().def(kSwivelor);
+    check(sb != nullptr && sid && *sid == kSwivelor && sd.name == "Swivelor" && roleOf(sd) == SimRole::Swivelor && sd.shape == Shape::Cube &&
+              (sd.flags & kDirectional) != 0 && (sd.flags & kInteractive) == 0 && !blockRegistry().findById("lithokraft:swiveler"),
+          "SWIVELOR: lithokraft:swivelor registered (Swivelor, never Swiveler) with its behaviour and role; full directional cube, no use; one id");
+    check(components::swivelorDetentQuarter(0) == 0 && components::swivelorDetentQuarter(16) == 1 && components::swivelorDetentQuarter(32) == 2 &&
+              components::swivelorDetentQuarter(64) == 3 && components::swivelorDetentQuarter(1) == -1 && components::swivelorDetentQuarter(48) == -1,
+          "SWIVELOR: the stated detents 0 / 16 / 32 / 64 are quarter turns 0..3 (0 = home); other strengths are not detents (OPEN)");
+    if (sb) {
+      bool wells = true;
+      for (int f = 0; f < 4; ++f) {
+        ComponentInputs in;
+        for (int d = 0; d < 4; ++d) in.side[d] = kMaxSignal;
+        in.top = kMaxSignal;
+        ComponentMemory m{};
+        const CellState st0 = makeState(0, f);
+        const ComponentStep k = sb->tick(in, st0, m);
+        int emits = 0;
+        for (int d = 0; d < 4; ++d) emits += sb->emitToward(d, k.state, m);
+        wells = wells && k.state == st0 && k.out == 0 && k.out2 == 0 && emits == 0;
+      }
+      check(wells, "SWIVELOR: the side wells are not a control port -- 64 on every side and on top changes nothing (stays home), emits nothing");
+    }
+    {  // live sim: Dialors drive all four sides, a Trace on top is fed; the Swivelor stays home and nothing around it moves.
+      ChunkMap sw;
+      sw.setRegistry(&blockRegistry());
+      { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; sw.insert(std::move(col)); }
+      const int sy = 20;
+      for (int x = 0; x < 16; ++x) for (int z = 0; z < 16; ++z) sw.set(x, sy - 1, z, kWaferSilicon);
+      auto put = [&](int x, int y, int z, BlockId b, CellState s) { sw.set(x, y, z, b); sw.setState(x, y, z, s); };
+      put(8, sy, 8, kSwivelor, makeState(0, 0));
+      put(8, sy, 7, kDialor, makeState(16, 2));  // faces S into the Swivelor front
+      put(9, sy, 8, kDialor, makeState(32, 3));  // faces W into its east
+      put(8, sy, 9, kDialor, makeState(64, 0));  // faces N into its back
+      put(7, sy, 8, kDialor, makeState(16, 1));  // faces E into its west
+      put(8, sy + 1, 8, kCeramic, 0);            // a block on the top mount (no Resin: nothing is bonded)
+      cSignalSim ss;
+      ss.scan(sw);
+      const cSignalSim::DirtyFn snone = [](int, int, int) {};
+      for (int i = 0; i < 10; ++i) ss.tick(sw, 0, 0, 100, snone);
+      const CellState s1 = sw.getState(8, sy, 8);
+      std::printf("  swivelor live: value %d facing %d (home 0 / N); top block %s\n", stValue(s1), stFacing(s1), sw.get(8, sy + 1, 8) == kCeramic ? "in place" : "MOVED");
+      check(sw.get(8, sy, 8) == kSwivelor && stValue(s1) == 0 && stFacing(s1) == 0 && sw.get(8, sy + 1, 8) == kCeramic,
+            "SWIVELOR LIVE: signals on every side do not turn it (control face OPEN); it stays home and the block on top stays put");
+    }
+    {
+      bool stills = true;
+      for (const char* m : {"swivelor_d00", "swivelor_d16", "swivelor_d32", "swivelor_d64"})
+        stills = stills && cComponentModels::instance().find(m) && !cComponentModels::instance().find(m)->quads.empty();
+      check(stills, "SWIVELOR ART: CloudAtlas row B detent stills d00 / d16 / d32 / d64 (gear ring + resin mount) load in the v2 component models");
+    }
+#ifdef LITHOKRAFT_MODELS_DIR
+    {
+      bool tex = true, res = true;
+      for (int sz : {16, 32, 64, 128}) {
+        const std::string pk = std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/";
+        for (const char* face : {"bottom", "front", "back", "east", "west", "top_d00", "top_d16", "top_d32", "top_d64"})
+          for (const char* kind : {"base", "tintmask"}) {
+            const std::string p = pk + "textures/blocks/swivelor/swivelor_" + face + "_" + kind + ".png";
+            std::string err;
+            const auto im = litholattice::Image::load(p, &err);
+            if (!im || im->width() != sz || im->height() != sz) { tex = false; std::printf("  swivelor tex %s: %s\n", p.c_str(), err.c_str()); }
+          }
+        std::ifstream rf(pk + "resources.json", std::ios::binary);
+        std::stringstream rs;
+        rs << rf.rdbuf();
+        const std::string rj = rs.str();
+        res = res && rj.find("\"swivelor_top_d00_base\": \"textures/blocks/swivelor/swivelor_top_d00_base.png\"") != std::string::npos &&
+              rj.find("\"swivelor\": {") != std::string::npos && rj.find("\"top\": \"swivelor_top_d00_base\"") != std::string::npos &&
+              rj.find("swiveler") == std::string::npos;
+      }
+      check(tex, "SWIVELOR ART: row B art for bottom / front / back / east / west and the four detent tops in pack_16 / 32 / 64 / 128 at pack resolution");
+      check(res, "SWIVELOR ART: every pack's resources.json maps the swivelor textures and model faces (home top d00); no 'swiveler'");
+      bool icons = true;
+      for (int sz : {32, 64, 128}) {
+        std::string err;
+        const auto im = litholattice::Image::load(std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/textures/items/swivelor.png", &err);
+        icons = icons && im && im->width() == sz;
+      }
+      check(icons, "SWIVELOR ART: row B item icons at 32 / 64 / 128 (the pack has no 16 icon)");
+    }
+#endif
+  }
+  {  // B9 2026-11-12 (JD): Resin, ITEM ONLY (look B Pot, CloudAtlas). Id lithokraft:resin = the pack's PROPOSAL (OPEN).
+     // OPEN, recorded as the current state only (update these when JD rules): the resin source block, apply / remove,
+     // bonding into assemblies, assembly limits for Pushor / Swivelor. Nothing here asserts how any of that works.
+    const lithokraft::ItemDef* rz = findItemByStringId("lithokraft:resin");
+    check(rz && rz == findItem(kItemResin) && kItemResin == kFirstItemId + 30 && rz->name == "Resin" && itemDisplayName(kItemResin) == "Resin" &&
+              rz->iconName == "resin" && rz->modelStem == "resin_item",
+          "RESIN: lithokraft:resin (proposed id) is the item Resin at kFirstItemId + 30 (append-only), icon 'resin', model resin_item");
+    auto lower = [](std::string s) { for (char& c : s) c = char(std::tolower(unsigned(c))); return s; };
+    bool wrong = true;
+    for (const char* w : {"lithokraft:resinblock", "lithokraft:resin_block", "lithokraft:resinor", "lithokraft:resin_item", "lithokraft:resin_pot",
+                          "lithokraft:resin_source", "lithokraft:resin_jar", "lithokraft:resin_drop"})
+      wrong = wrong && !findItemByStringId(w) && !blockRegistry().findById(w);
+    int resinItems = 0;
+    for (const lithokraft::ItemDef& d : itemRegistry())
+      if (lower(std::string(d.stringId)).find("resin") != std::string::npos || lower(std::string(d.name)).find("resin") != std::string::npos) ++resinItems;
+    check(wrong && resinItems == 1, "RESIN: one Resin item, spelled Resin; no Resinblock / Resinor / resin_item / pot / jar / drop / source ids");
+    int resinBlocks = 0, applicators = 0;
+    for (size_t b = 1; b < blockRegistry().size(); ++b) {
+      const std::string id = lower(std::string(blockRegistry().idOf(BlockId(b)))), nm = lower(std::string(blockRegistry().def(BlockId(b)).name));
+      if (id.find("resin") != std::string::npos || nm.find("resin") != std::string::npos) ++resinBlocks;
+      if (id.find("applicator") != std::string::npos || id.find("coating") != std::string::npos) ++applicators;
+    }
+    for (const lithokraft::ItemDef& d : itemRegistry()) {
+      const std::string id = lower(std::string(d.stringId));
+      if (id.find("applicator") != std::string::npos || id.find("coating") != std::string::npos) ++applicators;
+    }
+    if (resinBlocks || applicators) std::printf("  resin: %d resin block(s), %d applicator / coating id(s)\n", resinBlocks, applicators);
+    check(resinBlocks == 0 && !blockRegistry().findById("lithokraft:resin"),
+          "RESIN: it is an item, not a block -- no lithokraft:resin block and no block named resin (source block OPEN, out of scope)");
+    const cContentReg& rcontent = blockRegistry().content();
+    const auto reng = rcontent.findItem("lithokraft:resin");
+    check(rz && !rz->isTool && !rz->isWeapon && rz->toolAction == ToolAction::None && rz->projectile.empty() && !rz->startingItem &&
+              placedBlockForItem(kItemResin) == kAir && reng && rcontent.itemDef(*reng).placesBlock == 0 &&
+              itemIconRef(kItemResin) == "item:" + std::to_string(kItemResin) && applicators == 0,
+          "RESIN OPEN (current state): places nothing, no tool action, no coating / applicator ids -- apply / remove / bonding not built yet");
+#ifdef LITHOKRAFT_MODELS_DIR
+    {
+      const auto rl = model::loadModel(std::string(LITHOKRAFT_MODELS_DIR) + "/resin_item.lthm");
+      check(rl.error == model::LoadError::Ok && rl.model.geometry.leafCount() > 0 && !std::filesystem::exists(std::string(LITHOKRAFT_MODELS_DIR) + "/resin_item_B.lthm"),
+            "RESIN ART: the approved B pot model loads from models/resin_item.lthm (one copy, no _B duplicate)");
+      bool spr = true, faces = true, icons = true, man = true, nores = true, only = true;
+      for (int sz : {16, 32, 64, 128}) {
+        const std::string pk = std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/";
+        auto sized = [&](const std::string& rel) {
+          std::string err;
+          const auto im = litholattice::Image::load(pk + rel, &err);
+          const bool ok = im && im->width() == sz && im->height() == sz;
+          if (!ok) std::printf("  resin %s: %s\n", (pk + rel).c_str(), err.c_str());
+          return ok;
+        };
+        spr = spr && sized("textures/items/resin/resin_item.png");
+        for (const char* f : {"top", "bottom", "front", "back", "east", "west"}) faces = faces && sized(std::string("textures/items/resin/model_faces/resin_item_") + f + ".png");
+        if (sz == 16) icons = icons && !std::filesystem::exists(pk + "textures/ui/icons/resin.png");  // the pack has no 16 icon
+        else icons = icons && sized("textures/ui/icons/resin.png");
+        size_t n = 0, nf = 0;
+        std::error_code ec;
+        for (const auto& e : std::filesystem::directory_iterator(pk + "textures/items/resin", ec)) if (e.is_regular_file()) ++n;
+        for (const auto& e : std::filesystem::directory_iterator(pk + "textures/items/resin/model_faces", ec)) if (e.is_regular_file()) ++nf;
+        only = only && n == 1 && nf == 6;
+        auto slurp = [](const std::string& p) { std::ifstream f(p, std::ios::binary); std::stringstream s; s << f.rdbuf(); return s.str(); };
+        const std::string mj = slurp(pk + "manifest.json"), rj = slurp(pk + "resources.json");
+        man = man && mj.find("\"textures/items/resin/resin_item.png\"") != std::string::npos &&
+              mj.find("\"textures/items/resin/model_faces/resin_item_west.png\"") != std::string::npos &&
+              (sz == 16 || mj.find("\"textures/ui/icons/resin.png\"") != std::string::npos);
+        nores = nores && rj.find("resin_item") == std::string::npos && rj.find("\"resin\"") == std::string::npos;
+      }
+      check(spr, "RESIN ART: the approved B pot inventory sprite in pack_16 / 32 / 64 / 128 at pack resolution");
+      check(faces, "RESIN ART: the six held / dropped model face textures in all four packs at pack resolution");
+      check(icons, "RESIN ART: pot icons at 32 / 64 / 128 (textures/ui/icons/resin.png); the pack has no 16 icon and none was made");
+      check(man, "RESIN ART: every pack manifest lists the Resin sprite and model faces (and the icon where one ships)");
+      check(nores, "RESIN: no resources.json entry -- that is the block texture / model table, and Resin is not a block");
+      check(only, "RESIN ART: only look B is installed (one sprite + six faces per pack; no _B duplicates, Jar / Drop, sheets or comparison renders)");
+    }
+#endif
+  }
+  {  // B9 2026-11-12 (JD Via B): lattice cage + auto-elbow. Ids unchanged; the look is derived (nothing stored).
+     // OPEN (not tested, not sealed): elbow id vs corner state (interpretation: derived look on the same ids),
+     // hard power at a mouth, Repeator into a vertical mouth, up/down placement twist, strength-to-glow curve.
+    auto lowerS = [](std::string s) { for (char& c : s) c = char(std::tolower(unsigned(c))); return s; };
+    int viaIds = 0; bool noElbowId = true;
+    for (size_t b = 1; b < blockRegistry().size(); ++b) {
+      if (isVia(BlockId(b))) ++viaIds;
+      const std::string id = lowerS(std::string(blockRegistry().idOf(BlockId(b))));
+      if (id.find("elbow") != std::string::npos || id.find("via_corner") != std::string::npos) noElbowId = false;
+    }
+    for (const char* w : {"lithokraft:red_via_elbow", "lithokraft:blue_via_elbow", "lithokraft:via_elbow", "lithokraft:via", "lithokraft:red_via_corner"})
+      noElbowId = noElbowId && !blockRegistry().findById(w);
+    const auto rvi = blockRegistry().findById("lithokraft:red_via"), bvi = blockRegistry().findById("lithokraft:blue_via");
+    check(rvi && bvi && *rvi == kRedVia && *bvi == kBlueVia && viaIds == 6 && noElbowId && isPaletteHidden(kRedViaX) && !isPaletteHidden(kRedVia),
+          "VIA B: ids unchanged (red_via / blue_via + the existing hidden side orientations); no elbow / corner id invented");
+    bool straight = true, elbows = true;
+    for (const char* m : {"via_single", "via_top", "via_bottom", "via_mid"}) straight = straight && cComponentModels::instance().find(m) && !cComponentModels::instance().find(m)->quads.empty();
+    for (const char* m : {"via_elbow_single", "via_elbow_upjoint", "via_elbow_sidejoint", "via_elbow_mid"}) elbows = elbows && cComponentModels::instance().find(m) && !cComponentModels::instance().find(m)->quads.empty();
+    check(straight, "VIA B ART: lattice-cage straight stills single / top / bottom / mid load (shared by red and blue)");
+    check(elbows, "VIA B ART: the four elbow stills load (used only by the derived L look; no placeable elbow)");
+    const auto& look = blockAppearance();
+    check(look.shapedRender(blockRegistry().def(kRedVia)) && look.shapedRender(blockRegistry().def(kBlueVia)) && look.shapedRender(blockRegistry().def(kRedViaX)) &&
+              look.shapedRender(blockRegistry().def(kBlueViaZ)) && !cComponentModels::instance().find("red_via_idle") && !cComponentModels::instance().find("blue_via_idle"),
+          "VIA B: red and blue vias (all orientations) draw from the lattice-cage models; the slim-tube look is no longer live");
+    ChunkMap vw;
+    vw.setRegistry(&blockRegistry());
+    { auto col = std::make_unique<ChunkColumn>(); col->cx = 0; col->cz = 0; vw.insert(std::move(col)); }
+    const int vy = 20;
+    auto vl = [&](int x, int y, int z) {
+      return viaLook(vw.get(x, y, z), vw.getState(x, y, z), [&](int dx, int dy, int dz) { return vw.get(x + dx, y + dy, z + dz); },
+                     [&](int dx, int dy, int dz) { return vw.getState(x + dx, y + dy, z + dz); });
+    };
+    auto is = [](const ViaLook& L, const char* m) { return L.model && std::string(L.model) == m; };
+    vw.set(1, vy, 1, kRedVia);  // lone
+    for (int y = vy; y < vy + 3; ++y) vw.set(4, y, 1, kRedVia);  // stack of 3
+    vw.set(7, vy, 1, kRedVia); vw.set(7, vy + 1, 1, kBlueVia);   // red under blue: no merge
+    check(is(vl(1, vy, 1), "via_single") && !vl(1, vy, 1).elbow && vl(1, vy, 1).up == 2 && is(vl(4, vy, 1), "via_bottom") && is(vl(4, vy + 1, 1), "via_mid") &&
+              is(vl(4, vy + 2, 1), "via_top") && is(vl(7, vy, 1), "via_single") && is(vl(7, vy + 1, 1), "via_single"),
+          "VIA B: straight stack variants (single / bottom / mid / top); a different colour keeps its mouths");
+    // L: side run along X into a vertical run. Corner = the vertical via the sim links both ways.
+    vw.set(2, vy, 5, kRedViaX); vw.set(3, vy, 5, kRedVia); vw.set(3, vy + 1, 5, kRedVia);
+    const ViaLook c = vl(3, vy, 5), x0 = vl(2, vy, 5);
+    std::printf("  via L corner: %s up %d south %d arms %d; side via %s up %d\n", c.model ? c.model : "-", c.up, c.south, c.arms, x0.model ? x0.model : "-", x0.up);
+    check(c.elbow && is(c, "via_elbow_mid") && c.up == 2 && c.south == 1 && is(vl(3, vy + 1, 5), "via_top") && !x0.elbow && is(x0, "via_bottom") && x0.up == 0 &&
+              vw.get(3, vy, 5) == kRedVia,
+          "VIA B: an L of same-colour vias shows the elbow at the corner (still the plain Red Via block, no placed elbow); its arms are joints");
+    vw.set(2, vy, 5, kAir);
+    const bool brokeSide = !vl(3, vy, 5).elbow && is(vl(3, vy, 5), "via_bottom");
+    vw.set(2, vy, 5, kRedViaX); vw.set(3, vy + 1, 5, kAir);
+    const bool brokeUp = !vl(3, vy, 5).elbow && is(vl(3, vy, 5), "via_single");
+    check(brokeSide && brokeUp, "VIA B: breaking the L (either arm) puts the corner back to the straight still");
+    vw.set(2, vy, 9, kBlueViaX); vw.set(3, vy, 9, kBlueVia); vw.set(3, vy + 1, 9, kBlueVia);
+    vw.set(2, vy, 12, kBlueViaX); vw.set(3, vy, 12, kRedVia); vw.set(3, vy + 1, 12, kRedVia);
+    check(vl(3, vy, 9).elbow && is(vl(3, vy, 9), "via_elbow_mid") && !vl(3, vy, 12).elbow, "VIA B: blue L elbows the same way; a blue side run against a red riser does not");
+    vw.set(10, vy, 10, kRedVia); vw.set(9, vy, 10, kRedViaX); vw.set(10, vy, 11, kRedViaZ);  // flat L through a vertical via
+    const ViaLook hz = vl(10, vy, 10);
+    check(hz.elbow && hz.up == 1 && hz.south == 4, "VIA B: a flat L (X run + Z run meeting at a vertical via) elbows too");
+    vw.set(14, vy - 1, 14, kRedVia); vw.set(14, vy, 14, kRedVia); vw.set(14, vy + 1, 14, kRedVia); vw.set(13, vy, 14, kRedViaX);  // T
+    vw.set(6, vy, 14, kRedVia); vw.set(5, vy, 14, kRedViaX); vw.set(7, vy, 14, kRedViaX);  // straight-through with two side runs
+    vw.set(11, vy, 2, kRedVia); vw.set(10, vy, 2, kRedViaX); vw.set(12, vy, 2, kRedViaX); vw.set(11, vy, 3, kRedViaZ);  // three arms
+    check(!vl(14, vy, 14).elbow && is(vl(14, vy, 14), "via_mid") && !vl(6, vy, 14).elbow && !vl(11, vy, 2).elbow,
+          "VIA B: no T / Y / cross look -- three arms or opposite arms keep the straight still");
+    bool rot = true; int pairs = 0;
+    const foliage::Mesh* em = cComponentModels::instance().find("via_elbow_mid");
+    for (int a = 0; a < 6; ++a)
+      for (int b = 0; b < 6; ++b) {
+        if (a / 2 == b / 2) continue;
+        ++pairs;
+        foliage::Quad top{}, sth{};
+        top.lo[0] = 4; top.hi[0] = 12; top.lo[1] = 16; top.hi[1] = 16; top.lo[2] = 4; top.hi[2] = 12; top.face = 2;
+        sth.lo[0] = 4; sth.hi[0] = 12; sth.lo[1] = 4; sth.hi[1] = 12; sth.lo[2] = 16; sth.hi[2] = 16; sth.face = 4;
+        rot = rot && viaRotated(top, a, b).face == a && viaRotated(sth, a, b).face == b;
+        if (em) for (const foliage::Quad& q : em->quads) {
+          const foliage::Quad r = viaRotated(q, a, b);
+          for (int k = 0; k < 3; ++k) rot = rot && r.lo[k] >= 0 && r.hi[k] <= 16 && r.lo[k] <= r.hi[k];
+        }
+      }
+    check(rot && pairs == 24 && em, "VIA B: the canonical elbow (open +Y / +Z) turns into all 12 adjacent-face turns, open ends on the arms, inside the cell");
+#ifdef LITHOKRAFT_MODELS_DIR
+    {
+      bool tex = true, res = true, man = true, icons = true, clean = true;
+      std::vector<std::string> keys;
+      for (const char* f : {"top", "bottom", "side"}) for (const char* v : {"single", "top", "bottom", "mid"}) keys.push_back(std::string(f) + "_" + v);
+      for (const char* f : {"up", "down", "east", "west", "north", "south"}) for (const char* v : {"single", "upjoint", "sidejoint", "mid"}) keys.push_back(std::string("elbow_") + f + "_" + v);
+      for (int sz : {16, 32, 64, 128}) {
+        const std::string pk = std::string(LITHOKRAFT_MODELS_DIR) + "/../packs/pack_" + std::to_string(sz) + "/";
+        auto slurp = [](const std::string& p) { std::ifstream f(p, std::ios::binary); std::stringstream s; s << f.rdbuf(); return s.str(); };
+        const std::string rj = slurp(pk + "resources.json"), mj = slurp(pk + "manifest.json");
+        for (const std::string& k : keys)
+          for (const char* kind : {"base", "tintmask"}) {
+            const std::string rel = "textures/blocks/via/via_" + k + "_" + kind + ".png";
+            std::string err;
+            const auto im = litholattice::Image::load(pk + rel, &err);
+            if (!im || im->width() != sz || im->height() != sz) { tex = false; std::printf("  via tex %s: %s\n", (pk + rel).c_str(), err.c_str()); }
+            man = man && mj.find("\"" + rel + "\"") != std::string::npos;
+          }
+        // pack_16 has no red_via / blue_via model entry or HUD icon (pre-existing; it falls back), so it gets textures only.
+        const bool hasVia = rj.find("\"red_via\": {") != std::string::npos;
+        res = res && (hasVia || sz == 16);
+        for (const std::string& k : keys)
+          res = res && rj.find("\"via_v2_" + k + "\": \"textures/blocks/via/via_" + k + "_base.png\"") != std::string::npos &&
+                (!hasVia || rj.find("\"tint:via_v2_" + k + "\": \"via_v2_" + k + "_tint\"") != std::string::npos);
+        if (sz == 16) icons = icons && !std::filesystem::exists(pk + "textures/items/via.png");
+        else icons = icons && std::filesystem::exists(pk + "textures/items/via.png");
+        if (sz != 16) icons = icons && std::filesystem::exists(pk + "textures/ui/icons/red_via.png") && std::filesystem::exists(pk + "textures/ui/icons/blue_via.png");
+        icons = icons && !std::filesystem::exists(pk + "textures/items/via_elbow.png");
+        clean = clean && !std::filesystem::exists(pk + "preview_tinted") && !std::filesystem::exists(pk + "textures/blocks/via/via_B_top_single_base.png");
+      }
+      check(tex, "VIA B ART: straight (top / bottom / side x 4 variants) and elbow (6 faces x 4 states) art, base + tint mask, in pack_16 / 32 / 64 / 128");
+      check(res, "VIA B ART: every resources.json names the via_v2 textures and binds their channel tint masks on red_via and blue_via (pack_16: textures only, it has no via model entry)");
+      check(man, "VIA B ART: every pack manifest lists the Via B textures");
+      check(icons, "VIA B ART: lattice icon at 32 / 64 / 128 (no 16 icon made); the red / blue HUD icons stay; no elbow item icon");
+      check(clean, "VIA B ART: no _B duplicates, preview_tinted folders, sheets or renders in the game packs");
+    }
+#endif
   }
   {  // 2026-11-04 (JD t4304u): component delays through the shared cScheduledOutput line (exact tick counts).
     struct D { SimRole r; BlockId id; int want; const char* name; };

@@ -23,6 +23,10 @@ struct SilicaShadeCache::Impl {
   // Archie Phase 3c: COW map, atomic publish (mesher hot path, no mutex).
   using Map = std::unordered_map<int64_t, SilicaShade>;
   std::atomic<std::shared_ptr<const Map>> cache_{std::make_shared<const Map>()};
+  // Cache bound: past this many chunks, a publish starts from an empty map
+  // instead of copying the whole one (values are a pure function of the
+  // chunk coords, so cleared entries just recompute on their next lookup).
+  static constexpr size_t kMaxEntries = 4096;
 
   SilicaShade blend(int cx, int cz) {
     // The sanctioned sibling query: regenerate the chunk's column maps
@@ -57,7 +61,9 @@ SilicaShade SilicaShadeCache::shade(int cx, int cz) {
     auto snap = std::atomic_load_explicit(&impl_->cache_, std::memory_order_acquire);
     if (const auto it = snap->find(k); it != snap->end()) return it->second;
     const SilicaShade fresh = impl_->blend(cx, cz);
-    auto next = std::make_shared<Impl::Map>(*snap);
+    auto next = snap->size() >= Impl::kMaxEntries
+                    ? std::make_shared<Impl::Map>()
+                    : std::make_shared<Impl::Map>(*snap);
     const auto [it, inserted] = next->emplace(k, fresh);
     (void)inserted;
     std::shared_ptr<const Impl::Map> expected = snap;

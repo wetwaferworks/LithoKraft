@@ -5,8 +5,7 @@
 #include <functional>
 #include <string>
 #include <vector>
-#include "litholattice/ui/dialog.h"
-#include "litholattice/ui/ui_root.h"
+#include "lithokraft/game/ui_widgets.h"
 #include "lithokraft/game/cWorldCatalog.h"
 
 namespace lithokraft {
@@ -16,14 +15,14 @@ class cWorldPicker final {
   /// world = catalog index; spawn = "" (continue here), "spawn" (world default) or a named spawn.
   using PickFn = std::function<void(int world, const std::string& spawn)>;
   /// `onFolder` (2026-10-31, Load World): adds "Open world folder..." (the OS folder dialog).
-  void open(litholattice::ui::cUiRoot& ui, float k, int currentWorld, std::vector<std::string> currentSpawns, PickFn onPick,
+  void open(ui::cUiRoot& ui, float k, int currentWorld, std::vector<std::string> currentSpawns, PickFn onPick,
             std::function<void()> onFolder = {});
   bool isOpen() const { return dlg_ != nullptr; }
 
  private:
   void showSpawns(int world);
-  litholattice::ui::cDialog* dlg_ = nullptr;
-  litholattice::ui::cWidget* spawnCol_ = nullptr;
+  ui::cDialog* dlg_ = nullptr;
+  ui::cWidget* spawnCol_ = nullptr;
   int current_ = -1;
   float k_ = 1.f;
   std::vector<std::string> currentSpawns_;

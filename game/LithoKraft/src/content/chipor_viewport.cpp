@@ -58,13 +58,12 @@ std::vector<MicroCell> demoModelCells() {
 }
 
 std::vector<MicroCell> loadModelCells(std::string_view name) {
-  // Mutex-guarded cache: the mesher calls this on worker threads and the
-  // .lthm load does file I/O, so each distinct model loads exactly once.
-  static litholattice::cAtomicGate mutex;
-  static std::map<std::string, std::vector<MicroCell>, std::less<>> cache;
+  // MUTEX-FREE (scratch, 2026-11-11, JD t5192u): single-owner per thread. Each mesher worker owns
+  // its own cache (thread_local), so no cache entry is ever shared and no gate is needed. A model is
+  // loaded at most once per worker thread (deterministic: same file -> same cells on every thread).
+  thread_local std::map<std::string, std::vector<MicroCell>, std::less<>> cache;
   const std::string key(name);
   {
-    litholattice::cGateGuard<litholattice::cAtomicGate> lock(mutex);
     const auto it = cache.find(key);
     if (it != cache.end()) return it->second;
   }
@@ -81,10 +80,7 @@ std::vector<MicroCell> loadModelCells(std::string_view name) {
     // when the file is absent (e.g. a shipping build without the source tree).
     if (cells.empty() && key == kDefaultModel) cells = demoModelCells();
   }
-  {
-    litholattice::cGateGuard<litholattice::cAtomicGate> lock(mutex);
-    cache[key] = cells;
-  }
+  cache[key] = cells;
   return cells;
 }
 

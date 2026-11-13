@@ -186,10 +186,17 @@ class cSignalSim {
   int debugInputFrom(const ChunkMap& w, int x, int y, int z, int d) const { return inputFrom(w, x, y, z, d); }
   const ComponentMemory* debugMem(int x, int y, int z) const { auto it = comps_.find(packPos(x, y, z)); return it == comps_.end() ? nullptr : &it->second.mem; }
   // 2026-11-01 (JD placement spikes): wireBelow = a wire sits at (x,y-1,z). Lets a non-wire edit keep the
-  // flood topology (only that wire's links can see this cell's kCutsWire). LL_EDIT_LOCAL=0 kill.
+  // flood topology (only that wire's links can see this cell's climb-cut property). LL_EDIT_LOCAL=0 kill.
   void onBlockChanged(int x, int y, int z, BlockId now, bool wireBelow);
   // cPlayer chunk + radius: components outside the radius are frozen.
   void tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty);
+  /// 2026-11-07 (JD ruling): placement binding for Catchor / SignalTransmittor.
+  /// A component registered since the last cycle (placement, edit, or scan) that
+  /// is still unwired (aux mode 3) binds ONCE here, at the head of the cycle, to
+  /// the first Trace touching a side. Power/unpower transitions NEVER bind or
+  /// rebind: the tick-time auto-bind is retired, so a binding can only ever be
+  /// created by a placement/edit, and afterwards only player use modifies it.
+  void applyPlacementBinds(ChunkMap& w, const DirtyFn& dirty);
 
   // ---- Timing Handshake surface (hs-design Ãƒâ€šÃ‚Â§3.2) ----
   // tick() is reassembled from exactly these pieces, in this order, so the
@@ -406,6 +413,7 @@ class cSignalSim {
   int inputFrom(const ChunkMap& w, int x, int y, int z, int dir) const;  // signal arriving from neighbour in dir
   int emitToward(const ChunkMap& w, int x, int y, int z, int towardDir) const;  // component at xyz -> dir
   std::unordered_set<int64_t> torches_, wires_, lamps_;
+  std::unordered_set<int64_t> bindPending_;  // 2026-11-07 (JD): Catchor/Transmittor keys registered since last cycle, awaiting their one placement bind
   std::unordered_map<int64_t, Comp> comps_;
   // PlayL2: dense Comp* parallel to a sorted all-keys snapshot (compsGen_). Mount collect,
   // seed gather, and sharded tick walk contiguous pointers instead of hashing every key.
@@ -433,7 +441,8 @@ class cSignalSim {
   std::unordered_map<int64_t, size_t> compRecIdx_;
   std::vector<int64_t> settleCand_;
   uint64_t settleIterTotal_ = 0, settleCapHits_ = 0;
-  bool gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int z, bool fastInputs, bool publish, ComponentInputs& in);
+  bool gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int z, bool fastInputs, bool publish, ComponentInputs& in,
+                    std::vector<JammerZone>* jammerSink = nullptr);  // bug hunt #13: sharded ticks pass a per-shard sink; nullptr publishes straight to jammers_ (serial path only)
   void wakeSchedule(int64_t key, uint64_t delta);
   void connProbe(ChunkMap& w, const DirtyFn& dirty);  // PlayM: LL_CONN_PROBE save/reload census
   bool sameTick_ = envSameTick();  // PlayM: same-tick settle (setSameTick)
@@ -509,6 +518,7 @@ private:
   std::vector<std::vector<CompNext>> shardNext_;
   std::vector<std::vector<std::pair<int64_t, uint64_t>>> shardWake_;  // key,delta — merged after barrier
   std::vector<std::vector<std::pair<int64_t, CompSnap>>> shardSnap_;  // sameTick snaps — merged after barrier
+  std::vector<std::vector<JammerZone>> shardJammers_;               // bug hunt #13: jammer zones per shard — published serially after the barrier (cJammerReg::next_ is sim-thread-only)
   std::vector<size_t> shardTicked_;
   std::vector<size_t> shardOor_;
   std::array<std::vector<int64_t>, kMaxSignal + 1> buckets_;  // BFS work lists by strength

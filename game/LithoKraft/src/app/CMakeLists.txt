@@ -21,7 +21,7 @@ else()
   target_sources(lithokraft PRIVATE vulkan_stub_web.cpp)
   # Purge stage 1 (2026-10-28): the page-layer imports (lk_web.h, the
   # lk_gl* table, the lk_webio verbs) are declared in C++ with import
-  # annotations and provided at instantiation by lkboot.js — no JS
+  # annotations and provided at instantiation by lkboot.js â€” no JS
   # library registers them, so the driver's glue symbol checker must
   # not error on them. A genuinely missing import still fails loudly:
   # lkboot refuses instantiation, and the build's import census gate
@@ -46,8 +46,14 @@ endif()
 target_compile_definitions(lithokraft PRIVATE LITHOKRAFT_VERSION="${PROJECT_VERSION}"
                           LITHOKRAFT_SOURCE_DIR="${LithoKraft_SOURCE_DIR}"
                           LITHOKRAFT_ENGINE_ASSETS_DIR="${LithoLattice_SOURCE_DIR}/assets")
-set_target_properties(lithokraft PROPERTIES OUTPUT_NAME LithoKraft
-                      RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+option(LK_RECORDER_BUILD "Name the game exe LithoKraft-Recorder (separate recorder builds)" OFF)
+if(LK_RECORDER_BUILD)
+  set_target_properties(lithokraft PROPERTIES OUTPUT_NAME LithoKraft-Recorder
+                        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+else()
+  set_target_properties(lithokraft PROPERTIES OUTPUT_NAME LithoKraft
+                        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()
 if(LITHOKRAFT_DEV_BUILD)
   target_compile_definitions(lithokraft PRIVATE LITHOKRAFT_DEV_SCRIPTS_DIR="${LithoKraft_SOURCE_DIR}/scripts")
 endif()
@@ -140,6 +146,26 @@ add_executable(city_capture city_capture.cpp)
 target_link_libraries(city_capture PRIVATE lithokraft_game)
 set_target_properties(city_capture PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 litholattice_module_options(city_capture)
+
+# FrameHashRecorder contract self-test (tick-paced hashes.txt; Data 2026-11-09).
+# Headless; expected FAIL until the recorder stub is replaced by the real sink.
+add_executable(lithokraft_frame_hash_selftest frame_hash_recorder_selftest_main.cpp)
+target_link_libraries(lithokraft_frame_hash_selftest PRIVATE lithokraft_game)
+set_target_properties(lithokraft_frame_hash_selftest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+litholattice_module_options(lithokraft_frame_hash_selftest)
+add_test(NAME lithokraft_frame_hash_selftest COMMAND lithokraft_frame_hash_selftest WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+
+# FrameHashRecorder demo capture (headless software renderer; does not replace LithoKraft.exe).
+add_executable(frame_hash_demo_capture frame_hash_demo_capture.cpp)
+target_link_libraries(frame_hash_demo_capture PRIVATE lithokraft_game)
+set_target_properties(frame_hash_demo_capture PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+litholattice_module_options(frame_hash_demo_capture)
+
+add_executable(frame_hash_verify frame_hash_verify.cpp)
+target_link_libraries(frame_hash_verify PRIVATE lithokraft_game)
+set_target_properties(frame_hash_verify PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+litholattice_module_options(frame_hash_verify)
 # Texture generator: builds block textures from assets/texture_recipes/*.ltxr
 # into a pack (not a ctest entry; run manually per pack size, e.g.
 # ./texture_gen --recipes ../game/LithoKraft/assets/texture_recipes --pack ../game/LithoKraft/assets/packs/pack_64 --size 64).

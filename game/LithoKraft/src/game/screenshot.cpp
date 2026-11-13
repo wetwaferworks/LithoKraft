@@ -149,9 +149,10 @@ bool writeFileBytes(const std::string& path,
   }
   const size_t n =
       std::fwrite(bytes.data(), 1, bytes.size(), f);
-  const bool ok = n == bytes.size() && std::fclose(f) == 0;
+  const bool wrote = n == bytes.size();
+  const bool closed = std::fclose(f) == 0;
+  const bool ok = wrote && closed;
   if (!ok) {
-    std::fclose(f);
     if (err) *err = "write failed for '" + path + "'";
     return false;
   }

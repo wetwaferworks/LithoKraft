@@ -69,9 +69,15 @@ extern "C" { __declspec(dllexport) DWORD NvOptimusEnablement = 1; __declspec(dll
 #include "perf_headless.h"
 #include "BenchSampleGate.h"  // bench steady-state gate (JD 2026-10-30)
 static std::string g_frameDumpDir;  // --frame-dump DIR (showcase capture)
+static std::string g_frameHashDir;  // --frame-hash DIR (tick-paced hashes.txt)
+static int g_fhCamPresent = 0;  // shared present ordinal for deterministic bench camera
 #include "lithokraft/game/FrameDumpHub.h"       // showcase --frame-dump
+#include "lithokraft/game/McpDisplayVision.h"   // SCRATCH vulkfb: opt-in display-framebuffer vision (LL_MCP_DISPLAY_VISION=1)
 #include "lithokraft/game/cWorldConfigBuilder.h"  // 2026-10-31 (JD): in-process Load World
 #include "lithokraft/game/FrameVideoEncoder.h"
+#include "lithokraft/game/FrameHashRecorder.h"  // --frame-hash DIR (tick-paced hashes.txt)
+static lithokraft::cFrameHashRecorder* g_frameHashRec = nullptr;  // --frame-hash stepped sync
+#include "litholattice/render/ground_pulse.h"  // --frame-hash: pin fp.timeSec to sim time
 #include "handshake_test.h"
 #include "control_latency.h"
 #include "control_stream_test.h"
@@ -98,6 +104,7 @@ static std::string g_frameDumpDir;  // --frame-dump DIR (showcase capture)
 #include "litholattice/platform/window.h"
 #include "litholattice/render/pbr_materials.h"
 #include "litholattice/render/renderer.h"
+#include "litholattice/render/overlay_geometry.h"  // D9: snapshotHudStreams (render-worker HUD snapshot)
 #include "litholattice/mcp/server.h"  // cMcpServer + IStdioTransport (--mcp-stdio, P2c F-M9)
 #include "litholattice/render/frame_pacer.h"  // cFramePacer (render.fps_cap drive, D-M3)
 #include "litholattice/render/software_presenter.h"
@@ -176,7 +183,9 @@ class cMcpStdioTransport final : public litholattice::mcp::IStdioTransport {
   }
 
   void writeLine(std::string_view line) override {
-    ::litholattice::cGateGuard<::litholattice::cAtomicGate> lk(writeMutex_);
+    // MUTEX-FREE (scratch, 2026-11-11, JD t5192u): single-owner phase. The only caller is
+    // cMcpServer::runStdio's read->handle->write loop on the one MCP stdio thread, so the gate guarded
+    // nothing that a second thread could reach. (POSIX build only; Windows uses cFdStdioTransport.)
     std::string out(line);
     out.push_back('\n');
     const char* p = out.data();
@@ -196,7 +205,6 @@ class cMcpStdioTransport final : public litholattice::mcp::IStdioTransport {
   int outFd_;
   std::atomic<bool> stop_{false};
   std::string buffer_;
-  ::litholattice::cAtomicGate writeMutex_;
 };
 #endif  // !_WIN32
 
@@ -255,20 +263,20 @@ std::vector<std::filesystem::path> scanMods(const char* argv0) {
     break;
   }
   // Fail-closed key hygiene (M3, 2026-10-26): only JD's designated shipping
-  // key may ship. In release builds any other baked key — retired test,
-  // workstation dev, or unknown — is a hard boot refusal; in debug it's a
+  // key may ship. In release builds any other baked key ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â retired test,
+  // workstation dev, or unknown ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â is a hard boot refusal; in debug it's a
   // loud warning (dev loop). Runs before the mods/ early-return below so a
   // stock install can't dodge it.
   if (litholattice::assets::bakedKeyIsTestKey()) {
 #ifdef NDEBUG
     // Genuine boot refusal (not just "no mods"): returning an empty pack list
     // would let the game boot normally, defeating the fail-closed intent.
-    logError("FATAL: baked-in public key is not JD's shipping key (it is: %s) — refusing to boot a release build. "
+    logError("FATAL: baked-in public key is not JD's shipping key (it is: %s) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â refusing to boot a release build. "
              "Install JD's real key (see mod_signature.h) and rebuild.",
              litholattice::assets::bakedKeyDescription());
     std::exit(1);
 #else
-    logError("WARNING: baked-in public key is not JD's shipping key (it is: %s) — mods will verify against it. "
+    logError("WARNING: baked-in public key is not JD's shipping key (it is: %s) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â mods will verify against it. "
              "Replace before beta (see mod_signature.h).",
              litholattice::assets::bakedKeyDescription());
 #endif
@@ -279,14 +287,14 @@ std::vector<std::filesystem::path> scanMods(const char* argv0) {
   // structure can verify Trusted.
   litholattice::procgen::cStructureReg::instance().setTrustedPublicKeyHex(
       litholattice::assets::kBakedPublicKeyHex);
-  // Note: no mods/ directory is NOT an early return — the seal decision below must
+  // Note: no mods/ directory is NOT an early return ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the seal decision below must
   // still run (release with zero mods seals, fail closed). An empty ModSet falls
   // through to the same decision logic.
   const bool haveModsDir = fs::is_directory(exeDir / "mods", ec);
-  if (!haveModsDir) logInfo("mods: no mods/ directory — continuing with zero mods (seal decision still applies)");
+  if (!haveModsDir) logInfo("mods: no mods/ directory ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â continuing with zero mods (seal decision still applies)");
   // Containment (P1b, Appendix E M1, layer 2): loadModDirectory already
   // skips a single hostile mod with an error entry, but the boot boundary
-  // catches anything that still escapes — a crafted mod folder must never
+  // catches anything that still escapes ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â a crafted mod folder must never
   // abort boot; on a catastrophic scan failure we continue with zero mods
   // (and the seal decision below still applies, fail-closed).
   ModSet set;
@@ -294,9 +302,9 @@ std::vector<std::filesystem::path> scanMods(const char* argv0) {
     try {
       set = loadModDirectory(exeDir / "mods", {engine});
     } catch (const std::exception& ex) {
-      logError("mods: mod scan threw (%s) — continuing with zero mods", ex.what());
+      logError("mods: mod scan threw (%s) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â continuing with zero mods", ex.what());
     } catch (...) {
-      logError("mods: mod scan threw an unknown exception — continuing with zero mods");
+      logError("mods: mod scan threw an unknown exception ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â continuing with zero mods");
     }
   }
   for (const std::string& e : set.errors) logError("mods: %s", e.c_str());
@@ -321,11 +329,11 @@ std::vector<std::filesystem::path> scanMods(const char* argv0) {
       else if (m.signatureStatus == SignatureStatus::Verified)
         logInfo("mods: '%s' signature verified", m.id.c_str());
       // 2026-10-18 (JD, default-ON): a loaded unofficial mod also gets its
-      // provenance line at WARN in the boot log — elevate + flag, never
+      // provenance line at WARN in the boot log ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â elevate + flag, never
       // block. A mod in this set is Verified or Unsigned (Invalid signatures
       // are refused upstream by loadModDirectory and never load). The
       // mod.json schema has no provenance field, so an unsigned mod is
-      // labeled Community — the one label boot can truthfully give; the
+      // labeled Community ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the one label boot can truthfully give; the
       // SelfMade / AiAssisted lines wait in modWarnings.h for a schema field.
       if (m.signatureStatus == SignatureStatus::Unsigned)
         logWarn("mods: '%s' %s", m.id.c_str(),
@@ -444,7 +452,7 @@ struct Display {
 // Window + renderer for `backend` ("software", "gl33" or "vulkan"). Vulkan falls back to
 // OpenGL 3.3 with a log line when the loader, a device or any init step is missing (its window
 // is recreated for GL). Software renders on the CPU into its framebuffer; the window is still
-// created for OpenGL, whose context the presenter borrows purely as the blit mechanism — if
+// created for OpenGL, whose context the presenter borrows purely as the blit mechanism ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â if
 // that present path cannot be built, software falls back to gl33 the same loud way.
 Display createDisplay(const std::string& backend, bool vsync, bool validation, const std::string& present, const DisplayDesc& disp,
                       const std::string& vkArena, bool glArena, int swapImages = 0) {
@@ -557,11 +565,11 @@ double percentile(std::vector<double>& v, double q) {
 // 2026-10-18 (JD): wheel-ink rendering for the rolling build counter's startup
 // line. Even-index wheels ink muted lavender, odd-index wheels warm gray, and
 // any wheel that wrapped on the build that produced this binary inks brand
-// orange (SelectOR bus orange) — the per-wheel ink is computed by
+// orange (SelectOR bus orange) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the per-wheel ink is computed by
 // tools/build_counter.py at roll time and carried in the generated header
 // (kJdBuildCounterWheelInk). Ink is a console garnish only: the startup line
 // carries ANSI truecolor when stdout is a real terminal (NO_COLOR honoured);
-// pipes and captures — every bench and gate — keep the exact plain decimal
+// pipes and captures ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â every bench and gate ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â keep the exact plain decimal
 // string. (Where a log file is open in an interactive run it receives the same
 // inked line; the plain string remains the canonical value everywhere else.)
 static bool jdConsoleColor() {
@@ -604,6 +612,7 @@ struct RenderWorker {
       std::vector<Page> pages;
       uint64_t pagesVer = ~0ull;
       std::atomic<bool> lost{false};
+      ::litholattice::HudStreamSnapshot hudOwn;  // D9 flicker fix: the job's own copies of the HUD streams
       void loop() {
         ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m);
         for (;;) {
@@ -636,6 +645,9 @@ struct RenderWorker {
         if (shotArmed) { litholattice::threeway::RendererGuard rg; post(); shotArmed = false; }
         else if (pending && pending()) shotArmed = true;
         job = fp;
+        // D9 (JD flicker, 2026-11-12): the job must not borrow the game's HUD layers past this call... main
+        // paints the next frame into them in place while this job renders. Copy (on change) and repoint.
+        ::litholattice::snapshotHudStreams(fp, job, hudOwn);
         const int64_t pc0 = ph0 ? ::litholattice::tickprof::nowNs() : 0;
         quads.assign(fp.spriteQuads, fp.spriteQuads + (fp.spriteQuads ? fp.spriteQuadCount : 0));
         job.spriteQuads = quads.empty() ? nullptr : quads.data();
@@ -662,6 +674,7 @@ struct SwRenderJob {
       FrameParams fp{};
       std::vector<Quad> quads;  // the job's own sprite quads (fp.spriteQuads repointed here)
       std::vector<Page> pages;  // the job's own atlas pages (fp.spriteAtlasPages repointed here)
+      ::litholattice::HudStreamSnapshot hud;  // D9 flicker fix: the job's own HUD stream copies (fp.hudStatic / hudDynamic point here)
       uint64_t drainTarget = 0;  // Stage 2 seal: ring entries published at submit; the executor drains up to it, so the frame renders the store state after exactly those uploads
     };
 struct SwFrameSlot {
@@ -691,12 +704,13 @@ struct SwRenderWorker {
         { ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m); cv.wait(l, [&] { return !jobActive; }); err = jobErr; jobErr = nullptr; }
         if (err) std::rethrow_exception(err);  // a failed render surfaces on main one frame late (the sync path throws out of renderFrame itself)
         // B61-1 (mirrors RenderWorker::submit): the screenshot capture touches main-thread
-        // game state, so it runs here on main while no job is in flight — the armed job has
+        // game state, so it runs here on main while no job is in flight ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the armed job has
         // completed, so its grab snapshot is final. A capture armed during this frame's
         // update rides on the job submitted now and is taken at the next submit (or stop()).
         if (shotArmed) { post(); shotArmed = false; }
         else if (pending && pending()) shotArmed = true;
         job.fp = fp;
+        ::litholattice::snapshotHudStreams(fp, job.fp, job.hud);  // D9: never borrow the game's HUD layers past submit
         job.quads.assign(fp.spriteQuads, fp.spriteQuads + (fp.spriteQuads ? fp.spriteQuadCount : 0));
         job.fp.spriteQuads = job.quads.empty() ? nullptr : job.quads.data();
         job.fp.spriteQuadCount = job.quads.size();
@@ -712,7 +726,7 @@ struct SwRenderWorker {
       // Runs on the pool executor the moment the frame is finished (or on the caller when
       // the pool's detached mode is off). Swaps the finished pixels into the freest slot:
       // a Free slot, else the oldest Shown (already presented), else the older Ready
-      // (superseded unpresented). A Presenting slot is never a target — main presents one
+      // (superseded unpresented). A Presenting slot is never a target ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â main presents one
       // slot at a time, so a target always exists.
       void drain() {  // Archie Phase 2: wait out the job in flight (in-process world load)
         ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m);
@@ -734,7 +748,7 @@ struct SwRenderWorker {
             tgt->fb.width = fb.width;
             tgt->fb.height = fb.height;
             tgt->seq = seq;
-            tgt->storeGen = r->meshStoreGeneration();  // Stage 2: the post-drain seal, read here on the executor — the thread that applied the drain, after it
+            tgt->storeGen = r->meshStoreGeneration();  // Stage 2: the post-drain seal, read here on the executor ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the thread that applied the drain, after it
             tgt->state = SwFrameSlot::Ready;
           }
           if (r->deviceLost()) lost.store(true);
@@ -749,7 +763,7 @@ struct SwRenderWorker {
       // Main thread, present path: the newest FINISHED frame (F-B4). The presenter never
       // waits and never sees an in-flight buffer: with no new frame finished it re-presents
       // the last shown slot, and before the first completion it returns an empty
-      // framebuffer — the caller's zero-size check skips the blit, as it does today.
+      // framebuffer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the caller's zero-size check skips the blit, as it does today.
       const SoftwareFramebuffer& acquirePresent() {
         ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m);
         presentIdx = -1;
@@ -789,11 +803,11 @@ struct SwRenderWorker {
 // never-ending task: the browser presents an OffscreenCanvas only at task
 // boundaries, so a hand-rolled while loop rendered forever into a buffer
 // nobody ever saw (interactive boot = black canvas; bench mode, which
-// exits, presented its final frame — the tell). The fix drives the loop
+// exits, presented its final frame ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the tell). The fix drives the loop
 // through lk_frame_loop_set, whose registration unwinds main();
 // everything the loop touches therefore lives in this heap struct, never
 // in main()'s abandoned stack frame. Native and bench runs iterate the
-// same step function in a plain while loop — behaviour unchanged.
+// same step function in a plain while loop ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â behaviour unchanged.
 // ---------------------------------------------------------------------------
 struct FrameCtx {
   // Borrowed: owned by main()'s frame, assigned just before the loop runs.
@@ -818,6 +832,8 @@ struct FrameCtx {
 #if !defined(_WIN32)
   std::unique_ptr<cMcpStdioTransport> mcpTransport;
   int mcpSavedStdoutFd = -1;
+#else
+  int mcpSavedStdoutFdWin = -1;  // MCP stdout fix (2026-11-10): saved real stdout under --mcp-stdio
 #endif
   RenderWorker rw;
   SwRenderWorker sw;
@@ -1070,8 +1086,10 @@ int main(int argc, char** argv) {
     // --rom-screen 32|64 picks the demo screen size; --capture hides F3 / controls / hint text.
     else if (!std::strcmp(argv[i], "--test-world")) cfg.benchScene = "testworld";
     else if (!std::strcmp(argv[i], "--spawn") && i + 1 < argc) cfg.startSpawn = argv[++i];  // 2026-10-30 (JD): world picker relaunch target
+    else if (!std::strcmp(argv[i], "--pchie-maze") && i + 1 < argc) { cfg.benchScene = "pchiemaze"; cfg.dimension = "flatlab"; cfg.pchieMazeFile = argv[++i]; }  // 2026-11-10 (JD t5033u, PCHIE P7): in-engine B1 maze for the PCHIE reasoning model
     else if (!std::strcmp(argv[i], "--bolt-lab")) { cfg.benchScene = "boltlab"; cfg.dimension = "flatlab"; }  // 2026-10-30 (JD): Bolt PCHIE Lab stations on the Flat Lab plain
     else if (!std::strcmp(argv[i], "--flat-lab")) { cfg.benchScene = "testworld"; cfg.testWorldExamples = true; cfg.dimension = "flatlab"; }  // 2026-10-30 (JD): flat white Ceramic plain, every component row + every Examples / torture build
+    else if (!std::strcmp(argv[i], "--component-test")) { cfg.benchScene = "componenttest"; cfg.dimension = "componenttest"; }  // 2026-11-12 (JD t5295u): flat Wafer Silicon plain, one 3x3-chunk pad per Trace component
     else if (!std::strcmp(argv[i], "--test-world-examples")) { cfg.benchScene = "testworld"; cfg.testWorldExamples = true; }  // 2026-10-25 (JD): test world + Examples pads (clocks, ...) in any build
     else if (!std::strcmp(argv[i], "--rom-screen")) romScreen = int(num(32, 64));
     else if (!std::strcmp(argv[i], "--capture")) cfg.capture = true;
@@ -1095,6 +1113,7 @@ int main(int argc, char** argv) {
       }
     }
     else if (!std::strcmp(argv[i], "--frame-dump") && i + 1 < argc) g_frameDumpDir = argv[++i];  // showcase video: DIR/frames.mp4 via ffmpeg (LL_FFMPEG or PATH)
+    else if (!std::strcmp(argv[i], "--frame-hash") && i + 1 < argc) g_frameHashDir = argv[++i];  // tick-paced hashes.txt + frame_NNNN.rgb
     else if (!std::strcmp(argv[i], "--ui-shot") && i + 1 < argc) uiShot = argv[++i];  // Cortana 2026-10-16
     else if (!std::strcmp(argv[i], "--ui-view") && i + 1 < argc) uiView = argv[++i];
     else if (!std::strcmp(argv[i], "--verify-mesh")) litholattice::setMeshVerify(true);  // Cortana 2026-10-15 1345
@@ -1198,7 +1217,7 @@ int main(int argc, char** argv) {
     else {
       std::printf("usage: LithoKraft [--version] [--selftest] [--dim wafer|organic] [--size chunks] "
                   "[--tps 32|64|128|256|512] [--tps-unlock (debug: --tps up to 8192, powers of 2)] [--no-euv] [--radius chunks] [--render-threads 1|2|4|8|16|32|64] [--sw-scale 0.5|0.75|1.0] [--seconds s] [--vsync] [--display windowed|maximized|borderless|fullscreen] [--monitor N] [--resolution WxH] [--refresh Hz] [--log file] "
-                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--showcase wafer] [--frame-dump dir] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--flat-lab] [--bolt-lab] [--spawn name] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--stream-bench [file.json]] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--no-verify] [--mcp-stdio] "
+                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--showcase wafer] [--frame-dump dir] [--frame-hash dir] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--flat-lab] [--bolt-lab] [--component-test] [--pchie-maze file] [--spawn name] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--stream-bench [file.json]] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--no-verify] [--mcp-stdio] "
                   "[--vk-validation] [--vk-arena host|device|rebar] [--gl-arena on|off] [--handshake-workers n] [--stub-models] [--seed n] [--cities on|off] [--noise-preview graph.json [--preview-out f.png] "
                   "[--preview-output name] [--preview-size px] [--preview-scale blocks/px] [--preview-y y]]\n");
       return 0;
@@ -1219,6 +1238,20 @@ int main(int argc, char** argv) {
   // fullscreen. No config define gates this. --display windowed|maximized|fullscreen is the opt-out;
   // Settings > Display still changes the mode live for the session.
   GameSettings settings = GameSettings::load(settingsPath);
+  // JD ruling, 2026-11-09: dev builds ship with tick/GUI profiling ON by
+  // default (settings.json "tickProfile", default ON in non-NDEBUG builds)
+  // so the "gui profile:" logs are there when he needs them, with no
+  // LL_TICK_PROFILE ceremony. The env var remains the override: when it is
+  // set at all, this block does nothing and tickprof::enabled() reads the
+  // env exactly as before. tickprof reads the env lazily at first use, and
+  // nothing has called it yet this early in main().
+  if (!std::getenv("LL_TICK_PROFILE") && settings.tickProfile) {
+#ifdef _WIN32
+    _putenv_s("LL_TICK_PROFILE", "1");
+#else
+    setenv("LL_TICK_PROFILE", "1", 1);
+#endif
+  }
   // 2026-10-31 (JD): the saved Settings > Display choice persists across runs (Borderless stays the
   // default when settings.json has none). --display only sets this run's mode and never rewrites the
   // saved value. LL_DISPLAY_FORCE_BORDERLESS=1 restores the old forced-Borderless launch.
@@ -1309,6 +1342,11 @@ int main(int argc, char** argv) {
   }
 #endif
   if (cfg.benchScene == "boltlab" && saveDir.empty()) noSave = true;  // 2026-10-30: rebuilt every launch, like the test world
+  if (cfg.benchScene == "componenttest") {  // 2026-11-12 (JD): persists like the Flat Lab, own dir <data root>/saves/component-test
+    static const bool kFresh = [] { const char* e = std::getenv("LL_TESTWORLD_FRESH"); return e && e[0] == '1'; }();  // 1 = fresh, never saved
+    if (saveDir.empty() && !noSave && !kFresh) saveDir = (dataRoot(argv[0]) / "saves" / "component-test").lexically_normal().string();
+    if (saveDir.empty()) noSave = true;
+  }
   if (cfg.benchScene == "testworld") {
 #ifdef LK_PLAYTEST_SPAWN
     cfg.testWorldExamples = true;  // 2026-10-24 (JD): Examples section, playtest builds only
@@ -1385,8 +1423,8 @@ int main(int argc, char** argv) {
           cfg.diamondSimArea ? "diamond" : cfg.roundSimArea ? "round" : "square", roundSource,
           cfg.diamondStreamArea ? "diamond" : "square", streamSource);  // F56-6 (Cortana 2026-10-17) + diamond
   // SV-H2 seed precedence: an existing world's persisted seed (level.json in
-  // the save dir) WINS over --seed and over the default. This must run here —
-  // before Game construction — because Game's constructor builds the
+  // the save dir) WINS over --seed and over the default. This must run here ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â
+  // before Game construction ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â because Game's constructor builds the
   // dimensions from cfg.seed in its initializer list, before any save is
   // read; a late override would regenerate untouched (dirty-only-saved)
   // columns from the wrong seed under the saved ones. The Wafer is pinned
@@ -1409,7 +1447,7 @@ int main(int argc, char** argv) {
       cfg.seed = *persisted;
     } else if (!seedErr.empty()) {
       // Present but unreadable after recovery: warn loudly and fall back to
-      // the CLI/default seed. (level.json alone gates no region data — the
+      // the CLI/default seed. (level.json alone gates no region data ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the
       // blocks.names fail-closed path in cWorldSave is the data gate.)
       logError("save: world metadata in '%s' is unreadable (%s); falling back to %s seed %llu", cfg.saveDir.c_str(), seedErr.c_str(),
                seedGiven ? "the --seed" : "the default", (unsigned long long)cfg.seed);
@@ -1553,6 +1591,9 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "[mcp] %.*s\n", int(line.size()), line.data());
       });
       game.setMcpServer(mcpServer.get());
+      // MCP stdout fix (2026-11-10, JD t5117u): logInfo's console copy goes to stderr while
+      // the MCP server owns stdout (both platforms; the log file and tap are unchanged).
+      litholattice::logSetInfoToStderr(true);
 #if !defined(_WIN32)
       // stdout belongs to JSON-RPC now: save the real stdout for the
       // transport, then point fd 1 at stderr so logInfo (which writes to
@@ -1567,9 +1608,22 @@ int main(int argc, char** argv) {
       mcpThread = std::thread([srv, tr] { srv->runStdio(*tr); });
 #else
       // Windows: the engine's own stdio transport (blocking std::cin);
-      // the thread is detached at shutdown — process exit ends it. The
+      // the thread is detached at shutdown ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â process exit ends it. The
       // poll-based clean join above is the POSIX path this build targets.
       litholattice::mcp::cMcpServer* srv = mcpServer.get();
+      // MCP stdout fix (2026-11-10, JD t5117u): the Windows path had no fd redirect, so
+      // logInfo and any stray printf shared stdout with JSON-RPC (the cause of the Stage A
+      // "trailing characters" failures). Same scheme as POSIX: save the real stdout, point
+      // fd 1 at stderr, and send the engine transport's locked writes to the saved fd.
+      std::fflush(stdout);
+      F.mcpSavedStdoutFdWin = _dup(1);
+      if (F.mcpSavedStdoutFdWin >= 0 && _dup2(2, 1) == 0) {
+        litholattice::mcp::cFdStdioTransport::setOutputFd(F.mcpSavedStdoutFdWin);
+      } else {
+        if (F.mcpSavedStdoutFdWin >= 0) { _close(F.mcpSavedStdoutFdWin); F.mcpSavedStdoutFdWin = -1; }
+        litholattice::mcp::cFdStdioTransport::setOutputFd(1);  // fallback: still one locked write per line
+        logWarn("mcp: could not redirect fd 1 to stderr; MCP replies share stdout (writes are still serialized)");
+      }
       // Fix run 2 (R-RACE-1): the thread flags its exit so shutdown can cancel
       // the blocking stdin read and JOIN it before the server is freed.
       F.mcpDone = std::make_shared<std::atomic<bool>>(false);
@@ -1626,7 +1680,7 @@ int main(int argc, char** argv) {
   if (benchSeconds <= 0) window->raiseAndFocus();  // launch-focus fix: come to the front on first show
     F.wasFocused = window->focused();
     // Frame pacer (render.fps_cap, D-M3 game-side wiring 2026-10-13):
-    // configured from Settings at init (0 = off, vsync-only — the default)
+    // configured from Settings at init (0 = off, vsync-only ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the default)
     // and reconfigured live whenever the settings value changes (the
     // cvar/UI flow lands in Game::settings() via onSettingsChanged).
     // beginFrame() at the loop top, endFrameAndWait() right after swap.
@@ -1654,16 +1708,16 @@ int main(int argc, char** argv) {
 
     // ---- Three-way split, software path (Design B, Stage 1: asynchronous mailbox; same
     // LL_THREEWAY=1 toggle, default OFF). The software counterpart of RenderWorker: main submits
-    // a COMPLETE frame job — FrameParams by value, sprite quads deep-copied, atlas pages
+    // a COMPLETE frame job ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â FrameParams by value, sprite quads deep-copied, atlas pages
     // deep-copied on version change, borrowed pointers repointed at the job's own copies (the
-    // exact copy set RenderWorker::submit uses) — plus the mesh-store seal, the renderer's
+    // exact copy set RenderWorker::submit uses) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â plus the mesh-store seal, the renderer's
     // store generation at submit time. Stage 1 executes the job OFF the main thread, on the
     // band pool's detached executor worker (cSoftwareRenderer::renderFrameDetached; JD ruling 2:
     // the render side rides the pool threads, band count unchanged, no new always-on thread).
     // One job in flight, RenderWorker's own rule: submit() waits only while the previous job
     // is still rendering. The finished frame returns through two pixels-only handoff slots
     // (the Argon amendment: the renderer's fb_.pixels is SWAPPED with a slot buffer, never
-    // copied; depth_ and hizMax_ stay private to the renderer — renderFrame's post stages
+    // copied; depth_ and hizMax_ stay private to the renderer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â renderFrame's post stages
     // have already consumed them by completion). The presenter takes the newest FINISHED
     // slot (F-B4, accepted by JD: ~1 frame of display latency; sim/input latency untouched).
     // Renderer discipline mirrors the Vulkan worker exactly: the detached renderFrame runs
@@ -1683,13 +1737,13 @@ int main(int argc, char** argv) {
     if (threewayOn) {
       rw.r = renderer;
       rw.post = [&F] { if (F.game) F.game->capturePendingScreenshot(); };  // Phase 2: follows an in-process world load
-      rw.pending = [&F] { return F.game && F.game->screenshotPending(); };
+      rw.pending = [&F] { return (F.game && F.game->screenshotPending()) || lithokraft::cFrameDumpHub::instance().sink() || lithokraft::cMcpDisplayVision::instance().pending(); };  // --frame-hash/--frame-dump every frame
       rw.th = std::thread([&rw] { rw.loop(); });
       logInfo("threeway: ON (LL_THREEWAY=1): main = window/input/game, render thread = GPU/memory + present, sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
     } else if (swThreewayOn) {
       sw.r = display.software;
       sw.post = [&F] { if (F.game) F.game->capturePendingScreenshot(); };  // Phase 2: follows an in-process world load
-      sw.pending = [&F] { return F.game && F.game->screenshotPending(); };
+      sw.pending = [&F] { return (F.game && F.game->screenshotPending()) || lithokraft::cFrameDumpHub::instance().sink() || lithokraft::cMcpDisplayVision::instance().pending(); };  // --frame-hash/--frame-dump every frame
       cSoftwareRenderer::setDetachedPoolMode(true);  // Design B Stage 1: the pool spawns its executor worker (band count unchanged)
       display.software->setUploadRingEnabled(true);  // Design B Stage 2: game uploads stage in the lock-free ring; the executor applies them at the frame seal
       logInfo("threeway: ON (LL_THREEWAY=1): software path, stage 2 async mailbox + upload ring: main = window/input/game + present (newest finished frame), frame job copied and rendered on the band-pool executor, pixels-only slots, uploads lock-free via the ring (no upload guard), sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
@@ -1699,7 +1753,7 @@ int main(int argc, char** argv) {
     // Build 50 (2026-10-19, web present fix): the frame-loop state lives
     // in the heap FrameCtx F (aliases above bind the setup code to it), and
     // the loop body / shutdown tail are lkStepFrame()/lkShutdownTail().
-    // Native and bench runs iterate lkStepFrame directly — the exact
+    // Native and bench runs iterate lkStepFrame directly ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the exact
     // semantics of the original while loop. The interactive WEB run
     // instead registers lkStepFrame as the web main loop: with a
     // hand-rolled while loop the proxied pthread's task never ends, the
@@ -1856,6 +1910,77 @@ static bool lkStepFrame(FrameCtx& F) {
       const double frameMs = msBetween(tLast, now);
       worstMs = std::max(worstMs, frameMs);
       tLast = now;
+      if (kDebugBuild && ::litholattice::tickprof::enabled() && frames + perfFrames > 0) {
+        // 2026-11-09 next-build-2 (GUI diagnosis Section 6): the spike
+        // record and the per-second GUI phase profile. Debug builds only;
+        // LL_TICK_PROFILE gates the cost. The frame judged here is the one
+        // that ENDED at `now` (its input/update/render splits are last
+        // frame's stored values, the convention the hitch capture below
+        // already uses). Threshold: > 20 ms uncapped, else > 1.5x the
+        // frame deadline (cap or 60 Hz vblank stand-in).
+        struct GuiProf {
+          double sum[5] = {}, mx[5] = {};
+          uint64_t n = 0, rebuilt = 0, replayed = 0, layoutRan = 0;
+          uint64_t bumps0[6] = {};
+          int spikes = 0;
+          uint64_t dynRebuilt = 0;
+          std::chrono::steady_clock::time_point sec{};
+          bool started = false;
+        };
+        static GuiProf gp;
+        const auto& gt = game.gameUi().guiTimes();
+        const double phases[5] = {gt.modelMs, gt.updateMs, gt.layoutMs, gt.paintMs,
+                                  ::litholattice::tickprof::ms(::litholattice::tickprof::hudExpandNs())};
+        for (int i = 0; i < 5; ++i) { gp.sum[i] += phases[i]; gp.mx[i] = std::max(gp.mx[i], phases[i]); }
+        ++gp.n;
+        if (gt.paintRebuilt) ++gp.rebuilt; else ++gp.replayed;
+        if (gt.dynRebuilt) ++gp.dynRebuilt;
+        if (gt.layoutMs > 0.005) ++gp.layoutRan;
+        const double deadline = appliedFpsCap > 0 ? 1000.0 / appliedFpsCap : 1000.0 / 60.0;
+        const double spikeOver = appliedFpsCap > 0 ? 1.5 * deadline : 20.0;
+        if (frameMs > spikeOver) {
+          if (gp.spikes < 5) {
+            ++gp.spikes;
+            const auto& rp = ::litholattice::tickprof::render();
+            logInfo("spike: frame %.2f ms | input %.2f update %.2f (ui %.2f upload %.2f items %d bytes %zu batch %d) "
+                    "gui model %.2f upd %.2f lay %.2f paint %.2f(%s) expand %.2f | vk fence %.2f acquire %.2f record %.2f present %.2f | gpu %.2f"
+                    " | mesh drain %.2f (%d meshes %zu verts) commit %.2f batchland %d (%zu verts) hud %zu",
+                    frameMs, msInput, msUpdate, game.lastUiSplitMs(), game.lastUploadMs(), game.lastUploadItems(),
+                    game.lastUploadBytes(), game.lastUploadBatchMax(),
+                    gt.modelMs, gt.updateMs, gt.layoutMs, gt.paintMs, gt.paintRebuilt ? "rebuilt" : "replayed", phases[4],
+                    rp.valid ? ::litholattice::tickprof::ms(rp.ns[::litholattice::tickprof::kWaitFence]) : 0.0,
+                    rp.valid ? ::litholattice::tickprof::ms(rp.ns[::litholattice::tickprof::kAcquire]) : 0.0,
+                    rp.valid ? ::litholattice::tickprof::ms(rp.ns[::litholattice::tickprof::kRecord]) : 0.0,
+                    rp.valid ? ::litholattice::tickprof::ms(rp.ns[::litholattice::tickprof::kPresent]) : 0.0,
+                    double(renderer->gpuFrameMs()),
+                    game.lastMeshDrainMs(), game.lastMeshDrained(), game.lastMeshDrainVerts(), game.lastMeshCommitMs(),
+                    game.lastMeshBatchLanded(), game.lastMeshBatchVerts(), gt.paintDraws);
+          }
+        }
+        if (!gp.started) { gp.started = true; gp.sec = now; }
+        if (secondsBetween(gp.sec, now) >= 1.0) {
+          const double dn = double(std::max<uint64_t>(1, gp.n));
+          const auto& root = game.gameUi().root();
+          using PB = ui::cUiRoot::PaintBump;
+          const uint64_t bNow[6] = {root.paintBumps(PB::Text), root.paintBumps(PB::Event), root.paintBumps(PB::Structure),
+                                    root.paintBumps(PB::Tooltip), root.paintBumps(PB::Theme), root.paintBumps(PB::Other)};
+          logInfo("gui profile: model %.3f/%.2f update %.3f/%.2f layout %.3f/%.2f (ran %llu skipped %llu) paint %.3f/%.2f "
+                  "(rebuilt %llu replayed %llu, draws %zu [rects %zu texts %zu draws %zu icons %zu]) dyn (rebuilt %llu, draws %zu) expand %.3f/%.2f | bumps/s text %llu event %llu structure %llu tooltip %llu theme %llu other %llu",
+                  gp.sum[0] / dn, gp.mx[0], gp.sum[1] / dn, gp.mx[1], gp.sum[2] / dn, gp.mx[2],
+                  (unsigned long long)gp.layoutRan, (unsigned long long)(gp.n - gp.layoutRan),
+                  gp.sum[3] / dn, gp.mx[3], (unsigned long long)gp.rebuilt, (unsigned long long)gp.replayed, gt.paintDraws,
+                  gt.paintRects, gt.paintTexts, gt.paintDrawsOnly, gt.paintIcons,
+                  (unsigned long long)gp.dynRebuilt, gt.dynDraws,
+                  gp.sum[4] / dn, gp.mx[4],
+                  (unsigned long long)(bNow[0] - gp.bumps0[0]), (unsigned long long)(bNow[1] - gp.bumps0[1]),
+                  (unsigned long long)(bNow[2] - gp.bumps0[2]), (unsigned long long)(bNow[3] - gp.bumps0[3]),
+                  (unsigned long long)(bNow[4] - gp.bumps0[4]), (unsigned long long)(bNow[5] - gp.bumps0[5]));
+          for (int i = 0; i < 6; ++i) gp.bumps0[i] = bNow[i];
+          gp = GuiProf{};
+          gp.started = true;
+          gp.sec = now;
+        }
+      }
       if (litholattice::cHitchCapture::enabled() && frames + perfFrames > 0) {  // LL_HITCH_CAPTURE: stage breakdown of frames > 2x median
         static litholattice::cHitchCapture hcap;  // main thread only
         static int hcLogged = 0; static auto hcSec = now;
@@ -1906,15 +2031,118 @@ static bool lkStepFrame(FrameCtx& F) {
       // 0.0.1.54 [C54-2] (Proposed by JD; co-implemented by JD and Cortana): LL_BENCH_SHOT_AT=<s> delays the --ui-shot (far-view LOD shots).
       static const double kShotAt = [] { const char* e = std::getenv("LL_BENCH_SHOT_AT"); return e ? std::atof(e) : 0.0; }();
       if (!uiShotDone && secondsBetween(tStart, now) > std::max(kBenchWarmup, kShotAt)) { game.requestUiShot(uiShot); uiShotDone = true; }
+      if (!g_frameHashDir.empty() && !lithokraft::cFrameDumpHub::instance().sink()) {  // --frame-hash DIR: tick-paced hashes.txt
+        static lithokraft::FrameHashHeader hashHdr;
+        hashHdr.format_version = 1;
+        hashHdr.commit_sha =
+#ifdef LITHOKRAFT_COMMIT
+            LITHOKRAFT_COMMIT
+#else
+            "nogit"
+#endif
+            ;
+        hashHdr.build_type = "DebugOpt";
+        // lkbed item 4 (SCRATCH 2026-11-11): the header used to hardcode renderer "software" for every
+        // backend. It now names the ACTIVE renderer; renderer= is on every chained frame line, so
+        // vulkan/gl33 record_hash values move (software unchanged). max_frames is recorded in build_flags.
+        static const int kFhMaxFrames = [] { const char* e = std::getenv("LL_FRAME_HASH_MAX_FRAMES"); return e ? std::max(0, std::atoi(e)) : 45; }();
+        hashHdr.build_flags = "frame-hash max_frames=" + std::to_string(kFhMaxFrames);
+        {
+          const std::string rn = renderer ? std::string(renderer->name()) : std::string();
+          hashHdr.renderer = rn == "Vulkan" ? "vulkan" : (rn.rfind("OpenGL", 0) == 0 ? "gl33" : "software");
+        }
+        hashHdr.pixel_format = "RGB24";
+        hashHdr.input_source = "bench:frame-hash";
+        hashHdr.thread_count = 1;
+        hashHdr.device = "CPU";
+        hashHdr.tps = 0;
+        hashHdr.seed = 0;
+        hashHdr.hash_algorithms = "fnv1a64,sha256";
+        hashHdr.prev_record_hash = lithokraft::cFrameHashRecorder::kZeroRecordHash;
+        static lithokraft::cFrameHashRecorder hashRec(hashHdr);
+        hashRec.setOutputDir(g_frameHashDir);
+        hashRec.setOrdinalTicks(true);  // present-path: stable ordinal tick
+        hashRec.setDedupSimTicks(true);  // one present per sim tick (Data)
+        hashRec.setSkipFrames(0);
+        {
+          int minTick = 64;
+          if (const char* e = std::getenv("LL_FRAME_HASH_MIN_TICK")) minTick = std::max(0, std::atoi(e));
+          hashRec.setMinSimTick(uint64_t(minTick));
+          std::fprintf(stderr, "frame-hash: minSimTick=%d (LL_FRAME_HASH_MIN_TICK)\n", minTick);
+        }
+        
+        hashRec.setMaxFrames(kFhMaxFrames);  // default 45 (unchanged); LL_FRAME_HASH_MAX_FRAMES overrides
+        hashRec.setRequireContiguousSimTicks(true);  // every sim tick once, in order
+        lithokraft::cFrameDumpHub::instance().install(&hashRec);
+        g_frameHashRec = &hashRec;
+        std::atexit([] {
+          if (auto* s = lithokraft::cFrameDumpHub::instance().sink()) {
+            s->close();
+            lithokraft::cFrameDumpHub::instance().install(nullptr);
+          }
+        });
+      }
       if (!g_frameDumpDir.empty() && !lithokraft::cFrameDumpHub::instance().sink()) {  // --frame-dump DIR: frames -> ffmpeg at 30 fps
         static lithokraft::cFrameVideoEncoder encoder(g_frameDumpDir, tStart);
         lithokraft::cFrameDumpHub::instance().install(&encoder);
         std::atexit([] { if (auto* s = lithokraft::cFrameDumpHub::instance().sink()) { s->close(); lithokraft::cFrameDumpHub::instance().install(nullptr); } });
       }
-      if (benchSeconds > 0) game.setBenchCamera(float(F.benchGate.cameraSeconds(tStart, now)));
+      if (benchSeconds > 0) {
+        // --frame-hash: drive camera from present ordinal (deterministic across runs);
+        // otherwise wall-clock gate as before.
+        if (!g_frameHashDir.empty()) {
+          game.setBenchCamera(float(g_fhCamPresent) / 60.f);
+          ++g_fhCamPresent;
+        } else {
+          game.setBenchCamera(float(F.benchGate.cameraSeconds(tStart, now)));
+        }
+      }
+      // --frame-hash: once the stream has settled and minSimTick is reached, freeze the
+      // sim and step exactly one tick per present so every sim tick is shown once, in order.
+      if (!g_frameHashDir.empty()) {
+        static bool fhStepped = false;
+        static int fhMinTick = [] {
+          int m = 64;
+          if (const char* e = std::getenv("LL_FRAME_HASH_MIN_TICK")) m = std::max(0, std::atoi(e));
+          return m;
+        }();
+        const uint64_t wt = game.worldTick();
+        if (!fhStepped && game.streamSettled() && wt >= uint64_t(fhMinTick)) {
+          game.armFrameHashSteppedCapture();
+          // Let any in-flight free-run tick finish, then lock the record window to the
+          // next stepped tick so free-run leaps cannot break contiguous capture.
+          uint64_t stable = game.worldTick();
+          for (int i = 0; i < 50; ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            const uint64_t nowWt = game.worldTick();
+            if (nowWt == stable) break;
+            stable = nowWt;
+          }
+          if (g_frameHashRec) g_frameHashRec->setMinSimTick(stable + 1ull);
+          fhStepped = true;
+          std::fprintf(stderr, "frame-hash: armed stepped capture at worldTick=%llu (first record >= %llu)\n",
+                      (unsigned long long)stable, (unsigned long long)(stable + 1ull));
+        }
+        if (fhStepped) {
+          const uint64_t before = game.worldTick();
+          game.frameHashStepOne();
+          for (int spin = 0; spin < 10000; ++spin) {
+            if (game.worldTick() > before) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+          }
+        }
+      }
       const auto tUp = Clock::now();
       game.update(dt, w, h);
-      if (benchSeconds > 0) game.setBenchCamera(float(F.benchGate.cameraSeconds(tStart, now)));
+      if (benchSeconds > 0) {
+        // --frame-hash: drive camera from present ordinal (deterministic across runs);
+        // otherwise wall-clock gate as before.
+        if (!g_frameHashDir.empty()) {
+          game.setBenchCamera(float(g_fhCamPresent) / 60.f);
+        } else {
+          game.setBenchCamera(float(F.benchGate.cameraSeconds(tStart, now)));
+        }
+      }
       const auto tRender = Clock::now();
       msUpdate = msBetween(tUp, tRender);
       ovUpdSum += msUpdate; ++ovUpdN;  // F56-4
@@ -1956,16 +2184,31 @@ static bool lkStepFrame(FrameCtx& F) {
       if (w > 0 && h > 0) {
         game.uploadEntities();
         FrameParams fp = game.frameParams(w, h);
+        // Default: wall-clock render/animation time.
         fp.timeSec = float(secondsBetween(tStart, now));
-        // 2026-10-16 (capture aid): LL_RENDER_TIME=<sec> pins the render/animation clock so a
-        // shot shows an exact twinkle phase. Render-only; the sim clock is untouched.
+        // --frame-hash Step 1 (JD 2026-11-09): pin render clock to sim time so Trace
+        // shimmer / twinkle match across runs at the same worldTick. LL_RENDER_TIME
+        // still wins when set (capture aid).
+        if (!g_frameHashDir.empty()) {
+          if (auto ssOpt = game.simStats()) {
+            const auto& st = ssOpt->get();
+            const uint32_t tps = st.targetTps > 0 ? uint32_t(st.targetTps) : 32u;
+            fp.timeSec = litholattice::groundPulseTimeSec(st.worldTick, tps);
+          }
+        }
         static const char* pinT = std::getenv("LL_RENDER_TIME");
         if (pinT) fp.timeSec = float(std::atof(pinT));
         bool lostNow = false;
         if (threewayOn) { rw.submit(fp); lostNow = rw.lost.load(); }  // LL_THREEWAY handshake (Proposed by JD; co-implemented by JD and Cortana)
         else if (swThreewayOn) { sw.submit(fp); lostNow = sw.lost.load(); }  // LL_THREEWAY, software path (Design B stage 1: async mailbox)
         else {
+          // next-build-2 (diagnosis Section 6 item 3): feed the tickprof
+          // frame aggregator on the DEFAULT path too, so the render
+          // profile line (vk phase avg/max) prints without LL_THREEWAY.
+          // The worker path above already feeds it in RenderWorker::loop.
+          const int64_t tpT0 = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;
           renderer->renderFrame(fp);
+          if (tpT0) ::litholattice::tickprof::frames().add(0, ::litholattice::tickprof::nowNs() - tpT0, 0);
           game.capturePendingScreenshot();  // `screenshot` lands here, pre-present
           lostNow = renderer->deviceLost();
         }
@@ -2004,7 +2247,7 @@ static bool lkStepFrame(FrameCtx& F) {
             const int ttps = ssOpt ? ssOpt->get().targetTps : 0;
             if (full) {
               // Stage 1: on the split path the mesh count comes from the last COMPLETED
-              // frame (the worker caches it at completion) — reading the renderer's live
+              // frame (the worker caches it at completion) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â reading the renderer's live
               // drawOrder_ here would race an in-flight render on the executor.
               std::vector<double> sorted(ovMs);
               const double low1 = sorted.empty() ? 0.0 : percentile(sorted, 0.99);
@@ -2067,7 +2310,7 @@ static bool lkStepFrame(FrameCtx& F) {
           const uint64_t mem = processWorkingSetBytes();
           br.memPeak = std::max(br.memPeak, mem);
           const auto ssOpt = game.simStats();
-          if (!ssOpt) return true;  // (was: continue — skip the rest of this bench second)
+          if (!ssOpt) return true;  // (was: continue ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â skip the rest of this bench second)
           const SimStats& ss = ssOpt->get();
           if (F.benchGate.open()) br.tick.push_back(ss.tickMs);
           const double f = std::max(1, br.secFrames);
@@ -2124,6 +2367,17 @@ static void lkMcpStop(FrameCtx& F) {
       }
 #endif
       mcpServer.reset();
+#if defined(_WIN32)
+      // MCP stdout fix (2026-11-10): restore the real stdout for the bench summary / exit path.
+      if (F.mcpSavedStdoutFdWin >= 0) {
+        std::fflush(stdout);
+        litholattice::mcp::cFdStdioTransport::setOutputFd(1);
+        _dup2(F.mcpSavedStdoutFdWin, 1);
+        _close(F.mcpSavedStdoutFdWin);
+        F.mcpSavedStdoutFdWin = -1;
+      }
+#endif
+      litholattice::logSetInfoToStderr(false);
 #if !defined(_WIN32)
       mcpTransport.reset();
       if (mcpSavedStdoutFd >= 0) {
@@ -2156,6 +2410,11 @@ static void lkShutdownTail(FrameCtx& F) {
   auto& mcpTransport = F.mcpTransport;
   auto& mcpSavedStdoutFd = F.mcpSavedStdoutFd;
 #endif
+    // --frame-hash/--frame-dump: flush sink before threeway drain/teardown (atexit alone was missing hashes.txt).
+    if (auto* sink = lithokraft::cFrameDumpHub::instance().sink()) {
+      sink->close();
+      lithokraft::cFrameDumpHub::instance().install(nullptr);
+    }
     rw.stop();  // LL_THREEWAY: join the render thread before shutdown (Proposed by JD; co-implemented by JD and Cortana)
     sw.stop();  // LL_THREEWAY software path (stage 1): drain the in-flight job + land a trailing capture
     if (swThreewayOn) {  // Design B Stage 2: ring accounting, then the ring closes (later teardown uploads apply directly again)

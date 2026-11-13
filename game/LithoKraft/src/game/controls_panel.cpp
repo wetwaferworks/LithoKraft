@@ -26,7 +26,7 @@ const Row kRows[] = {
                      Action::Hotbar6, Action::Hotbar7, Action::Hotbar8, Action::Hotbar9, Action::Hotbar10}},
     {"hotbar next / prev", {Action::HotbarNext, Action::HotbarPrev}},
     {"inventory", {Action::Inventory}},
-    {"clear slot", {Action::Drop}},
+    {"drop item (Shift: whole stack)", {Action::Drop}},
     {"hide HUD", {Action::ToggleHUD}},
     {"hide controls", {Action::ToggleControls}},  // 2026-11-05 (JD): F4 - panel only
     {"debug stats", {Action::ToggleDebug}},

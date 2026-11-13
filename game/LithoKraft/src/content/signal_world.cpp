@@ -263,7 +263,15 @@ void cSignalWorldSim::command(ChunkMap& w, const SimCommand& c, const DirtyFn& d
     // PlayB (JD t4347u): the Routor's modes are Alt + click only; Alt + wheel does nothing on it.
     if (c.a != 0 && w.get(c.x, c.y, c.z) == kRedirectorSelect) return;
     bool any = false;
-    for (int i = 0; i < n; ++i) any = signal_.use(w, c.x, c.y, c.z, dirty, true) || any;
+    if (c.a != 0 && roleOf(w.get(c.x, c.y, c.z)) == SimRole::Dialor) {
+      // B9 (JD 2026-11-11 A9 playtest): Alt + wheel sets the DIALOR dial, the same direction as
+      // every other 1..64 setting (wheel up = +1 = a 1, wheel down = -1 = a 63). The Dialor's own
+      // steps are use() = +1 and useAlt() = -1 (settled rulings, unit-tested), so exactly one
+      // step each way here; 1..64 wraps inside those. Alt + click (a 0) keeps one useAlt() step.
+      any = signal_.use(w, c.x, c.y, c.z, dirty, /*alt=*/c.a >= 32);
+    } else {
+      for (int i = 0; i < n; ++i) any = signal_.use(w, c.x, c.y, c.z, dirty, true) || any;
+    }
     if (any) sounds_.push_back({SoundCue::Click, 0, c.x, c.y, c.z});
   }
   // Cortana 2026-10-15 2215 [GAME]: Repeator top-button select (JD D4) and walk-bridging (JD D9).
@@ -455,6 +463,7 @@ void cSignalWorldSim::tickHandshake(ChunkMap& world, const TickArea& area, const
   hsArea_ = area;
   hsDirty_ = dirty;
   hsFrozenCycle_ = false;
+  signal_.applyPlacementBinds(world, dirty);  // 2026-11-07 (JD): placement binds land before the cycle's phases, never on power transitions
   signal_.hsBeginCycle(world, area.pcx, area.pcz, area.radius);
   const uint64_t cycle = signal_.tickCount();
   const uint64_t base = (cycle - 1) * uint64_t(p);

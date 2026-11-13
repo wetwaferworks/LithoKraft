@@ -10,14 +10,8 @@
 #include <string>
 #include <vector>
 #include "litholattice/script/script_engine.h"
-#include "litholattice/ui/ui_root.h"
-
-namespace litholattice::ui {
-class cDialog;
-class cLabel;
-class cListView;
-class cTextEditor;
-}  // namespace litholattice::ui
+#include "lithokraft/game/ui_textedit.h"
+#include "lithokraft/game/ui_widgets.h"
 
 namespace lithokraft {
 

@@ -28,6 +28,7 @@ std::optional<ui::Key> uiKey(Key k) {
     case Key::Y: return ui::Key::Y;
     case Key::S: return ui::Key::S;
     case Key::F10: return ui::Key::F10;
+    case Key::GraveAccent: return ui::Key::Grave;  // tilde console key
     default: return std::nullopt;
   }
 }

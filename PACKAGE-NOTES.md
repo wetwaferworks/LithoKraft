@@ -14,7 +14,7 @@ game Alpha 0.0.3.20, scenario hashes cities ON cb32c824f8b3ea98 / OFF e015e51cf1
 - engine/            LithoLattice engine source (receive tree state, 2026-10-21)
 - game/              LithoKraft game source
 - host/lithocef/     the CEF layer host (ILithoCEF seam) — private, proprietary
-- wasm/              the thin web layer (lkboot.js / lkasm.js), pages, pack/serve tools
+- wasm/              the thin web layer (lkboot.js), pages, pack/serve tools
 - android-shell/     the Android shell app source (the mobile host)
 - docs/, Lore/, tools/, designers-editors/, top-level build/setup/manifest docs
 

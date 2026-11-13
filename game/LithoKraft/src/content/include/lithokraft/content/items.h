@@ -86,6 +86,13 @@ constexpr uint32_t kItemSiliconAluminum = kFirstItemId + 27;  ///< Silicon Alumi
 // the etch flow are JD-to-define; plain materials here.
 constexpr uint32_t kItemPhotoresist = kFirstItemId + 28;      ///< Photoresist (material)
 constexpr uint32_t kItemResist = kFirstItemId + 29;           ///< Resist (material)
+// Resin (JD 2026-11-11 10:04 PM ET; B9 2026-11-12): ITEM ONLY, "so the functionality can be tested"; look B
+// Pot (CloudAtlas, approved row B 10:28 PM ET). String id "lithokraft:resin" is the pack's PROPOSAL
+// (item_id_proposed) -- OPEN, not confirmed. OPEN (JD): the resin source block (exists, out of scope), how
+// resin is applied / removed, bonding into assemblies, how assemblies count against Pushor / Swivelor limits.
+// None of that exists: Resin places nothing, is no tool, nothing reads it. maxStack 512 follows the plain
+// material rows (not a JD ruling). Model resin_item.lthm is on disk; no item renderer reads models yet.
+constexpr uint32_t kItemResin = kFirstItemId + 30;            ///< Resin (item only; id proposed)
 
 /// What using the item on a block does (the tool half of the split).
 enum class ToolAction : uint8_t {

@@ -52,9 +52,16 @@
 #include "litholattice/audio/audio_selftest.h"
 #include "litholattice/input/input_selftest.h"
 #include "litholattice/procgen/procgen_selftest.h"
-#include "litholattice/ui/ui_selftest.h"
+#if defined(WS_DISABLED)
+#undef WS_DISABLED
+#endif
+#if defined(WS_VISIBLE)
+#undef WS_VISIBLE
+#endif
+#include "litholattice/ui/litho_gui_selftest.h"  // Litho GUI migration: replaces ui_selftest.h
 #include "lithokraft/game/game_ui_selftest.h"
 #include "lithokraft/game/wiring_selftest.h"
+#include "lithokraft/game/component_test_selftest.h"  // 2026-11-12 (JD): Component Test world
 #include "lithokraft/game/sprite_host.h"
 #include "lithokraft/game/settings.h"        // A4: render.fps_cap Settings field
 #include "lithokraft/game/settings_cvars.h"  // A4: render.fps_cap cvar row
@@ -90,7 +97,8 @@ static std::filesystem::path uniqueTempDir(const char* base) {
 }
 
 int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesystem::path>& packDirs, bool timingHandshake) {
-  int fails = runSignalSelfTest() + runContentSelfTest() + runAudioSelfTest() + runInputSelfTest() + runGameInputSelfTest() + runAssetsSelfTest();
+  const int signalFails = runSignalSelfTest();
+  int fails = signalFails + runContentSelfTest() + runAudioSelfTest() + runInputSelfTest() + runGameInputSelfTest() + runAssetsSelfTest();
   auto check = [&](bool ok, const char* what) { std::printf("  [%s] %s\n", ok ? "PASS" : "FAIL", what); if (!ok) ++fails; };
   cJobPool pool(2);
   {
@@ -105,11 +113,12 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     check(pool.failedJobs() == 1, "job pool: a throwing job does not terminate, waitIdle() still returns");
   }
   fails += procgen::runProcgenSelfTest(pool);
-  fails += ui::runUiSelfTest();
+  fails += litholattice::runLithoGuiSelftest() ? 0 : 1;  // Litho GUI migration: bool pass, not a fail count
   fails += runGameUiSelfTest();
   fails += runWiringSelfTest();
   fails += runSpriteHostSelfTest(packDirs);
   fails += runLocomotionSelfTest();
+  fails += runComponentTestSelfTest();  // 2026-11-12 (JD t5295u / t5296u)
   {  // render.fps_cap (A4 / brief B7, 2026-10-13): the game-side wiring of
      // the engine cFramePacer Ã¢â‚¬â€ Settings field, JSON persistence, the
      // render.fps_cap cvar flow, and pacer drive semantics. Deterministic
@@ -549,6 +558,140 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
                   back->hotbar[1] == kAir && slotIs(back->inventory, 0, uint32_t(kRedTrace), 7) &&
                   slotIs(back->inventory, 1, kItemFragment, 1) && back->inventory.slotAt(2).empty(),
               "save (P2b-1): v4 hotbar + inventory string ids name-remap on load (rename alias follows); an unknown item drops alone");
+      }
+      {  // C9 (2026-11-12): v4 inventory blocks from A9 (58 slots: 16 hotbar + 2 + 4x8 main + 8 gear,
+         // C9's own layout again) load as written, and 50-slot (8-slot hotbar) blocks remap section
+         // by section: hotbar, hands, main and gear keep their places.
+        bool allOk = true;
+        for (const int layout : {kPreFourRowTotalSlots, kLegacyTotalSlots}) {
+          storage::ByteWriter w;
+          w.u16(4);
+          f32w(w, 1.f); f32w(w, 64.f); f32w(w, 2.f); f32w(w, 0.f); f32w(w, 0.f);
+          w.bytes(storage::Bytes{'w', 'a', 'f', 'e', 'r'});
+          w.u8(0);
+          w.u8(0);   // hotbar field: none
+          w.u16(0);  // stats
+          w.u16(0);  // vitals
+          w.u16(uint16_t(layout));
+          const int hot = layout == kLegacyTotalSlots ? kLegacyInvHotbarSlots : kInvHotbarSlots;
+          for (int i = 0; i < layout; ++i) {
+            uint16_t c = 0;
+            if (i == 0) c = 1;                                  // hotbar 0
+            else if (i == hot) c = 2;                           // Left Hand
+            else if (i == hot + 2) c = 3;                       // main 0
+            else if (i == hot + 2 + kLegacyMainSlots - 1) c = 4;  // main 31 (the old last main slot)
+            else if (i == hot + 2 + kLegacyMainSlots) c = 5;    // gear Head
+            else if (i == layout - 1) c = 6;                    // gear Mind
+            const char* sid = c ? "lithokraft:red_wire" : "";
+            w.bytes(storage::Bytes(sid, sid + std::strlen(sid)));
+            w.u16(c);
+          }
+          writeRawPlayer(pdir, w.out);
+          cWorldSave save(pdir);
+          std::string err;
+          const auto back = save.readPlayer(&err);
+          const uint32_t R = uint32_t(kRedTrace);
+          bool ok = back && back->hasInventory && slotIs(back->inventory, 0, R, 1) && slotIs(back->inventory, kInvHotbarSlots, R, 2) &&
+                    slotIs(back->inventory, kMainFlatBase, R, 3) && slotIs(back->inventory, kMainFlatBase + 31, R, 4) &&
+                    slotIs(back->inventory, kCarrySlots + kGearHead, R, 5) && slotIs(back->inventory, kCarrySlots + kGearMind, R, 6);
+          if (back)
+            for (int f = kMainFlatBase + 32; f < kCarrySlots; ++f) ok = ok && back->inventory.slotAt(f).empty();
+          allOk = allOk && ok;
+        }
+        check(allOk && kTotalSlots == 58 && kMainSlots == 32 && kCarrySlots == 50,
+              "save (C9 4x8): A9 58-slot inventories load as written and 50-slot (8-hotbar) ones remap into the 58-slot layout");
+      }
+      // C9 (2026-11-12): a B9 90-slot inventory (4x16 main, gear 82..89) loads into the 4x8 layout.
+      // Hotbar / hands / main 0..31 keep their places, gear lands on 50..57, B9 main 32..63 spill (in
+      // order) into the first free main, then hotbar, then hand slots; a stack with no room is logged,
+      // never silently lost: the untouched B9 file stays as player.lat.b9-90slot.bak.
+      auto writeB9 = [&](const std::vector<std::pair<int, uint16_t>>& filled, bool withData, int dataRaw) {
+        storage::ByteWriter w;
+        w.u16(withData ? 5 : 4);
+        f32w(w, 1.f); f32w(w, 64.f); f32w(w, 2.f); f32w(w, 0.f); f32w(w, 0.f);
+        w.bytes(storage::Bytes{'w', 'a', 'f', 'e', 'r'});
+        w.u8(0);
+        w.u8(0);
+        w.u16(0);
+        w.u16(0);
+        w.u16(uint16_t(kB9TotalSlots));
+        for (int i = 0; i < kB9TotalSlots; ++i) {
+          uint16_t c = 0;
+          for (const auto& fc : filled)
+            if (fc.first == i) c = fc.second;
+          const char* sid = c ? "lithokraft:red_wire" : "";
+          w.bytes(storage::Bytes(sid, sid + std::strlen(sid)));
+          w.u16(c);
+        }
+        if (withData) {
+          w.u16(1);
+          w.u16(uint16_t(dataRaw));
+          w.bytes(storage::Bytes{'c', '9'});
+          w.u16(0);
+        }
+        writeRawPlayer(pdir, w.out);
+      };
+      {
+        std::error_code ec;
+        std::filesystem::remove(pdir / "player.lat.b9-90slot.bak", ec);
+        const int b9Main = kMainFlatBase, b9Gear = kMainFlatBase + kB9MainSlots;  // 18, 82
+        writeB9({{0, 1}, {kInvHotbarSlots, 2}, {b9Main, 3}, {b9Main + 31, 4}, {b9Main + 32, 7}, {b9Main + 63, 8},
+                 {b9Gear + kGearHead, 5}, {b9Gear + kGearMind, 6}},
+                true, b9Main + 63);
+        cWorldSave save(pdir);
+        std::string err;
+        const auto back = save.readPlayer(&err);
+        const uint32_t R = uint32_t(kRedTrace);
+        const bool kept = back && back->hasInventory && slotIs(back->inventory, 0, R, 1) && slotIs(back->inventory, kInvHotbarSlots, R, 2) &&
+                          slotIs(back->inventory, kMainFlatBase, R, 3) && slotIs(back->inventory, kMainFlatBase + 31, R, 4) &&
+                          slotIs(back->inventory, kCarrySlots + kGearHead, R, 5) && slotIs(back->inventory, kCarrySlots + kGearMind, R, 6);
+        check(kept, "save (C9 from B9): a 90-slot B9 inventory keeps hotbar, hands and main 0..31 in place; gear 82..89 lands on 50..57");
+        const bool spilled = back && slotIs(back->inventory, kMainFlatBase + 1, R, 7) && slotIs(back->inventory, kMainFlatBase + 2, R, 8);
+        check(spilled, "save (C9 from B9): B9 main 32..63 stacks move, in order, to the first free C9 main slots (none deleted)");
+        check(back && back->inventory.slotAt(kMainFlatBase + 2).customName == "c9",
+              "save (C9 from B9): a moved B9 stack keeps its stack data (name) in its new slot");
+        check(std::filesystem::exists(pdir / "player.lat.b9-90slot.bak", ec),
+              "save (C9 from B9): the untouched B9 player.lat is kept as player.lat.b9-90slot.bak");
+      }
+      {
+        std::error_code ec;
+        std::filesystem::remove(pdir / "player.lat.b9-90slot.bak", ec);
+        std::vector<std::pair<int, uint16_t>> filled;
+        for (int i = 0; i < kInvHotbarSlots; ++i)
+          if (i != 5) filled.push_back({i, 1});  // hotbar 5 free
+        filled.push_back({kInvHotbarSlots, 1});  // Left Hand filled, Right Hand free
+        for (int i = 0; i < 32; ++i) filled.push_back({kMainFlatBase + i, 1});
+        filled.push_back({kMainFlatBase + 40, 9});
+        filled.push_back({kMainFlatBase + 41, 10});
+        filled.push_back({kMainFlatBase + 42, 11});
+        writeB9(filled, false, 0);
+        cWorldSave save(pdir);
+        std::string err;
+        const auto back = save.readPlayer(&err);
+        const uint32_t R = uint32_t(kRedTrace);
+        bool others = back.has_value();
+        if (back)
+          for (int i = 0; i < 32; ++i) others = others && slotIs(back->inventory, kMainFlatBase + i, R, 1);
+        check(back && others && slotIs(back->inventory, 5, R, 9) && slotIs(back->inventory, kInvHotbarSlots + 1, R, 10) &&
+                  slotIs(back->inventory, 0, R, 1),
+              "save (C9 from B9): with the main grid full, overflow fills free hotbar slots, then the hands (nothing overwritten)");
+        int total = 0;
+        if (back)
+          for (const auto* s : back->inventory.allSlots()) total += s->empty() ? 0 : 1;
+        check(back && total == kCarrySlots && std::filesystem::exists(pdir / "player.lat.b9-90slot.bak", ec),
+              "save (C9 from B9): a stack with no free slot is not loaded but stays in the kept B9 file (logged)");
+      }
+      {  // C9 fix 3 (JD): creative placement never takes from the stack; survival takes one.
+        ItemStack one{uint32_t(kStone), 1}, full{uint32_t(kStone), 512}, s1{uint32_t(kStone), 1}, s512{uint32_t(kStone), 512};
+        const bool c1 = !consumePlacedOne(one, true) && one.itemId == uint32_t(kStone) && one.count == 1;
+        const bool c512 = !consumePlacedOne(full, true) && full.count == 512;
+        bool many = true;
+        for (int i = 0; i < 600; ++i) many = many && !consumePlacedOne(one, true);
+        check(c1 && c512 && many && one.count == 1,
+              "place (C9 creative): placing leaves the stack unchanged (from 1, from a full 512, after 600 places)");
+        const bool v1 = consumePlacedOne(s1, false) && s1.empty();
+        const bool v512 = consumePlacedOne(s512, false) && s512.count == 511 && s512.itemId == uint32_t(kStone);
+        check(v1 && v512, "place (C9 survival): placing still takes exactly one (512 -> 511, 1 -> empty)");
       }
       {  // C-L1 (P3-2): a v4 body with a trailing byte (CRC covers it, so
          // only the exact-consumption check can catch it) is refused; and
@@ -1368,6 +1511,11 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         else std::printf("  (no item icon for %.*s: textures/ui/icons/%.*s.png)\n", int(d.stringId.size()), d.stringId.data(), int(d.iconName.size()), d.iconName.data());
       }
       check(ok && itemIcons == itemDefs, "items: every non-block item has a textures/ui/icons icon in the pack stack (16 x 16 for the HUD)");
+      // B9 2026-11-12 (JD): Resin is an item -- the HUD gets its pot icon, an inventory holds and stacks it.
+      const Image* ri = rm.itemIcon(kItemResin);
+      Inventory rinv;
+      check(ok && ri && ri->width() == 16 && rinv.addItem(kItemResin, 3) == 0 && rinv.countOf(kItemResin) == 3,
+            "RESIN: the item has its HUD icon (pot) and a player inventory holds / stacks it (creative Equipment lists every item)");
     }
     {  // Fresh spawn inventory (items workstream): the Fragment is granted on
        // spawn and a fresh Inventory can hold every lore tool item.
@@ -1392,15 +1540,28 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
     }
     {
       HudLayer hud;
-      cHudUiRenderer r(hud, {}, [&](std::string_view) { return rm.icon(kRedTorch); });
-      r.drawImage({0, 0, 32, 32}, "block:4", {1, 1, 1, 1});
-      check(hud.draws.size() > 4, "hotbar: a block icon paints as pixel rects, not a single swatch");
+      lithogui::DrawList iconList;
+      iconList.imageQuad({0, 0, 32, 32}, ui::iconTextureId("block:4"), 1.0f);
+      cHudUiRenderer r(hud, [](int) { return std::optional<lithogui::Color>{}; },
+                       [&](int id) -> const Image* { return ui::iconTextureName(id) == "block:4" ? rm.icon(kRedTorch) : nullptr; });
+      r.render(iconList);
+      check(hud.draws.size() == 1 && hud.draws[0].icon && hud.iconAtlas && hud.iconAtlasVersion > 0,
+            "hotbar: a block icon paints as ONE textured quad (Phase B), not pixel rects or a swatch");
     }
     const cTextureReg& tex = rm.textures();
     const auto mats = rm.materials();
     auto face = [&](BlockId b, FaceSlot f, bool active) { return tex.texture(TextureId{mats->face(b, f, active).layer}).name; };
     check(ok && tex.textures().size() > 80 && tex.missingNames().empty() && rm.models().size() >= 24,
           "pack_64 resources.json: every texture loads into the registry, 24+ block models");
+    {  // D9 fix 2 (JD): the shipped theme's hotbar outline is the deeper violet #8A2EFF, 3 px; generic slots stay white.
+      const ui::Color hc = rm.theme().style("hotbar_slot").accent, sc = rm.theme().style("slot").accent;
+      auto nearC = [](float a, float b) { return std::fabs(a - b) < 0.5f / 255.f; };
+      check(rm.theme().hasStyle("hotbar_slot") && nearC(hc.r, 138.f / 255.f) && nearC(hc.g, 46.f / 255.f) && nearC(hc.b, 1.f) && nearC(hc.a, 1.f),
+            "hotbar (D9): the loaded ui/theme.json hotbar outline is #8A2EFF, opaque");
+      check(std::fabs(rm.theme().style("hotbar_slot").selectedWidth - 3.f) < 1e-4f && rm.theme().style("slot").selectedWidth == 0.f,
+            "hotbar (D9): the loaded ui/theme.json hotbar selected outline is 3 px (selected_width); generic slots keep the legacy width");
+      check(nearC(sc.r, 1.f) && nearC(sc.g, 1.f) && nearC(sc.b, 1.f), "hotbar (C9): the generic slot outline in ui/theme.json stays white");
+    }
     {  // fix 3c (JD t2288u): stacked vias draw the model's connected side variants (tinted)
       auto cs = [&](BlockId b, int v) { const FaceMaterial* m = mats->connectedSide(b, v, false); return m ? tex.texture(TextureId{m->layer}).name : std::string(); };
       bool tinted = true;
@@ -1445,6 +1606,31 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
               mats->tintSlot(mats->face(kRepeator, FaceSlot::Front, false).layer) != 0 &&
               tex.texture(TextureId{uint16_t(b.tintMask[mats->tintSlot(mats->face(kRepeator, FaceSlot::Front, false).layer) - 1])}).name == "repeator_front_tintmask",
           "materials: wire pieces, palettes and shader masks resolved from the models (no names in C++)");
+    {  // 2026-11-09 wire float hunt (JD live report on build 113): the port
+      // riser (trace arm), asserted HERE because only the real pack-built
+      // materials resolve named("trace_arm_*")... the content selftest's
+      // pack-less materials never do, so the riser branch cannot draw
+      // there. Flat blue span between two bound Catchors on stone: the
+      // risers stand on the wire's seat, the support top = the wire cell's
+      // floor (mesh y 16), climbing to +3 (the component port pads).
+      MeshInput in{};
+      for (auto& id : in.id) id = kAir;
+      auto at = [&](int x, int y, int z) -> BlockId& { return in.id[meshPadIndex(x + 1, y + 1, z + 1)]; };
+      auto stAt = [&](int x, int y, int z) -> CellState& { return in.st[meshPadIndex(x + 1, y + 1, z + 1)]; };
+      for (int x = 4; x <= 8; ++x) at(x, 0, 5) = kStone;
+      at(4, 1, 5) = kCatchor; stAt(4, 1, 5) = makeState(0, 1, 0);
+      at(8, 1, 5) = kCatchor; stAt(8, 1, 5) = makeState(0, 1, 0);
+      for (int x = 5; x <= 7; ++x) at(x, 1, 5) = kBlueTrace;
+      stAt(6, 1, 5) = makeState(40);
+      const ChunkMesh m = meshSubChunk(in, MeshContext{blockRegistry(), *mats, &blockAppearance()});
+      const FaceMaterial* arm = mats->named("trace_arm_blue");
+      int mnY = 1 << 30, mxY = -1;
+      if (arm)
+        for (const PackedVertex& v : m.verts)
+          if (v.layerIndex() == arm->layer) { mnY = std::min(mnY, int(v.y)); mxY = std::max(mxY, int(v.y)); }
+      check(ok && arm && mxY >= 0 && mnY == 16 && mxY == 16 + 3,
+            "appearance: port risers stand on the wire's seat (real materials, flat component span)");
+    }
     {  // 2026-10-16 (JD): Alpha build counter - fields 0..63, carry left on 64.
       using V = std::array<int, 4>;
       check(bumpBuildVersion(V{0, 0, 1, 0}) == V{0, 0, 1, 1} && bumpBuildVersion(V{0, 0, 1, 63}) == V{0, 0, 2, 0} &&

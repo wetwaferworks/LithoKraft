@@ -6,7 +6,7 @@
 #include <vector>
 #include "litholattice/input/device_state.h"
 #include "litholattice/input/input_event.h"
-#include "litholattice/ui/events.h"
+#include "lithokraft/game/ui_facade.h"
 
 namespace lithokraft {
 

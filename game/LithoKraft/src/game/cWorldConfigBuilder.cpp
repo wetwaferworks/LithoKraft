@@ -32,6 +32,7 @@ GameConfig cWorldConfigBuilder::build(const Launch& l, const std::vector<std::st
     else if (a == "--test-world-examples") { c.benchScene = "testworld"; c.testWorldExamples = true; }
     else if (a == "--flat-lab") { c.benchScene = "testworld"; c.testWorldExamples = true; c.dimension = "flatlab"; }
     else if (a == "--bolt-lab") { c.benchScene = "boltlab"; c.dimension = "flatlab"; }
+    else if (a == "--component-test") { c.benchScene = "componenttest"; c.dimension = "componenttest"; }  // 2026-11-12 (JD)
     else if (a == "--bench-scene" && more) c.benchScene = args[++i];
     else if (a == "--spawn" && more) c.startSpawn = args[++i];
     else if (a == "--renderer" && more) ++i;  // the running renderer stays
@@ -46,6 +47,11 @@ GameConfig cWorldConfigBuilder::build(const Launch& l, const std::vector<std::st
     if (saveDir.empty() && !noSave) saveDir = (root / "saves" / "playtest").lexically_normal().string();
   }
   if (c.benchScene == "boltlab" && saveDir.empty()) noSave = true;
+  if (c.benchScene == "componenttest") {  // 2026-11-12 (JD): persists like the Flat Lab (saves/component-test)
+    const char* fresh = std::getenv("LL_TESTWORLD_FRESH");
+    if (saveDir.empty() && !noSave && !(fresh && fresh[0] == '1')) saveDir = (root / "saves" / "component-test").lexically_normal().string();
+    if (saveDir.empty()) noSave = true;
+  }
   if (c.benchScene == "testworld") {
     if (l.playtestSpawn) c.testWorldExamples = true;
     c.sceneSize = l.romScreen >= 64 ? 64 : 32;

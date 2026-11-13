@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include "litholattice/core/atomic_gate.h"
 
 namespace lithokraft {
 namespace {
@@ -33,8 +32,7 @@ cMcpPlayerController::cMcpPlayerController(litholattice::cInputSystem& input,
 }
 
 std::vector<std::string> cMcpPlayerController::pilotIds() const {
-  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
-  return pilotIds_;
+  return pilotIds_;  // mutexfree 2b: immutable after construction (no gate needed)
 }
 
 Key cMcpPlayerController::keyFor(Action a) const {
@@ -49,7 +47,7 @@ void cMcpPlayerController::setHeld(Action a, bool held, bool& shadow,
   if (held == shadow) return;
   const Key k = keyFor(a);
   if (k == Key::Count) {
-    ++droppedUnbound_;
+    droppedUnbound_.fetch_add(1, std::memory_order_relaxed);
     shadow = held;  // don't spam the counter every frame
     return;
   }
@@ -61,7 +59,7 @@ void cMcpPlayerController::setHeld(Action a, bool held, bool& shadow,
 void cMcpPlayerController::pressOnce(Action a, std::vector<InputEvent>& out) {
   const Key k = keyFor(a);
   if (k == Key::Count) {
-    ++droppedUnbound_;
+    droppedUnbound_.fetch_add(1, std::memory_order_relaxed);
     return;
   }
   // Down+up in one batch: pressed() is true for exactly this frame
@@ -75,7 +73,7 @@ bool cMcpPlayerController::submitFrame(std::string_view pilot, const ControlFram
   std::vector<InputEvent> ev;
   ev.reserve(16);
   {
-    litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
+    owner_.check();  // mutexfree 2b: single MCP owner thread (was mutex_)
     auto it = pilots_.find(pilot);
     if (it == pilots_.end()) return false;  // unknown pilot (tool layer rejects first)
     PilotState& st = it->second;
@@ -105,7 +103,7 @@ bool cMcpPlayerController::submitFrame(std::string_view pilot, const ControlFram
 void cMcpPlayerController::releaseAll(std::string_view pilot) {
   std::vector<InputEvent> ev;
   {
-    litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
+    owner_.check();  // mutexfree 2b: single MCP owner thread (was mutex_)
     auto it = pilots_.find(pilot);
     if (it == pilots_.end()) return;
     PilotState& st = it->second;
@@ -121,8 +119,7 @@ void cMcpPlayerController::releaseAll(std::string_view pilot) {
 }
 
 uint64_t cMcpPlayerController::droppedUnbound() const {
-  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
-  return droppedUnbound_;
+  return droppedUnbound_.load(std::memory_order_relaxed);  // mutexfree 2b
 }
 
 cMcpPlayerView::cMcpPlayerView(std::function<GameState()> snapshot)

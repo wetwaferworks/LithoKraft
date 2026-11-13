@@ -106,8 +106,9 @@ Spawn buildDemoCircuit(ChunkMap& w, int ox, int oz) {
   put(22, y, 28, kButton);
   put(23, y, 28, kLatchor, makeState(0, E));
   put(24, y, 28, kRedTrace); put(25, y, 28, kLamp);
-  // Redirector: a Switch on its left side, output out the front -> Lamp.
-  put(30, y, 27, kSwitch, makeState(0, 0, 0, true));
+  // Multiplexor (2026-11-11 JD t5252u): facing east, A=west (back), B=south (right),
+  // control=north (left), out=east. Switch on A; control off selects A, so the front lamp lights.
+  put(29, y, 28, kSwitch, makeState(0, 0, 0, true));
   put(30, y, 28, kRedirector, makeState(0, E));
 
   // Row z=30: Tone Block. Switch (off) -> 28 red traces (64..37) -> Tone Block plays s=37 = C5.

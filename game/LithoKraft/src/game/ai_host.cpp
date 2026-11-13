@@ -51,7 +51,6 @@ void cAiHost::unbindWorld() {
   blocks_ = nullptr;
   pool_ = nullptr;
   observerSet_ = false;
-  litholattice::cGateGuard l(invMutex_);
   pendingCols_.clear();
 }
 
@@ -66,7 +65,6 @@ void cAiHost::setEnabled(bool on) {
     // Belt-and-braces (B-H1): anything posted in the enable/disable race
     // window is worthless now -- there is no cache to invalidate, and the
     // next construct() builds fresh from the live map regardless.
-    litholattice::cGateGuard l(invMutex_);
     pendingCols_.clear();
   }
 }
@@ -78,8 +76,7 @@ void cAiHost::postEditedColumn(int cx, int cz) {
   // one atomic load on the mutating thread, no mutex, no growth.
   if (!enabled_.load()) return;
   const uint64_t key = (uint64_t(uint32_t(cx)) << 32) | uint32_t(cz);
-  litholattice::cGateGuard l(invMutex_);
-  pendingCols_.push_back(key);
+  pendingCols_.push(key);  // ownership handoff to drainInvalidations()
 }
 
 void cAiHost::drainInvalidations() {
@@ -87,15 +84,11 @@ void cAiHost::drainInvalidations() {
   // but the queue must still be EMPTIED, never left to accumulate behind
   // the early return (the pre-fix bug: this return skipped the clear).
   if (!nav_) {
-    litholattice::cGateGuard l(invMutex_);
     pendingCols_.clear();
     return;
   }
   std::vector<uint64_t> cols;
-  {
-    litholattice::cGateGuard l(invMutex_);
-    cols.swap(pendingCols_);
-  }
+  pendingCols_.drain([&cols](uint64_t k) { cols.push_back(k); });  // phase edge
   if (cols.empty()) return;
   std::sort(cols.begin(), cols.end());
   cols.erase(std::unique(cols.begin(), cols.end()), cols.end());
@@ -117,7 +110,6 @@ void cAiHost::construct() {
   // anyway -- this keeps the queue from replaying ancient history on
   // first advance).
   {
-    litholattice::cGateGuard l(invMutex_);
     pendingCols_.clear();
   }
   // Prewarm the spawn area on this (owner) thread per the cWalkCache

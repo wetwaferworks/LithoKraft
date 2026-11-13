@@ -140,6 +140,11 @@ std::vector<ItemDef> buildItemTable() {
       {kItemResist, "lithokraft:resist", "Resist",
        false, false, ToolAction::None, 0, 0, "", false,
        /*maxStack*/ 512, /*tier*/ 0, "", /*model*/ "", "resist", false},
+      // Resin (B9 2026-11-12, JD): ITEM ONLY, look B Pot. Id proposed (OPEN). No block / coating / applicator;
+      // apply / remove / bonding / assembly limits are OPEN. See items.h.
+      {kItemResin, "lithokraft:resin", "Resin",
+       false, false, ToolAction::None, 0, 0, "", false,
+       /*maxStack*/ 512, /*tier*/ 0, "", /*model*/ "resin_item", "resin", false},
       // Chipor as an item: the printed chip. Block-backed -- the itemId IS
       // the Chipor BlockId, so a held Chipor and a placed Chipor are the
       // same id (the Etchor's name field names the individual chip in its

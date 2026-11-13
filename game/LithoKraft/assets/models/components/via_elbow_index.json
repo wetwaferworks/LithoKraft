@@ -1,0 +1,178 @@
+{
+  "format": "lithokraft_via_voxel_v2_concept",
+  "version": "elbow-v1",
+  "concept": "B Lattice cage - 90-degree turn junction",
+  "status": "APPROVED by JD (concept B lattice cage, 2026-11-11 10:22 PM ET; 90-degree elbows approved 10:44 PM ET, \"those look great\")",
+  "resolution": 32,
+  "lthm_level": 5,
+  "axes": "x=east, y=up, z=south; canonical elbow open at +Y (top, y=31) and +Z (south, z=31); casing faces x0 / x31 / z0 / y0 inert",
+  "engine_ids": {
+    "red": "lithokraft:red_via",
+    "blue": "lithokraft:blue_via"
+  },
+  "engine_id_for_elbow": "OPEN - same id with a corner state, or a second block, is not ruled",
+  "shape": "cube_transparent (full block, real cutouts)",
+  "geometry": "red and blue share these meshes; channel tint only",
+  "facing": "one canonical elbow; engine rotates it to any of the 12 adjacent-face pairs",
+  "open_ends": "two adjacent faces only (90-degree turn). No T, Y or cross junctions.",
+  "casing": "other four faces inert: no nubs, no port glow, no openings beyond the cage gaps",
+  "core": "quarter torus r<4.2 about the inner edge line, centreline radius 16; continuous, no miter",
+  "hoops": "half-hoop on each joined face (as straight B joints) + radial hoops at 30 and 60 deg (centreline spacing 8.38 vs straight period 8)",
+  "strength": "0 = off tint (dark core); 1-64 = tint mats lit; intensity curve not ruled",
+  "tint_mats": [
+    4,
+    12,
+    15
+  ],
+  "materials": {
+    "1": {
+      "name": "base",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#454D63",
+      "tint": false
+    },
+    "4": {
+      "name": "glow_seam",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "8": {
+      "name": "well",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "9": {
+      "name": "housing",
+      "neutral_hex": "#1D165A",
+      "tint": false
+    },
+    "10": {
+      "name": "accent",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "11": {
+      "name": "pale",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "12": {
+      "name": "barrel_glow",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "13": {
+      "name": "bezel",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "14": {
+      "name": "glass",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "15": {
+      "name": "core",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "18": {
+      "name": "housing_hi",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "19": {
+      "name": "purple_glow",
+      "neutral_hex": "#8B65DD",
+      "tint": false
+    }
+  },
+  "tint_colors": {
+    "red": {
+      "off": "#5A5556",
+      "on": "#FF514B"
+    },
+    "blue": {
+      "off": "#535659",
+      "on": "#2FB4FF"
+    }
+  },
+  "join_rule": "an arm end is a joint only when a same-colour via meets it end-to-end on that arm's axis; otherwise it keeps its mouth",
+  "variants": [
+    {
+      "variant": "single",
+      "up_arm_y31": "mouth",
+      "side_arm_z31": "mouth",
+      "lthm": "models/via_B_elbow_single.lthm",
+      "voxels_json": "models/via_B_elbow_single.voxels.json",
+      "cells": 7578,
+      "textures": {
+        "up": "textures/blocks/via/via_B_elbow_up_single_base.png",
+        "south": "textures/blocks/via/via_B_elbow_south_single_base.png",
+        "east": "textures/blocks/via/via_B_elbow_east_single_base.png",
+        "west": "textures/blocks/via/via_B_elbow_west_single_base.png",
+        "north": "textures/blocks/via/via_B_elbow_north_single_base.png",
+        "down": "textures/blocks/via/via_B_elbow_down_single_base.png"
+      }
+    },
+    {
+      "variant": "upjoint",
+      "up_arm_y31": "joint",
+      "side_arm_z31": "mouth",
+      "lthm": "models/via_B_elbow_upjoint.lthm",
+      "voxels_json": "models/via_B_elbow_upjoint.voxels.json",
+      "cells": 6656,
+      "textures": {
+        "up": "textures/blocks/via/via_B_elbow_up_upjoint_base.png",
+        "south": "textures/blocks/via/via_B_elbow_south_upjoint_base.png",
+        "east": "textures/blocks/via/via_B_elbow_east_upjoint_base.png",
+        "west": "textures/blocks/via/via_B_elbow_west_upjoint_base.png",
+        "north": "textures/blocks/via/via_B_elbow_north_upjoint_base.png",
+        "down": "textures/blocks/via/via_B_elbow_down_upjoint_base.png"
+      }
+    },
+    {
+      "variant": "sidejoint",
+      "up_arm_y31": "mouth",
+      "side_arm_z31": "joint",
+      "lthm": "models/via_B_elbow_sidejoint.lthm",
+      "voxels_json": "models/via_B_elbow_sidejoint.voxels.json",
+      "cells": 6656,
+      "textures": {
+        "up": "textures/blocks/via/via_B_elbow_up_sidejoint_base.png",
+        "south": "textures/blocks/via/via_B_elbow_south_sidejoint_base.png",
+        "east": "textures/blocks/via/via_B_elbow_east_sidejoint_base.png",
+        "west": "textures/blocks/via/via_B_elbow_west_sidejoint_base.png",
+        "north": "textures/blocks/via/via_B_elbow_north_sidejoint_base.png",
+        "down": "textures/blocks/via/via_B_elbow_down_sidejoint_base.png"
+      }
+    },
+    {
+      "variant": "mid",
+      "up_arm_y31": "joint",
+      "side_arm_z31": "joint",
+      "lthm": "models/via_B_elbow_mid.lthm",
+      "voxels_json": "models/via_B_elbow_mid.voxels.json",
+      "cells": 5550,
+      "textures": {
+        "up": "textures/blocks/via/via_B_elbow_up_mid_base.png",
+        "south": "textures/blocks/via/via_B_elbow_south_mid_base.png",
+        "east": "textures/blocks/via/via_B_elbow_east_mid_base.png",
+        "west": "textures/blocks/via/via_B_elbow_west_mid_base.png",
+        "north": "textures/blocks/via/via_B_elbow_north_mid_base.png",
+        "down": "textures/blocks/via/via_B_elbow_down_mid_base.png"
+      }
+    }
+  ],
+  "approved_concept": "B",
+  "approved_by": "JD, 2026-11-11 10:22 PM ET (straight B); 10:44 PM ET (elbows)"
+}

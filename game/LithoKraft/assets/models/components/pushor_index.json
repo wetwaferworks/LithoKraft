@@ -1,0 +1,235 @@
+{
+  "format": "lithokraft_pushor_voxel_v1",
+  "version": "v1",
+  "concept": "B Honeycomb face",
+  "status": "APPROVED by JD (concept B), 2026-11-11 10:28 PM ET",
+  "engine_id": "lithokraft:pushor",
+  "resolution": 32,
+  "lthm_level": 5,
+  "shape": "full block",
+  "renders": "resinview = same family camera, block placed facing EAST so the resin face is visible",
+  "axes": "x=east, y=up, z=south. Canonical facing NORTH: FRONT/resin pushing face z=0 (away from family camera). Engine rotates into 6 facings.",
+  "ports": {
+    "front_north": "PUSHING FACE, resin surface: no Trace wire",
+    "back/east/west/top/bottom": "accept Trace wire; read soft and hard power"
+  },
+  "materials": {
+    "1": {
+      "name": "base",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#454D63",
+      "tint": false
+    },
+    "4": {
+      "name": "glow_seam",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "5": {
+      "name": "button_up",
+      "neutral_hex": "#9A9A9A",
+      "tint": true
+    },
+    "6": {
+      "name": "button_down",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "7": {
+      "name": "button_well",
+      "neutral_hex": "#161922",
+      "tint": false
+    },
+    "8": {
+      "name": "readout_window",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "9": {
+      "name": "housing",
+      "neutral_hex": "#1D165A",
+      "tint": false
+    },
+    "10": {
+      "name": "accent",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "11": {
+      "name": "pale",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "12": {
+      "name": "glyph",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "13": {
+      "name": "bezel",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "14": {
+      "name": "rotor",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "15": {
+      "name": "well",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "16": {
+      "name": "channel",
+      "neutral_hex": "#5B3DB5",
+      "tint": true
+    },
+    "17": {
+      "name": "port_b",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "18": {
+      "name": "purple_glow",
+      "neutral_hex": "#8B65DD",
+      "tint": false
+    },
+    "19": {
+      "name": "port_c",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "20": {
+      "name": "purple_dim",
+      "neutral_hex": "#2A1F6E",
+      "tint": false
+    },
+    "21": {
+      "name": "sclera",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "22": {
+      "name": "iris_out",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "23": {
+      "name": "iris_in",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "24": {
+      "name": "pupil",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "25": {
+      "name": "glint",
+      "neutral_hex": "#FFFFFF",
+      "tint": false
+    },
+    "26": {
+      "name": "lid",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "30": {
+      "name": "resin_deep",
+      "neutral_hex": "#6A3510",
+      "tint": false
+    },
+    "31": {
+      "name": "resin",
+      "neutral_hex": "#B5651B",
+      "tint": false
+    },
+    "32": {
+      "name": "resin_mid",
+      "neutral_hex": "#DE8A2A",
+      "tint": false
+    },
+    "33": {
+      "name": "resin_hi",
+      "neutral_hex": "#F4B24A",
+      "tint": false
+    },
+    "34": {
+      "name": "resin_spec",
+      "neutral_hex": "#FFE2A0",
+      "tint": false
+    },
+    "35": {
+      "name": "casing",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "36": {
+      "name": "casing_rail",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    }
+  },
+  "tint_colors": {
+    "red": {
+      "off": "#5A5556",
+      "on": "#FF514B"
+    },
+    "blue": {
+      "off": "#535659",
+      "on": "#2FB4FF"
+    }
+  },
+  "tint_channels": {
+    "power": {
+      "mats": [
+        4,
+        16
+      ],
+      "mask": "*_tintmask.png",
+      "lit_when": "powered",
+      "faces": [
+        "top",
+        "bottom",
+        "back",
+        "east",
+        "west"
+      ],
+      "front": "no tint (resin)"
+    }
+  },
+  "states": [
+    {
+      "state": "retracted",
+      "lthm": "models/pushor_B_retracted.lthm"
+    },
+    {
+      "state": "extended (ILLUSTRATIVE)",
+      "lthm_base": "models/pushor_B_extended_base.lthm",
+      "lthm_head": "models/pushor_B_head.lthm",
+      "note": "head drawn one cell out like the Java piston; Pushor extension distance is OPEN"
+    }
+  ],
+  "behaviour_not_mesh": [
+    "push limit 32",
+    "one-tick spit vs push-and-retract",
+    "quasi-connectivity"
+  ],
+  "resin_mats": [
+    30,
+    31,
+    32,
+    33,
+    34
+  ]
+}

@@ -60,6 +60,7 @@
 //   a map reference).
 #pragma once
 
+#include "litholattice/core/phase_handoff.h"
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -97,8 +98,7 @@ class cAiHost {
   /// drain. Provably 0 at all times while the gate is off (posts are
   /// dropped at the sink), and 0 again after every advance() drain.
   size_t pendingInvalidations() const {
-    litholattice::cGateGuard l(invMutex_);
-    return pendingCols_.size();
+    return pendingCols_.sizeHint();
   }
   /// True when an cAiWorld actually exists (bound + enabled).
   bool constructed() const { return world_ != nullptr; }
@@ -138,8 +138,9 @@ class cAiHost {
   std::atomic<bool> enabled_ = false;  // ai.enabled gate (default OFF)
   bool observerSet_ = false;
   litholattice::ai::Cell observer_{};
-  mutable litholattice::cAtomicGate invMutex_;
-  std::vector<uint64_t> pendingCols_;  // packed column keys from the edit listener
+  // MUTEX-FREE (scratch, 2026-11-11): the edit listener (mutating thread) hands column keys off;
+  // the owner thread drains/clears them at its phase edge. Replaces invMutex_ + vector.
+  litholattice::cPhaseHandoff<uint64_t> pendingCols_;  // packed column keys from the edit listener
 };
 
 /// The game's NavRules for the engine cWalkCache (P0): solidity from

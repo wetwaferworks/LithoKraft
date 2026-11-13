@@ -55,6 +55,17 @@ struct ComponentInputs {
   /// neighbour (cCompBehavior::readLevel, or the wafer count of an Input Buffer), -1 = nothing
   /// readable there. Filled only for Thresholdors (the comparator reads what sits behind it).
   std::array<int, 4> level{-1, -1, -1, -1};
+  /// B9 2026-11-12 (JD): Watchor only -- the cell straight ahead of its front (the eye), read in the
+  /// component pass before any apply. watchValid = false: nothing was read (not a Watchor).
+  BlockId watchId = 0;
+  CellState watchState = 0;
+  bool watchValid = false;
+  /// B9 2026-11-12 (JD): Pushor only -- soft / hard power of the blocks above and below (its top / bottom
+  /// faces), whether a component output drives straight into a Trace face (hard powered), and whether an
+  /// adjacent (6 sides) Pushor was hard powered last tick (quasi-connectivity).
+  int pushVert = 0;
+  bool pushHard = false;
+  bool pushQuasi = false;
 
   int back(int facing) const { return side[dirBack(facing)]; }
   int left(int facing) const { return side[dirLeft(facing)]; }

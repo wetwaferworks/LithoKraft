@@ -2,15 +2,14 @@
 #include "lithokraft/game/game_ui.h"
 #include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <cstdio>
 #include <memory>
 #include <string>
 #include <vector>
 #include "lithokraft/content/blocks.h"
+#include "lithokraft/content/block_families.h"  // Item 4: palette groups + tab membership
 #include "lithokraft/content/items.h"  // itemDisplayName / itemIconRef (P2b-1 stack rendering)
-#include "litholattice/render/hud_ui_renderer.h"
-#include "litholattice/ui/containers.h"
-#include "litholattice/ui/lists.h"
 
 namespace lithokraft {
 namespace {
@@ -78,6 +77,7 @@ void cGameUi::rebuildHud() {
   const float k = s();
 
   debugPanel_ = &hud_->add<ui::cPanel>("hud");
+  debugPanel_->setDynamicSurface(true);  // JD paint ruling (2026-11-09): F3 text is a dynamic readout surface
   debugPanel_->setLayout(ui::Layout::at({0, 0}, {0, 0}, {8 * k, 24 * k}));  // Playtest 1 #5: top padding (was 8; first line clipped under the header)
   // 2026-10-16 (JD): the look-at line renders red so it stands out; the rest is unchanged.
   auto& debugStack = debugPanel_->add<ui::cStackPanel>(ui::Orientation::Vertical, 0.f);
@@ -89,13 +89,22 @@ void cGameUi::rebuildHud() {
 
   // 2026-10-31 (JD): tick stability readout, top right, coloured by cTickStabilityMeter.
   tickPanel_ = &hud_->add<ui::cPanel>("hud");
+  tickPanel_->setDynamicSurface(true);  // JD paint ruling (2026-11-09): the tick/TPS line is a dynamic readout surface
+  tickPanel_->setId("tick-panel");
   tickPanel_->setLayout(ui::Layout::at({1, 0}, {1, 0}, {-8 * k, 8 * k}));
   tickText_ = &tickPanel_->add<ui::cLabel>("", "hud_small");
 
   controlsPanel_ = &hud_->add<ui::cPanel>("hud");
+  controlsPanel_->setId("controls-panel");
   // Cortana 2026-10-16 (standards review): sits ABOVE the hotbar + slot-name rows (it used to
   // overlap the hotbar at 2x GUI scale) and uses the compact hud_small text.
-  controlsPanel_->setLayout(ui::Layout::at({0, 1}, {0, 1}, {8 * k, -(6 + 40 * hotbarScale_ + 24 + 12) * k}));
+  // 2026-11-08 (layout diagnosis item 2): the panel's placement now lifts
+  // by its REAL measured height (the facade measure fix), so this offset
+  // is only the clearance above the hotbar: hotbar (40*hotbarScale) plus
+  // BOTH name-label rows above it (slotName_ and lookName_, 24 each) plus
+  // margins. The old sum cleared only one label row and the block's last
+  // lines sat on the looked-at name.
+  controlsPanel_->setLayout(ui::Layout::at({0, 1}, {0, 1}, {8 * k, -(6 + 40 * hotbarScale_ + 48 + 12) * k}));
   controlsText_ = &controlsPanel_->add<ui::cLabel>("", "hud_controls");  // 2026-11-01 (JD): fixed size
   controlsText_->setColor({0.9f, 0.95f, 1.f, 1.f});
 
@@ -130,6 +139,7 @@ void cGameUi::rebuildHud() {
   for (int i = 0; i < kHotbarSlots; ++i) {
     ui::cSlot& slot = bar.add<ui::cSlot>(ui::Vec2{40 * k * hotbarScale_, 40 * k * hotbarScale_});  // kHotbarScale (JD 2026-10-25)
     slot.setScale(hotbarScale_ / kInventoryScale);  // frame + caption grow with the slot
+    slot.setStyleClass("hotbar_slot");  // C9 2026-11-12 (JD): own outline class; D9: #8A2EFF, 3 px
     // 2026-10-24 (JD): one row of 16; captions are the direct-select keys (1..9, 0), slots 11..16 are wheel-only.
     slot.setCaption(i < 9 ? std::to_string(i + 1) : i == 9 ? std::string("0") : std::string()).setData(i);
     slot.on("click", [this](ui::cWidget& w) {
@@ -144,9 +154,66 @@ void cGameUi::rebuildHud() {
   lookName_->setColor({1.f, 1.f, 1.f, 1.f});
   slotName_->setShadow(true);  // 2026-11-01 (JD): held-item + looked-at names always get a drop shadow
   lookName_->setShadow(true);
+
+  // Cursor stack (2026-11-11): the carried stack's floating cell. It
+  // lives in the HUD root tree (never the dialog tree, so palette
+  // rebuilds cannot drop it), LAST among the HUD children, flagged as
+  // a dynamic surface: it paints on the dynamic readout layer, above
+  // the modal dialog, and pointer motion re-expands only that layer
+  // (JD paint ruling, 2026-11-09). The HOST is disabled on purpose:
+  // hit testing stops at a disabled widget without consulting its
+  // children, so the cell that rides exactly under the pointer can
+  // never steal the click it hovers over. The cell itself stays
+  // enabled, so its paint is the ordinary slot paint (a disabled
+  // widget's background would solve to the disabled colour).
+  // Position comes from the facade's polled pointer at the tail of
+  // update(); the cell size matches a creative-main cell at this
+  // build scale (40 * k * kInventoryScale).
+  cursorCell_ = 40 * k * kInventoryScale;
+  cursorHost_ = &hud_->add<ui::cWidget>();
+  cursorHost_->setId("cursor-stack");
+  cursorHost_->setDynamicSurface(true);
+  cursorHost_->setEnabled(false);
+  cursorHost_->setVisible(false);
+  cursorSlot_ = &cursorHost_->add<ui::cSlot>(ui::Vec2{cursorCell_, cursorCell_});
+  refreshCursor(cursor_);  // re-seat the display copy on the fresh widgets
+}
+
+void cGameUi::refreshCursor(const ItemStack& stack) {
+  cursor_ = stack;
+  if (cursorSlot_) {
+    cursorSlot_->setIcon(stack.empty() ? std::string() : itemIconRef(stack.itemId));
+    cursorSlot_->setCaption(stack.empty() || stack.count <= 1 ? std::string() : std::to_string(stack.count));
+    cursorSlot_->setTooltip(stack.empty() ? std::string()
+                                          : itemDisplayName(stack.itemId) + " x" + std::to_string(stack.count));
+  }
+  // The cell shows only while the creative screen is open and a stack
+  // is carried; visibility flips ride the dynamic-membership path, so
+  // they cost one dynamic repaint, never a main-layer rebuild.
+  if (cursorHost_) cursorHost_->setVisible(!stack.empty() && inventory_ != nullptr);
+}
+
+void cGameUi::clearCursorDisplay() {
+  cursor_ = ItemStack{};
+  if (cursorSlot_) {
+    cursorSlot_->setIcon(std::string());
+    cursorSlot_->setCaption(std::string());
+    cursorSlot_->setTooltip(std::string());
+  }
+  if (cursorHost_) cursorHost_->setVisible(false);
 }
 
 void cGameUi::openInventory(int selectedSlot) { openInventory(selectedSlot, {}); }
+
+namespace {
+// B9 four-row (2026-11-12): the capacity readout derives from the layout constants
+// ("N \ 82 - 41,984 max": N filled carry slots of kCarrySlots, kCarrySlots x kMaxStack items).
+std::string creativeCapacityText(int filled) {
+  std::string mx = std::to_string(kCarrySlots * kMaxStack);
+  for (int i = int(mx.size()) - 3; i > 0; i -= 3) mx.insert(size_t(i), ",");
+  return std::to_string(filled) + " \\ " + std::to_string(kCarrySlots) + " - " + mx + " max";
+}
+}  // namespace
 
 void cGameUi::refreshCarry(const std::vector<ItemStack>& carry) {
   if (!inventory_ || carrySlots_.empty()) return;
@@ -157,72 +224,552 @@ void cGameUi::refreshCarry(const std::vector<ItemStack>& carry) {
     carrySlots_[i]->setCaption(st.empty() || st.count <= 1 ? std::string() : std::to_string(st.count));
     carrySlots_[i]->setTooltip(st.empty() ? std::string() : itemDisplayName(st.itemId) + " x" + std::to_string(st.count));  // 2026-10-31 (JD)
   }
+  if (creativeCap_) {  // Item 4: "N \ 82 - 41,984 max" (N = filled carry slots; B9: kCarrySlots x kMaxStack)
+    int filled = 0;
+    for (size_t i = 0; i < carry_.size() && i < size_t(kCarrySlots); ++i)
+      if (!carry_[i].empty()) ++filled;
+    creativeCap_->setText(creativeCapacityText(filled));
+  }
+}
+
+namespace {
+// Item 4 tab membership (Bedrock's five tabs mapped onto the registry's
+// own data): Construction = Building family; Nature = the foliage set
+// (the content layer's named foliage ids); Equipment = the wearable /
+// usable content items (the item registry's non-block items: tools, the
+// Fragment, gear items... the palette is block-based, so this tab lists
+// those item-backed blocks the registry carries); Items = everything
+// else, which is where the Trace components (the logic pieces) live;
+// All = everything.
+bool isFoliageBlock(BlockId b) {
+  static const std::vector<BlockId> kFoliage = {kFoliageCattail, kFoliageBush, kFoliageFern, kFoliageReeds,
+                                                kFoliageCrystalShrub, kFoliageMoss};
+  return std::find(kFoliage.begin(), kFoliage.end(), b) != kFoliage.end();
+}
+bool creativeTabHas(int tab, BlockId b) {
+  if (tab == 4) return true;
+  const BlockFamily f = cBlockFamilies::get().familyOf(b);
+  switch (tab) {
+    case 0: return f == BlockFamily::Building;
+    case 1: return false;  // Equipment holds ITEM entries, added by the rebuild (not blocks)
+    case 2: return f != BlockFamily::Building && !isFoliageBlock(b);
+    case 3: return isFoliageBlock(b);
+    default: return true;
+  }
+}
+std::string lowerAscii(std::string_view s) {
+  std::string out(s);
+  for (char& c : out) c = char(std::tolower(uint8_t(c)));
+  return out;
+}
+}  // namespace
+
+void cGameUi::rebuildCreativePalette() {
+  if (!paletteHost_) return;
+  paletteHost_->clearChildren();
+  // The rebuild replaces the palette subtree mid-frame (tab switch,
+  // filter edit, group toggle). The dialog around it re-centres only
+  // when its measure CHANGES (DialogHost::layout), and the WS4 gate in
+  // cUiRoot::layout skips same-generation frames... a tab whose content
+  // measures the same as the previous tab's would keep the dialog at
+  // the OLD placement, and the new grid's rects would be stamped
+  // relative to that stale origin while hit-testing walks the dialog
+  // chain elsewhere. Relayout the dialog itself after the rebuild so
+  // the whole subtree re-places in the same frame it appears.
+  ui::cWidget* dlgW = paletteHost_;
+  while (dlgW && dlgW->facadeId() != "inventory") dlgW = dlgW->parentW();
+  const bool hadRect = dlgW && dlgW->rect().w > 0;
+  const lithogui::Rect dlgRect = dlgW ? dlgW->rect() : lithogui::Rect{};
+  const float k = std::max(1.f, s());
+  const float cell = 40 * k * kInventoryScale;
+  const int cols = 9;  // the mock's palette density (was 7: sparser than approved)
+  static const char* kTabNames[5] = {"Construction", "Equipment", "Items", "Nature", "All"};
+  for (int t = 0; t < 5; ++t)
+    if (creativeTabBtns_[size_t(t)])
+      creativeTabBtns_[size_t(t)]->setText(std::string(t == creativeTab_ ? "> " : "") + kTabNames[t] + (t == creativeTab_ ? " <" : ""));
+  auto& col = paletteHost_->add<ui::cStackPanel>(ui::Orientation::Vertical, 4 * k);
+  if (creativeTab_ == 4) {  // the filter lives in All (Bedrock, not Java)
+    auto& filter = col.add<ui::cTextBox>();
+    filter.setId("creative-filter");
+    filter.setPlaceholder("Filter blocks...");
+    if (!creativeFilter_.empty()) filter.setText(creativeFilter_);
+    filter.setLayout(ui::Layout::sized({0, 28 * k}));
+    filter.on("change", [this, &filter](ui::cWidget&) {
+      const std::string f = lowerAscii(filter.text());
+      if (f != creativeFilter_) {
+        creativeFilter_ = f;
+        rebuildCreativePalette();
+      }
+    });
+  }
+  // Deterministic source order (the family-grouped palette enumeration);
+  // the All tab deduplicates to one entry per block (Bedrock search rule).
+  const std::vector<BlockId> all = paletteBlocksGrouped();
+  std::vector<BlockId> shown;
+  for (BlockId b : all) {
+    if (!creativeTabHas(creativeTab_, b)) continue;
+    if (creativeTab_ == 4 && !creativeFilter_.empty() &&
+        lowerAscii(blockRegistry().def(b).name).find(creativeFilter_) == std::string::npos)
+      continue;
+    shown.push_back(b);
+  }
+  auto& scroll = col.add<ui::cScrollView>();
+  {  // the scroll view takes the palette sub-frame's leftover height;
+     // its width is the sub-frame's width (stack cross-stretch)
+    ui::Layout lay;
+    lay.flex = 1;
+    scroll.setLayout(lay);
+  }
+  auto& content = scroll.emplaceContent<ui::cStackPanel>(ui::Orientation::Vertical, 4 * k);
+  if (creativeTab_ == 1) {
+    // Equipment: the registered non-block items (tools, weapons, the
+    // Fragment, materials), each with its item icon and name tooltip.
+    auto& grid = content.add<ui::cGridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
+    grid.setFitWidth(true);  // cells solved from the sub-frame's width
+    for (const ItemDef& d : itemRegistry()) {
+      if (d.itemId == 0) continue;
+      ui::cSlot& slot = grid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
+      slot.setIcon(itemIconRef(d.itemId)).setData(int(d.itemId));
+      slot.setTooltip(std::string(d.name));
+      // Cursor stack (2026-11-11): palette slots dispatch on the
+      // press edge; while a stack is carried the press is the DISCARD
+      // (paletteClickCursor), never a give on top of the discard.
+      slot.setPressActivated(true);
+      slot.on("press", [this](ui::cWidget& w) {
+        if (carrying()) {
+          if (cb_.paletteClickCursor) cb_.paletteClickCursor();
+          return;
+        }
+        if (cb_.pickItem) cb_.pickItem(uint32_t(static_cast<ui::cSlot&>(w).data()), (ui_.modifiers() & ui::kModShift) != 0);
+      });
+    }
+    return;
+  }
+  auto addGrid = [&](const std::vector<BlockId>& items) {
+    auto& grid = content.add<ui::cGridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
+    grid.setFitWidth(true);  // cells solved from the sub-frame's width
+    for (BlockId b : items) {
+      ui::cSlot& slot = grid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
+      slot.setIcon(blockIcon(b)).setData(int(b));
+      slot.setTooltip(blockName(b));  // hover tooltip with the name (theme scale = hudScale)
+      // Cursor stack (2026-11-11): press-edge dispatch; while
+      // carrying, the press discards instead of giving (see the
+      // Equipment slot above).
+      slot.setPressActivated(true);
+      slot.on("press", [this](ui::cWidget& w) {
+        if (carrying()) {
+          if (cb_.paletteClickCursor) cb_.paletteClickCursor();
+          return;
+        }
+        if (cb_.pickBlock) cb_.pickBlock(BlockId(static_cast<ui::cSlot&>(w).data()), (ui_.modifiers() & ui::kModShift) != 0);
+      });
+    }
+  };
+  if (creativeTab_ == 4) {
+    addGrid(shown);  // no collapsible groups in All (Bedrock)
+  } else {
+    // Collapsible variant groups, keyed by registry family (Bedrock's
+    // sub-sections). A family with one block shows as a bare grid.
+    static const char* kGroupNames[4] = {"Trace & signals", "Lamps", "Building", "Other blocks"};
+    for (int f = 0; f < 4; ++f) {
+      std::vector<BlockId> items;
+      for (BlockId b : shown)
+        if (int(cBlockFamilies::get().familyOf(b)) == f) items.push_back(b);
+      if (items.empty()) continue;
+      const std::string gname = kGroupNames[f];
+      const bool multi = creativeTab_ == 2 || items.size() > 1;
+      if (multi) {
+        const bool open = creativeGroupOpen_.count(gname) ? creativeGroupOpen_[gname] : true;
+        auto& head = content.add<ui::cButton>(std::string(open ? "- " : "+ ") + gname + " (" + std::to_string(items.size()) + ")");
+        head.setId("creative-group");
+        head.on("click", [this, gname](ui::cWidget&) {
+          creativeGroupOpen_[gname] = !(creativeGroupOpen_.count(gname) ? creativeGroupOpen_[gname] : true);
+          rebuildCreativePalette();
+        });
+        if (!open) continue;
+      }
+      addGrid(items);
+    }
+  }
+  if (hadRect && dlgW) dlgW->place(ui::fromGui(dlgRect), dlgW->theme());
 }
 
 void cGameUi::openInventory(int selectedSlot, const std::vector<ItemStack>& carry) {
   if (inventory_) return;
   carrySlots_.clear();
   carry_.clear();
+  clearCursorDisplay();  // a screen always opens empty-handed (plan 5.2: the game's close chain guarantees the truth; the display follows)
   const float k = std::max(1.f, s());
-  // P2b-1 honesty: this dialog is a creative BLOCK PALETTE, not the player
-  // inventory -- it lists every block in the registry and GIVES a full
-  // stack of the clicked block into the player's real inventory hotbar
-  // (the same inventory the HUD shows and player.lat persists).
-  // 2026-10-31 (JD): short header so it fits the panel; the help text is on the wrapped note lines.
-  const std::string title = "Block palette (creative)";
-  ui::cDialog& dlg = ui::cDialog::show(ui_, title);
+  const float invK = k * kInventoryWindowScale;  // 2026-11-11 (JD): +25% inventory window design size
+  const float cell = 40 * k * kInventoryScale;  // nominal cell (fit grids solve their real cell from their sub-frame)
+  // 2026-11-09 next-build-2 (Item 4): the COMBINED CREATIVE SCREEN (see
+  // the header note). P2b-1 honesty carried forward: the palette half
+  // GIVES full stacks into the player's real inventory (the same store
+  // the HUD shows and player.lat persists); the inventory half IS that
+  // store, laid out as JD's Nov 3 reference.
+  // 2026-11-09 creative rework (JD ruling, 12:06 EST: "set the GUI in
+  // one global frame that is the the screen size and then anchor all
+  // the sub frames to that frame"): the screen sits in ONE global
+  // cFrame that owns the screen's design size (1152 x 568 at scale 1,
+  // times kInventoryWindowScale 1.25 per JD 2026-11-11).
+  // The DialogHost spans the viewport and centres the dialog, capping
+  // it to the viewport minus margins; the frame is flex-seated in the
+  // dialog body, so at a smaller viewport the frame takes the capped
+  // rect and every section below solves inside it. Each section is a
+  // sub-frame panel anchored to the global frame (picker panel,
+  // inventory panel, Agent panel, hotbar section), and grid cells are
+  // SOLVED from the sub-frame's allotted width (cGridPanel fit mode),
+  // never summed from constants... the Item 4 original built sibling
+  // stacks at fixed sizes inside a content-sized dialog, which is why
+  // the hotbar row escaped the right edge on JD's machine.
+  ui::cDialog& dlg = ui::cDialog::show(ui_, "Creative inventory");
   dlg.setId("inventory");
-  auto& note = dlg.body().add<ui::cLabel>(
-      "Click: full stack (512) to hotbar slot " + std::to_string(selectedSlot + 1) + "\n"
-      "Shift-click: first free slot.  E/Esc: close", "hud_small");
-  note.setId("palette-note");
-  const std::vector<BlockId> palette = paletteBlocksGrouped();  // 2026-10-31 (JD): registry-driven, new blocks append
-  const int cols = 9, count = int(palette.size());
-  const int rows = (count + cols - 1) / cols;
-  const float cell = 40 * k * kInventoryScale;  // Cortana 2026-10-16: +25% slots/icons (JD)
-  auto& scroll = dlg.body().add<ui::cScrollView>();
-  const float gridH = float(rows) * cell;
-  scroll.setLayout(ui::Layout::sized({float(cols) * cell + ui::cScrollBar::kThickness, std::min(gridH, 5 * cell)}));
-  auto& grid = scroll.emplaceContent<ui::cGridPanel>(cols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
-  for (int i = 0; i < count; ++i) {
-    const BlockId b = palette[size_t(i)];
-    ui::cSlot& slot = grid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
-    slot.setIcon(blockIcon(b)).setData(int(b));
-    slot.setTooltip(blockName(b));  // 2026-10-31 (JD): hover tooltip with the name (theme scale = hudScale)
-    slot.on("click", [this](ui::cWidget& w) {
-      if (cb_.pickBlock) cb_.pickBlock(BlockId(static_cast<ui::cSlot&>(w).data()), (ui_.modifiers() & ui::kModShift) != 0);
+  // Build 189 fix (2026-11-09, JD's live playtest + his hierarchy
+  // ruling 20:34 EST): the design size is declared in the SAME units
+  // the contents are built in... build units, k-baked like every cell,
+  // margin and spacing below. The rework's "design unscaled" exception
+  // (the theme scale multiplies measures at paint, so declare 1152 x
+  // 568 raw) split the screen into two unit systems: at GUI scale 2
+  // the frame solved at HALF the size its contents assumed, the Agent
+  // column and the hotbar section arranged past the dialog's bottom
+  // edge, and JD's machine showed exactly that. One unit system per
+  // screen: the global frame is the screen, the two windows below are
+  // its subframes, and everything inside a window anchors to that
+  // window. When the design exceeds the viewport (2304 x 1136 at
+  // scale 2 on a 1920x1080 screen, or 2880 x 1420 after the 2026-11-11
+  // 25% window bump) DialogHost caps the dialog to the viewport minus
+  // margins and the flex/fit solves absorb the cap... the same solve
+  // the 1600x1000 bench exercised all along at scale 1.
+  auto& frame = dlg.body().add<ui::cFrame>(1152 * invK, 568 * invK);
+  frame.setId("creative-global-frame");
+  {
+    ui::Layout lay;
+    lay.flex = 1;  // at a capped dialog the frame takes the body's rect, not its design size
+    frame.setLayout(lay);
+  }
+  auto& halves = frame.add<ui::cStackPanel>(ui::Orientation::Horizontal, 8 * k);
+  // ---------------- LEFT: the Bedrock-model creative picker ----------
+  // A window subframe of the global frame (JD's hierarchy): it carries
+  // its own design size in build units and the picker panel fills it;
+  // nothing inside the panel solves against anything outside it.
+  auto& leftWin = halves.add<ui::cFrame>(497 * invK, 568 * invK);
+  leftWin.setId("creative-picker-frame");
+  {
+    ui::Layout lay;
+    lay.flex = 1;  // the mock's split: palette 1, inventory 1.3 (about 44% / 56%)
+    leftWin.setLayout(lay);
+  }
+  auto& left = leftWin.add<ui::cPanel>();
+  left.setId("creative-picker");
+  left.setBackgroundColor({0.145f, 0.16f, 0.19f, 1.f});
+  left.setBorderColor({0.32f, 0.35f, 0.40f, 1.f});
+  // Cursor stack (2026-11-11): the palette BACKGROUND is a discard
+  // target while carrying, so a player aiming at the creative side
+  // cannot miss into a give by a few pixels. The press tap hears only
+  // presses no live widget claimed (slots route their own discard /
+  // give; tab buttons, the filter field and group headers consume
+  // theirs, so navigation survives carrying... plan section 6).
+  left.setPressTap(true);
+  left.on("press", [this](ui::cWidget&) {
+    if (carrying() && cb_.paletteClickCursor) cb_.paletteClickCursor();
+  });
+  auto& leftCol = left.add<ui::cStackPanel>(ui::Orientation::Vertical, 4 * k);
+  leftCol.setLayout(ui::Layout::fill(ui::Edges::all(10 * k)));
+  auto& tabs = leftCol.add<ui::cStackPanel>(ui::Orientation::Horizontal, 2 * k);
+  static const char* kTabNames[5] = {"Construction", "Equipment", "Items", "Nature", "All"};
+  for (int t = 0; t < 5; ++t) {
+    auto& b = tabs.add<ui::cButton>(kTabNames[t]);
+    b.setId("creative-tab");
+    b.on("click", [this, t](ui::cWidget&) {
+      if (creativeTab_ != t) {
+        creativeTab_ = t;
+        rebuildCreativePalette();
+      }
     });
+    creativeTabBtns_[size_t(t)] = &b;
   }
-  if (!carry.empty()) {
-    // Playtest 2026-10-16: every carry slot (42 = hotbar 8 + offhand 2 + main 32), 14 per row.
-    dlg.body().add<ui::cLabel>("Carry: hotbar 1-16, offhand L/R, main 1-32", "hud_small");
-    const int ccols = cols;  // 2026-10-31 (JD): same columns as the palette so the grids line up
-    auto& cgrid = dlg.body().add<ui::cGridPanel>(ccols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
-    for (int i = 0; i < int(carry.size()); ++i) {
-      ui::cSlot& slot = cgrid.add<ui::cSlot>(ui::Vec2{cell - 4 * k, cell - 4 * k});
-      slot.setData(kCarryData + i);
-      slot.on("click", [this](ui::cWidget& w) {
-        if (cb_.pickCarry) cb_.pickCarry(static_cast<ui::cSlot&>(w).data() - kCarryData);
-      });
-      carrySlots_.push_back(&slot);
+  paletteHost_ = &leftCol.add<ui::cWidget>();
+  paletteHost_->setId("creative-palette");
+  {
+    ui::Layout lay;
+    lay.flex = 1;
+    paletteHost_->setLayout(lay);
+  }
+  auto& note = leftCol.add<ui::cLabel>(
+      "Palette is an infinite source. Click: full stack (512) in your hand; click any slot on the right to put it down.\n"
+      "Shift-click: straight to the first free hotbar slot (else slot " + std::to_string(selectedSlot + 1) + "). Click a slot on the right: pick its stack up.\n"
+      "Click again: put it down, merge it, or swap. Click the palette while holding: put it back.\n"
+      "Q over a slot: throw one item into the world. Shift+Q: throw the whole stack. E/Esc: close", "hud_small");
+  note.setId("palette-note");
+  // ---------------- RIGHT: JD's Nov 3 inventory, in its sub-frame ----
+  // The inventory window subframe, sibling to the picker window under
+  // the same law: its own design size in build units, the panel fills
+  // it, and the carry grid, Agent panel and hotbar section inside the
+  // panel anchor to this window and nothing else.
+  auto& rightWin = halves.add<ui::cFrame>(647 * invK, 568 * invK);
+  rightWin.setId("creative-inventory-frame");
+  {
+    ui::Layout lay;
+    lay.flex = 1.3f;
+    rightWin.setLayout(lay);
+  }
+  auto& right = rightWin.add<ui::cPanel>();
+  right.setId("creative-inventory-half");
+  right.setBackgroundColor({0.078f, 0.082f, 0.122f, 1.f});  // the mock's navy inventory panel
+  right.setBorderColor({0.56f, 0.64f, 0.85f, 1.f});
+  auto& rightCol = right.add<ui::cStackPanel>(ui::Orientation::Vertical, 6 * k);
+  rightCol.setLayout(ui::Layout::fill(ui::Edges::all(10 * k)));
+  auto fillSlot = [this, k](ui::cWidget& parent, int flat, const char* id, ui::Vec2 size) -> ui::cSlot& {
+    ui::cSlot& slot = parent.add<ui::cSlot>(size);
+    slot.setId(id);
+    slot.setData(kCarryData + flat);
+    // Cursor stack (2026-11-11): carry slots dispatch on the PRESS
+    // edge and hand EVERY press to the game, filled or empty: the
+    // game resolves lift / place / merge / swap from its cursor
+    // state. This replaces the Item 4 click-to-put-back, which JD's
+    // finding retired (it discarded in place and read as "clicking
+    // does nothing"); discard now happens only as the deliberate
+    // palette press while carrying.
+    slot.setPressActivated(true);
+    slot.on("press", [this](ui::cWidget& w) {
+      const int flat = static_cast<ui::cSlot&>(w).data() - kCarryData;
+      if (flat >= 0 && flat < kTotalSlots) {
+        // D9 (JD): Shift-click quick-moves a hotbar / main stack to the other section (Minecraft-style).
+        const bool quickMove = (ui_.modifiers() & ui::kModShift) != 0 && !carrying() && cb_.shiftClick &&
+                               (flat < kInvHotbarSlots || (flat >= kMainFlatBase && flat < kMainFlatBase + kMainSlots));
+        if (quickMove) cb_.shiftClick(flat);
+        else if (cb_.cursorClick) cb_.cursorClick(flat);
+      }
+    });
+    carrySlots_.push_back(&slot);
+    return slot;
+  };
+  // The slots are pushed in flat allSlots order (hotbar, L hand, R hand,
+  // main, gear) so refreshCarry's indexing stays the flat order, while
+  // the WIDGETS are placed in the reference layout below.
+  std::vector<ui::cSlot*> byFlat(size_t(kTotalSlots), nullptr);
+  {
+    // C9 2026-11-12 (JD 6:17-6:18 AM ET): Agent panel ON TOP of the inventory pane, the 32 main slots
+    // (four rows of EIGHT) ON THE BOTTOM, close to the hotbar; inventory and hotbar centred in the pane.
+    // The Agent panel keeps B9's widgets (worn columns with Accessories beside them) at full width.
+    auto& agent = rightCol.add<ui::cPanel>();
+    agent.setId("creative-agent");
+    agent.setBackgroundColor({0.10f, 0.085f, 0.12f, 1.f});
+    agent.setBorderColor({0.69f, 0.29f, 0.56f, 1.f}, 2.f);  // the mock's #b04a8f
+    auto& agentCol = agent.add<ui::cStackPanel>(ui::Orientation::Vertical, 4 * k);
+    // D9 2026-11-12 (JD): the magenta frame must enclose the whole equipment block. C9 filled the
+    // panel with fill(8k insets), but a stretched child's insets never count toward its parent's
+    // measured height (cWidget::measure), so the panel measured 16k short and Arms / Feet and the
+    // figure hung over its bottom edge (into the Inventory caption row). The column now fills the
+    // panel's padded content box with no extra insets: the panel's own padding is the frame's
+    // padding on all four sides, and the panel height (so the 4x8 grid's cells) is unchanged.
+    agentCol.setLayout(ui::Layout::fill());
+    auto& agentTitle = agentCol.add<ui::cLabel>("Agent", "hud");
+    agentTitle.setCentered(true);
+    // Bars side by side (the mock): each column is a label line (name
+    // left in its colour, value right) ABOVE a thin coloured track.
+    // No text rides on the track, so nothing can spill past a bar.
+    auto& barsRow = agentCol.add<ui::cStackPanel>(ui::Orientation::Horizontal, 6 * k);
+    auto makeBar = [&](const char* name, ui::Color nameColor, ui::Color fill, const char* val0,
+                       ui::cProgressBar*& trackOut, ui::cLabel*& valOut) {
+      auto& colB = barsRow.add<ui::cStackPanel>(ui::Orientation::Vertical, 2 * k);
+      {
+        ui::Layout lay;
+        lay.flex = 1;
+        colB.setLayout(lay);
+      }
+      // Label line (rework fix, 2026-11-09, convicted by the live
+      // 1600x1000 shots): the name sits on its own line and the value on
+      // the line under it, both above the track. Two separate labels in
+      // one horizontal row overlapped ("Healt64\\64"), and one combined
+      // "Health 64\\64" label still overflowed the column sideways into
+      // its neighbour ("Health 64\\Kharge 0\\64Static 0"): at this
+      // panel width each column is only about 80px, and the combined
+      // line measures wider. Stacked, each piece fits its column on its
+      // own line... the value line is at most "64\\64" wide.
+      auto& nm = colB.add<ui::cLabel>(name, "hud_small");
+      nm.setColor(nameColor);
+      valOut = &colB.add<ui::cLabel>(val0, "hud_small");
+      valOut->setColor({0.75f, 0.78f, 0.85f, 1.f});
+      trackOut = &colB.add<ui::cProgressBar>();
+      trackOut->setFillColor(fill);
+      trackOut->setLayout(ui::Layout::sized({0, 7 * k}));
+    };
+    makeBar("Health", {0.95f, 0.44f, 0.37f, 1.f}, {0.88f, 0.28f, 0.23f, 1.f}, "0\\64", agentHealth_, agentHealthVal_);
+    agentHealth_->setId("agent-health");
+    makeBar("Kharge", {0.45f, 0.72f, 0.95f, 1.f}, {0.25f, 0.62f, 0.85f, 1.f}, "0\\64", agentKharge_, agentKhargeVal_);
+    agentKharge_->setId("agent-kharge");
+    makeBar("Static", {0.85f, 0.66f, 0.23f, 1.f}, {0.85f, 0.66f, 0.23f, 1.f}, "0", agentStatic_, agentStaticVal_);
+    agentStatic_->setId("agent-static");
+    auto& agentBody = agentCol.add<ui::cStackPanel>(ui::Orientation::Horizontal, 8 * k);  // B9 four-row: worn | accessories
+    agentBody.setId("creative-agent-body");
+    auto& wornRow = agentBody.add<ui::cStackPanel>(ui::Orientation::Horizontal, 4 * k);
+    {
+      ui::Layout lay;
+      lay.flex = 1;
+      wornRow.setLayout(lay);
     }
-    inventory_ = &dlg;  // refreshCarry needs it set
-    refreshCarry(carry);
+    auto& wornL = wornRow.add<ui::cStackPanel>(ui::Orientation::Vertical, 3 * k);
+    auto& figure = wornRow.add<ui::cPanel>();
+    figure.setId("agent-figure");
+    figure.setBackgroundColor({0.05f, 0.05f, 0.08f, 1.f});
+    figure.setBorderColor({0.30f, 0.30f, 0.38f, 1.f});
+    {
+      ui::Layout lay;
+      lay.flex = 1;  // the figure region takes the space between the worn columns, full row height
+      figure.setLayout(lay);
+    }
+    figure.add<ui::cLabel>("Agent", "hud_small").setLayout(ui::Layout::at({0.5f, 0.5f}, {0.5f, 0.5f}));
+    auto& wornR = wornRow.add<ui::cStackPanel>(ui::Orientation::Vertical, 3 * k);
+    // Worn layout per the reference: left of the figure Head/Face/Chest/
+    // Arms, right of it Heart/Mind/Legs/Feet. Gear flat order is head,
+    // chest, legs, feet, arms, face, heart, mind (kGearSlots + slot).
+    static const struct { const char* name; int gear; } kWornL[4] = {{"Head", 0}, {"Face", 5}, {"Chest", 1}, {"Arms", 4}};
+    static const struct { const char* name; int gear; } kWornR[4] = {{"Heart", 6}, {"Mind", 7}, {"Legs", 2}, {"Feet", 3}};
+    // JD alignment correction (2026-11-09 08:01 EST): Head/Face/Chest/
+    // Arms form ONE clean aligned column keyed to Chest, no staggered
+    // offset. Every left label gets the width of the widest ("Chest"),
+    // so all four slots start at the same x. (The right column mirrors
+    // it: slot first at a shared x, label after.)
+    float wornLabelW = 0;
+    for (const auto& w : kWornL) wornLabelW = std::max(wornLabelW, dlg.theme().textWidth(w.name, 1.f));
+    for (const auto& w : kWornL) {
+      auto& rowp = wornL.add<ui::cStackPanel>(ui::Orientation::Horizontal, 3 * k);
+      auto& lab = rowp.add<ui::cLabel>(w.name, "hud_small");
+      lab.setLayout(ui::Layout::sized({wornLabelW, 0}));
+      byFlat[size_t(kCarrySlots + w.gear)] = &fillSlot(rowp, kCarrySlots + w.gear, "creative-worn", {40 * k, 40 * k});
+    }
+    for (const auto& w : kWornR) {
+      auto& rowp = wornR.add<ui::cStackPanel>(ui::Orientation::Horizontal, 3 * k);
+      byFlat[size_t(kCarrySlots + w.gear)] = &fillSlot(rowp, kCarrySlots + w.gear, "creative-worn", {40 * k, 40 * k});
+      rowp.add<ui::cLabel>(w.name, "hud_small");
+    }
+    // Capacity row (the mock's caprow): title left, capacity right -- C9: under the Agent panel,
+    // directly above the main grid.
+    auto& invHead = rightCol.add<ui::cStackPanel>(ui::Orientation::Horizontal, 6 * k);
+    invHead.setId("creative-inventory-head");
+    invHead.add<ui::cLabel>("Inventory", "hud");
+    auto& capSpacer = invHead.add<ui::cWidget>();
+    {
+      ui::Layout lay;
+      lay.flex = 1;
+      capSpacer.setLayout(lay);
+    }
+    creativeCap_ = &invHead.add<ui::cLabel>(creativeCapacityText(0), "hud_small");
+    creativeCap_->setId("creative-capacity");
+    // C9 main grid: 4 rows x 8, one fit-box grid that takes the height the Agent panel and the hotbar
+    // section leave (flex), cells square and evenly spaced (one 4k gap), as large as the rect allows,
+    // centred horizontally and sitting at the bottom of the rect (next to the hotbar).
+    auto& mainGrid = rightCol.add<ui::cGridPanel>(kMainCols, ui::Vec2{cell - 4 * k, cell - 4 * k}, 4 * k);
+    mainGrid.setId("creative-main-grid");
+    mainGrid.setFitBox(true);
+    {
+      ui::Layout lay;
+      lay.flex = 1;
+      mainGrid.setLayout(lay);
+    }
+    // Main grid widgets (flat 18..49, C9: 4 rows of 8) in layout
+    // position, row-major (carrySlots_ order is fixed up from byFlat below).
+    for (int i = 0; i < kMainSlots; ++i)
+      byFlat[size_t(kMainFlatBase + i)] = &fillSlot(mainGrid, kMainFlatBase + i, "creative-main", {cell - 4 * k, cell - 4 * k});
+    // Accessories: INSIDE the Agent panel (the mock), 3 columns x 2
+    // rows, each slot with its label under it, both anchored inside
+    // their cell. The 6 jewelry slots have no storage in the current
+    // Inventory model (gear is the 8 worn slots only)... display
+    // slots, honestly empty, carrying the design's labels.
+    auto& accCol = agentBody.add<ui::cStackPanel>(ui::Orientation::Vertical, 4 * k);  // B9 four-row: beside the worn row
+    accCol.setId("creative-accessories-col");
+    {
+      ui::Layout lay;
+      lay.flex = 0.8f;
+      accCol.setLayout(lay);
+    }
+    auto& accTitle = accCol.add<ui::cLabel>("Accessories", "hud_small");
+    accTitle.setCentered(true);
+    auto& accBox = accCol.add<ui::cStackPanel>(ui::Orientation::Vertical, 4 * k);
+    accBox.setId("creative-accessories");
+    static const char* kAcc[6] = {"Necklace", "L Wrist", "R Wrist", "Belt", "L Ankle", "R Ankle"};
+    for (int rowA = 0; rowA < 2; ++rowA) {
+      auto& accRow = accBox.add<ui::cStackPanel>(ui::Orientation::Horizontal, 4 * k);
+      accRow.setLayout(ui::Layout::sized({0, 54 * k}));
+      for (int colA = 0; colA < 3; ++colA) {
+        const char* a = kAcc[rowA * 3 + colA];
+        auto& cellP = accRow.add<ui::cPanel>("none");
+        {
+          ui::Layout lay;
+          lay.flex = 1;
+          cellP.setLayout(lay);
+        }
+        auto& s = cellP.add<ui::cSlot>(ui::Vec2{36 * k, 36 * k});
+        s.setId("creative-accessory");
+        s.setTooltip(std::string(a) + " (no accessory storage in the inventory model yet)");
+        s.setLayout(ui::Layout::at({0.5f, 0}, {0.5f, 0}, {0, 0}, {36 * k, 36 * k}));
+        auto& lab = cellP.add<ui::cLabel>(a, "hud_small");
+        lab.setCentered(true);
+        lab.setLayout(ui::Layout::at({0.5f, 0}, {0.5f, 0}, {0, 38 * k}));
+      }
+    }
+    // Hotbar section: spans the inventory sub-frame's full width under
+    // BOTH the grid and the Agent panel (the mock). Head row: "Hotbar"
+    // left, the hover readout centred (the mock's Selected line's
+    // place). The 18 slots (Left Hand, 16, Right Hand... hands
+    // OUTSIDE the 16) are one fit grid: cells solved from the
+    // section's width, so both hands always sit inside the row.
+    auto& hotHead = rightCol.add<ui::cStackPanel>(ui::Orientation::Horizontal, 6 * k);
+    hotHead.add<ui::cLabel>("Hotbar", "hud");
+    inventoryHover_ = &hotHead.add<ui::cLabel>(" ", "hud_small");
+    inventoryHover_->setCentered(true);
+    {
+      ui::Layout lay;
+      lay.flex = 1;
+      inventoryHover_->setLayout(lay);
+    }
+    auto& hotGrid = rightCol.add<ui::cGridPanel>(18, ui::Vec2{30 * k, 30 * k}, 3 * k);
+    hotGrid.setId("creative-hotbar");
+    hotGrid.setFitWidth(true);
+    byFlat[16] = &fillSlot(hotGrid, 16, "creative-hand-l", {30 * k, 30 * k});
+    for (int i = 0; i < kInvHotbarSlots; ++i) byFlat[size_t(i)] = &fillSlot(hotGrid, i, "creative-hotbar-slot", {30 * k, 30 * k});
+    byFlat[17] = &fillSlot(hotGrid, 17, "creative-hand-r", {30 * k, 30 * k});
+    // Hand labels under the hand cells, anchored at the cells' centres
+    // (1/36 and 35/36 of the row), "keys 1-8" centred beneath.
+    auto& hotLabels = rightCol.add<ui::cWidget>();
+    hotLabels.setLayout(ui::Layout::sized({0, 15 * k}));
+    auto& lhLab = hotLabels.add<ui::cLabel>("Left Hand", "hud_small");
+    lhLab.setCentered(true);
+    lhLab.setLayout(ui::Layout::at({1.f / 36.f, 0}, {0.5f, 0}));
+    auto& keysLab = hotLabels.add<ui::cLabel>("keys 1-8", "hud_small");
+    keysLab.setCentered(true);
+    keysLab.setColor({0.62f, 0.66f, 0.75f, 1.f});
+    keysLab.setLayout(ui::Layout::at({0.5f, 0}, {0.5f, 0}));
+    auto& rhLab = hotLabels.add<ui::cLabel>("Right Hand", "hud_small");
+    rhLab.setCentered(true);
+    rhLab.setLayout(ui::Layout::at({35.f / 36.f, 0}, {0.5f, 0}));
   }
-  inventoryHover_ = &dlg.body().add<ui::cLabel>(" ");
-  inventoryHover_->setCentered(true);
-  // 2026-10-31 (JD, intermittent width): the hover name and the text lines must never size the
-  // panel; it is the 9-column grid (+ scrollbar) wide, whatever text is showing.
-  const float panelW = float(cols) * cell + ui::cScrollBar::kThickness;
-  inventoryHover_->setLayout(ui::Layout::sized({panelW, 0}));
-  note.setLayout(ui::Layout::sized({panelW, 0}));
+  // carrySlots_ must be the flat order for refreshCarry: rebuild it from
+  // byFlat (fillSlot pushed in layout order above).
+  carrySlots_.clear();
+  for (int i = 0; i < kTotalSlots; ++i)
+    if (byFlat[size_t(i)]) carrySlots_.push_back(byFlat[size_t(i)]);
+  inventory_ = &dlg;  // refreshCarry needs it set
+  rebuildCreativePalette();
+  refreshCarry(carry);
   dlg.on("close", [this](ui::cWidget&) {
     inventory_ = nullptr;
     inventoryHover_ = nullptr;
     carrySlots_.clear();
+    clearCursorDisplay();  // display only: the game runs the return chain off inventoryClosed
+    creativeCap_ = nullptr;
+    agentHealth_ = agentKharge_ = agentStatic_ = nullptr;
+    agentHealthVal_ = agentKhargeVal_ = agentStaticVal_ = nullptr;
+    paletteHost_ = nullptr;
+    creativeTabBtns_.fill(nullptr);
     if (cb_.inventoryClosed) cb_.inventoryClosed();
   });
   inventory_ = &dlg;
+  // The dialog's "close" handler nulls the creative-screen pointers when
+  // the close EMITS (Escape / title-bar X). A game-asked closeModal emits
+  // nothing (see closeInventory), so closeInventory nulls them itself...
+  // both paths leave the pointers dead before the tree can be re-shown.
 }
 
 void cGameUi::openPause() {
@@ -577,10 +1124,36 @@ void cGameUi::closeInventory() {
   inventory_ = nullptr;  // close() emits "close": no callback for a close the game asked for
   inventoryHover_ = nullptr;
   carrySlots_.clear();
+  clearCursorDisplay();  // display only: Game::setInventoryOpen ran the return chain before this call
+  // Null the creative-screen pointers BEFORE closeModal, mirroring the
+  // dialog's own "close" handler: closeModal emits no "close", so
+  // without this the Agent bar / palette pointers kept naming widgets
+  // of a closed screen (found 2026-11-09: the paint-ruling selftest
+  // closed the screen and the following update() still wrote the bars,
+  // which also kept the F3 readout panel's inventory gate stale in
+  // test order). The dialog object itself is retained by the modal
+  // stack; the pointers are re-seated by openInventory on the next open.
+  creativeCap_ = nullptr;
+  agentHealth_ = agentKharge_ = agentStatic_ = nullptr;
+  agentHealthVal_ = agentKhargeVal_ = agentStaticVal_ = nullptr;
+  paletteHost_ = nullptr;
+  creativeTabBtns_.fill(nullptr);
   ui_.closeModal(*d);
+}  // NOTE (2026-11-09): the dialog widget tree OUTLIVES a game-asked close
+   // (the modal stack retains it), so the creative-screen pointers (Agent
+   // bars, palette host) stay valid here... unlike an Escape close, whose
+   // "close" handler nulls them. Do not "tidy" this by nulling them:
+   // a game-asked close can be followed by the screen being re-shown.
+
+namespace {
+// next-build-2 GUI phase timing (measure-only; see game_ui.h GuiFrameTimes).
+double guiMsBetween(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) {
+  return std::chrono::duration<double, std::milli>(b - a).count();
 }
+}  // namespace
 
 void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
+  const auto guiT0 = std::chrono::steady_clock::now();  // model phase: this fan-out
   const float k = float(effectiveGuiScale(hudScalePref_, viewport.x, viewport.y));
   const float hs = hotbarScaleFor(viewport.x, k);  // 2026-10-25: re-lay the hotbar when the cap changes
   if (k != scale_ || hs != hotbarScale_) {
@@ -609,17 +1182,27 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
     }
     debugText_->setText(joinLines(pre));
     debugLook_->setText(look);
-    debugLook_->setVisible(seen);
+    debugLook_->setVisible(seen);  // after the panel's own flip above: membership already settled, this routes dynamic
     debugTextPost_->setText(joinLines(post));
     debugTextPost_->setVisible(!post.empty());
   }
-  tickPanel_->setVisible(!m.tickLine.empty() && !menu_);
+  tickPanel_->setVisible(!m.tickLine.empty() && !menu_);  // visibility before the text below: a first show then paints once, not twice
   if (!m.tickLine.empty()) {
     static const ui::Color kLv[4] = {{0.35f, 1.f, 0.45f, 1.f}, {1.f, 0.85f, 0.25f, 1.f}, {1.f, 0.3f, 0.3f, 1.f}, {0.75f, 0.8f, 0.9f, 1.f}};  // 2026-11-05 Neutral=paused
     tickText_->setText(m.tickLine);
     tickText_->setColor(kLv[m.tickLevel < 0 ? 0 : m.tickLevel > 3 ? 3 : m.tickLevel]);
   }
   controlsText_->setText(joinLines(m.controlLines));
+  if (agentHealth_) {  // Item 4: the creative screen's Agent bars follow the model
+    auto bar = [](ui::cProgressBar* b, ui::cLabel* val, int v, int mx) {
+      b->setValue(mx > 0 ? float(v) / float(mx) : 0.f);
+      if (val) val->setText(std::to_string(v) + "\\" + std::to_string(mx));
+    };
+    bar(agentHealth_, agentHealthVal_, m.vitHealth, m.vitHealthMax);
+    bar(agentKharge_, agentKhargeVal_, m.vitKharge, m.vitKhargeMax);
+    agentStatic_->setValue(1.f);
+    if (agentStaticVal_) agentStaticVal_->setText(std::to_string(m.vitStatic));
+  }
   banner_->setVisible(!m.bannerLines.empty());
   bannerTitle_->setText(m.bannerLines.empty() ? std::string() : m.bannerLines.front());
   bannerText_->setText(m.bannerLines.size() > 1 ? m.bannerLines[1] : std::string());
@@ -638,6 +1221,13 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
     // slot 0 is finally visible in the HUD.
     slot.setIcon(itemIconRef(st.itemId));
     slot.setSelected(i == m.selected);
+    // 2026-11-08 (WS3): hotbar slots carry tooltip text like the palette
+    // and carry slots always did; the facade's hover tooltip driver is
+    // what finally displays it (plus palette and carry hovers).
+    const std::string tip = st.empty() ? std::string()
+                                : st.count > 1 ? itemDisplayName(st.itemId) + " x" + std::to_string(st.count)
+                                               : itemDisplayName(st.itemId);
+    if (slot.tooltip() != tip) slot.setTooltip(tip);
   }
   {
     const ItemStack& sel = m.hotbar[size_t(std::clamp(m.selected, 0, kHotbarSlots - 1))];
@@ -663,29 +1253,57 @@ void cGameUi::update(const HudModel& m, ui::Vec2 viewport, float dt) {
     }
     inventoryHover_->setText(hover);
   }
+  const auto guiT1 = std::chrono::steady_clock::now();
   ui_.update(dt);
+  const auto guiT2 = std::chrono::steady_clock::now();
   ui_.layout(viewport);
+  // Cursor stack (2026-11-11): seat the carried cell on the polled
+  // pointer AFTER layout, by direct placement. place() re-seats the
+  // widget's rect and arranges its child; it does not advance any
+  // paint generation (verified against the facade: setLayout/place
+  // are generation-free, and cUiRoot::layout is paintGen-gated), so a
+  // pointer move re-expands ONLY the dynamic layer that the cell
+  // rides. The cell is centred on the pointer like the reference.
+  if (cursorHost_ && cursorHost_->visible() && ui_.pointerSeen()) {
+    const ui::Vec2 p = ui_.lastPointer();
+    const float half = cursorCell_ * 0.5f;
+    cursorHost_->place({p.x - half, p.y - half, cursorCell_, cursorCell_}, ui_.theme());
+  }
+  const auto guiT3 = std::chrono::steady_clock::now();
+  guiTimes_.modelMs = guiMsBetween(guiT0, guiT1);
+  guiTimes_.updateMs = guiMsBetween(guiT1, guiT2);
+  guiTimes_.layoutMs = guiMsBetween(guiT2, guiT3);
 }
 
 void cGameUi::paint(HudLayer& hud, const BlockMaterials& materials, const std::function<const Image*(BlockId)>& icon,
                    const std::function<const Image*(uint32_t)>& itemIcon) const {
-  cHudUiRenderer renderer(hud, [&materials](std::string_view image) -> std::optional<ui::Color> {
+  const auto paintT0 = std::chrono::steady_clock::now();
+  // Litho GUI migration: cUiRoot::paint takes texture-id resolvers (the
+  // draw list's image quads carry ids); the game's resolvers are name-based,
+  // so translate id -> name through the facade registry and run the exact
+  // old logic. The slot tint multiplies the swatch (the icon path of the
+  // HUD renderer has no tint channel; tints there are the identity in
+  // practice -- block/item icons are drawn untinted).
+  ui_.paint(hud, [&materials](int textureId) -> std::optional<ui::Color> {
+    const std::string& image = ui::iconTextureName(textureId);
     constexpr std::string_view kPrefix = "block:";
     if (image.substr(0, kPrefix.size()) != kPrefix) return std::nullopt;
     int id = 0;
-    const std::string_view num = image.substr(kPrefix.size());
+    const std::string_view num = std::string_view(image).substr(kPrefix.size());
     if (std::from_chars(num.data(), num.data() + num.size(), id).ec != std::errc() || id <= 0 ||
         id >= int(blockRegistry().size()))
       return std::nullopt;
     const auto& c = materials.swatch(BlockId(id));
-    return ui::Color{c[0], c[1], c[2], 1.f};
-  }, [&icon, &itemIcon](std::string_view image) -> const Image* {
+    const ui::Color tint = ui::iconTint(textureId);
+    return ui::Color{c[0] * tint.r, c[1] * tint.g, c[2] * tint.b, tint.a};
+  }, [&icon, &itemIcon](int textureId) -> const Image* {
+    const std::string& image = ui::iconTextureName(textureId);
     constexpr std::string_view kItemPrefix = "item:";
     if (image.substr(0, kItemPrefix.size()) == kItemPrefix) {
       // Non-block item icon (a tool, the Fragment): the item icon atlas.
       if (!itemIcon) return nullptr;
       int id = 0;
-      const std::string_view num = image.substr(kItemPrefix.size());
+      const std::string_view num = std::string_view(image).substr(kItemPrefix.size());
       if (std::from_chars(num.data(), num.data() + num.size(), id).ec != std::errc() || id <= 0)
         return nullptr;
       return itemIcon(uint32_t(id));
@@ -693,12 +1311,68 @@ void cGameUi::paint(HudLayer& hud, const BlockMaterials& materials, const std::f
     constexpr std::string_view kPrefix = "block:";
     if (!icon || image.substr(0, kPrefix.size()) != kPrefix) return nullptr;
     int id = 0;
-    const std::string_view num = image.substr(kPrefix.size());
+    const std::string_view num = std::string_view(image).substr(kPrefix.size());
     if (std::from_chars(num.data(), num.data() + num.size(), id).ec != std::errc() || id <= 0 || id >= int(blockRegistry().size()))
       return nullptr;
-    return icon(BlockId(id));  // textured icon; the swatch above is the fallback
+    return icon(BlockId(id));  // block icon image; the swatch above is the fallback
   });
-  ui_.paint(renderer);
+  guiTimes_.paintMs = guiMsBetween(paintT0, std::chrono::steady_clock::now());
+  guiTimes_.paintRebuilt = ui_.paintRebuilt();
+  guiTimes_.paintDraws = ui_.paintDrawCount();
+  guiTimes_.paintRects = ui_.paintRectCount();
+  guiTimes_.paintTexts = ui_.paintTextCount();
+  guiTimes_.paintDrawsOnly = ui_.paintDrawOnlyCount();
+  guiTimes_.paintIcons = ui_.paintIconCount();
+  guiTimes_.dynRebuilt = ui_.dynamicRebuilt();
+  guiTimes_.dynDraws = ui_.dynamicDrawCount();
+}
+
+void cGameUi::paintSplit(HudLayer& hud, litholattice::HudLayerSplit& split, const BlockMaterials& materials,
+                         const std::function<const Image*(BlockId)>& icon,
+                         const std::function<const Image*(uint32_t)>& itemIcon) const {
+  // Same resolver translation as paint(), but through the facade's
+  // split entry so the stream refs ride along (cure 1, 2026-11-10).
+  const auto paintT0 = std::chrono::steady_clock::now();
+  ui_.paintSplit(hud, split, [&materials](int textureId) -> std::optional<ui::Color> {
+    const std::string& image = ui::iconTextureName(textureId);
+    constexpr std::string_view kPrefix = "block:";
+    if (image.substr(0, kPrefix.size()) != kPrefix) return std::nullopt;
+    int id = 0;
+    const std::string_view num = std::string_view(image).substr(kPrefix.size());
+    if (std::from_chars(num.data(), num.data() + num.size(), id).ec != std::errc() || id <= 0 ||
+        id >= int(blockRegistry().size()))
+      return std::nullopt;
+    const auto& c = materials.swatch(BlockId(id));
+    const ui::Color tint = ui::iconTint(textureId);
+    return ui::Color{c[0] * tint.r, c[1] * tint.g, c[2] * tint.b, tint.a};
+  }, [&icon, &itemIcon](int textureId) -> const Image* {
+    const std::string& image = ui::iconTextureName(textureId);
+    constexpr std::string_view kItemPrefix = "item:";
+    if (image.substr(0, kItemPrefix.size()) == kItemPrefix) {
+      if (!itemIcon) return nullptr;
+      int id = 0;
+      const std::string_view num = std::string_view(image).substr(kItemPrefix.size());
+      if (std::from_chars(num.data(), num.data() + num.size(), id).ec != std::errc() || id <= 0)
+        return nullptr;
+      return itemIcon(uint32_t(id));
+    }
+    constexpr std::string_view kPrefix = "block:";
+    if (!icon || image.substr(0, kPrefix.size()) != kPrefix) return nullptr;
+    int id = 0;
+    const std::string_view num = std::string_view(image).substr(kPrefix.size());
+    if (std::from_chars(num.data(), num.data() + num.size(), id).ec != std::errc() || id <= 0 || id >= int(blockRegistry().size()))
+      return nullptr;
+    return icon(BlockId(id));
+  });
+  guiTimes_.paintMs = guiMsBetween(paintT0, std::chrono::steady_clock::now());
+  guiTimes_.paintRebuilt = ui_.paintRebuilt();
+  guiTimes_.paintDraws = ui_.paintDrawCount();
+  guiTimes_.paintRects = ui_.paintRectCount();
+  guiTimes_.paintTexts = ui_.paintTextCount();
+  guiTimes_.paintDrawsOnly = ui_.paintDrawOnlyCount();
+  guiTimes_.paintIcons = ui_.paintIconCount();
+  guiTimes_.dynRebuilt = ui_.dynamicRebuilt();
+  guiTimes_.dynDraws = ui_.dynamicDrawCount();
 }
 
 }  // namespace lithokraft

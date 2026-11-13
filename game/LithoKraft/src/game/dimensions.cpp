@@ -5,6 +5,7 @@
 #include "builtin_worldgen.h"
 #include "lithokraft/content/appearance.h"
 #include "lithokraft/content/blocks.h"
+#include "lithokraft/content/component_test_world.h"  // 2026-11-12 (JD): Component Test spawn
 #include "litholattice/core/log.h"
 #include "lithokraft/game/interchange.h"
 #include "lithokraft/game/structures.h"
@@ -164,6 +165,21 @@ cDimensionReg createDimensions(const WorldgenSettings& settings) {
   };
   lab->chunks.setRegistry(&blockRegistry());
   r.add(std::move(lab));
+  // 2026-11-12 (JD t5295u): the Component Test plain -- the Flat Lab generator with a Wafer Silicon
+  // surface and body (assets/worldgen/componenttest.json): flat everywhere, far chunks included, no
+  // procedural generation of any kind. Used only by --component-test (cComponentTestWorld builds
+  // the pads). Spawn on the north aisle, feet on the silicone, looking +Z at the first pad row.
+  auto ct = std::make_unique<Dimension>();
+  ct->id = "componenttest"; ct->name = "Component Test"; ct->biomes = {"component_test"};
+  ct->generator = makeGenerator(settings, ct->id); ct->belowWorldFill = kStone;
+  ct->setup = [](ChunkMap& w, int /*size*/) -> Spawn {
+    float x = 0, z = 0, yaw = 0;
+    cComponentTestWorld::spawn(x, z, yaw);
+    const int h = std::max(0, w.surfaceY(int(x), int(z)));
+    return {x, float(h) + 1.f, z, yaw, -0.32f};
+  };
+  ct->chunks.setRegistry(&blockRegistry());
+  r.add(std::move(ct));
   return r;
 }
 

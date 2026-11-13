@@ -3,11 +3,6 @@
 #include <fstream>
 #include <sstream>
 #include "litholattice/core/log.h"
-#include "litholattice/ui/containers.h"
-#include "litholattice/ui/dialog.h"
-#include "litholattice/ui/lists.h"
-#include "litholattice/ui/menus.h"
-#include "litholattice/ui/text_edit.h"
 
 namespace lithokraft {
 namespace {

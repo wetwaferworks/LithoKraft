@@ -504,6 +504,29 @@ FramebufferLayout buildWireTorture(ChunkMap& w, int X, int Y, int Z) {
     put(X + 8, Y, z, kRedTorch); put(X + 9, Y, z, kRedTrace); put(X + 9, Y + 1, z, steps[k]); put(X + 10, Y, z, kWaferSilicon);
     put(X + 10, Y + 1, z, kRedTrace); put(X + 11, Y + 1, z, kRedTrace); put(X + 11, Y, z, kWaferSilicon);
   }
+  // Climb lab (2026-11-08 wire job, for JD's hands-on test): the new rules as
+  // walkable fixtures. Row z+28: blue climb up a glass step; the perpendicular
+  // corner (lower run climbs east into an upper run that heads north-south --
+  // the wall piece belongs to the lower wire: JD corner ruling, reading A);
+  // wire resting on crystal leaves, and a climb past a leaves overhang (leaves
+  // do not cut); a climb past a substrate overhang (substrate does not cut).
+  // Row z+30: an Insulatnor step (climbs on, 63) and an Insulatnor overhang
+  // (cuts the climb, upper stays dark).
+  {
+    const BlockId leaves = blockRegistry().findById("lithokraft:crystal_leaves_reddom").value_or(kAir);
+    const int z = Z + 28;
+    put(X, Y, z, kBlueTorch); put(X + 1, Y, z, kBlueTrace); put(X + 2, Y, z, kGlass); put(X + 2, Y + 1, z, kBlueTrace); put(X + 3, Y + 1, z, kBlueTrace); put(X + 3, Y, z, kGlass);
+    put(X + 8, Y, z, kRedTorch); put(X + 9, Y, z, kRedTrace); put(X + 10, Y, z, kWaferSilicon);
+    put(X + 10, Y + 1, z - 1, kRedTrace); put(X + 10, Y, z - 1, kWaferSilicon);
+    put(X + 10, Y + 1, z, kRedTrace);
+    put(X + 10, Y + 1, z + 1, kRedTrace); put(X + 10, Y, z + 1, kWaferSilicon);
+    put(X + 14, Y, z, kRedTorch); put(X + 15, Y, z, kRedTrace); put(X + 16, Y, z, leaves); put(X + 16, Y + 1, z, kRedTrace); put(X + 17, Y + 1, z, kRedTrace); put(X + 17, Y, z, kWaferSilicon);
+    put(X + 20, Y, z, kRedTorch); put(X + 21, Y, z, kRedTrace); put(X + 21, Y + 1, z, leaves); put(X + 22, Y, z, kWaferSilicon); put(X + 22, Y + 1, z, kRedTrace);
+    put(X + 25, Y, z, kRedTorch); put(X + 26, Y, z, kRedTrace); put(X + 26, Y + 1, z, kSubstrate); put(X + 27, Y, z, kWaferSilicon); put(X + 27, Y + 1, z, kRedTrace);
+    const int z2 = Z + 30;
+    put(X, Y, z2, kRedTorch); put(X + 1, Y, z2, kRedTrace); put(X + 2, Y, z2, kInsulatnor); put(X + 2, Y + 1, z2, kRedTrace); put(X + 3, Y + 1, z2, kRedTrace); put(X + 3, Y, z2, kWaferSilicon);
+    put(X + 6, Y, z2, kRedTorch); put(X + 7, Y, z2, kRedTrace); put(X + 7, Y + 1, z2, kInsulatnor); put(X + 8, Y, z2, kWaferSilicon); put(X + 8, Y + 1, z2, kRedTrace);
+  }
   // Ceiling wire under glass.
   for (int x = X; x <= X + 6; ++x) { put(x, Y + 3, Z + 10, kGlass); put(x, Y + 2, Z + 10, x == X ? kRedTorch : kRedTrace); }
   // Via tower (8 high), a wire beside it that must stay dark, blue beside red at the foot.

@@ -13,9 +13,9 @@
 // v1 wires exactly one pilot ("player" = the local player); adding pilot #2
 // is registering another id here — no MCP module changes.
 //
-// Threading: submitFrame()/releaseAll()/pilotIds() run on the MCP server
-// thread. All shared state is mutex-guarded; staging into the cInputSystem
-// is thread-safe by engine contract.
+// Threading (mutexfree pass 2b): submitFrame()/releaseAll()/pilotIds() run on the single MCP owner thread (the
+// stdio serve loop). Pilot shadow state is owned by that thread (checked by owner_, no gate); staging into the
+// cInputSystem is a lock-free phase handoff; droppedUnbound_ is a relaxed diagnostic counter.
 #pragma once
 
 #include <array>
@@ -29,7 +29,8 @@
 #include "litholattice/input/input_system.h"
 #include "litholattice/mcp/server.h"
 #include "lithokraft/game/actions.h"
-#include "litholattice/core/atomic_gate.h"
+#include "litholattice/core/single_owner.h"
+#include <atomic>
 
 namespace lithokraft {
 
@@ -63,9 +64,9 @@ class cMcpPlayerController : public litholattice::mcp::IPlayerController {
   litholattice::cInputSystem& input_;
   std::vector<std::string> pilotIds_;
   std::function<bool()> controllable_;
-  mutable litholattice::cAtomicGate mutex_;
+  litholattice::cSingleOwner owner_{"cMcpPlayerController pilot state (MCP owner thread)"};  // mutexfree 2b: was mutex_
   std::map<std::string, PilotState, std::less<>> pilots_;
-  uint64_t droppedUnbound_ = 0;
+  std::atomic<uint64_t> droppedUnbound_{0};  // mutexfree 2b: owner writes, any thread may read (diagnostic)
 };
 
 /// Game-side IPlayerView adapter: fills the snapshot from the live game.

@@ -29,6 +29,11 @@ extern const BlockId kPulsor;
 extern const BlockId kMemor;
 extern const BlockId kLatchor;
 extern const BlockId kDividor;  ///< 2026-11-05 (JD): Dividor, front = floor(back / 2)
+extern const BlockId kDialor;  ///< 2026-11-11 (JD): Dialor, independent 1..64 source, back inhibit
+extern const BlockId kSwivelor;  ///< B9 2026-11-12 (JD): Swivelor (revised), row B gear ring + resin mount; no control port (wells OPEN)
+extern const BlockId kPushor;  ///< B9 2026-11-12 (JD): Pushor, row B honeycomb face; power + quasi-connectivity only, extension distance OPEN
+extern const BlockId kBitor;  ///< B9 2026-11-12 (JD): Bitor, row B op readout; control 0 = AND (16/32/64 unconfirmed)
+extern const BlockId kWatchor;  ///< B9 2026-11-12 (JD): Watchor, row B eye cube; fires 64 out the back for one tick on a change ahead
 extern const BlockId kFusorSum;  ///< PlayN (JD): Fusor adder (old Fusor id = kFusor = Breakor)
 extern const BlockId kRedirectorSelect;  ///< 2026-11-04 (JD t4302u): Redirector (selected input -> front); kRedirector = Multiplexor
 extern const BlockId kRandor;  ///< 2026-10-31 (JD): random range block
@@ -49,7 +54,7 @@ extern const BlockId kRedViaX;
 extern const BlockId kRedViaZ;
 extern const BlockId kBlueViaX;
 extern const BlockId kBlueViaZ;
-extern const BlockId kGlass;    // non-conductive, see-through; cuts wire stairs past it
+extern const BlockId kGlass;    // non-conductive, see-through; does NOT cut wire stairs (JD 2026-11-08: transparent never cuts; Trace stairs through glass)
 extern const BlockId kCatchor;
 extern const BlockId kFrostedGlass;  // like glass, diffused look
 extern const BlockId kCeramic;
@@ -151,7 +156,7 @@ extern const BlockId kAluminumRamp;          ///< Aluminum Ramp (slope, corner s
 
 /// Game flags (BlockDef::flags, above the engine's kFirstGameFlag).
 constexpr uint32_t kPowerable = uint32_t(kFirstGameFlag) << 0;  // can be powered by wire or a torch below (then turns torches on it off)
-constexpr uint32_t kCutsWire = uint32_t(kFirstGameFlag) << 1;   // breaks wire climbing/descending past it
+constexpr uint32_t kCutsWire = uint32_t(kFirstGameFlag) << 1;   // legacy flag: formerly the climb-cut rule. Since the 2026-11-08 wire job the climb derives its cut from block properties (cutsWireClimb below); this flag remains registry data for its other readers (e.g. game.cpp's flatlab pad test) and no longer decides climbs.
 // Nav classification flags (P0, 2026-10-14): read by cAiHost's NavRules
 // builder (gameNavRules) to feed the engine cWalkCache. NO block row carries
 // either flag yet -- there is no ladder/vine or fluid content in the game --
@@ -165,7 +170,7 @@ enum class SimRole : uint16_t {
   None, Wire, Torch, Lamp, ColorLamp,
   Repeator, Thresholdor, Redirector, Pulsor, Memor, Latchor, Switch, cButton, Keyboard, Tone, Catchor,
   cSignalTransmittor, cSignalReceivor, cDish, cOverclockor, Lithographor, Chipor, cPortor, cFusor,
-  Etchor, Randor, cFusorSum, Dividor,  // Dividor appended 2026-11-05 (JD); cFusorSum appended PlayN; Randor appended 2026-10-31; Etchor appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
+  Etchor, Randor, cFusorSum, Dividor, Dialor, Watchor, Bitor, Pushor, Swivelor,  // Swivelor + Pushor appended B9 2026-11-12 (JD); Bitor appended B9 2026-11-12 (JD); Watchor appended B9 2026-11-12 (JD); Dialor appended 2026-11-11 (JD); Dividor appended 2026-11-05 (JD); cFusorSum appended PlayN; Randor appended 2026-10-31; Etchor appended 2026-10-13 (wiring pass B6): never insert mid-enum -- values are registry data
 };
 constexpr SimRole roleOf(const BlockDef& d) { return SimRole(d.role); }
 /// Lets content code compare the engine's raw BlockDef::role with a SimRole (found by ADL).
@@ -198,7 +203,11 @@ const cBlockReg& blockRegistry();
 /// 2026-11-04 (JD t4305u): the ONE right-click gate (game.cpp Use and the selftests): a block takes Use
 /// only when it is flagged kInteractive. The Thresholdor lacked the flag, so its subtract toggle
 /// worked in the selftest (sim.use direct) but never in game.
-inline bool playerUsable(const cBlockReg& reg, BlockId b) { return reg.has(b, kInteractive); }
+/// B9 (JD 2026-11-11): the DIALOR's dial is set with Alt + wheel (kCmdAltUse), never a bare click,
+/// so a bare right click does not reach it (its kInteractive use-cycle flag and use() stay as ruled).
+inline bool playerUsable(const cBlockReg& reg, BlockId b) {
+  return reg.has(b, kInteractive) && roleOf(reg.def(b)) != SimRole::Dialor;
+}
 /// Mutable registry handle for the seal/hot-swap system. Call single-threaded:
 /// seal() at boot after mods load, stageBlockUpdate()/refreshStaged() via the
 /// debug hot-swap path (cSimThread::runBetweenTicks). Never while sealed.
@@ -244,11 +253,66 @@ inline BlockId viaSide(BlockId b, int axis) {
 /// reads "power from an adjacent wire" uses isFlatWire.
 inline bool isWire(BlockId b) { return roleOf(b) == SimRole::Wire; }
 inline bool isFlatWire(BlockId b) { return isWire(b) && !isVia(b); }
+/// Whether a block can hold flat Trace on top of it (or under it, as a ceiling).
+/// JD's wire rulings, 2026-11-08: ANY solid block supports, deliberately broader
+/// than Minecraft: bottom slabs support (a slab is solid; Trace also climbs up
+/// and down slab steps, symmetrically), and crystal leaves support (a deliberate
+/// difference from Minecraft, JD's explicit choice). Non-solid blocks never do.
+inline bool canSupportWire(BlockId b) { return (blockDef(b).flags & kSolid) != 0; }
 /// Trace (flat wire, not vias) is a PARTIAL BLOCK THAT REQUIRES SUPPORT (JD 2026-10-24): it must lie on a
 /// solid block or hang under one (a ceiling); a wall beside it is no support. Placement is refused without
 /// support, and losing both supports pops it (cSimThread::popAttached -> stillSupported). Vias need none.
 template <class Map> bool wireSupported(const Map& w, int x, int y, int z) {
-  return blockDef(w.get(x, y - 1, z)).flags & kSolid || blockDef(w.get(x, y + 1, z)).flags & kSolid;
+  return canSupportWire(w.get(x, y - 1, z)) || canSupportWire(w.get(x, y + 1, z));
+}
+/// The insulating blocks (JD, 2026-10-14): Ceramic plus the three Insulat* blocks.
+/// In this def system insulating = solid, opaque, never kPowerable; the explicit
+/// list exists so the climb-cut rule below can name them even if a future
+/// insulating block is not solid + opaque.
+inline bool isInsulatingBlock(BlockId b) {
+  return b == kCeramic || b == kInsulatnor || b == kInsulator || b == kInsulatxor;
+}
+/// JD's climb-cut rule (2026-11-08, wire plan decision 2): the block in the cut
+/// cell (above the lower wire of a climb, or the step edge a descent passes)
+/// cuts the climb iff it is solid AND opaque, or it is an insulating block.
+/// Transparent blocks never cut (glass and frosted glass let Trace stair
+/// through them) and neither do non-solid blocks. Derived from block
+/// properties, NOT from the legacy kCutsWire flag: the flag and this rule
+/// disagree exactly on the transparent flag-carriers (glass, frosted glass,
+/// substrate, the Repeator, Switch, Button, Lithographor, the Trace Bulbs),
+/// which the flag cut and this rule does not. JD reviews the per-block census
+/// (Trace Wire Run Report, 2026-11-08) and adds special cases by name.
+inline bool cutsWireClimb(BlockId b) {
+  const BlockDef d = blockDef(b);
+  return ((d.flags & kSolid) && (d.flags & kOpaque)) || isInsulatingBlock(b);
+}
+/// Whether the step block beside a climbing wire presents a full sturdy face
+/// to it, so the climb's wall piece (the Straight piece running up the side)
+/// is drawn on it. Vanilla's rule, adapted: full solid + opaque cubes only.
+/// Glass, frosted glass, substrate, slabs and ramps take the floor strip
+/// only, no wall. Render-only; the sim link itself does not consult this.
+inline bool wireStepSturdy(BlockId b) {
+  const BlockDef d = blockDef(b);
+  return (d.flags & kSolid) && (d.flags & kOpaque) && d.shape == Shape::Cube;
+}
+/// The height (in 1/16 block units) of the top surface of the support under a
+/// flat wire cell: where the wire's floor piece SEATS (JD ruling, next-build-2
+/// run 2026-11-09, D2.3: the wire rests on its support's actual top surface).
+/// Derived from the support's shape, the same way support itself is derived
+/// (canSupportWire above): a bottom slab's top is at half height (8), a full
+/// block's at 16. Any other shape that can hold a wire seats at 16 today...
+/// the full cell top is the only other top surface the mesher draws for a
+/// supporting shape. Render-only; the sim never consults this.
+/// FRAME WARNING (wire float hunt, 2026-11-09): the value is measured in
+/// the SUPPORT's own cell frame. The wire's cell floor is the support
+/// cell's top, so a caller drawing in the wire's frame converts first
+/// (seat = value - 16 for a solid support; 0 = not solid, no surface).
+/// Using the raw value as a wire-frame offset floated every wire piece
+/// exactly one full block in build 113.
+inline int wireSeatHeight(BlockId support) {
+  const BlockDef d = blockDef(support);
+  if (!(d.flags & kSolid)) return 0;
+  return d.shape == Shape::Slab ? 8 : 16;
 }
 inline bool isComponent(BlockId b) { return roleOf(b) != SimRole::None; }
 /// Wire channel of a wire / torch (1 = red, 2 = blue; channels never connect).

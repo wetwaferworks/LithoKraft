@@ -24,7 +24,8 @@ cBlockFamilies::cBlockFamilies() {
       SimRole::Wire, SimRole::Pulsor, SimRole::Memor, SimRole::Randor, SimRole::cFusorSum, SimRole::Dividor, SimRole::Repeator, SimRole::Thresholdor,
       SimRole::Redirector, SimRole::Latchor, SimRole::Catchor, SimRole::Switch, SimRole::cButton, SimRole::Keyboard,
       SimRole::Tone, SimRole::cSignalTransmittor, SimRole::cSignalReceivor, SimRole::cDish, SimRole::cOverclockor,
-      SimRole::cPortor, SimRole::cFusor, SimRole::Chipor, SimRole::Lithographor, SimRole::Etchor};
+      SimRole::cPortor, SimRole::cFusor, SimRole::Chipor, SimRole::Lithographor, SimRole::Etchor,
+      SimRole::Dialor, SimRole::Watchor, SimRole::Bitor, SimRole::Pushor, SimRole::Swivelor};  // Swivelor + Pushor + Bitor + Watchor appended B9 2026-11-12 (JD); Dialor appended 2026-11-11 (JD): 17th reserved Trace keyword; do not insert mid-list
   const auto& reg = blockRegistry();
   family_.assign(reg.size(), BlockFamily::Unassigned);
   rank_.assign(reg.size(), 0);

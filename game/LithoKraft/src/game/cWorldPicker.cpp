@@ -1,15 +1,18 @@
 // World picker: see cWorldPicker.h. 2026-10-30 (JD).
 #include "lithokraft/game/cWorldPicker.h"
-#include "litholattice/ui/containers.h"
-#include "litholattice/ui/controls.h"
 
 namespace lithokraft {
 
-namespace ui = litholattice::ui;
+// namespace ui = lithokraft::ui;  // MSVC C2386: redundant self-alias inside namespace lithokraft (ui:: already resolves here)
 
 void cWorldPicker::open(ui::cUiRoot& root, float k, int currentWorld, std::vector<std::string> currentSpawns, PickFn onPick,
                         std::function<void()> onFolder) {
   if (dlg_) return;
+  // Validate the caller's world index against the catalog (bug hunt
+  // #11): an out-of-range current_ made showSpawns read past the end of
+  // entries(). Fall back to 0; an empty catalog shows no spawns at all.
+  const size_t catSize = cWorldCatalog::instance().entries().size();
+  if (currentWorld < 0 || size_t(currentWorld) >= catSize) currentWorld = 0;
   k_ = k; current_ = currentWorld; currentSpawns_ = std::move(currentSpawns); onPick_ = std::move(onPick);
   onFolder_ = std::move(onFolder);
   ui::cDialog& dlg = ui::cDialog::show(root, "Choose a world");
@@ -48,7 +51,13 @@ void cWorldPicker::open(ui::cUiRoot& root, float k, int currentWorld, std::vecto
 void cWorldPicker::showSpawns(int world) {
   if (!spawnCol_) return;
   spawnCol_->clearChildren();
-  const auto& e = cWorldCatalog::instance().entries()[size_t(world)];
+  // Validate here too (bug hunt #11): button handlers pass catalog
+  // indices, but showSpawns is also reachable with current_ and any
+  // future caller; an empty catalog has nothing to show.
+  const auto& entries = cWorldCatalog::instance().entries();
+  if (entries.empty()) return;
+  if (world < 0 || size_t(world) >= entries.size()) world = 0;
+  const auto& e = entries[size_t(world)];
   std::vector<std::pair<std::string, std::string>> items;  // (spawn key, button text)
   if (world == current_) {
     items.push_back({"", "Continue here"});

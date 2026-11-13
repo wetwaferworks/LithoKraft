@@ -278,6 +278,16 @@ cBlockReg& mutableRegistry() {
   r.add(def("lithokraft:routor", "Routor", kDir | kInteractive, S::Cube, "routor", "routor", R::Redirector,  /* PlayB (JD t4346u): the Redirector is the Routor; same registry slot (saves) */ 0, 0, 45));  // PlayN (JD): new adder, fresh id; placeholder tex (CloudAtlas art TODO)  // 2026-10-31 (JD): appended (stable ids)
   // 2026-11-05 (JD, CloudAtlas art): Dividor, front = floor(back / 2), 1 tick. Appended (stable ids).
   r.add(def("lithokraft:dividor", "Dividor", kDir, S::Cube, "dividor", "dividor", R::Dividor, 0, 0, 45));
+  // 2026-11-11 (JD 1:1 + CloudAtlas concept C): Dialor, independent 1..64, back inhibit, 1 tick. Appended (stable ids).
+  r.add(def("lithokraft:dialor", "Dialor", kDir | kInteractive, S::Cube, "dialor", "dialor", R::Dialor, 0, 0, 45));
+  // B9 2026-11-12 (JD row B, CloudAtlas eye cube, full block): Watchor. Appended (stable ids). No use / alt-use.
+  r.add(def("lithokraft:watchor", "Watchor", kDir, S::Cube, "watchor", "watchor", R::Watchor, 0, 0, 45));
+  // B9 2026-11-12 (JD row B, CloudAtlas op readout, 3/16 slab + housing like the Dividor): Bitor. Appended (stable ids).
+  r.add(def("lithokraft:bitor", "Bitor", kDir, S::Cube, "bitor", "bitor", R::Bitor, 0, 0, 45));
+  // B9 2026-11-12 (JD row B, CloudAtlas honeycomb face, full block): Pushor. Appended (stable ids). No use.
+  r.add(def("lithokraft:pushor", "Pushor", kDir, S::Cube, "pushor", "pushor", R::Pushor, 0, 0, 45));
+  // B9 2026-11-12 (JD row B, CloudAtlas gear ring + resin mount, full block): revised Swivelor. Appended (stable ids). No use.
+  r.add(def("lithokraft:swivelor", "Swivelor", kDir, S::Cube, "swivelor", "swivelor", R::Swivelor, 0, 0, 45));
     // Save migration: pre-rename ids remap to the -OR names (2026-10-10).
     r.addAlias("lithokraft:pulsar", "lithokraft:pulsor");
     r.addAlias("lithokraft:redirector_select", "lithokraft:routor");  // PlayB (JD t4346u): old saves
@@ -431,6 +441,11 @@ const BlockId kOrganicWallPost      = resolveId(blockRegistry(), "lithokraft:org
 const BlockId kRandor               = resolveId(blockRegistry(), "lithokraft:randor");
 const BlockId kFusorSum            = resolveId(blockRegistry(), "lithokraft:fusor_sum");
 const BlockId kDividor             = resolveId(blockRegistry(), "lithokraft:dividor");  // 2026-11-05 (JD)
+const BlockId kDialor              = resolveId(blockRegistry(), "lithokraft:dialor");  // 2026-11-11 (JD)
+const BlockId kWatchor             = resolveId(blockRegistry(), "lithokraft:watchor");  // B9 2026-11-12 (JD)
+const BlockId kBitor               = resolveId(blockRegistry(), "lithokraft:bitor");  // B9 2026-11-12 (JD)
+const BlockId kPushor              = resolveId(blockRegistry(), "lithokraft:pushor");  // B9 2026-11-12 (JD)
+const BlockId kSwivelor            = resolveId(blockRegistry(), "lithokraft:swivelor");  // B9 2026-11-12 (JD)
 const BlockId kRedirectorSelect    = resolveId(blockRegistry(), "lithokraft:routor");  /* PlayB: the Routor (name kept for callers) */  // 2026-11-04 (JD t4302u)
 
 std::vector<BlockId> paletteBlocks(bool includeHidden) {  // 2026-10-31 (JD): registry-driven palette

@@ -10,6 +10,7 @@
 #include "litholattice/core/math.h"
 #include "litholattice/world/chunk.h"  // packPos
 #include "litholattice/core/atomic_gate.h"
+#include "lithokraft/game/McpDisplayVision.h"  // SCRATCH vulkfb
 
 namespace lithokraft {
 namespace {
@@ -94,6 +95,46 @@ cMcpSensesAdapter::CvarState cMcpSensesAdapter::cvars() const {
 
 std::vector<std::string> cMcpSensesAdapter::pilotIds() const { return {"player"}; }
 
+// SCRATCH vulkfb (2026-11-11): the player's real on-screen frame from the active display renderer.
+// Off unless LL_MCP_DISPLAY_VISION=1. Waits (MCP thread) for a frame drawn after this request.
+bool cMcpSensesAdapter::captureDisplayFrame(std::string_view pilot, int width, int height, VisionFrame& out) {
+  if (!cMcpDisplayVision::enabled() || pilot != "player") return false;
+  cMcpDisplayVision& dv = cMcpDisplayVision::instance();
+  const uint64_t seq = dv.request();
+  cMcpDisplayVision::Frame f;
+  if (!dv.waitFrame(seq, 4000, f) || f.width <= 0 || f.height <= 0) return false;
+  const int w = std::clamp(width > 0 ? width : std::min(f.width, 640), kMinDim, 1280);
+  const int h = std::clamp(height > 0 ? height : std::max(kMinDim, f.height * w / f.width), kMinDim, 720);
+  std::vector<uint8_t> rgb(size_t(w) * size_t(h) * 3);
+  for (int y = 0; y < h; ++y) {  // box filter (integer source spans)
+    const int y0 = y * f.height / h, y1 = std::max(y0 + 1, (y + 1) * f.height / h);
+    for (int x = 0; x < w; ++x) {
+      const int x0 = x * f.width / w, x1 = std::max(x0 + 1, (x + 1) * f.width / w);
+      uint64_t acc[3] = {0, 0, 0}, n = 0;
+      for (int yy = y0; yy < y1; ++yy)
+        for (int xx = x0; xx < x1; ++xx) {
+          const uint8_t* q = &f.rgb[(size_t(yy) * size_t(f.width) + size_t(xx)) * 3];
+          acc[0] += q[0]; acc[1] += q[1]; acc[2] += q[2]; ++n;
+        }
+      uint8_t* d = &rgb[(size_t(y) * size_t(w) + size_t(x)) * 3];
+      for (int c = 0; c < 3; ++c) d[c] = uint8_t((acc[c] + n / 2) / n);
+    }
+  }
+  out.width = w;
+  out.height = h;
+  if (!litholattice::mcp::encodePngRgb(w, h, rgb.data(), out.png)) return false;
+  out.tick = f.tick;
+  out.source = f.renderer;
+  out.srcWidth = f.width;
+  out.srcHeight = f.height;
+  CameraViewPose res;
+  if (rig_ && rig_->resolvedPose(pilot, res)) {
+    out.camX = res.position.x; out.camY = res.position.y; out.camZ = res.position.z;
+    out.yaw = float(res.yaw * kRadToDeg); out.pitch = float(res.pitch * kRadToDeg);
+  }
+  return true;
+}
+
 bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, int height,
                                           VisionFrame& out) {
   // The pilot's engine camera (cPilotCameraRig) resolves the capture pose on
@@ -135,7 +176,7 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
                         litholattice::lookDir(eye, fwd));
 
   {
-    litholattice::cGateGuard<litholattice::cAtomicGate> rlk(renderMutex_);
+    owner_.check();  // mutexfree 2b: single MCP owner thread (was renderMutex_)
     sw_.setPerPixelShading(false);  // flat = the downgraded path
     sw_.resize(uint32_t(w), uint32_t(h));
     sw_.clear(kSkyClear);  // beyond loaded chunks: sky, not a crash
@@ -149,7 +190,7 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
     std::vector<std::shared_ptr<const CachedMesh>> drawList;
     drawList.reserve(meshes.size());
     {
-      litholattice::cGateGuard<litholattice::cAtomicGate> plk(protoMutex_);
+      // mutexfree 2b: protoMutex_ removed (same owner thread as the render pass above)
       auto& st = protoStates_[std::string(pilot)];  // per-pilot camera state
       litholattice::CullProtoConfig cfg;
       cfg.cometTailFrames = cv.cometTailFrames;
@@ -234,7 +275,7 @@ bool cMcpSensesAdapter::captureAudioChunk(std::string_view pilot, int tier, Audi
   const size_t need = litholattice::mcp::kAudioChunkFrames * step;
 
   // drainTap() is the tap's single reader; serialize captures.
-  litholattice::cGateGuard<litholattice::cAtomicGate> alk(audioMutex_);
+  owner_.check();  // mutexfree 2b: single MCP owner thread (was audioMutex_)
   const size_t got = audio_.drainTap(tapScratch_.data(), need);
   if (got < need) return false;  // tap has no data yet (or underran)
 

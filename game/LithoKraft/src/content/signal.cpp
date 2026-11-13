@@ -23,6 +23,7 @@
 //  3. Decouple sim rate from remesh/UI: signal phase must not wait on mesh rebuild (lever 5/12).
 //  4. Plot-thread isolation: ownership handoff / phases only â€” no new mutex, no second world model.
 #include "lithokraft/content/trace_conn.h"  // 2026-11-01 PlayL: Trace connection states
+#include "lithokraft/content/trace_link.h"  // 2026-11-08 wire job Phase 0: the ONE flat-Trace link derivation
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -386,7 +387,7 @@ void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now) {
   } else {
     topoDirty_ = true;
   }
-  torches_.erase(k); wires_.erase(k); lamps_.erase(k); comps_.erase(k); lampHold_.erase(k); lampDelay_.erase(k); ++compsGen_; mountFlipOk_ = false;
+  torches_.erase(k); wires_.erase(k); lamps_.erase(k); comps_.erase(k); bindPending_.erase(k); lampHold_.erase(k); lampDelay_.erase(k); ++compsGen_; mountFlipOk_ = false;
   if (r == SimRole::Torch) torches_.insert(k);
   else if (r == SimRole::Wire) wires_.insert(k);
   else if (r == SimRole::Lamp || r == SimRole::ColorLamp) lamps_.insert(k);
@@ -407,18 +408,31 @@ void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now) {
                     : (role == SimRole::Randor) ? 4 : 0; }
         syncCompWords(c);
         comps_[k] = c;
+        if (r == SimRole::Catchor || r == SimRole::cSignalTransmittor) bindPending_.insert(k);  // 2026-11-07 (JD): one placement bind at the head of the next cycle
       }
+  // 2026-11-07 (JD): placing a wire/torch beside an unwired Catchor/Transmittor
+  // also queues its one placement bind (build order: components first, wire
+  // run to them second). Only edits queue binds — never power transitions.
+  if (r == SimRole::Wire || r == SimRole::Torch) {
+    const cCompBehavior* bc = cBehaviorCatalog::get().component(kCatchor);
+    const cCompBehavior* bt = cBehaviorCatalog::get().component(kSignalTransmittor);
+    int x, y, z; unpackPos(k, x, y, z);
+    for (int d = 0; d < 4; ++d) {
+      const auto nit = comps_.find(packPos(x + kDirX[d], y, z + kDirZ[d]));
+      if (nit != comps_.end() && (nit->second.behavior == bc || nit->second.behavior == bt)) bindPending_.insert(nit->first);
+    }
+  }
 }
 
 // 2026-11-01 (JD placement spikes): a component / lamp / plain block edit with no wire in or under the cell leaves
-// every wire link unchanged (wireLinks reads kCutsWire of a cell only for the wire directly below it), so the
+// every wire link unchanged (the link derivation reads the climb-cut property of a cell only for the wire directly below it), so the
 // net flood is kept (relink) and only the readers of the touching nets are patched. LL_EDIT_LOCAL=0 kill.
 void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now, bool wireBelow) {
   ++editGen_;  // PlayM2
   const int64_t k = packPos(x, y, z);
   const SimRole r = roleOf(now);
   // 2026-11-01 (box): torch edits are local too - torches are never in a net, a reader list or a wire link
-  // (only kCutsWire above a wire matters, and wireBelow excludes that); torches_ / srcReach_ / genSeeds_ are
+  // (only the cut property above a wire matters, and wireBelow excludes that); torches_ / srcReach_ / genSeeds_ are
   // rebuilt from torches_ every buildNets. LL_EDIT_LOCAL_TORCH=0: torch edits take the full path (old).
   static const bool torchLocal = [] { const char* e = std::getenv("LL_EDIT_LOCAL_TORCH"); return !(e && e[0] == '0'); }();
   const bool torchOk = torchLocal || (!torches_.contains(k) && r != SimRole::Torch);
@@ -428,7 +442,7 @@ void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now, bool wireBelow
   if (netsValid_) { diagKind_ = 7; diagCx_ = x >> 4; diagCz_ = z >> 4; diagOwn_ = true; }  // diag: local edit
   fullPass_ = true; netsValid_ = false; editLocal_ = true;
   const bool wasComp = comps_.contains(k), wasLamp = lamps_.contains(k);
-  lamps_.erase(k); comps_.erase(k); lampHold_.erase(k); lampDelay_.erase(k); torches_.erase(k); ++compsGen_; mountFlipOk_ = false;
+  lamps_.erase(k); comps_.erase(k); bindPending_.erase(k); lampHold_.erase(k); lampDelay_.erase(k); torches_.erase(k); ++compsGen_; mountFlipOk_ = false;
   if (r == SimRole::Torch) torches_.insert(k);
   const bool isLamp = r == SimRole::Lamp || r == SimRole::ColorLamp;
   bool isComp = false;
@@ -450,6 +464,8 @@ void cSignalSim::onBlockChanged(int x, int y, int z, BlockId now, bool wireBelow
                     : (role == SimRole::Randor) ? 4 : 0; }
         syncCompWords(c);
         comps_[k] = c;
+        { const auto rr = blockRegistry().def(now).role;
+          if (rr == SimRole::Catchor || rr == SimRole::cSignalTransmittor) bindPending_.insert(k); }  // 2026-11-07 (JD): placement bind
         isComp = true;
       }
   auto patch = [&](std::vector<std::vector<int64_t>>& lists, int64_t wk, bool add) {
@@ -513,30 +529,36 @@ void cSignalSim::collectMountPowered(const ChunkMap& w) {
     mountCandGen_ = editGen_; mountCandN_ = n; mountCandPtr_ = compAllKeys_.data(); mountCandHard_ = hardAny;
   }
   const size_t nIter = kIncr ? mountCand_.size() : n;
+  // TPS (2026-11-06): ONE walk over the candidates computes both former passes (attached
+  // switches / buttons below, hard-power emitters further down). The resulting contents of
+  // mountPowered_ are identical by construction: it is a max-membership set (B-L1, above) —
+  // the switch pass writes kMaxSignal (the maximum) and the emitter pass max-reduces, so the
+  // two contributions commute per support block and visit order cannot leak. Each candidate's
+  // block, state and role are now loaded once instead of once per pass.
   for (size_t ii = 0; ii < nIter; ++ii) {
     const size_t i = kIncr ? size_t(mountCand_[ii]) : ii;
     const int64_t k = compAllKeys_[i];
     Comp& c = *compAllPtrs_[i];
     int x, y, z; unpackPos(k, x, y, z);
-    const CellState s = w.getState(x, y, z);
-    if (!stAttach(s) || !stOn(s)) continue;
-    if (const auto r = blockRegistry().def(w.get(x, y, z)).role; r != uint16_t(SimRole::Switch) && r != uint16_t(SimRole::cButton)) continue;
-    int ox, oy, oz;
-    attachOffset(stAttach(s), ox, oy, oz);
-    mountPowered_[packPos(x + ox, y + oy, z + oz)] = uint8_t(kMaxSignal);
-  }
-  // A lit Repeator hard-powers the solid conductive block it faces (not glass / ceramic: they are
-  // not powerable), so wire and components on that block's other faces pick the signal up.
-  for (size_t ii = 0; ii < nIter; ++ii) {
-    const size_t i = kIncr ? size_t(mountCand_[ii]) : ii;
-    const int64_t k = compAllKeys_[i];
-    Comp& c = *compAllPtrs_[i];
+    const BlockId b = w.get(x, y, z);
+    const auto role = blockRegistry().def(b).role;
+    // Former pass 1: an attached switch / button that is on strongly powers its support block.
+    if (role == uint16_t(SimRole::Switch) || role == uint16_t(SimRole::cButton)) {
+      const CellState s = w.getState(x, y, z);
+      if (stAttach(s) && stOn(s)) {
+        int ox, oy, oz;
+        attachOffset(stAttach(s), ox, oy, oz);
+        mountPowered_[packPos(x + ox, y + oy, z + oz)] = uint8_t(kMaxSignal);
+      }
+    }
+    // Former pass 2: a lit Repeator hard-powers the solid conductive block it faces (not glass
+    // / ceramic: they are not powerable), so wire and components on that block's other faces
+    // pick the signal up.
     if (!(c.faceWord & 0xFFFFu) && !c.mem.out && !c.mem.out2) continue;  // PlayL2 #8: faceWord out|out2
-    int x, y, z; unpackPos(k, x, y, z);
-    if (!c.mem.out && w.get(x, y, z) != kRedirectorSelect) continue;  // PlayB: a Routor's second path hard-powers too
+    if (!c.mem.out && b != kRedirectorSelect) continue;  // PlayB: a Routor's second path hard-powers too
     // 2026-11-01 PlayL (JD, LL_HARD_ANY): any component output facing the block hard-powers it, not only a Repeator.
-    if (const auto hr = blockRegistry().def(w.get(x, y, z)).role; !cPulseRules::hardAnyComponent() && hr != uint16_t(SimRole::Repeator) &&
-        hr != uint16_t(SimRole::Pulsor) && w.get(x, y, z) != kRedirectorSelect) continue;  // PlayB: Pulsor / Routor always hard-power
+    if (!cPulseRules::hardAnyComponent() && role != uint16_t(SimRole::Repeator) &&
+        role != uint16_t(SimRole::Pulsor) && b != kRedirectorSelect) continue;  // PlayB: Pulsor / Routor always hard-power
     const CellState s = w.getState(x, y, z);
     for (int d = 0; d < 4; ++d) {
       const int es = compEmit(c.behavior, c.mem, c.emitMode, d, s);
@@ -796,7 +818,46 @@ bool epOn() { static const bool on = [] { const char* e = std::getenv("LL_TICK_P
 double epMs() { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
 struct EpTimer { double& acc; double s; EpTimer(double& a) : acc(a), s(epOn() ? epMs() : 0) {} ~EpTimer() { if (epOn()) acc += epMs() - s; } };
 }
+// 2026-11-07 (JD ruling): placement binding. Once per registration (placement,
+// edit, scan), an unwired Catchor / SignalTransmittor binds to the first Trace
+// touching one of its sides — the same scan the retired tick-time auto-bind
+// ran, but ONLY here, at the head of the first cycle after the edit. Power
+// and unpower transitions never reach this code, so they can never bind or
+// rebind; afterwards only player use (use / useAlt) modifies the component.
+void cSignalSim::applyPlacementBinds(ChunkMap& w, const DirtyFn& dirty) {
+  if (bindPending_.empty()) return;
+  std::vector<int64_t> keys(bindPending_.begin(), bindPending_.end());
+  bindPending_.clear();
+  std::sort(keys.begin(), keys.end());  // canonical order, like every other sim walk
+  const cBlockReg& reg = blockRegistry();
+  for (const int64_t k : keys) {
+    const auto it = comps_.find(k);
+    if (it == comps_.end()) continue;
+    int x, y, z; unpackPos(k, x, y, z);
+    const BlockId b = w.get(x, y, z);
+    const SimRole role = roleOf(b);
+    if (role != SimRole::Catchor && role != SimRole::cSignalTransmittor) continue;
+    const CellState s = w.getState(x, y, z);
+    if ((stAux(s) & 3) != 3) continue;  // already wired: placement never rewires
+    for (int d = 0; d < 4; ++d) {
+      const int nx = x + kDirX[d], nz = z + kDirZ[d];
+      const BlockId nb = w.get(nx, y, nz);
+      const BlockDef nd = reg.def(nb);
+      int ch = 0;
+      if (nd.role == SimRole::Wire || nd.role == SimRole::Torch) ch = cBehaviorCatalog::get().colour(nd);
+      const bool rep = role == SimRole::Catchor && cPulseRules::repeatorLinks() &&
+                       nd.role == SimRole::Repeator && stFacing(w.getState(nx, y, nz)) == dirBack(d);
+      if (ch == 1 || ch == 2 || rep) {
+        w.setState(x, y, z, makeState(stValue(s), (d + 2) & 3, ch == 2 ? 4 : 0, false));
+        dirty(x, y, z);
+        break;
+      }
+    }
+  }
+}
+
 void cSignalSim::tick(ChunkMap& w, int pcx, int pcz, int radius, const DirtyFn& dirty) {
+  applyPlacementBinds(w, dirty);  // 2026-11-07 (JD): one placement bind per registration, before anything ticks
   // Reassembled from the hs* pieces (hs-design Ã‚Â§3.2); the handshake path in
   // cSignalWorldSim drives the identical pieces through the authority.
   hsBeginCycle(w, pcx, pcz, radius);
@@ -871,7 +932,14 @@ uint64_t cSignalSim::simScopeFp(const ChunkMap& w, int pcx, int pcz, int radius)
     for (int dx = -r; dx <= r; ++dx) {
       const int cx = pcx + dx, cz = pcz + dz;
       if (!area_.contains(cx * 16 + 8, cz * 16 + 8) && std::abs(dx) + std::abs(dz) > r) continue;
-      const uint64_t p = uint64_t(reinterpret_cast<uintptr_t>(w.column(cx, cz)));
+      // Bug hunt #21 (2026-11-08): fingerprint CONTENT IDENTITY, not the heap
+      // address. The raw pointer aliased whenever a freed column's replacement
+      // landed at the same address, so a real column swap could fingerprint as
+      // "unchanged" and hsBeginCycle kept stale cached nets. structureGen()
+      // names every structural column change (insert / erase / sub swap...
+      // chunk_map.h) and is monotonic per map, so folding it in makes a swap
+      // always move the fingerprint regardless of allocator address reuse.
+      const uint64_t p = w.structureGen();
       fp = (fp ^ (p + uint64_t(dx * 131 + dz) * 0x100000001B3ull)) * 0x100000001B3ull;
     }
   return fp;
@@ -1198,12 +1266,8 @@ void cSignalSim::wakeAround(int64_t k) {
 static bool viaVertOk(BlockId self, BlockId nb) {
   return (viaAxis(self) == 0 || viaAxis(nb) == 0) && !isSideVia(self) && !isSideVia(nb);
 }
-static bool viaSideOk(BlockId self, BlockId nb, int dx) {
-  const int ax = dx ? 1 : 2, sa = viaAxis(self), na = viaAxis(nb);
-  if (sa > 0 && sa != ax) return false;
-  if (na > 0 && na != ax) return false;
-  return sa > 0 || na > 0;
-}
+// viaSideOk lives in trace_link.h (2026-11-08 wire job Phase 0): the sim and
+// the appearance arm scan share the one link derivation now.
 
 void cSignalSim::wireLinks(const ChunkMap& w, int x, int y, int z, std::vector<int64_t>& out) const {
   const auto& reg = blockRegistry();
@@ -1222,18 +1286,19 @@ void cSignalSim::wireLinks(const ChunkMap& w, int x, int y, int z, std::vector<i
     }
     return;
   }
-  const bool upBlocked = reg.has(w.get(x, y + 1, z), kCutsWire);
+  // Flat-Trace links come from the ONE shared derivation (trace_link.h,
+  // 2026-11-08 wire job Phase 0); results are emitted in the historical
+  // kH x dy order so net construction sees the identical sequence.
+  TraceLinkDirs dirs[4];
+  traceLinkDirs(self, channel, w.getState(x, y, z),
+                [&](int dx, int dy, int dz) { return w.get(x + dx, y + dy, z + dz); },
+                [&](int dx, int dy, int dz) { return w.getState(x + dx, y + dy, z + dz); }, dirs);
   for (auto& d : kH) {
     const int nx = x + d[0], nz = z + d[1];
-    for (int dy = -1; dy <= 1; ++dy) {
-      if (dy == 1 && upBlocked) continue;
-      if (dy == -1 && reg.has(w.get(nx, y, nz), kCutsWire)) continue;
-      const BlockDef nd = reg.def(w.get(nx, y + dy, nz));
-      if (nd.role != SimRole::Wire || nd.channel != channel) continue;
-      if (isVia(w.get(nx, y + dy, nz)) && !(dy == 0 && viaSideOk(self, w.get(nx, y, nz), d[0]))) continue;  // Trace feeds a via only through a side via's open end
-      if (!cTraceConn::sideOn(w.getState(x, y, z), d[0], 0, d[1]) || !cTraceConn::sideOn(w.getState(nx, y + dy, nz), -d[0], 0, -d[1])) continue;  // PlayL connection states
-      out.push_back(packPos(nx, y + dy, nz));
-    }
+    const int dd = d[0] == 1 ? 1 : d[0] == -1 ? 3 : d[1] == -1 ? 0 : 2;  // kH entry -> kDirX/kDirZ index
+    for (int dy = -1; dy <= 1; ++dy)
+      if (dy == 0 ? dirs[dd].side : dy == 1 ? dirs[dd].up : dirs[dd].down)
+        out.push_back(packPos(nx, y + dy, nz));
   }
 }
 
@@ -1586,7 +1651,8 @@ litholattice::TickRate cSignalSim::classTickRate(BlockId block, const cCompBehav
 }
 
 // 2026-11-01 PlayM: one component's inputs (shared by the component pass and the same-tick settle).
-bool cSignalSim::gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int z, bool fastInputs, bool publish, ComponentInputs& in) {
+bool cSignalSim::gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int z, bool fastInputs, bool publish, ComponentInputs& in,
+                              std::vector<JammerZone>* jammerSink) {
   const SimRole role = roleOf(blockRegistry().def(w.get(x, y, z)));
   if (role == SimRole::cSignalReceivor || role == SimRole::cDish) {
     int rs = 0, rc = 0;
@@ -1631,6 +1697,27 @@ bool cSignalSim::gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int
         in.repSides = uint8_t(in.repSides | (1u << d));
     }
   }
+  if (role == SimRole::Pushor) {  // B9 2026-11-12 (JD): Pushor power sensing (all faces but the front) + quasi-connectivity
+    const int pf = stFacing(w.getState(x, y, z));
+    for (int d = 0; d < 4; ++d) {  // hard powered: a component output drives straight into a Trace face
+      if (d == pf) continue;     // the front (resin pushing face) reads nothing
+      const int nx = x + kDirX[d], nz = z + kDirZ[d];
+      if (comps_.contains(packPos(nx, y, nz)) && emitToward(w, nx, y, nz, dirBack(d)) > 0) in.pushHard = true;
+    }
+    for (int dy : {1, -1}) {  // top / bottom faces read the soft / hard power of the block there
+      const int hp = hardPower(w, x, y + dy, z);
+      in.pushVert = std::max(in.pushVert, hp > 0 ? hp : softPower(x, y + dy, z));
+    }
+    for (const auto& d : k6) {  // quasi: an adjacent Pushor hard powered last tick soft-powers this one
+      const int nx = x + d[0], ny = y + d[1], nz = z + d[2];
+      if (roleOf(blockRegistry().def(w.get(nx, ny, nz))) == SimRole::Pushor && (stAux(w.getState(nx, ny, nz)) & 1u)) in.pushQuasi = true;
+    }
+  }
+  if (role == SimRole::Watchor) {  // B9 2026-11-12 (JD): the eye watches the one cell directly ahead (front)
+    const int wf = stFacing(w.getState(x, y, z));
+    const int fx = x + kDirX[wf], fz = z + kDirZ[wf];
+    in.watchId = w.get(fx, y, fz); in.watchState = w.getState(fx, y, fz); in.watchValid = true;
+  }
   if (role == SimRole::Randor) in.rng = randor::rollSeed(randor::worldSeed().load(std::memory_order_relaxed), k, tickNo_);  // 2026-10-31 (JD)
   if (role == SimRole::Redirector || role == SimRole::cFusor || role == SimRole::Repeator) {  // 2026-11-05 (JD): + Repeator side lock
     const int rf = stFacing(w.getState(x, y, z));
@@ -1643,8 +1730,14 @@ bool cSignalSim::gatherInputs(ChunkMap& w, int64_t k, Comp& c, int x, int y, int
       }
     }
   }
-  if (publish && role == SimRole::cOverclockor && c.mem.jammer)
-    jammers_.publish(JammerZone{x, y, z, kJammerRadius, c.mem.channel});
+  if (publish && role == SimRole::cOverclockor && c.mem.jammer) {
+    // Bug hunt #13 (2026-11-08): cJammerReg::next_ is sim-thread-only. Sharded
+    // ticks pass a per-shard sink and tickComponents publishes the zones
+    // serially after the barrier, in canonical shard order... the old direct
+    // publish raced push_back on a shared vector from job-pool workers.
+    if (jammerSink) jammerSink->push_back(JammerZone{x, y, z, kJammerRadius, c.mem.channel});
+    else jammers_.publish(JammerZone{x, y, z, kJammerRadius, c.mem.channel});
+  }
   if (fastInputs && c.fast) {
     for (int d = 0; d < 4; ++d) {
       switch (c.kind[d]) {
@@ -1834,7 +1927,8 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
   auto runRange = [&](size_t begin, size_t endEx, std::vector<CompNext>& out,
                       std::vector<std::pair<int64_t, uint64_t>>* wakes,
                       std::vector<std::pair<int64_t, CompSnap>>* snaps,
-                      size_t* ticked, size_t* oor) {
+                      size_t* ticked, size_t* oor,
+                      std::vector<JammerZone>* jammerSink = nullptr) {
     for (size_t ii = begin; ii < endEx; ++ii) {
       const int64_t k = iterKeys[ii];
       Comp* cp = (iterPtrs && ii < iterPtrs->size()) ? (*iterPtrs)[ii] : nullptr;
@@ -1860,7 +1954,7 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
       if (!area_.contains(x, z)) { if (kTable) { if (oor) ++(*oor); else ++compOutOfRange_; } continue; }
       const BlockId bid = w.get(x, y, z);
       litholattice::TickRate rate = c.rate;
-      if (const auto rit = classRates_.find(bid); rit != classRates_.end()) rate = rit->second;
+      if (!classRates_.empty()) if (const auto rit = classRates_.find(bid); rit != classRates_.end()) rate = rit->second;  // TPS: empty map (shipped content) skips the per-component hash find
       if (rate.divide > 1 && (tickNo_ % rate.divide) != uint64_t(ratePhaseFor(k, rate.divide))) {
         c.rateHeld = true;
         if (wakeOn) {
@@ -1874,7 +1968,7 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
       c.rateHeld = false;
       if (ticked) ++(*ticked); else ++lastTicked_;
       ComponentInputs in;
-      const bool fastUsed = gatherInputs(w, k, c, x, y, z, fastInputs, true, in);
+      const bool fastUsed = gatherInputs(w, k, c, x, y, z, fastInputs, true, in, jammerSink);
       const CellState pre = fastUsed ? *c.self : w.getState(x, y, z);
       if (sameTick) {
         if (snaps) snaps->push_back({k, CompSnap{c.mem, pre}});
@@ -1910,6 +2004,7 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
     if (shardNext_.size() < nShards) shardNext_.resize(nShards);
     if (shardWake_.size() < nShards) shardWake_.resize(nShards);
     if (shardSnap_.size() < nShards) shardSnap_.resize(nShards);
+    if (shardJammers_.size() < nShards) shardJammers_.resize(nShards);
     if (shardTicked_.size() < nShards) shardTicked_.assign(nShards, 0);
     else std::fill(shardTicked_.begin(), shardTicked_.begin() + nShards, size_t(0));
     if (shardOor_.size() < nShards) shardOor_.assign(nShards, 0);
@@ -1918,13 +2013,14 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
     for (unsigned i = 0; i < nShards; ++i) {
       shardNext_[i].clear();
       shardWake_[i].clear();
+      shardJammers_[i].clear();
       if (sameTick) shardSnap_[i].clear();
       const size_t start = size_t(i) * base + std::min(size_t(i), rem);
       const size_t len = base + (size_t(i) < rem ? 1 : 0);
       shardNext_[i].reserve(len);
       pool->submitUrgent([&, i, start, len] {
         runRange(start, start + len, shardNext_[i], &shardWake_[i],
-                 sameTick ? &shardSnap_[i] : nullptr, &shardTicked_[i], &shardOor_[i]);
+                 sameTick ? &shardSnap_[i] : nullptr, &shardTicked_[i], &shardOor_[i], &shardJammers_[i]);
       });
     }
     pool->waitIdle();  // single atomic barrier; ownership returns to sim thread
@@ -1937,6 +2033,7 @@ void cSignalSim::tickComponents(ChunkMap& w, const DirtyFn& dirty) {
       lastTicked_ += shardTicked_[i];
       if (kTable) compOutOfRange_ += shardOor_[i];
       for (const auto& [wk, wd] : shardWake_[i]) wakeSched(wk, wd);
+      for (const JammerZone& jz : shardJammers_[i]) jammers_.publish(jz);  // bug hunt #13: serial publish, shard order = key order
       if (sameTick) for (const auto& [sk, ss] : shardSnap_[i]) compSnap_.insert_or_assign(sk, ss);
     }
   }
@@ -2091,19 +2188,31 @@ void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
     struct Re { int64_t k; Comp* c; ComponentStep step; ComponentMemory mem; };
     std::vector<Re> re;
     re.reserve(settleCand_.size());
+    rebuildCompDense();  // TPS: fresh sorted dense keys/ptrs for the resolve below (gen-guarded no-op when current)
+    size_t denseJ = 0;
     for (int64_t k : settleCand_) {  // phase 1: read every input (no writes)
-      const auto cit = comps_.find(k);
-      if (cit == comps_.end()) continue;
-      Comp& c = cit->second;
+      // TPS (2026-11-06): merge-walk the sorted dense arrays instead of a comps_.find hash
+      // lookup per candidate per iteration. settleCand_ is ascending in both branches
+      // (compOrder_ is sorted; the incremental branch sorts + dedupes), so the walk resolves
+      // the same components in the same order, and a missing key skips exactly as
+      // find() == end() did.
+      while (denseJ < compAllKeys_.size() && compAllKeys_[denseJ] < k) ++denseJ;
+      if (denseJ >= compAllKeys_.size() || compAllKeys_[denseJ] != k) continue;
+      Comp* cp = compAllPtrs_[denseJ];
+      if (!cp) continue;
+      Comp& c = *cp;
       int x, y, z; unpackPos(k, x, y, z);
       if (!area_.contains(x, z)) continue;
       // A Repeator is a pure delay line: it keeps sampling at the start of the tick (pass 0), so its labelled
       // delay stays exact (re-reading here would make every Repeator one tick shorter; JD: delays stay).
       if (blockRegistry().def(w.get(x, y, z)).role == SimRole::Repeator) continue;
+      // B9 2026-11-12: a Watchor observes the watched cell once per tick (pass 0); re-reading it here would
+      // see this tick's own applies (zero-tick watching) and double-step its fire / rest memory.
+      if (blockRegistry().def(w.get(x, y, z)).role == SimRole::Watchor) continue;
       // PlayL Phase5: packed rate at place; classRates_ override (RATE handshake / lithography) still wins.
     const BlockId bid = w.get(x, y, z);
     litholattice::TickRate rate = c.rate;
-    if (const auto rit = classRates_.find(bid); rit != classRates_.end()) rate = rit->second;
+    if (!classRates_.empty()) if (const auto rit = classRates_.find(bid); rit != classRates_.end()) rate = rit->second;  // TPS: empty map (shipped content) skips the per-candidate hash find
       if (rate.divide > 1 && (tickNo_ % rate.divide) != uint64_t(ratePhaseFor(k, rate.divide))) continue;  // not its phase tick: holds
       auto sit = compSnap_.find(k);
       if (sit == compSnap_.end()) sit = compSnap_.emplace(k, CompSnap{c.mem, w.getState(x, y, z)}).first;  // slept in pass 0: state is pre-tick
@@ -2112,7 +2221,16 @@ void cSignalSim::hsSettle(ChunkMap& w, const DirtyFn& dirty) {
       ComponentMemory mem = sit->second.mem;
       CellState cur = sit->second.state;
       ComponentStep step{};
-      for (uint32_t s = 0; s < rate.multiply; ++s) { step = c.behavior->tick(in, cur, mem); cur = step.state; }
+      // TPS (2026-11-06): the main pass's Thresholdor hot specialization is textually
+      // identical to cThresholdor::tick, which ignores ComponentMemory entirely, so running
+      // it here on the snapshot copy yields exactly the virtual call's step (the litho path
+      // already uses the specializations the same way). Repeators never reach this loop —
+      // they are skipped above (delays stay) — so hotKind 1 cannot occur here.
+      for (uint32_t s = 0; s < rate.multiply; ++s) {
+        if (hotSpecOn() && c.hotKind == 2) step = hotTickThresholdor(in, cur);
+        else step = c.behavior->tick(in, cur, mem);
+        cur = step.state;
+      }
       step = scheduleOutput(k, c, w.get(x, y, z), step);  // 2026-11-04 (JD t4304u): same-tick settle replaces this tick's entry
       re.push_back({k, &c, step, std::move(mem)});
     }
@@ -2300,17 +2418,19 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
       }
       return;
     }
-    const bool upBlocked = reg.has(w.get(x, y + 1, z), kCutsWire);
+    // Flat-Trace links from the ONE shared derivation (trace_link.h,
+    // 2026-11-08 wire job Phase 0), emitted in the historical kH x dy
+    // order; the area scope test stays here at the call site.
+    TraceLinkDirs dirs[4];
+    traceLinkDirs(self, channel, w.getState(x, y, z),
+                  [&](int dx, int dy, int dz) { return w.get(x + dx, y + dy, z + dz); },
+                  [&](int dx, int dy, int dz) { return w.getState(x + dx, y + dy, z + dz); }, dirs);
     for (auto& d : kH) {
       const int nx = x + d[0], nz = z + d[1];
+      const int dd = d[0] == 1 ? 1 : d[0] == -1 ? 3 : d[1] == -1 ? 0 : 2;  // kH entry -> kDirX/kDirZ index
       for (int dy = -1; dy <= 1; ++dy) {
-        if (dy == 1 && upBlocked) continue;        // climbing needs headroom above this wire
-        if (dy == -1 && reg.has(w.get(nx, y, nz), kCutsWire)) continue;  // descending past a block edge
-        const BlockDef nd = reg.def(w.get(nx, y + dy, nz));
-        if (nd.role != SimRole::Wire || nd.channel != channel) continue;  // red never meets blue
-        if (isVia(w.get(nx, y + dy, nz)) && !(dy == 0 && viaSideOk(self, w.get(nx, y, nz), d[0]))) continue;  // only a side via's open end
+        if (!(dy == 0 ? dirs[dd].side : dy == 1 ? dirs[dd].up : dirs[dd].down)) continue;
         if (!area_.contains(nx, nz)) continue;
-        if (!cTraceConn::sideOn(w.getState(x, y, z), d[0], 0, d[1]) || !cTraceConn::sideOn(w.getState(nx, y + dy, nz), -d[0], 0, -d[1])) continue;  // PlayL connection states
         fn(nx, y + dy, nz);
       }
     }
@@ -2323,7 +2443,12 @@ void cSignalSim::hsPropagateFull(ChunkMap& w, const DirtyFn& dirty) {
       forEachLink(x, y, z, [&](int nx, int ny, int nz) {
         const int ns = (selfVia || isVia(w.get(nx, ny, nz))) ? s : s - 1;  // vias are lossless
         if (ns <= 0 || stValue(w.getState(nx, ny, nz)) >= ns) return;
-        w.setState(nx, ny, nz, CellState(ns));
+        // Bug hunt #17 (2026-11-08): preserve the connection-state bits like every
+        // sibling flood path (seed/reset/pulse/hsPropagateNet). The bare CellState(ns)
+        // zeroed bits 7..15, so a custom-masked wire reached by the full pass silently
+        // reverted to auto-connect and the clobbered state was saved. JD's Signal
+        // Propagation Law: those bits ARE propagation semantics; preserve them exactly.
+        w.setState(nx, ny, nz, cTraceConn::withValue(w.getState(nx, ny, nz), ns));
         // B-M4 (P3-2): NO direct strengthBuf_ write here any more. The
         // incremental path records only FINAL changed cells (per-net
         // pending lists, replayed by hsApplyStrengthPending); this loop
@@ -2823,6 +2948,11 @@ bool cSignalSim::lithoCompile(const ChunkMap& w, int x0, int y0, int z0, int x1,
   std::vector<int64_t> keys;
   for (const auto& [k, c] : comps_) { int x, y, z; unpackPos(k, x, y, z); if (inBox(x, y, z)) keys.push_back(k); }
   std::sort(keys.begin(), keys.end());
+  // B9 2026-11-12: the compiled chip has no world cells to watch, so a box holding a Watchor does not
+  // compile (the live sim keeps running it). Lithography support for Watchor is a leftover.
+  for (int64_t k : keys) { int x, y, z; unpackPos(k, x, y, z); if (roleOf(reg.def(w.get(x, y, z))) == SimRole::Watchor) return false; }
+  // B9 2026-11-12: the chip does not model a Pushor's vertical / quasi inputs either: a box with one does not compile.
+  for (int64_t k : keys) { int x, y, z; unpackPos(k, x, y, z); if (roleOf(reg.def(w.get(x, y, z))) == SimRole::Pushor) return false; }
   std::unordered_map<int64_t, int32_t> idx;
   for (int64_t k : keys) {
     const Comp& c = comps_.at(k);

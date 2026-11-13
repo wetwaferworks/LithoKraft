@@ -15,15 +15,16 @@ execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CUR
 if(NOT LK_GIT_COMMIT)
   set(LK_GIT_COMMIT "nogit")
 endif()
-add_library(lithokraft_game STATIC build_version.cpp game.cpp world_save.cpp chunk_streamer.cpp bench_stream.cpp FrameDumpHub.cpp FrameVideoEncoder.cpp L0NeighbourHold.cpp StreamFillTracker.cpp actions.cpp input_selftest.cpp dimensions.cpp wafer_biomes.cpp wafer_pulse.cpp structures.cpp controls_panel.cpp player.cpp resource_manager.cpp sound_director.cpp
-            game_ui.cpp cWorldCatalog.cpp cWorldPicker.cpp game_ui_selftest.cpp script_editor.cpp ui_input_bridge.cpp ui_script_bindings.cpp settings.cpp extensible_facet.cpp
+add_library(lithokraft_game STATIC build_version.cpp game.cpp world_save.cpp chunk_streamer.cpp bench_stream.cpp FrameDumpHub.cpp FrameVideoEncoder.cpp FrameHashRecorder.cpp frame_hash_recorder_selftest.cpp L0NeighbourHold.cpp StreamFillTracker.cpp actions.cpp input_selftest.cpp dimensions.cpp wafer_biomes.cpp wafer_pulse.cpp structures.cpp controls_panel.cpp player.cpp resource_manager.cpp sound_director.cpp
+            game_ui.cpp cWorldCatalog.cpp component_test_selftest.cpp cWorldPicker.cpp game_ui_selftest.cpp script_editor.cpp ui_input_bridge.cpp ui_script_bindings.cpp settings.cpp extensible_facet.cpp
+            ui_facade.cpp ui_widgets.cpp ui_textedit.cpp ui_mod.cpp ui_theme.cpp
             settings_cvars.cpp game_commands.cpp world_query.cpp silica_biome.cpp
             etching.cpp lithography.cpp signing.cpp wiring_selftest.cpp
             screenshot.cpp fragment_gallery.cpp screenshot_selftest.cpp
             fragment_state.cpp fragment_selftest.cpp
             fragment_markdown.cpp fragment_markdown_selftest.cpp
             scout.cpp map_render.cpp scout_selftest.cpp
-            mcp_player_control.cpp mcp_senses_adapter.cpp camera_controller.cpp
+            mcp_player_control.cpp mcp_world_reader.cpp mcp_senses_adapter.cpp camera_controller.cpp
             ${LITHOKRAFT_BUILTIN_WORLDGEN})
 target_include_directories(lithokraft_game PUBLIC include PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(lithokraft_game PUBLIC lithokraft_content litholattice_ai litholattice_sim litholattice_world litholattice_render litholattice_platform litholattice_script litholattice_audio litholattice_input litholattice_ui litholattice_console litholattice_core litholattice_entity litholattice_mcp litholattice_camera litholattice_projectile)
@@ -33,6 +34,7 @@ litholattice_module_options(lithokraft_game)
 # (adapter, vitals/oxygen tick, stat persistence, MCP snapshot source).
 target_sources(lithokraft_game PRIVATE player_adapter.cpp)
 target_link_libraries(lithokraft_game PUBLIC litholattice_player)
+target_link_libraries(lithokraft_game PUBLIC litholattice_crypto)  # FrameHashRecorder SHA-256
 
 # 2026-10-31 (JD): Save World (tick-boundary snapshot + pool write) and in-process Load World.
 target_sources(lithokraft_game PRIVATE cWorldSnapshot.cpp cAsyncSaver.cpp cWorldConfigBuilder.cpp cFolderPicker.cpp cWorldLoadSoak.cpp cWorldFileCheck.cpp cTickStabilityMeter.cpp)
@@ -54,14 +56,14 @@ target_sources(lithokraft_game PRIVATE sprite_host.cpp sprite_host_selftest.cpp)
 target_link_libraries(lithokraft_game PUBLIC litholattice_sprite litholattice_systerian litholattice_procgen)
 
 # AiWorld production host (ai_host.{h,cpp}): Game-side ownership of the
-# engine AiWorld (brief B6, 2026-10-13) — bind to the live dimension,
+# engine AiWorld (brief B6, 2026-10-13) â€” bind to the live dimension,
 # ai.enabled gate, advance() driven from elapsed sim world ticks.
 # ai_host_selftest.cpp joins the app selftest. litholattice_ai is already
 # linked PUBLIC above.
 target_sources(lithokraft_game PRIVATE ai_host.cpp ai_host_selftest.cpp)
 
 # Deceitor mob (deceitor.{h,cpp}): game-owned behaviour for the first
-# AiWorld mob content — barter / betrayal / failed-click / pack
+# AiWorld mob content â€” barter / betrayal / failed-click / pack
 # retaliation brains, liked-items + barter tables, director registry.
 # deceitor_selftest.cpp joins the app selftest.
 target_sources(lithokraft_game PRIVATE deceitor.cpp deceitor_selftest.cpp)

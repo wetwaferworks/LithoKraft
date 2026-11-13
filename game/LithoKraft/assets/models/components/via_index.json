@@ -1,0 +1,165 @@
+{
+  "format": "lithokraft_via_voxel_v2_concept",
+  "version": "v1",
+  "concept": "B Lattice cage",
+  "resolution": 32,
+  "lthm_level": 5,
+  "axes": "x=east, y=up, z=south; canonical through-axis = Y (mouths top y=31 and bottom y=0); casing x0/x31/z0/z31 inert",
+  "engine_ids": {
+    "red": "lithokraft:red_via",
+    "blue": "lithokraft:blue_via"
+  },
+  "role": "Wire",
+  "flags": "kSolid | kTransparent",
+  "shape": "cube_transparent (full block, real cutouts)",
+  "geometry": "red and blue share these meshes; channel tint only",
+  "facing": "one canonical model (shaft along Y); engine rotates it to the placed facing (6 directions)",
+  "open_ends": "the two faces on the through-axis",
+  "casing": "other four faces inert: no nubs, no port glow",
+  "strength": "0 = off tint (dark core); 1-64 = tint mats lit, intensity may follow strength; no extra meshes",
+  "tint_mats": [
+    4,
+    12,
+    15
+  ],
+  "materials": {
+    "1": {
+      "name": "base",
+      "neutral_hex": "#2B3040",
+      "tint": false
+    },
+    "2": {
+      "name": "bevel",
+      "neutral_hex": "#3C4357",
+      "tint": false
+    },
+    "3": {
+      "name": "etch",
+      "neutral_hex": "#454D63",
+      "tint": false
+    },
+    "4": {
+      "name": "glow_seam",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "8": {
+      "name": "well",
+      "neutral_hex": "#090724",
+      "tint": false
+    },
+    "9": {
+      "name": "housing",
+      "neutral_hex": "#1D165A",
+      "tint": false
+    },
+    "10": {
+      "name": "accent",
+      "neutral_hex": "#9F77EC",
+      "tint": false
+    },
+    "11": {
+      "name": "pale",
+      "neutral_hex": "#C8A9F6",
+      "tint": false
+    },
+    "12": {
+      "name": "barrel_glow",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "13": {
+      "name": "bezel",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "14": {
+      "name": "glass",
+      "neutral_hex": "#3C268E",
+      "tint": false
+    },
+    "15": {
+      "name": "core",
+      "neutral_hex": "#FFFFFF",
+      "tint": true
+    },
+    "18": {
+      "name": "housing_hi",
+      "neutral_hex": "#5B3DB5",
+      "tint": false
+    },
+    "19": {
+      "name": "purple_glow",
+      "neutral_hex": "#8B65DD",
+      "tint": false
+    }
+  },
+  "tint_colors": {
+    "red": {
+      "off": "#5A5556",
+      "on": "#FF514B"
+    },
+    "blue": {
+      "off": "#535659",
+      "on": "#2FB4FF"
+    }
+  },
+  "stack_rule": "variant chosen by same-colour via on the same through-axis at each end",
+  "variants": [
+    {
+      "variant": "single",
+      "top_end": "mouth",
+      "bottom_end": "mouth",
+      "lthm": "models/via_B_single.lthm",
+      "voxels_json": "models/via_B_single.voxels.json",
+      "cells": 7152,
+      "textures": {
+        "top": "textures/blocks/via/via_B_top_single_base.png",
+        "bottom": "textures/blocks/via/via_B_bottom_single_base.png",
+        "side": "textures/blocks/via/via_B_side_single_base.png"
+      }
+    },
+    {
+      "variant": "top",
+      "top_end": "mouth",
+      "bottom_end": "joint",
+      "lthm": "models/via_B_top.lthm",
+      "voxels_json": "models/via_B_top.voxels.json",
+      "cells": 6020,
+      "textures": {
+        "top": "textures/blocks/via/via_B_top_top_base.png",
+        "bottom": "textures/blocks/via/via_B_bottom_top_base.png",
+        "side": "textures/blocks/via/via_B_side_top_base.png"
+      }
+    },
+    {
+      "variant": "bottom",
+      "top_end": "joint",
+      "bottom_end": "mouth",
+      "lthm": "models/via_B_bottom.lthm",
+      "voxels_json": "models/via_B_bottom.voxels.json",
+      "cells": 6020,
+      "textures": {
+        "top": "textures/blocks/via/via_B_top_bottom_base.png",
+        "bottom": "textures/blocks/via/via_B_bottom_bottom_base.png",
+        "side": "textures/blocks/via/via_B_side_bottom_base.png"
+      }
+    },
+    {
+      "variant": "mid",
+      "top_end": "joint",
+      "bottom_end": "joint",
+      "lthm": "models/via_B_mid.lthm",
+      "voxels_json": "models/via_B_mid.voxels.json",
+      "cells": 4888,
+      "textures": {
+        "top": "textures/blocks/via/via_B_top_mid_base.png",
+        "bottom": "textures/blocks/via/via_B_bottom_mid_base.png",
+        "side": "textures/blocks/via/via_B_side_mid_base.png"
+      }
+    }
+  ],
+  "status": "APPROVED by JD (concept B lattice cage, 2026-11-11 10:22 PM ET; 90-degree elbows approved 10:44 PM ET, \"those look great\")",
+  "approved_concept": "B",
+  "approved_by": "JD, 2026-11-11 10:22 PM ET (straight B); 10:44 PM ET (elbows)"
+}

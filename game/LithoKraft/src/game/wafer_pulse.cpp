@@ -41,6 +41,10 @@ struct WaferPulseCache::Impl {
   // Archie Phase 3c: COW map published by atomic shared_ptr (mesher hot path, no mutex).
   using Map = std::unordered_map<int64_t, std::array<float, 13>>;
   std::atomic<std::shared_ptr<const Map>> cache_{std::make_shared<const Map>()};
+  // Cache bound: past this many chunks, a publish starts from an empty map
+  // instead of copying the whole one (values are a pure function of the
+  // chunk coords, so cleared entries just recompute on their next lookup).
+  static constexpr size_t kMaxEntries = 4096;
 
   std::array<float, 13> blend(int cx, int cz) {
     // The sanctioned sibling query: regenerate the chunk's column maps
@@ -73,7 +77,8 @@ struct WaferPulseCache::Impl {
       auto snap = std::atomic_load_explicit(&cache_, std::memory_order_acquire);
       if (const auto it = snap->find(k); it != snap->end()) return it->second;
       const std::array<float, 13> fresh = blend(cx, cz);
-      auto next = std::make_shared<Map>(*snap);
+      auto next = snap->size() >= kMaxEntries ? std::make_shared<Map>()
+                                              : std::make_shared<Map>(*snap);
       const auto [it, inserted] = next->emplace(k, fresh);
       (void)inserted;
       std::shared_ptr<const Map> expected = snap;
