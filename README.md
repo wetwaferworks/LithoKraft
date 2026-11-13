@@ -17,7 +17,7 @@ The engine's CMake project builds both. See `engine/README.md` for the architect
 | `wasm/` | WebAssembly build: scripts, packaging and test harnesses |
 | `android-shell/` | Android wrapper app |
 | `cmake/` | Cross-compile toolchain files (wasm32) |
-| `tools/` | Build driver (`build.py`), build counter, generators, small utilities; `pass2/` and `demos/` |
+| `tools/` | Build driver (`build.py`), build counter, generators, small utilities; `software-renderer-rework/` and `demos/` |
 | `designers-editors/` | Emblem and shield designer tools (Python) |
 | `docs/` | Research, roadmap, reviews, playtests, safety and versioning records (see `docs/README.md`) |
 | `Lore/` | World and story bible, briefs and lore drops |

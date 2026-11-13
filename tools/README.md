@@ -10,4 +10,4 @@
 | `systerian_translator.py` | Systerian (in-game script) translator |
 | `update_desktop_shortcuts.*` | Refresh local desktop shortcuts |
 | `demos/` | Standalone demos (software renderer) |
-| `pass2/` | Pass 2 work-package scripts (historical) |
+| `software-renderer-rework/` | Scripts used during the software-renderer rework (historical) |

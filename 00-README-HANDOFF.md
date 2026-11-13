@@ -39,7 +39,7 @@
   - A full pass is required before anything is recommended.
 - **Promote (JD only):** `gate.ps1 -exe <exe> -tag <t> -Promote`
   - Writes RECOMMENDED.txt, then runs `python tools\update_desktop_shortcuts.py`.
-- **Tests:** `tools/pass2/p2test.ps1`. It targets `LithoKraft.exe`; to test a parked build, copy the script and point `$x` at that build.
+- **Tests:** `tools/software-renderer-rework/p2test.ps1`. It targets `LithoKraft.exe`; to test a parked build, copy the script and point `$x` at that build.
 - **Hash baselines (must hold):**
   - Cities on: `cb32c824f8b3ea98`
   - Cities off: `e015e51cf1559089`
