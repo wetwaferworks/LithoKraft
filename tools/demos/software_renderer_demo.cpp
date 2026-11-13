@@ -1,6 +1,6 @@
 // Standalone software renderer demo: rasterizes triangles, saves PPM.
 // Compile: g++ -std=c++17 -I engine/src/render/include -I engine/src/core/include
-//          engine/src/render/software_renderer.cpp demo_sw.cpp -o /tmp/demo_sw
+//          engine/src/render/software_renderer.cpp tools/demos/software_renderer_demo.cpp -o /tmp/demo_sw
 #include "litholattice/render/software_renderer.h"
 #include <cstdio>
 using namespace litholattice;
