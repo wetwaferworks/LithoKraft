@@ -1,9 +1,17 @@
-// 2026-10-31 (JD): LL_THREAD_LAYOUT selects the thread layout before the thread census boots.
-//   8 (default) = 3 permanent threads (main game loop, tick loop, control+event loop: LL_HS_LAYOUT=original),
-//                 3 for vertex meshing + rendering (render thread LL_THREEWAY=1 + 2 dedicated lock-free
-//                 mesh/vertex workers LL_DED_LAYOUT=8), 2 shared lock-free pool workers held in reserve.
-//   0 / legacy  = the previous layout (shared pool cores-2 + handshake shards).
-// Each component env var the user already set wins. Never exceeds hardware threads (census clamps).
+// 2026-10-31 (JD) / 2026-11-14 (JD, TheReefs): LL_THREAD_LAYOUT selects the layout before the
+// thread census boots. The permanent three are always reserved first:
+//   (1) main game loop, (2) timing handshake + control, (3) tick/sim.
+// Handshake shards still run inline on the tick thread under LL_HS_LAYOUT=original (sim-path
+// unchanged, hashes stay put); the control/event thread is the control half of that pair.
+// After those three, remaining = max(hw-3, 1) and all render/vertex/mesh work (dedicated mesh
+// pool, threeway render/executor, software raster bands, reserve job workers) shares a budget
+// of remaining+2, from planRenderSide() in the census. On 4 hw threads that is 3 render-side
+// threads; on a 12-thread workstation, 11.
+//   8 (default) = those env defaults (LL_HS_LAYOUT=original, LL_THREEWAY=1, LL_DED_LAYOUT=8);
+//                 actual worker counts come from the census plan, not fixed 3+2.
+//   0 / legacy  = previous env defaults (shared pool + handshake shards); the same render-side
+//                 budget still applies, with mesh folded into the shared pool.
+// Each component env var the user already set wins.
 #pragma once
 #include <cstdlib>
 #include <cstring>
@@ -24,9 +32,10 @@ class cThreadLayout {
   static std::string describe() {
     if (legacy_) return "threads: layout legacy (LL_THREAD_LAYOUT=0): shared pool cores-2 + handshake shards";
     auto g = [](const char* k) { const char* e = std::getenv(k); return std::string(e ? e : "-"); };
-    return "threads: layout 8 (default; LL_THREAD_LAYOUT=0 for legacy): permanent 3 = main game loop + tick loop + "
-           "control/event loop; mesh+render 3 = render thread + 2 dedicated lock-free mesh/vertex workers; "
-           "reserve 2 = shared lock-free pool workers (idle until lent) [LL_HS_LAYOUT=" + g("LL_HS_LAYOUT") +
+    return "threads: layout 8 (default; LL_THREAD_LAYOUT=0 for legacy): permanent 3 = main game loop + "
+           "timing-handshake/control + tick/sim (shards still inline on tick under original handshake); "
+           "render-side budget = remaining+2 from the census (mesh + reserve pool + software bands + "
+           "threeway executor share it) [LL_HS_LAYOUT=" + g("LL_HS_LAYOUT") +
            " LL_THREEWAY=" + g("LL_THREEWAY") + " LL_POOL_LOCKFREE=" + g("LL_POOL_LOCKFREE") +
            " LL_DED_LAYOUT=" + g("LL_DED_LAYOUT") + "]";
   }
