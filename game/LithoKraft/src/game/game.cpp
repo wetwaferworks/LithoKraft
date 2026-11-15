@@ -18,6 +18,8 @@
 #include "lithokraft/game/ChunkMapPresence.h"
 #include "lithokraft/game/FrameDumpHub.h"  // showcase --frame-dump
 #include "lithokraft/game/McpDisplayVision.h"  // SCRATCH vulkfb (opt-in, LL_MCP_DISPLAY_VISION=1)
+#include "lithokraft/game/NemoViewObjects.h"
+#include "lithokraft/game/NemoViewWindow.h"
 #include "litholattice/core/threeway.h"  // LL_THREEWAY (Proposed by JD; co-implemented by JD and Cortana)
 #include "litholattice/mods/mod_interface.h"  // kPerm* for the script sandbox
 #include "litholattice/mods/mod_permissions.h"  // permissionBitForName (mcp grant/revoke)
@@ -1234,6 +1236,7 @@ void Game::setBenchCamera(float t) {
 
 Game::~Game() {
   logInfo("exit: game teardown (paused=%d)", int(paused_));
+  cNemoViewWindow::instance().setWanted(false, nullptr);  // close the Nemo View window before the adapter goes
   holdTicksForIo("exit");  // B9: tick pause FIRST, then the exit save, then leave
   stream_.reset();
   streamer_.reset();  // waits out in-flight generation jobs (they may touch save_)
@@ -5013,6 +5016,16 @@ void Game::update(float dt, int width, int height) {
                           std::clamp(cvarFloat("render.velocity_margin_gain", 1.f), 0.f, 10.f),
                           cvarInt("render.two_tier", 0) != 0,
                           std::clamp(cvarFloat("render.two_tier_outer_deg", 10.f), 0.f, 30.f)});
+    // Nemo View: the object table follows the loaded block materials; the pop-up window
+    // follows render.nemo_view. Both are read-only views; nothing here feeds the sim.
+    if (const auto mats = resources_.materials(); mats && mats.get() != nemoObjectsFor_) {
+      nemoObjectsFor_ = mats.get();
+      mcpSenses_.setObjectTable(buildNemoObjectTable(*mats));
+    }
+    cNemoViewWindow& nemoView = cNemoViewWindow::instance();
+    nemoView.setStyle(cvarInt("render.nemo_view_style", 0));
+    nemoView.setView(cvarInt("render.nemo_view_objects", 1) != 0, cvarInt("render.nemo_view_cols", 80));
+    nemoView.setWanted(cvarInt("render.nemo_view", 0) == 1, &mcpSenses_);
   }
   // cCamera system (presentation only): sync the camera.* cvars into the
   // camera configs, then advance the cameras â€” samples the player's true

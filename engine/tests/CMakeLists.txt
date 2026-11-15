@@ -11,6 +11,12 @@ foreach(module core world render sim ai anim storage procgen trees shrubs water 
   # fix 3b: out-of-tree build dirs cannot find game/ assets (wafer.json) by walking up the cwd.
   set_tests_properties(engine_${module} PROPERTIES ENVIRONMENT "LITHO_SOURCE_ROOT=${LithoLattice_SOURCE_DIR}/..")
 endforeach()
+# Nemo View (the ASCII picture Little Nemo reads): integer frame builder, identical frames for
+# every worker count, the software renderer's object-id buffer. Own executable, a few seconds.
+add_executable(nemo_view_test nemo_view_test.cpp)
+target_link_libraries(nemo_view_test PRIVATE litholattice_render litholattice_crypto litholattice_core)
+litholattice_module_options(nemo_view_test)
+add_test(NAME engine_nemo_view COMMAND nemo_view_test)
 # Cortana 2026-10-15 1500 (TOOLS, MC-02): these modules write to fixed %TEMP% paths; never run them
 # concurrently under parallel ctest.
 set_tests_properties(engine_storage engine_assets engine_mods engine_world PROPERTIES RESOURCE_LOCK litho_tempdir)

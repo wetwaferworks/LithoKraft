@@ -196,6 +196,7 @@ cSoftwareRenderer::~cSoftwareRenderer() = default;
 void cSoftwareRenderer::resize(uint32_t w, uint32_t h) {
   fb_.resize(w, h);
   depth_.assign(size_t(w) * h, 0xFFFF);
+  if (objectsOn_) objects_.assign(size_t(w) * h, 0);
   hizFbW_ = 0;  // Cortana 2026-10-15 1715: Hi-Z off until the next clear()
 }
 
@@ -728,7 +729,23 @@ void cSoftwareRenderer::clear(uint32_t color) {
   // Cortana 2026-10-15 1455: runtime-dispatched fill (AVX2 or baseline; identical bytes).
   swsimd::fill32(fb_.pixels.data(), fb_.pixels.size(), color);
   swsimd::fill16(depth_.data(), depth_.size(), 0xFFFF);
+  if (objectsOn_) objects_.assign(depth_.size(), 0);
   hizReset();  // Cortana 2026-10-15 1715: Hi-Z
+}
+
+// Nemo View object ids: off unless a table is set; the colour/depth path never reads them.
+static thread_local uint8_t tlObject = 0;
+
+void cSoftwareRenderer::setObjectCapture(const uint8_t* layerToObject, size_t count) {
+  objectsOn_ = layerToObject != nullptr && count > 0;
+  if (objectsOn_) {
+    layerObject_.assign(layerToObject, layerToObject + count);
+    objects_.assign(depth_.size(), 0);
+  } else {
+    layerObject_.clear();
+    objects_.clear();
+    objects_.shrink_to_fit();
+  }
 }
 
 // Cortana 2026-10-15 1715: hierarchical-Z [ENGINE] (see software_renderer.h).
@@ -860,6 +877,7 @@ void cSoftwareRenderer::rasterizeTriangle(const float* v0, const float* v1,
       }
       depth_[idx] = q;
       fb_.pixels[idx] = color;
+      if (objectsOn_) objects_[idx] = tlObject;
     }
   }
 }
@@ -1553,6 +1571,11 @@ void cSoftwareRenderer::renderFlatQuads(const PackedVertex* verts, size_t count,
            screen[(i+2)*4+3] > 0 && screen[(i+3)*4+3] > 0;
   };
   for (size_t i = 0; i + 3 < count; i += 4) {
+    if (objectsOn_) {
+      const uint32_t layer = verts[i].layerIndex();
+      tlObject = objectOverride_ >= 0 ? uint8_t(objectOverride_)
+                                      : (layer < layerObject_.size() ? layerObject_[layer] : uint8_t(0));
+    }
     if (!quadVisible(i)) {
       // Cortana 2026-10-15 1420 (Elfie Â§1.2): the flat/sprite path dropped
       // quads crossing the near plane (RND-H2 fixed only the per-pixel

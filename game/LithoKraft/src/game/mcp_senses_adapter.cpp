@@ -11,6 +11,8 @@
 #include "litholattice/world/chunk.h"  // packPos
 #include "litholattice/core/atomic_gate.h"
 #include "lithokraft/game/McpDisplayVision.h"  // SCRATCH vulkfb
+#include "lithokraft/game/NemoViewHub.h"
+#include "litholattice/render/software_simd.h"  // g_depthRemapMode (Nemo View depth bands)
 
 namespace lithokraft {
 namespace {
@@ -135,36 +137,30 @@ bool cMcpSensesAdapter::captureDisplayFrame(std::string_view pilot, int width, i
   return true;
 }
 
-bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, int height,
-                                          VisionFrame& out) {
-  // The pilot's engine camera (cPilotCameraRig) resolves the capture pose on
-  // the game thread; an unknown pilot — or one whose camera has not
-  // resolved yet (no frame ticked) — fails, as an unknown pilot did before.
-  CameraViewPose res;
-  if (!rig_ || !rig_->resolvedPose(pilot, res)) return false;
-
+cMcpSensesAdapter::Snapshot cMcpSensesAdapter::takeSnapshot() const {
   // Snapshot the shared state under one lock: cvars and a shallow
   // (shared_ptr) copy of the mesh cache. The entries are immutable, so the
-  // render below sees a consistent world without blocking the game thread.
-  CvarState cv;
-  std::unordered_map<int64_t, std::shared_ptr<const CachedMesh>> meshes;
-  std::vector<litholattice::PackedVertex> spriteVerts;
-  litholattice::Vec3 spriteOrigin;
-  {
-    litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
-    cv = cvars_;
-    meshes = meshes_;
-    spriteVerts = spriteVerts_;
-    spriteOrigin = spriteOrigin_;
-  }
+  // render sees a consistent world without blocking the game thread.
+  Snapshot s;
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
+  s.cv = cvars_;
+  s.meshes = meshes_;
+  s.spriteVerts = spriteVerts_;
+  s.spriteOrigin = spriteOrigin_;
+  s.objectTable = objectTable_;
+  return s;
+}
 
-  const int w = std::clamp(width > 0 ? width : cv.visionWidth, kMinDim, kMaxDim);
-  const int h = std::clamp(height > 0 ? height : cv.visionHeight, kMinDim, kMaxDim);
+void cMcpSensesAdapter::setObjectTable(std::shared_ptr<const std::vector<uint8_t>> table) {
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
+  objectTable_ = std::move(table);
+}
 
-  // Eye / orientation / FOV from the engine camera's resolved pose
-  // (radians internally; VisionFrame reports degrees, as before).
+void cMcpSensesAdapter::renderCone(litholattice::cSoftwareRenderer& sw, litholattice::CullProtoState& st,
+                                   const CameraViewPose& res, int w, int h, const Snapshot& snap,
+                                   bool spritesAsEntities) const {
+  const CvarState& cv = snap.cv;
   const double ex = res.position.x, ey = res.position.y, ez = res.position.z;
-  const float yawDeg = float(res.yaw * kRadToDeg), pitchDeg = float(res.pitch * kRadToDeg);
   const float fovDeg = float(res.fovRad * kRadToDeg);
   const float yawR = res.yaw, pitchR = res.pitch;
   // The engine camera's forward (cPlayer::forward convention, radians).
@@ -174,53 +170,66 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
       litholattice::mul(litholattice::perspective(float(std::clamp(fovDeg, 10.0f, 120.0f) * kDegToRad),
                                                  float(w) / float(h), kNear, kFar),
                         litholattice::lookDir(eye, fwd));
+  sw.setPerPixelShading(false);  // flat = the downgraded path
+  sw.resize(uint32_t(w), uint32_t(h));
+  sw.clear(kSkyClear);  // beyond loaded chunks: sky, not a crash
+  // Culling-cache prototypes (JD 2026-10-11): pass 1 classifies every mesh
+  // under the prototype pipeline (per-camera state owned by the caller's
+  // thread); pass 2 renders the survivors. Base FOV margin is the
+  // foundation; the prototypes only add keep-behavior.
+  const double nowSec = std::chrono::duration<double>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count();
+  std::vector<std::shared_ptr<const CachedMesh>> drawList;
+  drawList.reserve(snap.meshes.size());
+  {
+    litholattice::CullProtoConfig cfg;
+    cfg.cometTailFrames = cv.cometTailFrames;
+    cfg.velocityMargin = cv.velocityMargin;
+    cfg.velocityMarginGain = cv.velocityMarginGain;
+    cfg.twoTier = cv.twoTier;
+    cfg.twoTierOuterDeg = cv.twoTierOuterDeg;
+    st.configure(cfg);  // no-op when unchanged (history/velocity survive)
+    st.beginFrame(vp, yawR, pitchR, nowSec);
+    for (const auto& [k, cm] : snap.meshes) {
+      // Sub-chunk world origin (16^3), the same offset the GL backend
+      // uploads as its per-mesh uniform; baked into the MVP here.
+      const litholattice::Vec3 mn{float(cm->cx * 16), float(cm->sy * 16), float(cm->cz * 16)};
+      if (st.decide(vp, mn, {mn.x + 16.0f, mn.y + 16.0f, mn.z + 16.0f}, eye,
+                    cv.frustumMarginDeg) == litholattice::CullDecision::Full)
+        drawList.push_back(cm);
+    }
+  }
+  for (const auto& cm : drawList) {
+    const litholattice::Vec3 mn{float(cm->cx * 16), float(cm->sy * 16), float(cm->cz * 16)};
+    const litholattice::Mat4 mvp = litholattice::mul(vp, translation(mn.x, mn.y, mn.z));
+    sw.renderMesh(cm->verts.data(), cm->verts.size(), mvp.m);
+  }
+  // Sprites (flat form fed by Game's cSpriteHost): drawn after the world,
+  // world-anchored via the same translation trick with their own origin.
+  if (!snap.spriteVerts.empty()) {
+    const litholattice::Mat4 mvp =
+        litholattice::mul(vp, translation(snap.spriteOrigin.x, snap.spriteOrigin.y, snap.spriteOrigin.z));
+    if (spritesAsEntities) sw.setObjectOverride(int(litholattice::nemoview::ObjectId::Entity));
+    sw.renderMesh(snap.spriteVerts.data(), snap.spriteVerts.size(), mvp.m);
+    if (spritesAsEntities) sw.setObjectOverride(-1);
+  }
+}
 
+bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, int height,
+                                          VisionFrame& out) {
+  // The pilot's engine camera (cPilotCameraRig) resolves the capture pose on
+  // the game thread; an unknown pilot — or one whose camera has not
+  // resolved yet (no frame ticked) — fails, as an unknown pilot did before.
+  CameraViewPose res;
+  if (!rig_ || !rig_->resolvedPose(pilot, res)) return false;
+  const Snapshot snap = takeSnapshot();
+  const int w = std::clamp(width > 0 ? width : snap.cv.visionWidth, kMinDim, kMaxDim);
+  const int h = std::clamp(height > 0 ? height : snap.cv.visionHeight, kMinDim, kMaxDim);
   {
     owner_.check();  // mutexfree 2b: single MCP owner thread (was renderMutex_)
-    sw_.setPerPixelShading(false);  // flat = the downgraded path
-    sw_.resize(uint32_t(w), uint32_t(h));
-    sw_.clear(kSkyClear);  // beyond loaded chunks: sky, not a crash
-    // Culling-cache prototypes (JD 2026-10-11): pass 1 classifies every mesh
-    // under the prototype pipeline (per-pilot state, its own mutex — the game
-    // thread never blocks on this); pass 2 renders the survivors. Base FOV
-    // margin is the foundation; the prototypes only add keep-behavior.
-    const double nowSec = std::chrono::duration<double>(
-                              std::chrono::steady_clock::now().time_since_epoch())
-                              .count();
-    std::vector<std::shared_ptr<const CachedMesh>> drawList;
-    drawList.reserve(meshes.size());
-    {
-      // mutexfree 2b: protoMutex_ removed (same owner thread as the render pass above)
-      auto& st = protoStates_[std::string(pilot)];  // per-pilot camera state
-      litholattice::CullProtoConfig cfg;
-      cfg.cometTailFrames = cv.cometTailFrames;
-      cfg.velocityMargin = cv.velocityMargin;
-      cfg.velocityMarginGain = cv.velocityMarginGain;
-      cfg.twoTier = cv.twoTier;
-      cfg.twoTierOuterDeg = cv.twoTierOuterDeg;
-      st.configure(cfg);  // no-op when unchanged (history/velocity survive)
-      st.beginFrame(vp, yawR, pitchR, nowSec);
-      for (const auto& [k, cm] : meshes) {
-        // Sub-chunk world origin (16^3), the same offset the GL backend
-        // uploads as its per-mesh uniform; baked into the MVP here.
-        const litholattice::Vec3 mn{float(cm->cx * 16), float(cm->sy * 16), float(cm->cz * 16)};
-        if (st.decide(vp, mn, {mn.x + 16.0f, mn.y + 16.0f, mn.z + 16.0f}, eye,
-                      cv.frustumMarginDeg) == litholattice::CullDecision::Full)
-          drawList.push_back(cm);
-      }
-    }
-    for (const auto& cm : drawList) {
-      const litholattice::Vec3 mn{float(cm->cx * 16), float(cm->sy * 16), float(cm->cz * 16)};
-      const litholattice::Mat4 mvp = litholattice::mul(vp, translation(mn.x, mn.y, mn.z));
-      sw_.renderMesh(cm->verts.data(), cm->verts.size(), mvp.m);
-    }
-    // Sprites (flat form fed by Game's cSpriteHost): drawn after the world,
-    // world-anchored via the same translation trick with their own origin.
-    if (!spriteVerts.empty()) {
-      const litholattice::Mat4 mvp =
-          litholattice::mul(vp, translation(spriteOrigin.x, spriteOrigin.y, spriteOrigin.z));
-      sw_.renderMesh(spriteVerts.data(), spriteVerts.size(), mvp.m);
-    }
+    // mutexfree 2b: protoMutex_ removed (same owner thread as the render pass)
+    renderCone(sw_, protoStates_[std::string(pilot)], res, w, h, snap, false);
     // Framebuffer pixels are 0xAARRGGBB; PNG wants RGB bytes.
     const auto& fb = sw_.framebuffer();
     std::vector<uint8_t> rgb(size_t(w) * size_t(h) * 3);
@@ -236,12 +245,88 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
   }
 
   out.tick = tick_ ? tick_() : 0;
-  out.camX = ex;
-  out.camY = ey;
-  out.camZ = ez;
-  out.yaw = yawDeg;
-  out.pitch = pitchDeg;
+  out.camX = res.position.x;
+  out.camY = res.position.y;
+  out.camZ = res.position.z;
+  out.yaw = float(res.yaw * kRadToDeg);
+  out.pitch = float(res.pitch * kRadToDeg);
   return true;
+}
+
+// Nemo View. Capture sizes tile exactly into 4x4-pixel cells: 40 cols = 160x88 (22 rows),
+// 80 = 320x180 (45 rows), 96 = 384x216 (54 rows); the fovea is the centre 128x48 of the
+// 320x180 view (32x12). The object pass is on only for this render.
+bool cMcpSensesAdapter::buildAscii(litholattice::cSoftwareRenderer& sw, litholattice::CullProtoState& cull,
+                                   const CameraViewPose& res, const litholattice::mcp::AsciiRequest& req,
+                                   litholattice::nemoview::AsciiFrame& out) const {
+  namespace nv = litholattice::nemoview;
+  const Snapshot snap = takeSnapshot();
+  const int cols = req.fovea ? 80 : req.cols;
+  const int w = cols * 4;
+  const int rows = cols == 40 ? 22 : cols == 96 ? 54 : 45;
+  const int h = rows * 4;
+  const bool objects = req.objects && snap.objectTable && !snap.objectTable->empty();
+  if (objects) sw.setObjectCapture(snap.objectTable->data(), snap.objectTable->size());
+  renderCone(sw, cull, res, w, h, snap, objects);
+  nv::SourceView src;
+  src.width = w;
+  src.height = h;
+  src.pixels = sw.framebuffer().pixels.data();
+  src.depth = sw.depthBuffer().data();
+  src.objects = objects ? sw.objectBuffer().data() : nullptr;
+  src.depthRemapMode = litholattice::swsimd::g_depthRemapMode;
+  nv::FrameConfig cfg;
+  cfg.cols = cols;
+  cfg.rows = rows;
+  if (req.fovea) {
+    src.cropW = 128;
+    src.cropH = 48;
+    src.cropX = (w - 128) / 2;
+    src.cropY = (h - 48) / 2;
+    cfg.cols = 32;
+    cfg.rows = 12;
+  }
+  cfg.mode = req.objects ? nv::ViewMode::Objects : nv::ViewMode::PixelsAndDepth;
+  const bool ok = nv::build(src, cfg, out);
+  if (objects) sw.setObjectCapture(nullptr, 0);
+  out.tick = tick_ ? tick_() : 0;
+  return ok;
+}
+
+bool cMcpSensesAdapter::captureAsciiFrame(std::string_view pilot, const litholattice::mcp::AsciiRequest& req,
+                                          litholattice::mcp::AsciiCapture& out) {
+  namespace nv = litholattice::nemoview;
+  CameraViewPose res;
+  if (!rig_ || !rig_->resolvedPose(pilot, res)) return false;
+  nv::AsciiFrame f;
+  {
+    owner_.check();  // the MCP owner thread owns sw_ and protoStates_
+    if (!buildAscii(sw_, protoStates_[std::string(pilot)], res, req, f)) return false;
+  }
+  out.cols = f.cols;
+  out.rows = f.rows;
+  out.tick = f.tick;
+  out.mode = nv::viewModeName(f.mode);
+  out.lutSha = nv::depthTableShaPrefix();
+  out.glyph = nv::glyphRows(f);
+  out.fg = nv::fgRows(f);
+  out.depth = nv::bandRows(f);
+  out.cls = nv::objectRows(f);
+  out.sha256 = nv::shaHex(f);
+  out.yaw = float(res.yaw * kRadToDeg);
+  out.pitch = float(res.pitch * kRadToDeg);
+  cNemoViewHub::instance().publish(f, "Nemo's look");
+  return true;
+}
+
+bool cMcpSensesAdapter::previewAsciiFrame(litholattice::cSoftwareRenderer& sw, litholattice::CullProtoState& cull,
+                                          const litholattice::mcp::AsciiRequest& req,
+                                          litholattice::nemoview::AsciiFrame& out, float* yawDeg, float* pitchDeg) {
+  CameraViewPose res;
+  if (!rig_ || !rig_->resolvedPose("player", res)) return false;
+  if (yawDeg) *yawDeg = float(res.yaw * kRadToDeg);
+  if (pitchDeg) *pitchDeg = float(res.pitch * kRadToDeg);
+  return buildAscii(sw, cull, res, req, out);
 }
 
 bool cMcpSensesAdapter::setCameraPose(std::string_view pilot, const CameraPose& pose) {

@@ -852,6 +852,7 @@ class Game {
   // uploadMeshes() and cvar values from update(); wired the same way
   // (McpBackends{.vision, .audio}).
   cMcpSensesAdapter mcpSenses_;
+  const void* nemoObjectsFor_ = nullptr;  ///< block materials the Nemo View object table was built from
   // MCP server wiring (P2c, F-M9): non-owning; main.cpp owns the server
   // and its stdio thread and clears this (setMcpServer(nullptr)) before
   // destroying either. Only the `mcp` console commands read it, on the

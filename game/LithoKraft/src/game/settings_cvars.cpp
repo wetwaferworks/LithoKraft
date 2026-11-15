@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 
 #include "litholattice/console/concmd.h"
@@ -438,6 +439,23 @@ void registerMcpSensesCvars(litholattice::console::cConsoleReg& r) {
     // Args: name, type, default, archived=true, help, flags.
     if (!r.registerCVar(row.name, CVarType::Int, row.def, true, row.help, CVarFlags{}, &err))
       r.print(std::string("mcp senses: cvar '") + row.name + "' not registered: " + err);
+  }
+  // Nemo View pop-up window (not archived, so it never lands in the shared settings file).
+  // LL_NEMO_VIEW=1 at launch opens it from the start.
+  {
+    const char* e = std::getenv("LL_NEMO_VIEW");
+    const bool atLaunch = e && std::string(e) == "1";
+    const Row nemo[] = {
+        {"render.nemo_view", atLaunch ? "1" : "0", "Nemo View pop-up window, the ASCII picture Little Nemo reads: 0 closed, 1 open"},
+        {"render.nemo_view_style", "0", "Nemo View colours: 0 matrix green, 1 true palette, 2 depth heat, 3 object colours"},
+        {"render.nemo_view_objects", "1", "Nemo View preview: 1 object characters (wall #, door |), 0 pixels and depth only"},
+        {"render.nemo_view_cols", "80", "Nemo View preview width in characters: 40, 80 or 96"},
+    };
+    for (const auto& row : nemo) {
+      std::string err;
+      if (!r.registerCVar(row.name, CVarType::Int, row.def, false, row.help, CVarFlags{}, &err))
+        r.print(std::string("nemo view: cvar '") + row.name + "' not registered: " + err);
+    }
   }
   // Fix 2026-10-11 (regression, LOW): mcp.audio_tier and camera.chunk_radius
   // are write-only today (the builder wires them later); clamp at registration

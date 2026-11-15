@@ -290,6 +290,17 @@ class cSoftwareRenderer : public IRenderer {
   /// caller yet (P3-3, Appendix D L2).
   void applyFXAA();
 
+  /// Nemo View object ids (opt-in, off by default). With a table set, the flat path also writes
+  /// one byte per pixel into objectBuffer(): table[texture layer] of the depth-test winner, or the
+  /// override while one is set (sprites, entities). Colour and depth output are unchanged either
+  /// way. Pass nullptr/0 to turn it off. The table is copied.
+  void setObjectCapture(const uint8_t* layerToObject, size_t count);
+  bool objectCaptureOn() const { return objectsOn_; }
+  /// Object id for everything drawn until cleared (-1 = use the layer table).
+  void setObjectOverride(int id) { objectOverride_ = id; }
+  const std::vector<uint8_t>& objectBuffer() const { return objects_; }
+  const std::vector<uint16_t>& depthBuffer() const { return depth_; }
+
   /// Enable/disable per-pixel shading (default: flat for speed).
   void setPerPixelShading(bool enable) { perPixel_ = enable; }
 
@@ -394,6 +405,10 @@ class cSoftwareRenderer : public IRenderer {
   int asciiSpan_ = 255;  ///< value span (JD amendment: full 0-255 default)
   std::string asciiText_;  ///< last ASCII stage's raw text grid
   bool perPixel_ = false;  ///< per-pixel shading (slower, better quality)
+  bool objectsOn_ = false;            ///< Nemo View object ids (setObjectCapture)
+  int objectOverride_ = -1;
+  std::vector<uint8_t> objects_;      ///< per-pixel object id, parallel to depth_ (only when objectsOn_)
+  std::vector<uint8_t> layerObject_;  ///< texture layer -> object id
   SoftwareShadingTier shadingTier_ = SoftwareShadingTier::Basic;  ///< fragment tier (per-pixel path)
   const PbrFragmentContext* pbrContext_ = nullptr;  ///< PBR context (registry/lights/camera); may be null
 

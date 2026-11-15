@@ -80,6 +80,8 @@
 #include "litholattice/mcp/mcp_senses.h"
 #include "litholattice/render/renderer.h"  // ChunkMesh
 #include "litholattice/render/software_renderer.h"
+#include "litholattice/render/nemo_view.h"
+#include "litholattice/render/cull_prototypes.h"
 #include "lithokraft/game/camera_controller.h"  // cPilotCameraRig (engine pilot cameras)
 #include "lithokraft/game/mcp_player_control.h"  // cMcpPlayerView::GameState
 #include "litholattice/core/atomic_gate.h"
@@ -129,6 +131,9 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   /// Captures render them after the chunk meshes, flat-shaded (the sprite's
   /// average color as brightness). Called once per frame from Game::update.
   void setSpriteVerts(std::vector<litholattice::PackedVertex> verts, litholattice::Vec3 origin);
+  /// Nemo View: texture layer -> object id table (built by the game when the block materials
+  /// load; immutable once handed over). Empty = no object ids (pixels and depth only).
+  void setObjectTable(std::shared_ptr<const std::vector<uint8_t>> table);
   /// Refresh the cvar-driven knobs (mcp.vision_width, mcp.vision_height,
   /// mcp.audio_tier, camera.chunk_radius). Called once per frame from
   /// Game::update().
@@ -153,6 +158,16 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   bool captureDisplayFrame(std::string_view pilot, int width, int height,
                            litholattice::mcp::VisionFrame& out) override;
 
+  /// Nemo View (LL_MCP_NEMO_VIEW=1 registers the tool): the pilot's software view as an integer
+  /// ASCII frame. MCP thread; the frame is also published to cNemoViewHub for the pop-up window.
+  bool captureAsciiFrame(std::string_view pilot, const litholattice::mcp::AsciiRequest& req,
+                         litholattice::mcp::AsciiCapture& out) override;
+  /// Nemo View window (any one thread that owns `sw` and `cull`): a preview frame of the player's
+  /// view, built exactly like captureAsciiFrame but with the caller's own renderer.
+  bool previewAsciiFrame(litholattice::cSoftwareRenderer& sw, litholattice::CullProtoState& cull,
+                         const litholattice::mcp::AsciiRequest& req, litholattice::nemoview::AsciiFrame& out,
+                         float* yawDeg = nullptr, float* pitchDeg = nullptr);
+
   // -- IAudioCapture (MCP thread) -------------------------------------------
   /// One 1024-frame chunk at the tier rate (tier clamped 0..3). Returns
   /// false for an unknown pilot or when the tap has no data yet.
@@ -164,6 +179,21 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
     int cx = 0, sy = 0, cz = 0;  ///< sub-chunk coords; world origin = *16
     std::vector<litholattice::PackedVertex> verts;  ///< quads, sub-chunk-local
   };
+  /// One consistent copy of the shared state, taken under the gate.
+  struct Snapshot {
+    CvarState cv;
+    std::unordered_map<int64_t, std::shared_ptr<const CachedMesh>> meshes;
+    std::vector<litholattice::PackedVertex> spriteVerts;
+    litholattice::Vec3 spriteOrigin{};
+    std::shared_ptr<const std::vector<uint8_t>> objectTable;
+  };
+  Snapshot takeSnapshot() const;
+  /// Renders the snapshot from `res` into `sw` at w x h (flat shading, prototype culling with
+  /// `cull`). Shared by the PNG capture, the Nemo View capture and the Nemo View window.
+  void renderCone(litholattice::cSoftwareRenderer& sw, litholattice::CullProtoState& cull,
+                  const CameraViewPose& res, int w, int h, const Snapshot& snap, bool spritesAsEntities) const;
+  bool buildAscii(litholattice::cSoftwareRenderer& sw, litholattice::CullProtoState& cull, const CameraViewPose& res,
+                  const litholattice::mcp::AsciiRequest& req, litholattice::nemoview::AsciiFrame& out) const;
 
   litholattice::cAudioEngine& audio_;
   std::function<cMcpPlayerView::GameState()> snapshot_;
@@ -175,6 +205,7 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   CvarState cvars_;
   std::vector<litholattice::PackedVertex> spriteVerts_;  ///< latest sprite frame (software form)
   litholattice::Vec3 spriteOrigin_{};                    ///< world origin spriteVerts_ are relative to
+  std::shared_ptr<const std::vector<uint8_t>> objectTable_;  ///< Nemo View: texture layer -> object id
 
   // mutexfree pass 2b: renderMutex_/protoMutex_/audioMutex_ removed. sw_, protoStates_ and tapScratch_ (and the tap's
   // single-reader side) are owned by the single MCP owner thread; owner_ checks it.
