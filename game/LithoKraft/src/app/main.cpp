@@ -1069,7 +1069,7 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--bench-path") && i + 1 < argc) {
       benchPath = argv[++i];
       if (benchPath != "orbit" && benchPath != "stream" && benchPath != "flyover" && benchPath != "walk" && benchPath != "still" && benchPath != "live" &&
-          benchPath != "whip" && benchPath != "sprint" && benchPath != "zigzag") { std::fprintf(stderr, "--bench-path: orbit|stream|flyover|walk|still|live|whip|sprint|zigzag\n"); badArg = true; }
+          benchPath != "whip" && benchPath != "sprint" && benchPath != "zigzag" && benchPath != "forward" && benchPath != "line") { std::fprintf(stderr, "--bench-path: orbit|stream|flyover|walk|still|live|whip|sprint|zigzag|forward|line\n"); badArg = true; }
     }
     else if (!std::strcmp(argv[i], "--soak")) {
       benchSeconds = 60.0 * num(1, 1440);
@@ -1544,16 +1544,20 @@ int main(int argc, char** argv) {
     // capacity one job (one stage) at a time, and every Timing Handshake epoch reclaims it,
     // so shard jobs never queue behind world-gen. poolWorkers (Archie's small-host cap of 3
     // included) is now the view's concurrency cap; the shared pool's lendCap also limits it.
-    // Step 10 (default off): LL_DED_LAYOUT=6|8 gives gen/mesh/vertex work 2 dedicated workers
-    // of their own (lock-free with LL_POOL_LOCKFREE=1) instead of a view on the shared pool.
+    // LL_DED_LAYOUT=6|8: gen/mesh/vertex work gets its own lock-free pool, sized from the
+    // census render-side plan (JD 2026-11-14), not a hardcoded 2. The shared pool is the reserve.
     const char* dedLayout = std::getenv("LL_DED_LAYOUT");
     const bool ded = dedLayout && (dedLayout[0] == '6' || dedLayout[0] == '8');
     std::unique_ptr<cJobPool> dedPool;
-    if (ded) {
-      dedPool = std::make_unique<cJobPool>(2u);
-      poolWorkers = 2;
-      logInfo("threads: LL_DED_LAYOUT=%c: 2 dedicated mesh/vertex workers (%s), shared pool %u", dedLayout[0],
-              dedPool->lockFree() ? "lock-free" : "LOCKED: set LL_POOL_LOCKFREE=1", cJobPool::shared().size());
+    const litholattice::ThreadBudget& tbud = litholattice::cThreadCensus::instance().budget();
+    if (ded && tbud.meshDedicated > 0) {
+      dedPool = std::make_unique<cJobPool>(tbud.meshDedicated);
+      poolWorkers = tbud.meshDedicated;
+      logInfo("threads: LL_DED_LAYOUT=%c: %u dedicated mesh/vertex workers (%s), shared reserve pool %u "
+              "(render-side budget %u = remaining %u + 2, bands %u)",
+              dedLayout[0], tbud.meshDedicated,
+              dedPool->lockFree() ? "lock-free" : "LOCKED: set LL_POOL_LOCKFREE=1", tbud.pool,
+              tbud.renderSideBudget, tbud.remaining, tbud.renderBands);
     }
     logInfo("%s", cThreadLayout::describe().c_str());
     cJobPool pool(ded ? *dedPool : cJobPool::shared(), cJobPool::Lane::Background, poolWorkers);
@@ -1650,7 +1654,8 @@ int main(int argc, char** argv) {
     }
 
     F.tStart = Clock::now(); F.tLast = F.tStart; F.tTitle = F.tStart; F.tPerf = F.tStart;
-    constexpr double kBenchWarmup = 3.0;  // world load + first meshes settle before measuring
+    double kBenchWarmup = 3.0;  // world load + first meshes settle before measuring; LL_BENCH_WARMUP overrides (0 = cold, sample from t=0)
+    if (const char* w = std::getenv("LL_BENCH_WARMUP")) kBenchWarmup = std::max(0.0, std::atof(w));
     // Cortana 2026-10-16 (BUG-0004): --ui-shot only ran inside a bench, so a plain
     // --ui-shot launch never wrote its PNG and never exited. It now implies a short
     // self-closing bench (2 s after warm-up) when no --bench was given.
@@ -1662,7 +1667,7 @@ int main(int argc, char** argv) {
     if (benchSeconds > 0) runSeconds = kBenchWarmup + benchSeconds;
     if (benchSeconds > 0) game.setBenchPath(benchPath);
     if (benchSeconds > 0) {  // JD 2026-10-30: steady-state sampling; the stream workload paths keep the plain warm-up
-      const bool exempt = game.benchStreamer() != nullptr || benchPath == "stream" || benchPath == "soak" || benchPath == "showcase";
+      const bool exempt = game.benchStreamer() != nullptr || benchPath == "stream" || benchPath == "soak" || benchPath == "showcase" || benchPath == "forward" || benchPath == "line" || benchPath == "sprint";
       F.benchGate.configure(kBenchWarmup, lithokraft::cBenchSampleGate::capFromEnv(), exempt);
       if (!exempt) runSeconds += F.benchGate.capS();  // trimmed to gate-open + bench seconds when the gate opens
     }
@@ -1883,7 +1888,7 @@ static bool lkStepFrame(FrameCtx& F) {
 #else
   constexpr bool kDebugBuild = false;
 #endif
-  constexpr double kBenchWarmup = 3.0;  // mirrors main()'s setup constant of the same name/value
+  const double kBenchWarmup = [] { const char* w = std::getenv("LL_BENCH_WARMUP"); return w ? std::max(0.0, std::atof(w)) : 3.0; }();  // mirrors main()'s warmup (LL_BENCH_WARMUP)
   if (window->shouldClose()) { logInfo("exit: window close requested (paused=%d)", int(game.paused())); return false; }
       if (benchSeconds <= 0 && appliedFpsCap == -1 && game.settings().fpsCap == -1) {  // auto resolve
         if (++autoFrames > 60) autoRenderSum += msRender;

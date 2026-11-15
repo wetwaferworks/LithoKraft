@@ -185,8 +185,18 @@ void cChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
     // A world with a save keeps cJobPool: cWorldSave::loadColumn takes loadMutex_/storesMutex_ --
     // unless the save runs the lock-free I/O path (LL_LF_LOAD / LL_LF_SAVE), which takes neither.
     static const bool kLfGen = [] { const char* e = std::getenv("LL_LF_GEN"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
-    if (kLfGen && (!save || save->lockFreeIo()) && litholattice::cLfJobQueue::enabled()) litholattice::cLfJobQueue::shared().submit(std::move(job));
-    else pool_.submit(std::move(job));
+    // TheReefs 2026-11-14: same 0-worker LF-queue trap as mesh submit. On a
+    // 4-thread host cLfJobQueue claims 0 workers and runs every generate/
+    // loadColumn inline on the game thread (pumpStream pre/stream 25-55 ms
+    // while flying). When the LF queue has no workers, route to the
+    // dedicated lock-free mesh pool (already in the 2+1+0 budget). No new
+    // locks or threads; results still land on the existing lock-free done_
+    // queue and promote at the between-ticks hold.
+    if (kLfGen && (!save || save->lockFreeIo()) && litholattice::cLfJobQueue::enabled()
+        && litholattice::cLfJobQueue::shared().workers() > 0)
+      litholattice::cLfJobQueue::shared().submit(std::move(job));
+    else
+      pool_.submit(std::move(job));
   }
 }
 

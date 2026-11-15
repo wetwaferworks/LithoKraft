@@ -101,8 +101,24 @@ int effectiveStreamRadius(const lithokraft::GameConfig& c) {
 template <class Pool, class F>
 static void submitMeshJob(Pool& pool, F&& f) {
   static const bool lf = [] { const char* e = std::getenv("LL_LF_UPLOAD"); return !(e && e[0] == '0');  /* PlayL: default ON (JD 2026-11-01) */ }();
-  if (lf && litholattice::cLfJobQueue::enabled()) litholattice::cLfJobQueue::shared().submit(std::forward<F>(f));
-  else pool.submit(std::forward<F>(f));
+  // TheReefs 2026-11-14 hitch: cLfJobQueue::shared() claims 0 workers on a
+  // 4-thread host (census room is 0 once main/clock/dedicated mesh are
+  // reserved). enabled() is always on, and a 0-worker queue runs every
+  // submit inline on the game thread — firstMesh/border remesh then pay
+  // gather+mesh under the between-ticks hold (~15-47 ms). When the LF
+  // queue has no workers, route to the dedicated lock-free mesh pool
+  // (already in the 2+1+0 budget). No new locks; hashes unchanged.
+  if (lf && litholattice::cLfJobQueue::enabled() && litholattice::cLfJobQueue::shared().workers() > 0)
+    litholattice::cLfJobQueue::shared().submit(std::forward<F>(f));
+  else {
+    static bool logged = false;
+    if (!logged) {
+      logged = true;
+      if (lf && litholattice::cLfJobQueue::enabled())
+        litholattice::logInfo("mesh submit: LL_LF_JOBS has 0 workers; routing column meshes to the dedicated mesh pool");
+    }
+    pool.submit(std::forward<F>(f));
+  }
 }
 static const char* lfIoTag() {
   static const char* t = [] {
@@ -1132,6 +1148,23 @@ void Game::setBenchCamera(float t) {
   if (benchPath_ == "sprint") {  // T2/T3: from the spawn along +x at 60 blocks/s, 30 up (~4 chunk borders/s); the play streamer follows
     player_.pos = {benchCenter_.x + 60.f * t, benchCenter_.y + 30.f, benchCenter_.z};
     player_.yaw = 0.f; player_.pitch = -0.25f;
+    locoPlace(sim_, locomotion_, player_.pos);
+    benchCam_ = player_.pos;
+    return;
+  }
+  if (benchPath_ == "forward" || benchPath_ == "line") {
+    // TheReefs 2026-11-14: straight-line play-streamer flight (JD fly-forward
+    // hitch / 20-25 to 70 fps swing). Default 24 blocks/s, 20 up, +x from spawn.
+    // LL_FORWARD_SPEED overrides. Does not use cBenchStreamer (sim/world unchanged).
+    static const float speed = [] {
+      const char* e = std::getenv("LL_FORWARD_SPEED");
+      const float v = e ? float(std::atof(e)) : 24.f;
+      return v > 0.f ? v : 24.f;
+    }();
+    static bool logged = false;
+    if (!logged) { logged = true; logInfo("bench forward: +x at %.1f blocks/s, 20 up (play streamer)", double(speed)); }
+    player_.pos = {benchCenter_.x + speed * t, benchCenter_.y + 20.f, benchCenter_.z};
+    player_.yaw = 0.f; player_.pitch = -0.2f;
     locoPlace(sim_, locomotion_, player_.pos);
     benchCam_ = player_.pos;
     return;
@@ -2166,7 +2199,14 @@ static bool frameHold(cSimThread& sim, ::litholattice::cGateLock<litholattice::c
 // each other by turns). Freeze recovery stays with the pause state machine
 // (entering Playing clears the latch), exactly as before.
 // 2026-10-25 stutter pass: stream churn counters for the once-a-second split line.
-namespace { size_t g_colsAdded = 0, g_colsEvicted = 0, g_uploadsCapped = 0; }
+namespace { size_t g_colsAdded = 0, g_colsEvicted = 0, g_uploadsCapped = 0;
+// TheReefs 2026-11-14 hitch profile (game thread only; no locks).
+struct MeshSubmitSplit { double publishMs = 0, pinMs = 0; int columns = 0, slabs = 0; };
+MeshSubmitSplit g_meshSubmitSplit;
+inline double pumpMsSince(std::chrono::steady_clock::time_point t0) {
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+}
+}
 int Game::swLodLevel(int d) const {
   return swLodRings_.level(d);  // PlayB: clamped to the view radius; 0 when LOD is not live
 }
@@ -2438,12 +2478,18 @@ void Game::submitMeshColumn(int cx, int cz) {
   if (swLodOn_ && swLodRings_.live()) swLodMeshed_[ChunkKey::make(cx, cz)] = swLodFor(cx, cz);  // Phase 3a: game thread records the ring
   std::vector<std::shared_ptr<MeshInput>> batch;
   batch.reserve(kSubChunks);
+  const auto tPub = std::chrono::steady_clock::now();
   if (litholattice::cowColumnsEnabled()) active_->chunks.cowTable().publish(active_->chunks, blockRegistry(), cx, cz, ~uint64_t(0));  // M5
+  g_meshSubmitSplit.publishMs += pumpMsSince(tPub);
+  const auto tPin = std::chrono::steady_clock::now();
   for (int sy = 0; sy < kSubChunks; ++sy) {
     if (!c->subs[sy]) continue;
     if (meshBackpressured()) { submitMeshAt(cx, sy, cz); continue; }  // defers the key (t3366u)
     batch.push_back(snapshotSlab(cx, sy, cz, /*ownFresh=*/false));
   }
+  g_meshSubmitSplit.pinMs += pumpMsSince(tPin);
+  ++g_meshSubmitSplit.columns;
+  g_meshSubmitSplit.slabs += int(batch.size());
   if (batch.empty()) return;
   ++p6ColumnJobs_;
   meshInFlight_ += int(batch.size());  // P8 quiescence
@@ -2553,6 +2599,17 @@ void Game::pumpStreaming(float frameDtMs) {
   // eviction and OUTSIDE the sim hold, a few per pump (never a free burst).
   ++streamPumps_;
   constexpr size_t kDeferredFreesPerPump = 4;
+  const auto tPump = std::chrono::steady_clock::now();
+  g_meshSubmitSplit = {};
+  double msPre = 0, msStream = 0, msHold = 0, msStaged = 0, msPromote = 0, msScan = 0, msFirst = 0, msBorder = 0, msDefer = 0, msEvict = 0;
+  int nScan = 0, nFirst = 0, nBorder = 0, nFromDisk = 0;
+  auto logPumpSplit = [&](const char* why) {
+    const double total = pumpMsSince(tPump);
+    if (total < 20.0) return;
+    logInfo("pumpStream split (%.1f ms, %s): pre=%.1f stream=%.1f hold=%.1f staged=%.1f promote=%.1f scan=%.1f (n=%d disk=%d) firstMesh=%.1f (n=%d) border=%.1f (n=%d) defer=%.1f evict=%.1f | cow publish=%.1f pin=%.1f meshCols=%d slabs=%d",
+            total, why, msPre, msStream, msHold, msStaged, msPromote, msScan, nScan, nFromDisk, msFirst, nFirst, msBorder, nBorder, msDefer, msEvict,
+            g_meshSubmitSplit.publishMs, g_meshSubmitSplit.pinMs, g_meshSubmitSplit.columns, g_meshSubmitSplit.slabs);
+  };
   deferredFree_.collect(streamPumps_, kDeferredFreesPerPump);
   if (!streamer_ || !sim_ || !active_) return;
   const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
@@ -2628,7 +2685,10 @@ void Game::pumpStreaming(float frameDtMs) {
     }
     streamer_->setRequestBudgetFloor(edgeNear ? 4 : -1);
   }
-  streamer_->update(pcx, pcz);
+  { const auto tStm = std::chrono::steady_clock::now();
+    streamer_->update(pcx, pcz);
+    msStream += pumpMsSince(tStm);
+  }
   // CAM-2 (P2c): non-player cameras (third/follow/free view camera, MCP
   // pilot cameras) request columns around their own centres within their
   // chunk-radius budget â€” AFTER the player's update, so they only spend
@@ -2651,9 +2711,14 @@ void Game::pumpStreaming(float frameDtMs) {
   }
   const bool deferredMeshReady = !deferredMeshOrder_.empty() && !meshBackpressured();
   if (!streamer_->hasReady() && borderRing_.empty() && !deferredMeshReady && l0Hold_.empty() && !needStagedPromote) {
+    const auto tEv = std::chrono::steady_clock::now();
     evictFarColumns();
+    msEvict += pumpMsSince(tEv);
+    msPre = pumpMsSince(tPump) - msEvict;
+    logPumpSplit("early-evict");
     return;
   }
+  msPre = pumpMsSince(tPump);
   // P0a carry (P2b-2): the ready queue is drained only under the
   // between-ticks hold â€” never under a still-running worker, and (build
   // 80) never under a stopped sim either: a refused hold defers the whole
@@ -2668,28 +2733,37 @@ void Game::pumpStreaming(float frameDtMs) {
   static int insertSkips = 0;  // game thread only
   bool insertBusy = false;
   if (!frameHold(*sim_, simHold, insertSkips, insertBusy, /*allowBlock=*/false)) {
-    if (insertBusy) return;  // sim mid-tick: try next frame, batch stays queued
+    msHold = pumpMsSince(tPump) - msPre;
+    if (insertBusy) { logPumpSplit("hold-busy"); return; }  // sim mid-tick: try next frame, batch stays queued
     static int deferLog = 0;  // game thread only; rate-limited report
     if ((deferLog++ % 256) == 0)
       logWarn("stream: insertion deferred (sim hold refused: %s); batch stays queued",
               sim_->handshakeFrozen() ? "timing handshake frozen" : "handshake workers outstanding");
+    logPumpSplit("hold-refused");
     return;
   }
+  msHold = pumpMsSince(tPump) - msPre;
   if (needStagedPromote) {
     // PlayH crash fix: scanColumn + stage flip only while holding blockMutex_ (same as insert path).
     auto& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
     int promoted = 0;
     constexpr int kPromoteBudget = 4;
+    const auto tSt = std::chrono::steady_clock::now();
     for (const auto& [key, col] : active_->chunks.columns()) {
       if (promoted >= kPromoteBudget) break;
       if (!col || col->state.stage() != litholattice::ChunkStage::StagedSim) continue;
       if (std::max(std::abs(col->cx - pcx), std::abs(col->cz - pcz)) > stagedPromoteR) continue;
       (void)key;
+      const auto tSc = std::chrono::steady_clock::now();
       signal.scanColumn(active_->chunks, col->cx, col->cz);
+      msScan += pumpMsSince(tSc); ++nScan;
       col->state.setStage(litholattice::ChunkStage::Active);
+      const auto tM = std::chrono::steady_clock::now();
       submitMeshColumn(col->cx, col->cz);
+      msFirst += pumpMsSince(tM); ++nFirst;
       ++promoted;
     }
+    msStaged += pumpMsSince(tSt);
   }
   // B-M2 (P3-2): bounded insertion batch. Up to kMaxInFlight (32) columns
   // could finish between pumps; inserting all of them in this one
@@ -2707,7 +2781,9 @@ void Game::pumpStreaming(float frameDtMs) {
   // spiral only. Counted in sim ticks, never wall clock.
   const int grant = promoteBudget_.open(sim_->stats().worldTick);  // world ticks: ticksStepped() only counts paused single-steps
   size_t bypassed = 0;
+  const auto tProm = std::chrono::steady_clock::now();
   std::vector<StreamedColumn> fresh = streamer_->takeReadyPromote(size_t(grant), pcx, pcz, spawnSpiral_, &bypassed);
+  msPromote += pumpMsSince(tProm);
   promoteBudget_.spend(int(fresh.size() - bypassed));
   p5Bypassed_ += bypassed;
   cSignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
@@ -2754,7 +2830,10 @@ void Game::pumpStreaming(float frameDtMs) {
       // columns need no scan: worldgen places only SimRole::None blocks
       // (verified against the procgen/game worldgen paths), so there is
       // nothing to index and no SGNL payload exists for them.
+      ++nFromDisk;
+      const auto tSc = std::chrono::steady_clock::now();
       signal.scanColumn(active_->chunks, cx, cz);
+      msScan += pumpMsSince(tSc); ++nScan;
       if (!sc.signal.empty() && !signal.importState(sc.signal))
         logError("save: streamed column %d,%d signal state unreadable (components restart idle)", cx, cz);
     }
@@ -2771,8 +2850,11 @@ void Game::pumpStreaming(float frameDtMs) {
       // Fix (b): the first L0 mesh waits for the 8 Moore neighbours (or the hold's expiry).
       if (l0Hold_.enabled() && !cL0NeighbourHold::neighboursPresent(cChunkMapPresence(active_->chunks), cx, cz))
         l0Hold_.hold(ChunkKey::make(cx, cz), sim_->stats().worldTick);  // world ticks: ticksStepped() only counts paused single-steps
-      else
+      else {
+        const auto tM = std::chrono::steady_clock::now();
         startFirstMesh(cx, cz);
+        msFirst += pumpMsSince(tM); ++nFirst;
+      }
     } else {
       c->state.setStage(litholattice::ChunkStage::Active);  // all air: nothing to mesh
     }
@@ -2781,7 +2863,9 @@ void Game::pumpStreaming(float frameDtMs) {
     std::vector<uint64_t> ready;
     l0Hold_.setMaxTicks(cL0NeighbourHold::maxTicksFor(sim_->stats().targetTps));  // 2 s of ticks at the live rate
     l0Hold_.collectReady(cChunkMapPresence(active_->chunks), sim_->stats().worldTick, ready);  // (under the between-ticks hold)
-    for (uint64_t key : ready) startFirstMesh(int(int32_t(key >> 32)), int(int32_t(key & 0xffffffffu)));
+    const auto tL0 = std::chrono::steady_clock::now();
+    for (uint64_t key : ready) { startFirstMesh(int(int32_t(key >> 32)), int(int32_t(key & 0xffffffffu))); ++nFirst; }
+    msFirst += pumpMsSince(tL0);
   }
   {  // P5 lazy border ring: re-mesh at most kBorderColsPerPump neighbor columns whose
      // BorderGen moved (coalesced: a column queued by several new neighbors re-meshes once).
@@ -2792,6 +2876,7 @@ void Game::pumpStreaming(float frameDtMs) {
     p6SlackSlices_ += uint64_t(extra);
     std::vector<uint64_t> border;
     borderRing_.popUpTo(kBorderColsPerPump + size_t(extra), border);
+    const auto tB = std::chrono::steady_clock::now();
     for (uint64_t key : border) {
       const int bx = int(int32_t(key >> 32)), bz = int(int32_t(key & 0xffffffffu));
       const ChunkColumn* c = active_->chunks.column(bx, bz);
@@ -2803,10 +2888,13 @@ void Game::pumpStreaming(float frameDtMs) {
       submitMeshColumn(bx, bz);
       slack_.noteSlice(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - s0).count());
       ++p5BorderRemeshed_;
+      ++nBorder;
     }
+    msBorder += pumpMsSince(tB);
   }
   {  // t3366u backpressure release: resubmit deferred sub-chunks (fresh snapshots), bounded per pump
     constexpr int kDeferredMeshPerPump = 64;
+    const auto tD = std::chrono::steady_clock::now();
     for (int n = 0; n < kDeferredMeshPerPump && !deferredMeshOrder_.empty() && !meshBackpressured(); ++n) {
       const int64_t k = deferredMeshOrder_.front();
       deferredMeshOrder_.pop_front();
@@ -2816,13 +2904,20 @@ void Game::pumpStreaming(float frameDtMs) {
       if (const ChunkColumn* c = active_->chunks.column(x, z); c && c->subs[y])
         submitMeshAt(x, y, z);
     }
+    msDefer += pumpMsSince(tD);
   }
-  if (fresh.empty()) return;  // hold released by the lock's destructor
+  if (fresh.empty()) {
+    logPumpSplit("no-insert");
+    return;  // hold released by the lock's destructor
+  }
   chunkColumns_ = active_->chunks.columns().size();
   if (simHold.owns_lock()) simHold.unlock();  // release before evictFarColumns (it takes its own hold)
   g_colsAdded += added;
   if (added) logInfo("stream: +%zu columns around chunk (%d, %d); %zu loaded", added, pcx, pcz, chunkColumns_);
+  const auto tEv = std::chrono::steady_clock::now();
   evictFarColumns();
+  msEvict += pumpMsSince(tEv);
+  logPumpSplit("insert");
 }
 
 // Column eviction policy (A2 / B-M1). JD-DECISION parameters (brief C6:

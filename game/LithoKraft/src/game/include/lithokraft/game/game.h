@@ -158,6 +158,7 @@ class Game {
   /// --bench: put the camera on a fixed, repeatable path at time `t` seconds. "orbit": a slow
   /// circle over the spawn. "stream": a straight line (+x, 32 blocks/s) out of the fixed world,
   /// with a cBenchStreamer generating / meshing / dropping columns around the camera.
+  /// "forward" / "line": play-streamer +x flight at 24 blocks/s (LL_FORWARD_SPEED), 20 up.
   void setBenchPath(const std::string& path);
   /// Cortana 2026-10-16 (GUI overhaul tooling): open a UI view for a bench screenshot
   /// ("hud" = gameplay HUD + F3 panel, "menu", "settings", "pause") and capture the next frame
