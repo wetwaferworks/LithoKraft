@@ -134,6 +134,8 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   /// Nemo View: texture layer -> object id table (built by the game when the block materials
   /// load; immutable once handed over). Empty = no object ids (pixels and depth only).
   void setObjectTable(std::shared_ptr<const std::vector<uint8_t>> table);
+  /// Nemo View: precomputed texture-layer colours (0xFFRRGGBB), built at load. Display only.
+  void setTextureColors(std::shared_ptr<const std::vector<uint32_t>> colors);
   /// Refresh the cvar-driven knobs (mcp.vision_width, mcp.vision_height,
   /// mcp.audio_tier, camera.chunk_radius). Called once per frame from
   /// Game::update().
@@ -186,6 +188,7 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
     std::vector<litholattice::PackedVertex> spriteVerts;
     litholattice::Vec3 spriteOrigin{};
     std::shared_ptr<const std::vector<uint8_t>> objectTable;
+    std::shared_ptr<const std::vector<uint32_t>> textureColors;
   };
   Snapshot takeSnapshot() const;
   /// Renders the snapshot from `res` into `sw` at w x h (flat shading, prototype culling with
@@ -206,6 +209,7 @@ class cMcpSensesAdapter : public litholattice::mcp::IVisionCapture,
   std::vector<litholattice::PackedVertex> spriteVerts_;  ///< latest sprite frame (software form)
   litholattice::Vec3 spriteOrigin_{};                    ///< world origin spriteVerts_ are relative to
   std::shared_ptr<const std::vector<uint8_t>> objectTable_;  ///< Nemo View: texture layer -> object id
+  std::shared_ptr<const std::vector<uint32_t>> textureColors_;  ///< Nemo View: texture layer -> sampled colour
 
   // mutexfree pass 2b: renderMutex_/protoMutex_/audioMutex_ removed. sw_, protoStates_ and tapScratch_ (and the tap's
   // single-reader side) are owned by the single MCP owner thread; owner_ checks it.

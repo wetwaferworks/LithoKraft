@@ -250,6 +250,43 @@ bool parseGrid(const std::string& spec, Grid& out) {
   return gridBySize(cols, rows, out);
 }
 
+
+uint32_t sampleTextureColor(const uint32_t* argb, int tile) {
+  if (!argb || tile <= 0) return 0;
+  uint64_t r = 0, g = 0, b = 0, n = 0;
+  for (int j = 0; j < 4; ++j)
+    for (int i = 0; i < 4; ++i) {
+      const int x = (i * 2 + 1) * tile / 8;
+      const int y = (j * 2 + 1) * tile / 8;
+      const uint32_t t = argb[size_t(y) * size_t(tile) + size_t(x)];
+      if ((t >> 24) < 128) continue;
+      r += (t >> 16) & 0xFF;
+      g += (t >> 8) & 0xFF;
+      b += t & 0xFF;
+      ++n;
+    }
+  if (!n) return 0;
+  return 0xFF000000u | uint32_t(r / n) << 16 | uint32_t(g / n) << 8 | uint32_t(b / n);
+}
+
+uint32_t sampleTextureColorRgba(const uint8_t* rgba, int tile) {
+  if (!rgba || tile <= 0) return 0;
+  uint64_t r = 0, g = 0, b = 0, n = 0;
+  for (int j = 0; j < 4; ++j)
+    for (int i = 0; i < 4; ++i) {
+      const int x = (i * 2 + 1) * tile / 8;
+      const int y = (j * 2 + 1) * tile / 8;
+      const uint8_t* p = rgba + (size_t(y) * size_t(tile) + size_t(x)) * 4;
+      if (p[3] < 128) continue;
+      r += p[0];
+      g += p[1];
+      b += p[2];
+      ++n;
+    }
+  if (!n) return 0;
+  return 0xFF000000u | uint32_t(r / n) << 16 | uint32_t(g / n) << 8 | uint32_t(b / n);
+}
+
 bool prepare(const SourceView& src, const FrameConfig& cfg, AsciiFrame& out, std::string* err) {
   auto fail = [&](const char* why) {
     if (err) *err = why;
@@ -271,6 +308,7 @@ bool prepare(const SourceView& src, const FrameConfig& cfg, AsciiFrame& out, std
   out.fg.assign(n, 0);
   out.band.assign(n, uint8_t(kSkyBand));
   out.object.assign(n, 0);
+  out.texColor.assign(n, 0);  // display only; finish() / canonicalRecord() never read this
   out.sha256.fill(0);
   return true;
 }
@@ -281,6 +319,7 @@ void buildRows(const SourceView& src, const FrameConfig& cfg, AsciiFrame& out, i
   const int cellPixels = cw * chh;
   const bool useObjects = cfg.mode == ViewMode::Objects && src.objects != nullptr;
   const bool useFaces = src.faces != nullptr;
+  const bool useTex = src.layers != nullptr && src.layerColors != nullptr && src.layerColorCount > 0;
   rowBegin = std::max(rowBegin, 0);
   rowEnd = std::min(rowEnd, cfg.rows);
   for (int cy = rowBegin; cy < rowEnd; ++cy) {
@@ -289,6 +328,7 @@ void buildRows(const SourceView& src, const FrameConfig& cfg, AsciiFrame& out, i
       uint16_t nearest = 0xFFFF;
       uint16_t objCounts[16] = {};
       uint16_t faceCounts[8] = {};
+      uint64_t tr = 0, tg = 0, tb = 0, tn = 0;
       const int px0 = src.cropX + cx * cw, py0 = src.cropY + cy * chh;
       for (int y = py0; y < py0 + chh; ++y) {
         const size_t row = size_t(y) * size_t(src.width);
@@ -305,6 +345,18 @@ void buildRows(const SourceView& src, const FrameConfig& cfg, AsciiFrame& out, i
           if (useFaces) {
             const uint8_t face = src.faces[row + size_t(x)];
             ++faceCounts[face < 6 ? face : 7];
+          }
+          if (useTex && src.depth && src.depth[row + size_t(x)] != 0xFFFF) {
+            const uint16_t layer = src.layers[row + size_t(x)];
+            if (layer < uint16_t(src.layerColorCount)) {
+              const uint32_t tc = src.layerColors[layer];
+              if ((tc >> 24) >= 128) {
+                tr += (tc >> 16) & 0xFF;
+                tg += (tc >> 8) & 0xFF;
+                tb += tc & 0xFF;
+                ++tn;
+              }
+            }
           }
         }
       }
@@ -370,6 +422,12 @@ void buildRows(const SourceView& src, const FrameConfig& cfg, AsciiFrame& out, i
       out.fg[i] = cf.ink;
       out.band[i] = uint8_t(band);
       out.object[i] = uint8_t(object);
+      if (useTex && !empty && tn) {
+        out.texColor[i] = 0xFF000000u | uint32_t((tr + tn / 2) / tn) << 16 |
+                         uint32_t((tg + tn / 2) / tn) << 8 | uint32_t((tb + tn / 2) / tn);
+      } else if (i < out.texColor.size()) {
+        out.texColor[i] = 0;
+      }
     }
   }
 }
@@ -658,7 +716,7 @@ bool neighbourEdge(const AsciiFrame& f, size_t i) {
   return false;
 }
 
-CellLook decodeCell(uint64_t word, ViewStyle style, const DisplaySettings& display) {
+CellLook decodeCell(uint64_t word, ViewStyle style, const DisplaySettings& display, uint32_t texColor) {
   const CellFields c = unpackCell(word);
   CellLook look;
   look.glyph = c.glyph;
@@ -695,6 +753,12 @@ CellLook decodeCell(uint64_t word, ViewStyle style, const DisplaySettings& displ
       // changes how full the backing is (already packed into fill).
       look.ink = paletteColour(c.ink);
       look.fill = paletteColour(c.fill);
+      if (display.textureColor && (texColor & 0x00FFFFFFu) != 0) {
+        // Texture albedo, dimmed by the cell's packed shade (light 0..15).
+        const int shade = clampi((c.light & 15) * 17, 0, 255);
+        look.ink = scaleRgb(texColor, shade);
+        look.fill = scaleRgb(texColor, shade * fillScale(c.face) / 256);
+      }
       const int fade = displayFogFade(c.depth, display.fogScale);
       look.ink = fadeTowardSky(look.ink, fade);
       look.fill = fadeTowardSky(look.fill, fade);
@@ -729,12 +793,18 @@ CellLook decodeCell(uint64_t word, ViewStyle style, const DisplaySettings& displ
       break;
     }
   }
+  if (style != ViewStyle::Solid && style != ViewStyle::Depth && display.textureColor &&
+      (texColor & 0x00FFFFFFu) != 0 && look.glyph != ' ' && (c.depth & 7) != kSkyBand) {
+    const int shade = clampi((c.light & 15) * 17, 0, 255);
+    look.ink = scaleRgb(texColor, shade);
+  }
   applyDisplay(look, c, display, false);
   return look;
 }
 
 CellLook decodeCell(const AsciiFrame& f, size_t i, ViewStyle style, const DisplaySettings& display) {
-  CellLook look = decodeCell(cellAt(f, i), style, display);
+  const uint32_t tex = (i < f.texColor.size()) ? f.texColor[i] : 0;
+  CellLook look = decodeCell(cellAt(f, i), style, display, tex);
   if (display.edgeLift > 0 && neighbourEdge(f, i)) {
     const CellFields c = unpackCell(cellAt(f, i));
     if ((c.depth & 7) != kSkyBand) look.ink = lightenInk(look.ink, display.edgeLift);

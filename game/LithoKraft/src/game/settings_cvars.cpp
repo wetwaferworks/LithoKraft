@@ -516,6 +516,14 @@ void registerMcpSensesCvars(litholattice::console::cConsoleReg& r) {
                           "ASCII display minimum foreground luma (0..200, default 96, about 38%). Paint only; sky and spaces are skipped.",
                           CVarFlags{}, &err))
         r.print(std::string("nemo view: cvar 'render.ascii_luma_floor' not registered: ") + err);
+      const char* texDef = "1";
+      if (const char* te = std::getenv("LL_ASCII_TEXTURE_COLOR")) {
+        if (std::string(te) == "0" || std::string(te) == "off") texDef = "0";
+      }
+      if (!r.registerCVar("render.ascii_texture_color", CVarType::Int, texDef, false,
+                          "ASCII display: colour each character from its block texture (sampled at load). Paint only, default on. Shared with a later main-window ASCII play mode.",
+                          CVarFlags{}, &err))
+        r.print(std::string("nemo view: cvar 'render.ascii_texture_color' not registered: ") + err);
     }
     r.setCVarChangeFn("render.nemo_view_cols", [](cConsoleReg& reg, const auto& c) {
       static bool syncing = false;

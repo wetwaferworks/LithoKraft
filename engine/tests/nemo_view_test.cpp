@@ -261,6 +261,43 @@ int main() {
       check(n > 0 && brightY > rawY, "default display luma is brighter than hash-faithful paint on visible cells");
       check(skyLifted == 0, "empty sky cells are not lifted to the foreground floor");
     }
+
+    {
+      // Texture colour is paint-only: a sampled layer table must not move the hash.
+      std::vector<uint32_t> tile(16 * 16, 0xFF2060C0u);  // blue-ish
+      for (int i = 0; i < 16 * 16; i += 7) tile[size_t(i)] = 0x00000000u;  // some holes, skipped
+      const uint32_t avg = sampleTextureColor(tile.data(), 16);
+      check(((avg >> 16) & 0xFF) < 0x40 && ((avg >> 8) & 0xFF) < 0x80 && (avg & 0xFF) > 0xA0,
+            "4x4 sample grid averages an opaque blue tile to a blue colour");
+      std::vector<uint16_t> layers(size_t(320) * 180, 1);
+      std::vector<uint32_t> table(4, 0);
+      table[1] = avg ? avg : 0xFF2060C0u;
+      SourceView v = src;
+      v.layers = layers.data();
+      v.layerColors = table.data();
+      v.layerColorCount = 4;
+      AsciiFrame painted;
+      build(v, cfg, painted);
+      check(shaHex(painted) == shaHex(f) && glyphRows(painted) == glyphRows(f),
+            "texture-colour table does not change the hashed record or the glyph plane");
+      int coloured = 0, fallback = 0;
+      DisplaySettings on = kDefaultDisplay;
+      on.textureColor = true;
+      DisplaySettings off = kDefaultDisplay;
+      off.textureColor = false;
+      for (size_t i = 0; i < painted.cell.size(); ++i) {
+        const CellFields cf = unpackCell(painted.cell[i]);
+        if (cf.depth == kSkyBand || painted.glyph[i] == ' ') continue;
+        if (!painted.texColor[i]) continue;
+        const CellLook a = decodeCell(painted, i, ViewStyle::Solid, on);
+        const CellLook b = decodeCell(painted, i, ViewStyle::Solid, off);
+        const int ab = int(a.ink & 0xFF), bb = int(b.ink & 0xFF);
+        const int ar = int((a.ink >> 16) & 0xFF), br = int((b.ink >> 16) & 0xFF);
+        if (ab > ar && (ab - ar) > (bb > br ? (bb - br) : 0)) ++coloured;
+        else ++fallback;
+      }
+      check(coloured > 0, "solid display with texture colour uses the sampled block colour on visible cells");
+    }
     std::printf("[NEMO-VIEW] fixture 80x45 objects sha256 %s\n", shaHex(f).c_str());
     std::printf("%s\n", g.substr(0, 81 * 14).c_str());
   }

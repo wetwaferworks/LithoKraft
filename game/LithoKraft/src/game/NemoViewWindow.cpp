@@ -207,9 +207,10 @@ void paintFrame(WindowState& st, HWND hwnd, const nv::AsciiFrame& f, const char*
   }
 
   char footer[280];
-  std::snprintf(footer, sizeof footer, "%s   tick %llu   %s view   %dx%d   sha %.12s   style %s   gamma 0.%02d  floor %d",
+  std::snprintf(footer, sizeof footer, "%s   tick %llu   %s view   %dx%d   sha %.12s   style %s   gamma 0.%02d  floor %d  tex %s",
                 source, static_cast<unsigned long long>(f.tick), nv::viewModeName(f.mode), f.cols, f.rows,
-                nv::shaHex(f).c_str(), nv::viewStyleName(vs), display.gammaHundredths, display.lumaFloor);
+                nv::shaHex(f).c_str(), nv::viewStyleName(vs), display.gammaHundredths, display.lumaFloor,
+                display.textureColor ? "on" : "off");
   SetBkMode(dc, TRANSPARENT);
   SetTextColor(dc, RGB(169, 112, 255));  // JD violet
   TextOutA(dc, 6, h - kFooterPx + 3, footer, int(std::strlen(footer)));
@@ -296,6 +297,7 @@ void cNemoViewWindow::run(cMcpSensesAdapter* adapter) {
       nv::DisplaySettings display = nv::kDefaultDisplay;
       display.gammaHundredths = gammaHundredths_.load();
       display.lumaFloor = lumaFloor_.load();
+      display.textureColor = textureColor_.load();
       const cNemoViewHub::Entry& e = hub.latest();
       if (e.seq != 0 && cNemoViewHub::nowMs() - e.steadyMs < 3000) {
         paintFrame(st, hwnd, e.frame, e.source.c_str(), style, display);

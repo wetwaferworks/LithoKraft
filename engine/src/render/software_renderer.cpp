@@ -199,6 +199,7 @@ void cSoftwareRenderer::resize(uint32_t w, uint32_t h) {
   if (objectsOn_) {
     objects_.assign(size_t(w) * h, 0);
     faces_.assign(size_t(w) * h, 7);
+    layers_.assign(size_t(w) * h, 0);
   }
   hizFbW_ = 0;  // Cortana 2026-10-15 1715: Hi-Z off until the next clear()
 }
@@ -735,6 +736,7 @@ void cSoftwareRenderer::clear(uint32_t color) {
   if (objectsOn_) {
     objects_.assign(depth_.size(), 0);
     faces_.assign(depth_.size(), 7);
+    layers_.assign(depth_.size(), 0);
   }
   hizReset();  // Cortana 2026-10-15 1715: Hi-Z
 }
@@ -742,6 +744,7 @@ void cSoftwareRenderer::clear(uint32_t color) {
 // Nemo View object ids: off unless a table is set; the colour/depth path never reads them.
 static thread_local uint8_t tlObject = 0;
 static thread_local uint8_t tlFace = 7;  // 7 = unknown (valid faces are 0-5)
+static thread_local uint16_t tlLayer = 0;
 
 void cSoftwareRenderer::setObjectCapture(const uint8_t* layerToObject, size_t count) {
   objectsOn_ = layerToObject != nullptr && count > 0;
@@ -749,12 +752,15 @@ void cSoftwareRenderer::setObjectCapture(const uint8_t* layerToObject, size_t co
     layerObject_.assign(layerToObject, layerToObject + count);
     objects_.assign(depth_.size(), 0);
     faces_.assign(depth_.size(), 7);
+    layers_.assign(depth_.size(), 0);
   } else {
     layerObject_.clear();
     objects_.clear();
     objects_.shrink_to_fit();
     faces_.clear();
     faces_.shrink_to_fit();
+    layers_.clear();
+    layers_.shrink_to_fit();
   }
 }
 
@@ -890,6 +896,7 @@ void cSoftwareRenderer::rasterizeTriangle(const float* v0, const float* v1,
       if (objectsOn_) {
         objects_[idx] = tlObject;
         faces_[idx] = tlFace;
+        layers_[idx] = tlLayer;
       }
     }
   }
@@ -1586,6 +1593,7 @@ void cSoftwareRenderer::renderFlatQuads(const PackedVertex* verts, size_t count,
   for (size_t i = 0; i + 3 < count; i += 4) {
     if (objectsOn_) {
       const uint32_t layer = verts[i].layerIndex();
+      tlLayer = uint16_t(layer);
       tlObject = objectOverride_ >= 0 ? uint8_t(objectOverride_)
                                       : (layer < layerObject_.size() ? layerObject_[layer] : uint8_t(0));
       const uint8_t raw = uint8_t(verts[i].faceAo & 7);

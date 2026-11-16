@@ -5,6 +5,7 @@
 
 #include "litholattice/render/nemo_view.h"
 #include "lithokraft/content/blocks.h"
+#include "litholattice/assets/texture_registry.h"
 
 namespace lithokraft {
 
@@ -40,6 +41,19 @@ std::shared_ptr<const std::vector<uint8_t>> buildNemoObjectTable(const litholatt
   }
   if (table.size() < 4096) table.resize(4096, uint8_t(ObjectId::Other));  // layers past the rules read as Other
   return std::make_shared<const std::vector<uint8_t>>(std::move(table));
+}
+
+std::shared_ptr<const std::vector<uint32_t>> buildNemoTextureColors(const litholattice::cTextureReg& textures) {
+  const auto src = textures.textures();
+  const int tile = textures.tileSize();
+  std::vector<uint32_t> table(src.size(), 0);
+  for (size_t i = 0; i < src.size(); ++i) {
+    const litholattice::Image& img = src[i].image;
+    if (img.width() != tile || img.height() != tile || img.pixels().size() < size_t(tile) * size_t(tile) * 4)
+      continue;
+    table[i] = litholattice::nemoview::sampleTextureColorRgba(img.pixels().data(), tile);
+  }
+  return std::make_shared<const std::vector<uint32_t>>(std::move(table));
 }
 
 }  // namespace lithokraft

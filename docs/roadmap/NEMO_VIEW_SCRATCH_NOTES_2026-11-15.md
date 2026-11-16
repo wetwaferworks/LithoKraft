@@ -92,3 +92,29 @@ Settings, shared so a later main-window ASCII play mode can use the same knobs:
 - `render.ascii_luma_floor` (0..200, default 96).
 
 `render.ascii_display` is not a separate switch: `gamma 100` and `luma_floor 0` is the hash-faithful paint. The Nemo View footer shows the current gamma and floor. That playable main-window path is still not wired.
+
+
+## Texture colour (human-facing only)
+
+Paint only. The hashed `nemo_ascii.v2` record, the packed cell word, the glyph plane, and Nemo's prompt are unchanged. After this change, every fixture hash above still matched, including 80x45 (`95c90f393878009ae385adf585f891b8b317857f2ccff79f7be0c677ef0989bc`) and the rendered scene (`2e050fbcd1b8b1b6649e2245c235496c3ddeab76552ec0565a70ad81e7412034`). `lithokraft_frame_hash_selftest` still passed.
+
+The Nemo preview path is flat-shaded, so framebuffer ink is lighting, not block albedo. At load, each texture layer is sampled on a fixed 4x4 grid (`(2i+1)*tile/8`) and those averages are kept next to the object table. While object capture is on, the software renderer also writes the winning texture layer per pixel. The ASCII builder averages the precomputed colours of the non-sky samples in each cell into a display-only `texColor` plane, which is never read by `canonicalRecord()`.
+
+`decodeCell` then tints the glyph (and a darker fill) by that colour, dimmed by the packed light, then the existing fog and DisplaySettings (gamma, luma floor, contrast, edge lift).
+
+Settings, shared so a later main-window ASCII play mode can use the same knobs:
+
+- `render.ascii_texture_color` (default on). Launch override: `LL_ASCII_TEXTURE_COLOR=0` (or `off`) to paint lighting only.
+- `kRawDisplay` leaves texture colour off, so hash-faithful paint stays linear and un-tinted.
+
+The Nemo View footer shows `tex on` or `tex off`. That playable main-window path is still not wired.
+
+Single-threaded frame build after this change (same machine):
+
+| Grid    | ms/frame | fail-above |
+|---------|----------|------------|
+| 80x45   | 0.424    | 5.0 ms     |
+| 96x54   | 0.495    | 7.2 ms     |
+| 160x90  | 1.003    | 20.0 ms    |
+| 180x80  | 1.038    | 20.0 ms    |
+| 240x135 | 2.435    | 45.0 ms    |

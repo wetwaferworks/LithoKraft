@@ -130,6 +130,9 @@ struct SourceView {
   const uint16_t* depth = nullptr;    ///< software depth codes (swsimd::depthQ); nullptr = all sky
   const uint8_t* objects = nullptr;   ///< per-pixel object id; nullptr = none
   const uint8_t* faces = nullptr;     ///< per-pixel face id 0-5; nullptr = unknown
+  const uint16_t* layers = nullptr;  ///< per-pixel texture layer of the depth-test winner; display only
+  const uint32_t* layerColors = nullptr;  ///< precomputed 0xFFRRGGBB per texture layer; display only
+  int layerColorCount = 0;
   int depthRemapMode = 0;             ///< LL_SW_DEPTH_REMAP in effect when the frame was drawn (0..2)
   /// Optional crop (the fovea). Zero size = the whole frame.
   int cropX = 0, cropY = 0, cropW = 0, cropH = 0;
@@ -156,6 +159,7 @@ struct AsciiFrame {
   std::vector<uint8_t> fg;            ///< derived: ink palette index 0..15 per cell
   std::vector<uint8_t> band;          ///< derived: depth band 0..7 per cell
   std::vector<uint8_t> object;        ///< derived: majority object id per cell (0 in PixelsAndDepth)
+  std::vector<uint32_t> texColor;     ///< display only: averaged block-texture colour per cell (0xFFRRGGBB); not hashed
   std::array<uint8_t, 32> sha256{};   ///< SHA-256 of canonicalRecord(); set by finish()
 };
 
@@ -218,6 +222,11 @@ int fillScale(uint8_t face);                         ///< fill = ink * this / 25
 int fogFade(int band);                               ///< 0..256, how far colour is pulled toward the sky
 const std::array<uint8_t, 32>& depthTableSha256();   ///< SHA-256 of the baked band table
 std::string depthTableShaPrefix();                   ///< first 16 hex characters
+/// Average of a fixed 4x4 sample grid over a square tile of 0xAARRGGBB texels (opaque only).
+/// Deterministic; used to precompute per-block texture colours at load. Returns 0 if none.
+uint32_t sampleTextureColor(const uint32_t* argb, int tile);
+/// Same pattern over tightly packed RGBA8 bytes (R,G,B,A per pixel).
+uint32_t sampleTextureColorRgba(const uint8_t* rgba, int tile);
 
 // ---- building ----
 /// Checks the geometry (exact tiling) and sizes `out`. False with `err` set on bad input.
@@ -262,11 +271,12 @@ struct DisplaySettings {
   int contrast = 336;        ///< ink versus fill; 256 is unchanged, default about 1.31x
   int fogScale = 144;        ///< display fog as 256ths of the packed fade (256 = as packed). Default is gentler.
   int edgeLift = 80;         ///< extra luma on depth / object-id edges, display only
+  bool textureColor = true;  ///< apply precomputed block-texture colours (paint only; default on)
 };
 
 inline constexpr DisplaySettings kDefaultDisplay{};
-/// Hash-faithful paint: no gamma, no floor, packed fog, no edge lift.
-inline constexpr DisplaySettings kRawDisplay{100, 0, 256, 256, 0};
+/// Hash-faithful paint: no gamma, no floor, packed fog, no edge lift, no texture colour.
+inline constexpr DisplaySettings kRawDisplay{100, 0, 256, 256, 0, false};
 
 struct CellLook {
   char glyph = ' ';
@@ -274,7 +284,7 @@ struct CellLook {
   uint32_t fill = 0xFF000000;  ///< 0xFFRRGGBB; black when the style has no backing
 };
 
-CellLook decodeCell(uint64_t word, ViewStyle style, const DisplaySettings& display = kDefaultDisplay);
+CellLook decodeCell(uint64_t word, ViewStyle style, const DisplaySettings& display = kDefaultDisplay, uint32_t texColor = 0);
 CellLook decodeCell(const AsciiFrame& f, size_t i, ViewStyle style, const DisplaySettings& display = kDefaultDisplay);
 
 }  // namespace litholattice::nemoview

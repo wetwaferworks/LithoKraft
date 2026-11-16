@@ -5022,6 +5022,7 @@ void Game::update(float dt, int width, int height) {
     if (const auto mats = resources_.materials(); mats && mats.get() != nemoObjectsFor_) {
       nemoObjectsFor_ = mats.get();
       mcpSenses_.setObjectTable(buildNemoObjectTable(*mats));
+      mcpSenses_.setTextureColors(buildNemoTextureColors(resources_.textures()));
     }
     cNemoViewWindow& nemoView = cNemoViewWindow::instance();
     nemoView.setStyle(cvarInt("render.nemo_view_style", 4));
@@ -5046,7 +5047,8 @@ void Game::update(float dt, int width, int height) {
     // at the game view (that path is not wired yet).
     nemoView.setGrid(cvarInt("render.nemo_view_objects", 1) != 0, asciiGrid.cols, asciiGrid.rows,
                      asciiGrid.captureW, asciiGrid.captureH);
-    nemoView.setDisplay(cvarInt("render.ascii_gamma", 62), cvarInt("render.ascii_luma_floor", 96));
+    nemoView.setDisplay(cvarInt("render.ascii_gamma", 62), cvarInt("render.ascii_luma_floor", 96),
+                       cvarInt("render.ascii_texture_color", 1) != 0);
     const int nemoViewMode = cvarInt("render.nemo_view", 0);
     nemoView.setWanted(nemoViewMode != 0, &mcpSenses_, nemoViewMode == 2);
   }

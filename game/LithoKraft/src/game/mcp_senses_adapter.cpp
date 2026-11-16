@@ -148,12 +148,18 @@ cMcpSensesAdapter::Snapshot cMcpSensesAdapter::takeSnapshot() const {
   s.spriteVerts = spriteVerts_;
   s.spriteOrigin = spriteOrigin_;
   s.objectTable = objectTable_;
+  s.textureColors = textureColors_;
   return s;
 }
 
 void cMcpSensesAdapter::setObjectTable(std::shared_ptr<const std::vector<uint8_t>> table) {
   litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
   objectTable_ = std::move(table);
+}
+
+void cMcpSensesAdapter::setTextureColors(std::shared_ptr<const std::vector<uint32_t>> colors) {
+  litholattice::cGateGuard<litholattice::cAtomicGate> lk(mutex_);
+  textureColors_ = std::move(colors);
 }
 
 void cMcpSensesAdapter::renderCone(litholattice::cSoftwareRenderer& sw, litholattice::CullProtoState& st,
@@ -281,6 +287,12 @@ bool cMcpSensesAdapter::buildAscii(litholattice::cSoftwareRenderer& sw, litholat
   src.objects = objects ? sw.objectBuffer().data() : nullptr;
   src.faces = (objects && sw.faceBuffer().size() == sw.objectBuffer().size()) ? sw.faceBuffer().data()
                                                                                : nullptr;
+  if (objects && snap.textureColors && !snap.textureColors->empty() &&
+      sw.layerBuffer().size() == sw.objectBuffer().size()) {
+    src.layers = sw.layerBuffer().data();
+    src.layerColors = snap.textureColors->data();
+    src.layerColorCount = int(snap.textureColors->size());
+  }
   src.depthRemapMode = litholattice::swsimd::g_depthRemapMode;
   nv::FrameConfig cfg =
       nv::FrameConfig::forGrid(req.fovea ? nv::kFoveaGrid : grid,

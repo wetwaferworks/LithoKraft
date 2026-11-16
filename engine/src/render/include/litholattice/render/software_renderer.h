@@ -302,6 +302,9 @@ class cSoftwareRenderer : public IRenderer {
   /// Face id of the depth-test winner (0-5, same numbering as PackedVertex faceAo); empty when
   /// object capture is off. Colour and depth output are unchanged either way.
   const std::vector<uint8_t>& faceBuffer() const { return faces_; }
+  /// Texture layer of the depth-test winner (parallel to objectBuffer); empty when capture is off.
+  /// Display only: used to look up a precomputed texture colour. Colour and depth output are unchanged.
+  const std::vector<uint16_t>& layerBuffer() const { return layers_; }
   const std::vector<uint16_t>& depthBuffer() const { return depth_; }
 
   /// Enable/disable per-pixel shading (default: flat for speed).
@@ -412,6 +415,7 @@ class cSoftwareRenderer : public IRenderer {
   int objectOverride_ = -1;
   std::vector<uint8_t> objects_;      ///< per-pixel object id, parallel to depth_ (only when objectsOn_)
   std::vector<uint8_t> faces_;        ///< per-pixel face id 0-5, parallel to objects_ (only when objectsOn_)
+  std::vector<uint16_t> layers_;      ///< per-pixel texture layer, parallel to objects_ (only when objectsOn_)
   std::vector<uint8_t> layerObject_;  ///< texture layer -> object id
   SoftwareShadingTier shadingTier_ = SoftwareShadingTier::Basic;  ///< fragment tier (per-pixel path)
   const PbrFragmentContext* pbrContext_ = nullptr;  ///< PBR context (registry/lights/camera); may be null
