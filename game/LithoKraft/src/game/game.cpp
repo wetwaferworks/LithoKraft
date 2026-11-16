@@ -3495,14 +3495,11 @@ void Game::holdTicksForIo(const char* why) {
   ioTickHold_ = true;
   applySimPause();  // no new tick starts from here
   if (sim_ && sim_->running()) {
-    // Wait out a tick already in flight (ticks hold the block gate across their whole window).
-    // Bounded: a frozen / poisoned handshake refuses the hold without being busy, and the
-    // save's own stop() path stays the authority there.
-    ::litholattice::cGateLock<litholattice::cBlockGate> h;
-    bool busy = false;
-    const auto until = Clock::now() + std::chrono::milliseconds(2000);
-    while (!sim_->tryHoldBetweenTicks(h, &busy) && busy && Clock::now() < until)
-      std::this_thread::sleep_for(std::chrono::microseconds(100));
+    // Wait out a tick already in flight. t46u item 6b: the tick thread acknowledges its next phase
+    // boundary (lock-free) instead of this thread trying for the block gate. Bounded as before: the
+    // save's own stop() path stays the authority if the tick thread does not get there.
+    if (!sim_->waitTickBoundary(std::chrono::milliseconds(2000)))
+      logWarn("tick pause: %s - no tick boundary within 2 s; the save's stop() path decides", why);
   }
   logInfo("tick pause: %s - ticks held (world tick %llu)", why, (unsigned long long)worldTick());
   traceIo(std::string("hold:") + why);

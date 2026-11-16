@@ -189,6 +189,11 @@ class cSimThread {
   /// tick thread for a long time (the pinned-shot freeze) calls this while it waits, so callers on
   /// other threads are not held for the whole park.
   void serviceOwnerJobs() { serveOwnerJobsGated(); }
+  /// t46u item 6b: waits, bounded and lock-free, until the tick thread starts a new mutation window, so a
+  /// tick that was in flight when the caller asked has fully finished (its post section too). True at once
+  /// when the sim is not running, on the tick thread, or when the caller already holds the world. False on
+  /// timeout (a stuck tick thread). A paused tick thread wakes for it.
+  bool waitTickBoundary(std::chrono::milliseconds timeout);
   /// Stream hand-off (2026-10-15): lock the sim between iterations WITHOUT
   /// pausing or stopping it, so the game thread can insert/erase chunk
   /// columns. Returns false (nothing held) when the timing handshake is
@@ -402,6 +407,8 @@ class cSimThread {
   // and serviceOwnerJobs() from a park hook. stop() runs whatever is left after the join.
   struct OwnerJob { std::function<void()>* fn = nullptr; std::exception_ptr err; std::atomic<bool> done{false}; OwnerJob* next = nullptr; };
   alignas(64) std::atomic<OwnerJob*> ownerJobs_{nullptr};
+  alignas(64) std::atomic<uint64_t> boundarySeq_{0};  // t46u 6b: bumped at the start of every mutation window
+  std::atomic<int> boundaryWanted_{0};                // t46u 6b: waiters in waitTickBoundary (the paused park wakes for them)
   std::atomic<std::thread::id> simTid_{};   // the tick thread while run() is live
   std::atomic<bool> tickLive_{false};       // start() .. stop()'s join: a tick thread may still take jobs
   void runOwnerJobs();          // caller owns the world (tick thread inside its window)

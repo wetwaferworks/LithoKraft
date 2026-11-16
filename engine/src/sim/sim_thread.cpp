@@ -255,6 +255,25 @@ void cSimThread::runBetweenTicks(std::function<void()> fn) {
   if (j.err) std::rethrow_exception(j.err);
 }
 
+bool cSimThread::waitTickBoundary(std::chrono::milliseconds timeout) {
+  if (!running_.load(std::memory_order_acquire) || simTid_.load(std::memory_order_acquire) == std::this_thread::get_id() ||
+      blockMutex_.heldByMe())
+    return true;
+  // Wanted first, then the reading: a park that starts after this sees the want and does not park; one
+  // already parked is woken by the epoch bump below.
+  boundaryWanted_.fetch_add(1, std::memory_order_acq_rel);
+  const uint64_t s = boundarySeq_.load(std::memory_order_acquire);
+  notifyWake();
+  const auto until = std::chrono::steady_clock::now() + timeout;
+  bool ok = false;
+  lkIdleWaitUntil([&] {
+    if (boundarySeq_.load(std::memory_order_acquire) != s || !running_.load(std::memory_order_acquire)) { ok = true; return true; }
+    return std::chrono::steady_clock::now() >= until;
+  });
+  boundaryWanted_.fetch_sub(1, std::memory_order_acq_rel);
+  return ok;
+}
+
 void cSimThread::runOwnerJobs() {
   OwnerJob* list = ownerJobs_.exchange(nullptr, std::memory_order_acq_rel);
   OwnerJob* fifo = nullptr;  // the stack is newest first; run oldest first
@@ -818,6 +837,7 @@ void cSimThread::run() {
       // t46u item 6a: runBetweenTicks jobs (hot swap, camera raycast, surface probes) run here, between
       // ticks, by the thread that owns the world. Not deferred by a freeze: the old gate path was not either.
       runOwnerJobs();
+      boundarySeq_.fetch_add(1, std::memory_order_acq_rel);  // t46u 6b: a new window has started (waitTickBoundary)
 
       // ---- control PRE phase (control serialization): drain every control
       // source's submissions once per iteration and stamp each event with
@@ -1052,7 +1072,7 @@ void cSimThread::run() {
       while (running_.load(std::memory_order_relaxed) && paused_.load(std::memory_order_relaxed) &&
              stepRequested_.load(std::memory_order_relaxed) == 0 &&
              wakeEpoch_.load(std::memory_order_relaxed) == e &&
-             !ownerJobs_.load(std::memory_order_acquire)) {  // t46u 6a: a job pushed before `e` was read must not wait out the park
+             !ownerJobs_.load(std::memory_order_acquire) && boundaryWanted_.load(std::memory_order_acquire) == 0) {  // t46u 6a: a job pushed before `e` was read must not wait out the park
         std::this_thread::sleep_for(std::chrono::microseconds(200));
       }
     } else if (passCut) {
