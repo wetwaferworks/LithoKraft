@@ -58,6 +58,7 @@
 #include "litholattice/render/mesher.h"
 #include "litholattice/render/binary_greedy_mesher.h"
 int testCanonicalMeshEntry();  // canonical_mesh_test.cpp (render pipeline step 2-3)
+int testGlslAttrParseEntry();  // glsl_attr_parse_test.cpp (gl33 chunk.vert parser vs the old regexes)
 #include "litholattice/render/micro_mesher.h"
 #include "litholattice/subdiv/octree.h"
 #include "litholattice/subdiv/subdiv_store.h"
@@ -9776,7 +9777,7 @@ int runModule(const std::string& m) {
   const int before = g_fails;
   if (m == "core") { testCore(); testFailFast(); testCounterHash(); testSeqLockStress(); testJobInjectionStress(); testThreadCensus(); testThreadCensusRulings(); }
   else if (m == "world") { testWorld(); testMarchRay(); testChunkIngress(); }
-  else if (m == "render") { testRender(); g_fails += testSoftwareRenderer(); g_fails += testVkSpriteConversion(); testVkPacked12(); g_fails += testCanonicalMeshEntry(); }
+  else if (m == "render") { testRender(); g_fails += testSoftwareRenderer(); g_fails += testVkSpriteConversion(); testVkPacked12(); g_fails += testCanonicalMeshEntry(); g_fails += testGlslAttrParseEntry(); }
   else if (m == "sim") { testSim(); testAreaShape(); testChangedColumns(); testTickPosts(); testRandomTicks(); testStepTicks(); testHandshakeGroups(); testDetSched(); testTraceJitCompose(); testSignalPropagate(); testBlockNames(); testAttachables(); testThreadLifecycle(); testLendReclaim(); testTickLedger(); }
   else if (m == "ai") testAi();
   else if (m == "anim") g_fails += anim::runAnimSelfTest();

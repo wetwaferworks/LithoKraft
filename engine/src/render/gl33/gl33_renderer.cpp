@@ -11,7 +11,6 @@
 #include <iterator>
 #include <map>
 #include <optional>
-#include <regex>
 #include <cstdlib>
 #include <unordered_map>
 #include <string_view>
@@ -31,6 +30,7 @@ extern "C" __attribute__((import_module("env"), import_name("lk_mega_draw"))) in
 #include "litholattice/assets/shader_library.h"
 #include "litholattice/core/log.h"
 #include "litholattice/render/block_materials.h"
+#include "litholattice/render/glsl_attr_parse.h"  // canonPullVariant: chunk.vert attribute rewrite
 #include "litholattice/render/overlay_geometry.h"
 #include "litholattice/render/pbr_gl_upload.h"
 #include "litholattice/render/pbr_quad_mesh.h"
@@ -77,24 +77,9 @@ std::string builtinSource(std::string_view file, std::string* error) {
 /// the vertex-array path (legacy meshes, entities), so one program serves both and the
 /// shading code below the attributes is the unmodified chunk.vert by construction.
 std::optional<std::string> canonPullVariant(const std::string& vs, std::string* why) {
-  static const std::regex attr(R"(layout\s*\(\s*location\s*=\s*([0-3])\s*\)\s*in\s+(uvec[234]|uint)\s+(aPos|aInfo|aShade|aLayerHi)\s*;)");
+  // 2026-11-16 (S5 web): bounded hand parser (glsl_attr_parse.h), same grammar as the old regexes.
   std::string out;
-  int found = 0;
-  auto it = std::sregex_iterator(vs.begin(), vs.end(), attr);
-  size_t last = 0;
-  for (; it != std::sregex_iterator(); ++it) {
-    const std::smatch& m = *it;
-    out += vs.substr(last, size_t(m.position(0)) - last);
-    out += "layout(location = " + m[1].str() + ") in " + m[2].str() + " " + m[3].str() + "_lkIn; " + m[2].str() + " " + m[3].str() + ";";
-    last = size_t(m.position(0) + m.length(0));
-    ++found;
-  }
-  out += vs.substr(last);
-  if (found != 4) { *why = "chunk.vert does not declare aPos/aInfo/aShade/aLayerHi as plain attributes"; return std::nullopt; }
-  static const std::regex mainRe(R"(void\s+main\s*\(\s*(void)?\s*\))");
-  std::smatch mm;
-  if (!std::regex_search(out, mm, mainRe)) { *why = "no main() in chunk.vert"; return std::nullopt; }
-  out.replace(size_t(mm.position(0)), size_t(mm.length(0)), "void lk_chunk_main()");
+  if (!glslparse::rewriteChunkVert(vs, &out, why)) return std::nullopt;
   const std::optional<std::string> hdr = builtinFile("canonical_pull_legacy.glsl");
   if (!hdr) { *why = "missing built-in canonical_pull_legacy.glsl"; return std::nullopt; }
   out += "\n" + *hdr + R"(
