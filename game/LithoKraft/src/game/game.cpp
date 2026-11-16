@@ -2622,7 +2622,9 @@ void Game::pumpStreaming(float frameDtMs) {
             total, why, msPre, msStream, msHold, msStaged, msPromote, msScan, nScan, nFromDisk, msFirst, nFirst, msBorder, nBorder, msDefer, msEvict,
             g_meshSubmitSplit.publishMs, g_meshSubmitSplit.pinMs, g_meshSubmitSplit.columns, g_meshSubmitSplit.slabs);
   };
-  deferredFree_.collect(streamPumps_, kDeferredFreesPerPump);
+  // t46u 6b-2b: an extracted / demoted column is freed only once the tick side has adopted a
+  // directory without it (and the two-pump fence has passed, as before).
+  if (!active_ || active_->chunks.tickSideCaughtUp()) deferredFree_.collect(streamPumps_, kDeferredFreesPerPump);
   if (!streamer_ || !sim_ || !active_) return;
   const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
   streamCx_ = pcx; streamCz_ = pcz; streamCentreSet_ = true;  // bench settle gate reads the pump's centre
@@ -2918,6 +2920,7 @@ void Game::pumpStreaming(float frameDtMs) {
     }
     msDefer += pumpMsSince(tD);
   }
+  active_->chunks.publishDirectory();  // t46u 6b-2b: publish the new column set while still holding the world
   if (fresh.empty()) {
     logPumpSplit("no-insert");
     return;  // hold released by the lock's destructor
@@ -3069,6 +3072,7 @@ void Game::evictFarColumns() {
     ++evicted;
   }
   chunkColumns_ = active_->chunks.columns().size();
+  active_->chunks.publishDirectory();  // t46u 6b-2b: publish the new column set while still holding the world
   if (simHold.owns_lock()) simHold.unlock();
   g_colsEvicted += evicted;
   if (evicted) logInfo("stream: evicted %zu far columns around chunk (%d, %d); %zu loaded", evicted, pcx, pcz, chunkColumns_);
@@ -3133,6 +3137,7 @@ void Game::demoteFarColumns() {
     borderRing_.forget(key);
     ++n;
   }
+  active_->chunks.publishDirectory();  // t46u 6b-2b: demote bumps the structure generation; publish while holding
   if (simHold.owns_lock()) simHold.unlock();
   farDemoted_ += n;
   static uint64_t lastLog = 0;
@@ -5145,6 +5150,10 @@ void Game::update(float dt, int width, int height) {
             streamer_ ? std::min(streamer_->admitRadius(), effectiveStreamRadius(cfg_)) : 0,
             (unsigned long long)g_fhDeferrals, (unsigned long long)g_fhEscalations, (unsigned long long)g_fhBlocks,
             (unsigned long long)g_fhLocoUnlocked);
+    if (active_)  // t46u 6b-2b: column directory health (stale adoptions should stay 0; retired / deferred stay bounded)
+      logInfo("column directory: stale adoptions %llu, retired held %zu, deferred frees pending %zu, tick side caught up %d",
+              (unsigned long long)active_->chunks.directoryStaleAdoptions(), active_->chunks.directoryRetired(),
+              deferredFree_.pending(), active_->chunks.tickSideCaughtUp() ? 1 : 0);
     g_split = UpdateSplit{};
     g_colsAdded = g_colsEvicted = g_uploadsCapped = 0;
     g_fhDeferrals = g_fhEscalations = g_fhBlocks = g_fhLocoUnlocked = 0;

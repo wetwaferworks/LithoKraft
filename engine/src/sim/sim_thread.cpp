@@ -289,6 +289,7 @@ void cSimThread::runOwnerJobs() {
 void cSimThread::serveOwnerJobsGated() {
   if (!ownerJobs_.load(std::memory_order_acquire)) return;
   litholattice::cGateGuard l(blockMutex_);
+  if (simTid_.load(std::memory_order_acquire) == std::this_thread::get_id()) chunks_.adoptDirectory();  // t46u 6b-2b
   runOwnerJobs();
 }
 
@@ -330,6 +331,7 @@ void cSimThread::start() {
   }
   if (running_.exchange(true)) return;  // already running: a second std::thread assignment would terminate
   tickLive_.store(true, std::memory_order_release);  // t46u 6a: owner jobs go to the tick thread from here on
+  chunks_.tickSideStarting();  // t46u 6b-2b: the caller (structure owner) publishes the column directory first
   if (handshake_) handshake_->start();  // pull workers first: phases may be published immediately
   // A-M5: a routine stop/start cleared the authority's freeze latch (see
   // cTimingHandshakeAuthority::start()); if no freeze is in effect now,
@@ -348,6 +350,11 @@ bool cSimThread::stop() {
   if (wasRunning) notifyWake();  // A-M7: a parked paused loop must wake to see the stop
   if (wasRunning && thread_.joinable()) thread_.join();
   tickLive_.store(false, std::memory_order_release);  // t46u 6a: joined; the world is the caller's again
+  if (wasRunning) {  // t46u 6b-2b: no tick side left: drop its view, free every retired column
+    logInfo("column directory at sim stop: stale adoptions %llu, retired held %zu (freed now)",
+            (unsigned long long)chunks_.directoryStaleAdoptions(), chunks_.directoryRetired());
+    chunks_.tickSideStopped();
+  }
   serveOwnerJobsGated();  // t46u 6a: jobs that missed the tick thread's last pass run here
   if (!thread_.joinable()) threadRecord_.retireAll();  // P2: joined -> RETURNED
   if (handshake_) return handshake_->stop();  // no-detach bounded join (P0a/C2); false = worker outstanding, poisoned
@@ -673,6 +680,7 @@ void cSimThread::publishEvents() {
 void cSimThread::run() {
   const HighResTimerScope timerResolution;  // 1 ms sleeps for the high-rate domains
   simTid_.store(std::this_thread::get_id(), std::memory_order_release);  // t46u 6a: runBetweenTicks from a hook runs inline
+  tl_lkTickSide = true;  // t46u 6b-2b: this thread's column lookups read the adopted directory
   struct TidClear { std::atomic<std::thread::id>& t; ~TidClear() { t.store(std::thread::id{}, std::memory_order_release); } } tidClear{simTid_};
   // CH-H8: masterStep_/worldTickN_/dropped_/acc_/window state are MEMBERS,
   // initialised once at construction — this function deliberately does NOT
@@ -827,6 +835,7 @@ void cSimThread::run() {
       const bool rdOn = cThreadReadout::enabled();  // LL_THREAD_READOUT (read-only; tick thread is this slot's only writer)
       const uint64_t rdT0 = rdOn ? cThreadReadout::nowNs() : 0;
       litholattice::cGateGuard l(blockMutex_);
+      chunks_.adoptDirectory();  // t46u 6b-2b: phase boundary: adopt the owner's newest column directory
       const uint64_t rdT1 = rdOn ? cThreadReadout::nowNs() : 0;
       struct RdPass { bool on; uint64_t t0, t1; ~RdPass() { if (on) cNamedThreadLoad::instance().pass(cNamedThreadLoad::kTick, t1 - t0, cThreadReadout::nowNs() - t1); } } rdPass{rdOn, rdT0, rdT1};
       struct HolderMark { HolderMark() { locktiming::setBlockHolder(locktiming::kHolderSimTick); } ~HolderMark() { locktiming::setBlockHolder(locktiming::kHolderNone); } } holderMark;  // 0.0.1.60 diagnostic
@@ -962,6 +971,7 @@ void cSimThread::run() {
     // (flushDirty snapshots, HUD inspect) and also runs under blockMutex_, so
     // holdBetweenTicks() callers may insert/erase columns without stop()/start().
     ::litholattice::cGateLock<cBlockGate> postLock(blockMutex_);
+    chunks_.adoptDirectory();  // t46u 6b-2b: the owner may have changed the column set between window and post
     locktiming::setBlockHolder(locktiming::kHolderSimPost);  // 0.0.1.60 diagnostic (cleared before postLock.unlock())
 
     bool flushNow = editsApplied;  // player edits remesh at once (no added latency)
@@ -989,6 +999,7 @@ void cSimThread::run() {
       lastFlush = tFlush; lastFlushTick = worldTickN_;
       if (unlockForFlush && !postLock.owns_lock()) {
         postLock = ::litholattice::cGateLock<cBlockGate>(blockMutex_);
+        chunks_.adoptDirectory();  // t46u 6b-2b: and again after the unlocked flush
         locktiming::setBlockHolder(locktiming::kHolderSimPost);
       }
     }

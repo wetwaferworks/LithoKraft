@@ -22,6 +22,7 @@ class cColumnDirectory {
  public:
   struct Dir {
     uint64_t seq = 0;
+    uint64_t gen = 0;  // the owner's structure generation this directory was built from (6b-2b staleness check)
     std::unordered_map<uint64_t, ChunkColumn*> cols;
     ChunkColumn* find(uint64_t key) const {
       const auto it = cols.find(key);
@@ -37,8 +38,8 @@ class cColumnDirectory {
   // ---- structure owner ----
   /// Publishes `cols` as the newest directory and returns its sequence. A directory the tick thread
   /// never adopted is replaced (and freed here: the tick thread can only reach a directory it adopted).
-  uint64_t publish(std::unordered_map<uint64_t, ChunkColumn*> cols) {
-    auto* d = new Dir{++pubSeq_, std::move(cols)};
+  uint64_t publish(std::unordered_map<uint64_t, ChunkColumn*> cols, uint64_t gen = 0) {
+    auto* d = new Dir{++pubSeq_, gen, std::move(cols)};
     delete pending_.exchange(d, std::memory_order_acq_rel);
     return d->seq;
   }
@@ -67,6 +68,19 @@ class cColumnDirectory {
   const Dir* current() const { return cur_.get(); }  // tick thread only
   uint64_t ackedSeq() const { return acked_.load(std::memory_order_acquire); }
 
+  // ---- either side ----
+  /// 6b-2b: true while a tick side may adopt (set by the owner around the tick thread's life).
+  void setConsumerLive(bool on) { consumerLive_.store(on, std::memory_order_release); }
+  /// True when nothing published is still unacknowledged, or no tick side is live: whatever the
+  /// owner took out of its map before its last publish is unreachable from the tick side.
+  bool consumerCaughtUp() const {
+    return !consumerLive_.load(std::memory_order_acquire) || ackedSeq() >= pubSeq_;  // pubSeq_: owner reads its own
+  }
+  /// 6b-2b diagnostics: adoptions that found the owner's structure changed with no publish (the tick
+  /// side then read the live map, still under the world gate). Should stay 0; nonzero = a missed publish site.
+  void noteStale() { stale_.fetch_add(1, std::memory_order_relaxed); }
+  uint64_t staleAdoptions() const { return stale_.load(std::memory_order_relaxed); }
+
  private:
   size_t reclaimUpTo(uint64_t seq) {
     size_t n = 0;
@@ -86,6 +100,8 @@ class cColumnDirectory {
   std::vector<std::pair<uint64_t, std::unique_ptr<ChunkColumn>>> retired_;  // owner only: (visible-from seq, column)
   std::atomic<Dir*> pending_{nullptr};                                       // newest unadopted directory
   alignas(64) std::atomic<uint64_t> acked_{0};                               // tick thread -> owner
+  std::atomic<bool> consumerLive_{false};                                    // owner: a tick side may adopt
+  std::atomic<uint64_t> stale_{0};                                           // diagnostics (see noteStale)
   std::unique_ptr<Dir> cur_;                                                 // tick thread only
 };
 

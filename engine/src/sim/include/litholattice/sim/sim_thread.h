@@ -445,6 +445,7 @@ class cSimThread {
            std::chrono::steady_clock::now() - t0 < std::chrono::milliseconds(1))
       std::this_thread::yield();
     blockMutex_.lock();
+    chunks_.adoptDirectory();  // t46u 6b-2b: a reader or insert may have run in the handoff
     locktiming::setBlockHolder(locktiming::kHolderSimTick);
   }
   const cBlockReg& blocks_;
