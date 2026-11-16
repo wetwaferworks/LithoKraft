@@ -189,6 +189,16 @@ class cSimThread {
   /// tick thread for a long time (the pinned-shot freeze) calls this while it waits, so callers on
   /// other threads are not held for the whole park.
   void serviceOwnerJobs() { serveOwnerJobsGated(); }
+  /// t46u item 6b-3: OWNER (game) THREAD ONLY. Queues fn to run on the tick thread at its next phase
+  /// boundary: right after it adopts the column directory, before any boundary or owner job, with the
+  /// world in the tick side's hands. Does not wait. Posts run oldest first, each exactly once. With no
+  /// tick thread live (before start(), after stop()'s join) the world is the caller's, so fn runs at
+  /// once (after any older post). stop() runs whatever the tick thread did not reach. Use it for work
+  /// on state the tick thread owns (signal sim indexes, cell stage flags) that follows a structural
+  /// change the owner made: the tick side sees the change and the follow-up at the same boundary.
+  void postToTick(std::function<void()> fn);
+  /// Posts run so far (diagnostic; any thread).
+  uint64_t tickPostsRun() const noexcept { return tickPostsRun_.load(std::memory_order_relaxed); }
   /// t46u item 6b: waits, bounded and lock-free, until the tick thread starts a new mutation window, so a
   /// tick that was in flight when the caller asked has fully finished (its post section too). True at once
   /// when the sim is not running, on the tick thread, or when the caller already holds the world. False on
@@ -407,6 +417,17 @@ class cSimThread {
   // and serviceOwnerJobs() from a park hook. stop() runs whatever is left after the join.
   struct OwnerJob { std::function<void()>* fn = nullptr; std::exception_ptr err; std::atomic<bool> done{false}; OwnerJob* next = nullptr; };
   alignas(64) std::atomic<OwnerJob*> ownerJobs_{nullptr};
+  // t46u item 6b-3: postToTick queue. The owner pushes heap nodes onto a lock-free stack; the tick
+  // thread takes the whole stack with one exchange at each adoption and runs it oldest first.
+  struct TickPost { std::function<void()> fn; TickPost* next = nullptr; };
+  alignas(64) std::atomic<TickPost*> tickPosts_{nullptr};
+  std::atomic<uint64_t> tickPostsRun_{0};
+  void runTickPosts();  // caller owns the world (tick thread at a boundary, or the owner with no tick thread)
+  // Every phase boundary where the tick thread takes the world: adopt the directory, then run the posts.
+  void adoptBoundary() {
+    chunks_.adoptDirectory();
+    if (tickPosts_.load(std::memory_order_acquire)) runTickPosts();
+  }
   alignas(64) std::atomic<uint64_t> boundarySeq_{0};  // t46u 6b: bumped at the start of every mutation window
   std::atomic<int> boundaryWanted_{0};                // t46u 6b: waiters in waitTickBoundary (the paused park wakes for them)
   std::atomic<std::thread::id> simTid_{};   // the tick thread while run() is live
@@ -445,7 +466,7 @@ class cSimThread {
            std::chrono::steady_clock::now() - t0 < std::chrono::milliseconds(1))
       std::this_thread::yield();
     blockMutex_.lock();
-    chunks_.adoptDirectory();  // t46u 6b-2b: a reader or insert may have run in the handoff
+    adoptBoundary();  // t46u 6b-2b/6b-3: a reader or insert may have run in the handoff
     locktiming::setBlockHolder(locktiming::kHolderSimTick);
   }
   const cBlockReg& blocks_;

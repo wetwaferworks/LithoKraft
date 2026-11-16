@@ -287,10 +287,44 @@ void cSimThread::runOwnerJobs() {
 }
 
 void cSimThread::serveOwnerJobsGated() {
-  if (!ownerJobs_.load(std::memory_order_acquire)) return;
+  const bool onTick = simTid_.load(std::memory_order_acquire) == std::this_thread::get_id();
+  if (!ownerJobs_.load(std::memory_order_acquire) && !(onTick && tickPosts_.load(std::memory_order_acquire))) return;
   litholattice::cGateGuard l(blockMutex_);
-  if (simTid_.load(std::memory_order_acquire) == std::this_thread::get_id()) chunks_.adoptDirectory();  // t46u 6b-2b
+  if (onTick) adoptBoundary();  // t46u 6b-2b/6b-3 (posts are the tick side's: never run here off the tick thread)
   runOwnerJobs();
+}
+
+void cSimThread::postToTick(std::function<void()> fn) {
+  if (!fn) return;
+  if (!tickLive_.load(std::memory_order_acquire)) {
+    // No tick thread: the world is ours (owner thread). Older posts first, then this one. Gated like the
+    // inline runBetweenTicks path (the gate is reentrant, so a caller already holding it is fine).
+    litholattice::cGateGuard l(blockMutex_);
+    if (tickPosts_.load(std::memory_order_acquire)) runTickPosts();
+    fn();
+    tickPostsRun_.fetch_add(1, std::memory_order_relaxed);
+    return;
+  }
+  TickPost* p = new TickPost{std::move(fn), nullptr};
+  TickPost* head = tickPosts_.load(std::memory_order_relaxed);
+  do { p->next = head; } while (!tickPosts_.compare_exchange_weak(head, p, std::memory_order_acq_rel, std::memory_order_relaxed));
+  notifyWake();  // a parked (paused) loop runs one pass and adopts
+}
+
+void cSimThread::runTickPosts() {
+  TickPost* list = tickPosts_.exchange(nullptr, std::memory_order_acq_rel);
+  TickPost* fifo = nullptr;  // the stack is newest first; run oldest first
+  while (list) { TickPost* n = list->next; list->next = fifo; fifo = list; list = n; }
+  while (fifo) {
+    std::unique_ptr<TickPost> p(fifo);
+    fifo = fifo->next;
+    try { p->fn(); } catch (const std::exception& e) {
+      logError("sim: a posted tick-side job threw (%s); skipped", e.what());
+    } catch (...) {
+      logError("sim: a posted tick-side job threw; skipped");
+    }
+    tickPostsRun_.fetch_add(1, std::memory_order_relaxed);
+  }
 }
 
 bool cSimThread::tryHoldBetweenTicks(::litholattice::cGateLock<cBlockGate>& hold, bool* busy) {
@@ -354,6 +388,10 @@ bool cSimThread::stop() {
     logInfo("column directory at sim stop: stale adoptions %llu, retired held %zu (freed now)",
             (unsigned long long)chunks_.directoryStaleAdoptions(), chunks_.directoryRetired());
     chunks_.tickSideStopped();
+  }
+  if (tickPosts_.load(std::memory_order_acquire)) {  // t46u 6b-3: joined; the owner runs what the tick thread did not reach
+    litholattice::cGateGuard l(blockMutex_);
+    runTickPosts();
   }
   serveOwnerJobsGated();  // t46u 6a: jobs that missed the tick thread's last pass run here
   if (!thread_.joinable()) threadRecord_.retireAll();  // P2: joined -> RETURNED
@@ -835,7 +873,7 @@ void cSimThread::run() {
       const bool rdOn = cThreadReadout::enabled();  // LL_THREAD_READOUT (read-only; tick thread is this slot's only writer)
       const uint64_t rdT0 = rdOn ? cThreadReadout::nowNs() : 0;
       litholattice::cGateGuard l(blockMutex_);
-      chunks_.adoptDirectory();  // t46u 6b-2b: phase boundary: adopt the owner's newest column directory
+      adoptBoundary();  // t46u 6b-2b/6b-3: phase boundary: adopt the owner's newest column directory, run its posts
       const uint64_t rdT1 = rdOn ? cThreadReadout::nowNs() : 0;
       struct RdPass { bool on; uint64_t t0, t1; ~RdPass() { if (on) cNamedThreadLoad::instance().pass(cNamedThreadLoad::kTick, t1 - t0, cThreadReadout::nowNs() - t1); } } rdPass{rdOn, rdT0, rdT1};
       struct HolderMark { HolderMark() { locktiming::setBlockHolder(locktiming::kHolderSimTick); } ~HolderMark() { locktiming::setBlockHolder(locktiming::kHolderNone); } } holderMark;  // 0.0.1.60 diagnostic
@@ -971,7 +1009,7 @@ void cSimThread::run() {
     // (flushDirty snapshots, HUD inspect) and also runs under blockMutex_, so
     // holdBetweenTicks() callers may insert/erase columns without stop()/start().
     ::litholattice::cGateLock<cBlockGate> postLock(blockMutex_);
-    chunks_.adoptDirectory();  // t46u 6b-2b: the owner may have changed the column set between window and post
+    adoptBoundary();  // t46u 6b-2b/6b-3: the owner may have changed the column set between window and post
     locktiming::setBlockHolder(locktiming::kHolderSimPost);  // 0.0.1.60 diagnostic (cleared before postLock.unlock())
 
     bool flushNow = editsApplied;  // player edits remesh at once (no added latency)
@@ -999,7 +1037,7 @@ void cSimThread::run() {
       lastFlush = tFlush; lastFlushTick = worldTickN_;
       if (unlockForFlush && !postLock.owns_lock()) {
         postLock = ::litholattice::cGateLock<cBlockGate>(blockMutex_);
-        chunks_.adoptDirectory();  // t46u 6b-2b: and again after the unlocked flush
+        adoptBoundary();  // t46u 6b-2b/6b-3: and again after the unlocked flush
         locktiming::setBlockHolder(locktiming::kHolderSimPost);
       }
     }
@@ -1083,7 +1121,8 @@ void cSimThread::run() {
       while (running_.load(std::memory_order_relaxed) && paused_.load(std::memory_order_relaxed) &&
              stepRequested_.load(std::memory_order_relaxed) == 0 &&
              wakeEpoch_.load(std::memory_order_relaxed) == e &&
-             !ownerJobs_.load(std::memory_order_acquire) && boundaryWanted_.load(std::memory_order_acquire) == 0) {  // t46u 6a: a job pushed before `e` was read must not wait out the park
+             !ownerJobs_.load(std::memory_order_acquire) && !tickPosts_.load(std::memory_order_acquire) &&
+             boundaryWanted_.load(std::memory_order_acquire) == 0) {  // t46u 6a: a job pushed before `e` was read must not wait out the park
         std::this_thread::sleep_for(std::chrono::microseconds(200));
       }
     } else if (passCut) {

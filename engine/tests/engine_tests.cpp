@@ -4431,6 +4431,47 @@ void testChangedColumns() {
   check(st.takeChangedColumns().empty(), "cSimThread: ticks that change nothing mark nothing");
 }
 
+// t46u item 6b-3: postToTick runs owner posts on the tick thread at its next boundary, oldest first,
+// exactly once; inline when no tick thread is live; a paused (parked) tick thread wakes for them; stop()
+// runs what the tick thread did not reach.
+void testTickPosts() {
+  std::printf("sim: postToTick (owner posts run on the tick thread at the next boundary)\n");
+  ChunkMap w = worldWithColumns(3, &fixtureBlocks());
+  SimConfig cfg;
+  cfg.tickRate = 64; cfg.radiusChunks = 4;
+  cSimThread st(w, fixtureBlocks(), std::make_unique<ChangingSim>(), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
+  const std::thread::id me = std::this_thread::get_id();
+  bool ranHere = false;
+  st.postToTick([&] { ranHere = std::this_thread::get_id() == me; });
+  check(ranHere && st.tickPostsRun() == 1, "postToTick: with no tick thread it runs at once on the caller");
+  std::vector<int> order;  // touched only by whoever runs the posts; read after stop()
+  std::atomic<int> offCaller{0}, ran{0};
+  st.start();
+  st.waitLoops(2);
+  for (int i = 0; i < 200; ++i)
+    st.postToTick([&, i] { order.push_back(i); if (std::this_thread::get_id() != me) ++offCaller; ++ran; });
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (ran.load() < 200 && std::chrono::steady_clock::now() < until) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  check(ran.load() == 200 && offCaller.load() == 200, "postToTick: a running tick thread runs every post itself");
+  st.setPaused(true);
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));  // let it reach the paused park
+  std::atomic<bool> pausedRan{false};
+  st.postToTick([&] { pausedRan = std::this_thread::get_id() != me; });
+  const auto until2 = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (!pausedRan.load() && std::chrono::steady_clock::now() < until2) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  check(pausedRan.load(), "postToTick: a paused tick thread wakes and runs the post");
+  st.setPaused(false);
+  for (int i = 200; i < 300; ++i) st.postToTick([&, i] { order.push_back(i); });
+  st.stop();
+  bool inOrder = order.size() == 300;
+  for (size_t i = 0; inOrder && i < order.size(); ++i) inOrder = order[i] == int(i);
+  check(inOrder, "postToTick: every post runs exactly once, oldest first, and stop() runs the leftovers");
+  check(st.tickPostsRun() == 302, "postToTick: the run counter matches the posts");
+  bool afterStop = false;
+  st.postToTick([&] { afterStop = std::this_thread::get_id() == me; });
+  check(afterStop, "postToTick: after stop() it runs at once on the caller again");
+}
+
 // Random ticks: a full section of an opted-in block; every pick reaches onRandomTick.
 struct RandomSim final : IWorldSim {
   std::atomic<int>* worldTicks; std::atomic<int>* picks;
@@ -9736,7 +9777,7 @@ int runModule(const std::string& m) {
   if (m == "core") { testCore(); testFailFast(); testCounterHash(); testSeqLockStress(); testJobInjectionStress(); testThreadCensus(); testThreadCensusRulings(); }
   else if (m == "world") { testWorld(); testMarchRay(); testChunkIngress(); }
   else if (m == "render") { testRender(); g_fails += testSoftwareRenderer(); g_fails += testVkSpriteConversion(); testVkPacked12(); g_fails += testCanonicalMeshEntry(); }
-  else if (m == "sim") { testSim(); testAreaShape(); testChangedColumns(); testRandomTicks(); testStepTicks(); testHandshakeGroups(); testDetSched(); testTraceJitCompose(); testSignalPropagate(); testBlockNames(); testAttachables(); testThreadLifecycle(); testLendReclaim(); testTickLedger(); }
+  else if (m == "sim") { testSim(); testAreaShape(); testChangedColumns(); testTickPosts(); testRandomTicks(); testStepTicks(); testHandshakeGroups(); testDetSched(); testTraceJitCompose(); testSignalPropagate(); testBlockNames(); testAttachables(); testThreadLifecycle(); testLendReclaim(); testTickLedger(); }
   else if (m == "ai") testAi();
   else if (m == "anim") g_fails += anim::runAnimSelfTest();
   else if (m == "storage") testStorage();
