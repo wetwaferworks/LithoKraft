@@ -1,3 +1,6 @@
+// RENAMED 2026-11-16 (JD t41u): was window_emscripten.cpp. Retired vendor-toolchain web window,
+// kept for reference only: no CMake target compiles it (the live web window is window_web.cpp on
+// our own lk_web / LithoRoot surface). Its two std::mutex members are left for the mutex-removal pass.
 // Emscripten (browser) implementation of the Window interface — WASM checkpoint,
 // 2026-10-18 overnight; input backend landed 2026-10-19 (JD playtest report #1:
 // "controls don't work in the web browser"). NEW FILE: the native window.cpp is

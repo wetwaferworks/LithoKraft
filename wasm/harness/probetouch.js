@@ -37,7 +37,7 @@ async function main() {
   // Remove it before any page script runs so the engine's capture
   // requests no-op exactly as they do on the phone. (With the API
   // present, desktop Chrome locks on play, the engine re-locks every
-  // 0.5 s per window_emscripten.cpp's frame loop, and Chrome then
+  // 0.5 s per window_web_legacy.cpp's frame loop, and Chrome then
   // reports clientX/Y = 0,0 for pointer events on overlay elements —
   // probetouchdiag5/6 — a desktop-only artifact the phone never sees.)
   await page.evaluateOnNewDocument(() => {

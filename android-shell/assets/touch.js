@@ -2,7 +2,7 @@
 //
 // Page-shell feature only: no engine/WASM code is involved. The overlay
 // translates thumbs into the EXACT DOM event shapes the emscripten
-// backend's own listeners already consume (window_emscripten.cpp):
+// backend's own listeners already consume (window_web_legacy.cpp):
 //   document 'keydown'/'keyup'  -> e.code + e.key (+ repeat/ctrl/meta)
 //   canvas   'mousedown'/'mouseup' -> e.button + e.offsetX/e.offsetY
 //   canvas   'mousemove'         -> e.offsetX/e.offsetY (+ movementX/Y)

@@ -54,7 +54,7 @@ irrecoverably — not the plan.
     fallback); stock `software_presenter.cpp` body guarded
     `#if !defined(__EMSCRIPTEN__)` (native preprocessing unchanged);
     render CMakeLists gains the one source line;
-    `window_emscripten.cpp` now creates+makes-current a WebGL2 context
+    `window_web_legacy.cpp` now creates+makes-current a WebGL2 context
     on `#canvas` for OpenGL33 windows (the native contract), with
     preserveDrawingBuffer for post-exit frame inspection.
 - [x] A/B pages written (`wasm/full/index.html` software, `wasm/full/gl.html`
@@ -134,7 +134,7 @@ retire the legacy counter remains JD's open call (it was not an error).
 ## Report #1 — controls (root causes, plural, each with evidence)
 
 **Cause A (as shipped):** the bundle booted the *null* input backend
-(`window_emscripten.cpp`: "keyboard/mouse input is not wired yet") AND
+(`window_web_legacy.cpp`: "keyboard/mouse input is not wired yet") AND
 booted with `--bench`, in which the app disables cursor grab and
 self-exits. Dead by construction — this alone explains JD's report.
 
@@ -411,7 +411,7 @@ delivered artifact rather than rebuilding:
 - Source: the fix is present in `game/LithoKraft/src/app/main.cpp`
   (`lkStepFrame`/`lkShutdownTail`/`emscripten_set_main_loop_arg`,
   dispatch at the `__EMSCRIPTEN__` seam; backup
-  `main.cpp.orig-2026-10-19-build50`). `window_emscripten.cpp` also
+  `main.cpp.orig-2026-10-19-build50`). `window_web_legacy.cpp` also
   carries a build50 backup, but its shipped diff is comment-only —
   the code fix is main.cpp alone, as the addendum states.
 - Gate spot-check re-run independently (Node demo-test, shipped
@@ -442,7 +442,7 @@ counter **0.0.0.0.0.0.0.58**, game **Alpha 0.0.2.61** (three ticks past
 ## What anti-aliasing was actually doing
 
 Nothing. The shipped GL context requests NO antialiasing:
-`engine/src/platform/window_emscripten.cpp` created the WebGL2 context
+`engine/src/platform/window_web_legacy.cpp` created the WebGL2 context
 with `attrs.antialias = EM_FALSE`, and the GL33 renderer draws straight
 into the default framebuffer — no MSAA renderbuffer, no resolve pass,
 no `render.aa` engagement anywhere in the GL path (the software
@@ -542,7 +542,7 @@ should be confirmed with the same one-line check on his machine.
 
 ## What changed (and why)
 
-1. **`?aa=off|on|4`** (GL page): `window_emscripten.cpp` reads the
+1. **`?aa=off|on|4`** (GL page): `window_web_legacy.cpp` reads the
    param on the browser main thread (the worker's own `location` is
    the worker URL — the `?debuginput` trap) and sets the WebGL context
    `antialias` attribute. WebGL's attribute is boolean (ANGLE's
@@ -635,7 +635,7 @@ The zip's binary is the 62 build; no build of any kind followed it.
 
 ## Work item A1 — memory-mapped input (landed)
 
-`engine/src/platform/window_emscripten.cpp`: a fixed shared-memory
+`engine/src/platform/window_web_legacy.cpp`: a fixed shared-memory
 input ring (512 records × 80 B, header with magic/write/read/dropped +
 canvas geometry) lives in WASM linear memory. The existing DOM
 listeners write binary records into it with Atomics when the page is
@@ -787,7 +787,7 @@ surface to plain thin imports. Counter history of the run: builds
 unchanged); the counter rolled to 0.0.0.0.0.0.1.0 at build 64; the
 shipped binary is the final build, 66 (0.0.0.0.0.0.1.2 / Alpha 0.0.3.4).
 
-## The cadence change (one file: engine/src/platform/window_emscripten.cpp)
+## The cadence change (one file: engine/src/platform/window_web_legacy.cpp)
 
 Root cause, restated precisely: build 62's ring was drained by
 `poll()`, which the web main loop calls ONCE PER PRESENTED FRAME —

@@ -122,7 +122,7 @@ storage is evictable. **Not designed here — inventoried only, per instructions
 Step 1 is **done** (emsdk installed at `~/workspace/emsdk`, Emscripten
 6.0.12). Step 2 is **at checkpoint**: the tree configures and the full game
 links under Emscripten (`build-wasm/LithoKraft.wasm`, 4.8 MB) with the
-platform stub in `engine/src/platform/window_emscripten.cpp`; node smokes
+platform stub in `engine/src/platform/window_web_legacy.cpp`; node smokes
 run the sim/content self-tests (122 PASS, 0 FAIL) and the demo format suite
 (31/31) up to the no-pthreads thread wall. The frame itself is **not** yet
 on canvas — remaining for this step: the `emscripten_set_main_loop`

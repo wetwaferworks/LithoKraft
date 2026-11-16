@@ -12,7 +12,7 @@ waits on another.
 
 * `std::mutex`, `std::recursive_mutex`, `std::shared_mutex` and `std::condition_variable` are
   gone from the desktop engine and game. The only real `std::mutex` left is in the web window
-  backend (`window_emscripten.cpp`) and in the optional CEF host layer (`host/lithocef`).
+  backend (`window_web_legacy.cpp`) and in the optional CEF host layer (`host/lithocef`).
 * What replaced them is not lock-free. `cAtomicGate`, `cBlockGate` (reentrant) and the MCP
   `cSpinGate` are spinlocks built from an atomic bool: a second thread still waits for the
   first one, it just spins instead of sleeping. `cAtomicCondition` is a polling condition
@@ -88,7 +88,7 @@ three days, L a week or more.
 | 29 | `engine/src/audio/include/litholattice/audio/occlusion_thread.h:98` | `cAtomicGate queriesMu_` | Query list growth | game adds, occlusion thread snapshots | **MPSC ring** of new queries; occlusion thread owns the list. | Low | S |
 | 30 | `engine/src/core/include/litholattice/core/f3_trace.h:20` | `cAtomicGate m` | Debug HUD text sample | renderer writes, test reads | **DB** with atomic index. | Low | S |
 | 31 | `engine/src/platform/window_web.cpp:72, 730` | `cAtomicGate` (x2) | Web input queue and conversion | browser thread, drain thread | **SPSC ring** (the ring path already exists; retire the legacy drain). | Low | S |
-| 32 | `engine/src/platform/window_emscripten.cpp:65, 863` | **`std::mutex`** (x2) | Same as above on the Emscripten build | browser thread, drain thread | Same as 31; this is the last `std::mutex` in the engine proper. | Low | S |
+| 32 | `engine/src/platform/window_web_legacy.cpp:65, 863` | **`std::mutex`** (x2) | Same as above on the Emscripten build | browser thread, drain thread | Same as 31; this is the last `std::mutex` in the engine proper. | Low | S |
 
 ### Logging, tracing, MCP, game helpers
 

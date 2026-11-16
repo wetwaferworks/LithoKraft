@@ -46,7 +46,7 @@ Conclusion (already in WASM-READINESS.md §5): GLFW cannot be the browser route.
 ### Wiring added (all reversible, all backed up)
 
 New files (additive only):
-- `engine/src/platform/window_emscripten.cpp` — browser `Window`: canvas
+- `engine/src/platform/window_web_legacy.cpp` — browser `Window`: canvas
   sizing via Emscripten HTML5, null input backend, page-session clipboard,
   `glProcAddress` → `emscripten_webgl_get_proc_address`, Vulkan honestly
   unavailable. Its header comment states the stub's limits (no HTML5 input
@@ -59,7 +59,7 @@ CMake edits (build wiring only; `.orig-2026-10-18-wasm` beside each):
 - `engine/CMakeLists.txt` — GLFW FetchContent, glslang FetchContent, and
   `add_subdirectory(src/render_vk)` each wrapped in `if(NOT EMSCRIPTEN)`.
 - `engine/src/platform/CMakeLists.txt` — `if(EMSCRIPTEN)` selects
-  `window_emscripten.cpp` (links input+core only); `else()` keeps the native
+  `window_web_legacy.cpp` (links input+core only); `else()` keeps the native
   GLFW sources/link/defines verbatim.
 - `game/LithoKraft/src/app/CMakeLists.txt` — `litholattice_render_vk` link
   gated to non-Emscripten; the stub source joins the exe under EMSCRIPTEN.
@@ -74,7 +74,7 @@ CMake edits (build wiring only; `.orig-2026-10-18-wasm` beside each):
   rest (~36% of the closure attempted):
   1. `engine/src/mcp/sockets.cpp:203` — `unknown type name 'timeval'`: glibc's
      `sys/socket.h` provides it transitively; Emscripten's musl one doesn't.
-  2. `window_emscripten.cpp` — `emscripten_get_proc_address` is not the name
+  2. `window_web_legacy.cpp` — `emscripten_get_proc_address` is not the name
      in this SDK; the WebGL variant is.
 - **Fixes (both in the sanctioned classes):** the shim now uses
   `emscripten_webgl_get_proc_address` (`<emscripten/html5_webgl.h>`);
@@ -172,7 +172,7 @@ cache; no packing finding.
 ## 3. Review pass
 
 **WASM additions (self-review, read cold after writing):**
-- `window_emscripten.cpp` implements every `Window` symbol the native file
+- `window_web_legacy.cpp` implements every `Window` symbol the native file
   exports (checked against `window.cpp` line by line, including
   `displayModeName`/`parseDisplayMode`, which are byte-identical copies of the
   pure string logic). Deviations from native, all deliberate and commented:

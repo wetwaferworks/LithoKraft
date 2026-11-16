@@ -10,7 +10,7 @@ question from the source, and ships the cheap wins behind URL switches.
 ## What anti-aliasing was actually doing
 
 Nothing. The shipped GL context requests NO antialiasing:
-engine/src/platform/window_emscripten.cpp created the WebGL2 context with
+engine/src/platform/window_web_legacy.cpp created the WebGL2 context with
 `attrs.antialias = EM_FALSE`, and the GL33 renderer draws straight into
 the default framebuffer — there is no MSAA renderbuffer or resolve pass
 anywhere in the GL path (no render.aa engagement; the software presenter's
@@ -46,7 +46,7 @@ Top-level vs itch-style iframe (shipped build 55, same bench):
 
 ## What changed (and why)
 
-1. `?aa=off|on|4` on gl.html → window_emscripten.cpp reads the param on
+1. `?aa=off|on|4` on gl.html → window_web_legacy.cpp reads the param on
    the browser main thread and sets the WebGL context's `antialias`
    attribute accordingly. WebGL's attribute is boolean (ANGLE's implicit
    MSAA is conventionally 4x), so on and 4 land in the same place.
