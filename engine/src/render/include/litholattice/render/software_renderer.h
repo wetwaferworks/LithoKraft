@@ -214,10 +214,9 @@ class cSoftwareRenderer : public IRenderer {
   /// Three-way software split (Design B, Stage 1): execute renderFrame(fp)
   /// detached on the band pool's executor worker (see setDetachedPoolMode)
   /// and return immediately; onDone(err) runs on that worker when the frame
-  /// is finished (err null on success). The render executes under
-  /// threeway::RendererGuard, exactly as the Vulkan RenderWorker's loop
-  /// does, so the game's remaining guarded renderer calls (grabs, settings,
-  /// entity uploads) stay serialised with it. Stage 2: before the render,
+  /// is finished (err null on success). t46u: no lock around the render; the
+  /// game reaches the renderer only through the command mailbox while the
+  /// split runs (renderer_mailbox.h). Stage 2: before the render,
   /// the executor drains the upload ring up to `drainTarget` (the seal —
   /// see drainUploadRing) with NO guard: the game's mesh uploads no longer
   /// take the guard at all on this path. The caller owns everything fp
@@ -227,6 +226,19 @@ class cSoftwareRenderer : public IRenderer {
   /// either way.
   void renderFrameDetached(const FrameParams& fp, uint64_t drainTarget,
                            const std::function<void(std::exception_ptr)>& onDone);
+  /// t46u item 2 (JD 2026-11-16): the frame body for a pump running ON the executor:
+  /// drain the upload ring up to drainTarget (the seal), renderFrame(fp), retire the drained
+  /// buffers. No guard: on the split path the executor owns the renderer between seals.
+  void renderJobOnExecutor(const FrameParams& fp, uint64_t drainTarget);
+  /// t46u item 2: work the detached executor polls (the app's frame mailbox). pumpOnce()
+  /// runs on the executor and returns false when it had nothing to do (the executor then
+  /// backs off: yield, then a short sleep; no peer wait).
+  struct IDetachedPump {
+    virtual ~IDetachedPump() = default;
+    virtual bool pumpOnce() = 0;
+  };
+  /// Main thread. nullptr uninstalls and returns only once the executor is out of pumpOnce().
+  static void setDetachedPump(IDetachedPump* p);
   /// Pool-wide detached mode (Design B, Stage 1): while on, the shared
   /// cSwBandPool spawns one extra worker — the executor that runs
   /// renderFrameDetached bodies (band count unchanged; synchronous run()

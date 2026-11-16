@@ -1991,7 +1991,7 @@ void Game::loadActive() {
 }
 
 bool Game::switchDimension(const std::string& id) {
-  litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
+  // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   Dimension* next = registry_.find(id);
   if (!next || next == active_) return false;
   holdTicksForIo("exit-dimension");  // B9: pause, then save the old dimension, then leave it
@@ -2943,8 +2943,7 @@ void Game::retireColumnMeshes(int cx, int cz, bool force) {
   // the upload ring like every other upload â€” this function then touches
   // no renderer state and takes no guard, so an eviction pump never waits
   // on the in-flight render. Other paths keep the guard exactly as before.
-  std::unique_ptr<litholattice::threeway::RendererGuard> rendererGuard;
-  if (!renderer_.meshUploadsQueued()) rendererGuard = std::make_unique<litholattice::threeway::RendererGuard>();
+  // t46u item 2: no guard on any path; on the split path renderer_ is the command mailbox.
   for (int sy = 0; sy < kSubChunks; ++sy) {
     const int64_t key = packPos(cx, sy, cz);
     const bool hadClassic = force || meshSeq_.count(key) != 0 || pendingMesh_.count(key) != 0;  // force: the view gate retires sim-thread meshes the seq maps never saw
@@ -3266,7 +3265,7 @@ void Game::handleToggles() {
 
 // F9: rebuild textures, models, materials and shaders from the packs, then remesh everything.
 void Game::reloadResources() {
-  litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
+  // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   const auto t0 = Clock::now();
   resources_.reload();
   resources_.apply(renderer_);
@@ -3712,7 +3711,7 @@ static DisplayMode displayModeFromIndex(int i) {
 // A settings control changed: apply the live ones now, persist everything (tick radius and
 // vsync are boot-only and note it in the UI).
 void Game::onSettingsChanged(const GameSettings& s) {
-  litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
+  // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   const GameSettings old = settings_;
   settings_ = s;
   if (s.masterVolume != old.masterVolume) audio_.post(AudioCommand::masterGain(s.masterVolume));
@@ -3833,7 +3832,7 @@ void Game::saveSettings() {
 }
 
 void Game::pushCullProtoConfig() {
-  litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
+  // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   litholattice::CullProtoConfig cfg;
   cfg.cometTailFrames = settings_.cometTailFrames;
   cfg.velocityMargin = settings_.velocityMargin;
@@ -4576,7 +4575,7 @@ void Game::handleWorldActions() {
 // renderFrame(), before present) completes the capture. One pending shot
 // at a time â€” a second `screenshot` before the frame lands is refused.
 std::string Game::requestScreenshot(const ScreenshotRequest& req) {
-  litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
+  // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   if (pendingShot_) return "screenshot: a capture is already pending for this frame";
   if (req.toFragment) {
     renderer_.requestGrab();
@@ -4607,7 +4606,7 @@ std::string Game::requestScreenshot(const ScreenshotRequest& req) {
 }
 
 void Game::debugShowUi(const std::string& view) {
-  litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
+  // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   if (view == "menu" || view == "settings" || view == "worlds") enterMenu();
   if (view == "settings") ui_.openSettings(settings_);
   if (view == "worlds") openWorldPicker();  // 2026-10-30: shot of the world picker
@@ -4619,7 +4618,7 @@ void Game::debugShowUi(const std::string& view) {
 }
 
 void Game::requestUiShot(const std::string& path) {
-  litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
+  // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   if (pendingShot_) return;
   renderer_.requestGrab();
   pendingShot_ = PendingShot{ScreenshotRequest{}, path};
@@ -5105,8 +5104,7 @@ void Game::update(float dt, int width, int height) {
   // waits on the in-flight render. Every other path (the Vulkan split
   // included) keeps the guard exactly as before; the guard is not even
   // constructed on the ring path, so it cannot block on the render's behalf.
-  std::unique_ptr<litholattice::threeway::RendererGuard> rgUpload;
-  if (!renderer_.meshUploadsQueued()) rgUpload = std::make_unique<litholattice::threeway::RendererGuard>();
+  // t46u item 2: no guard on any path; on the split path renderer_ is the command mailbox.
   const auto tUp = Clock::now();
   uploadBytes_ = 0;
   // PBR material table: the backend re-uploads only when the registry generation moved
@@ -5129,7 +5127,6 @@ void Game::update(float dt, int width, int height) {
   if (stream_) uploadBytes_ += stream_->update(benchSet_ ? benchCam_.x : player_.pos.x, benchSet_ ? benchCam_.z : player_.pos.z, resources_.materials());
   g_split.lap(7);
   uploadMs_ = msBetween(tUp, Clock::now());
-  if (rgUpload) rgUpload->release();  // LL_THREEWAY (absent on the Stage 2 ring path by design)
   playSounds();
   updateEntities();
   g_split.lap(8);
@@ -5981,7 +5978,7 @@ std::string Game::deceitorAttackCmd() {
 }
 
 void Game::uploadEntities() {
-  litholattice::threeway::RendererGuard rendererGuard;  // LL_THREEWAY: renderer calls vs the render thread (Proposed by JD; co-implemented by JD and Cortana)
+  // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   using namespace litholattice;
   std::vector<PackedVertex> verts;
   // Optimization (audit App.A/game-2): skip the 64-block querySphere scan and

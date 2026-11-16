@@ -370,8 +370,8 @@ class IRenderer {
   /// game's update order: materials first, then uploads).
   virtual void enqueuePbrMaterials(const cMaterialReg& reg) { setPbrMaterials(reg); }
   /// True when this backend stages mesh uploads for the render side to
-  /// drain (Stage 2 ring): the game's upload phase then takes no
-  /// RendererGuard — nothing waits in line behind the in-flight render.
+  /// drain (Stage 2 ring). t46u: the command mailbox (renderer_mailbox.h)
+  /// reports true while the split runs; nothing waits behind the in-flight render.
   virtual bool meshUploadsQueued() const { return false; }
   /// 2026-10-25 stutter pass: mesh pool fill in [0, 1] (live mesh bytes / device-local budget), or -1
   /// when the backend has no bounded pool. The game stops admitting far columns above 0.9.

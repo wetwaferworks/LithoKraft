@@ -112,6 +112,8 @@ static lithokraft::cFrameHashRecorder* g_frameHashRec = nullptr;  // --frame-has
 #include "litholattice/render/software_renderer.h"
 #include "litholattice/render_vk/vulkan_renderer.h"
 #include "litholattice/core/threeway.h"  // LL_THREEWAY (Proposed by JD; co-implemented by JD and Cortana)
+#include "litholattice/core/triple_buffer.h"     // t46u item 2: frame mailboxes
+#include "litholattice/render/renderer_mailbox.h"  // t46u item 2: renderer command mailbox (replaces the renderer lock)
 #include "litholattice/core/tick_profile.h"  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
 #include <atomic>
 #include <functional>
@@ -597,74 +599,133 @@ static std::string jdCounterDisplay() {
   return out;
 }
 
+// t46u item 2 (JD 2026-11-16): frame mailboxes with no lock, no spin gate and no condition
+// variable. Main fills the back job and publishes it (cTripleBuffer: one atomic exchange);
+// the render side takes the newest job, applies the renderer command mailbox up to the job's
+// seal (cRendererMailbox, renderer_mailbox.h), renders, publishes its read snapshot and the
+// finished frame, then bumps `completed`. Main never waits on the render for correctness.
+// Frame pacing (the main loop sets the rate): when the job submitted last has not been taken
+// yet, main is a full frame ahead, so it sleeps in short steps until the render side takes it
+// instead of overwriting it. No data is protected by that sleep; it only stops main from
+// running frames nobody will draw.
+static void lkPaceUntilTaken(const std::function<bool()>& stillPending) {
+  if (!stillPending()) return;
+  ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwSubmitWait);
+  const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
+  while (stillPending() && std::chrono::steady_clock::now() < until) std::this_thread::sleep_for(std::chrono::microseconds(200));
+}
+/// Render side -> main exception handoff. Ownership of `err` follows the flag.
+struct LkErrHandoff {
+  std::exception_ptr err;
+  std::atomic<bool> has{false};
+  void put(std::exception_ptr e) {  // render side
+    if (has.load(std::memory_order_acquire)) return;  // main has not taken the first one yet
+    err = std::move(e);
+    has.store(true, std::memory_order_release);
+  }
+  std::exception_ptr take() {  // main
+    if (!has.load(std::memory_order_acquire)) return nullptr;
+    std::exception_ptr e = std::move(err);
+    err = nullptr;
+    has.store(false, std::memory_order_release);
+    return e;
+  }
+};
+/// Main: sleep until the render side has finished everything submitted (world load, shutdown).
+static void lkDrainRender(const char* who, const std::function<bool()>& busy) {
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (busy()) {
+    if (std::chrono::steady_clock::now() >= until) { logWarn("%s: render side still busy after 10 s; continuing", who); return; }
+    std::this_thread::sleep_for(std::chrono::microseconds(200));
+  }
+}
+
 struct RenderWorker {
       using Quad = std::remove_const_t<std::remove_pointer_t<decltype(FrameParams::spriteQuads)>>;
       using Page = std::remove_const_t<decltype(FrameParams::spriteAtlasPages)::element_type>;
+      struct Job {
+        FrameParams fp{};
+        std::vector<Quad> quads;
+        std::vector<Page> pages;
+        uint64_t pagesVer = ~0ull;                // atlas version this buffer's page copy belongs to
+        ::litholattice::HudStreamSnapshot hud;    // D9 flicker fix: the job's own copies of the HUD streams
+        uint64_t cmdSeal = 0, seq = 0;
+      };
       IRenderer* r = nullptr;
+      ::litholattice::cRendererMailbox* mbox = nullptr;
       std::function<void()> post;
       std::function<bool()> pending;  // B61-1
-      bool shotArmed = false;          // B61-1: a capture was armed for the frame submitted last
+      bool shotArmed = false;         // B61-1: a capture rides on job shotSeq
+      uint64_t shotSeq = 0;
       std::thread th;
-      ::litholattice::cAtomicGate m;
-      ::litholattice::cAtomicCondition cv;
-      bool has = false, busy = false, quit = false;
-      FrameParams job{};
-      std::vector<Quad> quads;
-      std::vector<Page> pages;
-      uint64_t pagesVer = ~0ull;
+      ::litholattice::cTripleBuffer<Job> jobs;
+      std::atomic<bool> quit{false};
+      std::atomic<uint64_t> completed{0};
+      uint64_t submitted = 0;  // main-owned
       std::atomic<bool> lost{false};
-      ::litholattice::HudStreamSnapshot hudOwn;  // D9 flicker fix: the job's own copies of the HUD streams
-      void loop() {
-        ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m);
-        for (;;) {
-          cv.wait(l, [&] { return has || quit; });
-          if (!has) return;
-          has = false; busy = true;
-          l.unlock();
-          {
-            const int64_t pw0 = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
-            litholattice::threeway::RendererGuard rg;
+      LkErrHandoff err;
+      void loop() {  // render thread
+        unsigned idle = 0;
+        while (!quit.load(std::memory_order_acquire)) {
+          if (!jobs.take()) {
+            if (++idle < 64) std::this_thread::yield();
+            else std::this_thread::sleep_for(std::chrono::microseconds(100));
+            continue;
+          }
+          idle = 0;
+          Job& j = jobs.front();
+          try {
+            const int64_t pw0 = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only)
+            mbox->applyUpTo(j.cmdSeal);  // P5 seal: the game's renderer calls for this frame
             const int64_t pw1 = pw0 ? ::litholattice::tickprof::nowNs() : 0;
-            r->renderFrame(job);
+            r->renderFrame(j.fp);
             const int64_t pw2 = pw0 ? ::litholattice::tickprof::nowNs() : 0;
+            mbox->afterFrame();
             if (r->deviceLost()) lost.store(true);
             if (pw0) ::litholattice::tickprof::frames().add(pw1 - pw0, pw2 - pw1, ::litholattice::tickprof::nowNs() - pw2);
+          } catch (...) {
+            err.put(std::current_exception());
           }
-          l.lock();
-          busy = false;
-          cv.notify_all();
+          completed.store(j.seq, std::memory_order_release);
         }
       }
-      void submit(const FrameParams& fp) {  // main thread: the render handshake
-        ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m);
+      void submit(const FrameParams& fp) {  // main thread
+        if (std::exception_ptr e = err.take()) std::rethrow_exception(e);
         const int64_t ph0 = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only)
-        cv.wait(l, [&] { return !busy && !has; });
+        lkPaceUntilTaken([this] { return jobs.pending(); });
         if (ph0) { ::litholattice::tickprof::frames().handoffNs.fetch_add(::litholattice::tickprof::nowNs() - ph0); ::litholattice::tickprof::frames().handoffs.fetch_add(1); }
-        // B61-1 (Proposed by JD; co-implemented by JD and Cortana): the screenshot capture touches main-thread game state (console, Logbook gallery, player
-        // pose), so it runs here on the main thread while the render thread is idle, right after the armed frame.
-        // A capture armed during this frame's update rides on the job submitted now, so it is taken at the next submit.
-        if (shotArmed) { litholattice::threeway::RendererGuard rg; post(); shotArmed = false; }
-        else if (pending && pending()) shotArmed = true;
-        job = fp;
-        // D9 (JD flicker, 2026-11-12): the job must not borrow the game's HUD layers past this call... main
-        // paints the next frame into them in place while this job renders. Copy (on change) and repoint.
-        ::litholattice::snapshotHudStreams(fp, job, hudOwn);
+        // B61-1: the capture touches main-thread game state, so it runs here on main once the
+        // armed job has completed (its grab is published by then).
+        if (shotArmed && completed.load(std::memory_order_acquire) >= shotSeq) { post(); shotArmed = false; }
+        const bool arm = !shotArmed && pending && pending();
+        Job& j = jobs.back();
+        j.fp = fp;
+        ::litholattice::snapshotHudStreams(fp, j.fp, j.hud);  // D9: never borrow the game's HUD layers past submit
         const int64_t pc0 = ph0 ? ::litholattice::tickprof::nowNs() : 0;
-        quads.assign(fp.spriteQuads, fp.spriteQuads + (fp.spriteQuads ? fp.spriteQuadCount : 0));
-        job.spriteQuads = quads.empty() ? nullptr : quads.data();
-        job.spriteQuadCount = quads.size();
-        if (fp.spriteAtlasVersion != pagesVer) { pages.assign(fp.spriteAtlasPages.begin(), fp.spriteAtlasPages.end()); pagesVer = fp.spriteAtlasVersion; }
-        job.spriteAtlasPages = std::span<const Page>(pages.data(), pages.size());
+        j.quads.assign(fp.spriteQuads, fp.spriteQuads + (fp.spriteQuads ? fp.spriteQuadCount : 0));
+        j.fp.spriteQuads = j.quads.empty() ? nullptr : j.quads.data();
+        j.fp.spriteQuadCount = j.quads.size();
+        if (fp.spriteAtlasVersion != j.pagesVer) { j.pages.assign(fp.spriteAtlasPages.begin(), fp.spriteAtlasPages.end()); j.pagesVer = fp.spriteAtlasVersion; }
+        j.fp.spriteAtlasPages = std::span<const Page>(j.pages.data(), j.pages.size());
         if (pc0) { ::litholattice::tickprof::frames().copyNs.fetch_add(::litholattice::tickprof::nowNs() - pc0); ::litholattice::tickprof::frames().copies.fetch_add(1); }
-        has = true;
-        cv.notify_all();
+        j.cmdSeal = mbox->seal();
+        j.seq = ++submitted;
+        if (arm) { shotArmed = true; shotSeq = j.seq; }
+        jobs.publish();
       }
+      bool busy() const { return jobs.pending() || completed.load(std::memory_order_acquire) < submitted; }
+      void drain() { if (th.joinable()) lkDrainRender("threeway", [this] { return busy(); }); }
       void stop() {
         if (!th.joinable()) return;
-        { ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m); quit = true; }
-        cv.notify_all();
+        drain();
+        quit.store(true, std::memory_order_release);
         th.join();
-        if (shotArmed && post) post();  // B61-1: a capture armed for the last rendered frame still lands (render thread joined)
+        if (std::exception_ptr e = err.take()) {
+          try { std::rethrow_exception(e); }
+          catch (const std::exception& x) { logError("threeway: render job failed at shutdown: %s", x.what()); }
+          catch (...) { logError("threeway: render job failed at shutdown (unknown exception)"); }
+        }
+        if (shotArmed && post) { post(); shotArmed = false; }  // B61-1: a capture armed for the last rendered frame still lands
       }
       ~RenderWorker() { stop(); }
     };
@@ -675,127 +736,99 @@ struct SwRenderJob {
       FrameParams fp{};
       std::vector<Quad> quads;  // the job's own sprite quads (fp.spriteQuads repointed here)
       std::vector<Page> pages;  // the job's own atlas pages (fp.spriteAtlasPages repointed here)
+      uint64_t pagesVer = ~0ull;  // atlas version this buffer's page copy belongs to
       ::litholattice::HudStreamSnapshot hud;  // D9 flicker fix: the job's own HUD stream copies (fp.hudStatic / hudDynamic point here)
-      uint64_t drainTarget = 0;  // Stage 2 seal: ring entries published at submit; the executor drains up to it, so the frame renders the store state after exactly those uploads
+      uint64_t drainTarget = 0;  // Stage 2 seal: upload-ring entries published at submit
+      uint64_t cmdSeal = 0;      // t46u: renderer commands published at submit
+      uint64_t seq = 0;
     };
-struct SwFrameSlot {
+struct SwFrameOut {
       SoftwareFramebuffer fb;  // pixels only (Argon amendment): the presentable image
       uint64_t seq = 0;        // job sequence that produced these pixels
       uint64_t storeGen = 0;   // that job's mesh-store seal
-      enum State : uint8_t { Free, Ready, Presenting, Shown } state = Free;
     };
-struct SwRenderWorker {
+struct SwRenderWorker final : cSoftwareRenderer::IDetachedPump {
       cSoftwareRenderer* r = nullptr;
+      ::litholattice::cRendererMailbox* mbox = nullptr;
       std::function<void()> post;     // B61-1 mirror: capture of a finished frame (game state lives on main)
       std::function<bool()> pending;  // B61-1 mirror: a capture is armed (game.screenshotPending())
-      bool shotArmed = false;         // B61-1: a capture was armed for the job submitted last
-      ::litholattice::cAtomicGate m;
-      ::litholattice::cAtomicCondition cv;
-      SwRenderJob job;                // the one mailbox slot (producer side)
-      uint64_t pagesVer = ~0ull;      // atlas version the job's page copy belongs to
-      bool jobActive = false;         // a job is submitted and not yet completed (m)
-      std::exception_ptr jobErr;      // first failure of a completed job, surfaced on main (m)
-      uint64_t submitted = 0, completed = 0;  // (m)
-      SwFrameSlot slots[2];           // pixels-only handoff slots (m)
-      int presentIdx = -1;            // slot main is presenting from, else -1 (main thread only)
+      bool shotArmed = false;         // B61-1: a capture rides on job shotSeq
+      uint64_t shotSeq = 0;
+      bool installed = false;         // main-owned: the pump is installed on the executor
+      ::litholattice::cTripleBuffer<SwRenderJob> jobs;  // main -> executor
+      ::litholattice::cTripleBuffer<SwFrameOut> outs;   // executor -> main (present)
+      uint64_t submitted = 0;                            // main-owned
+      std::atomic<uint64_t> completed{0};
       std::atomic<bool> lost{false};
       std::atomic<size_t> lastDrawn{0};  // meshes drawn by the last completed frame (overlay readout)
-      void submit(const FrameParams& fp) {  // main thread: copy the job in, hand it to the executor, return
-        std::exception_ptr err;
-        { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwSubmitWait); ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m); cv.wait(l, [&] { return !jobActive; }); err = jobErr; jobErr = nullptr; }
-        if (err) std::rethrow_exception(err);  // a failed render surfaces on main one frame late (the sync path throws out of renderFrame itself)
-        // B61-1 (mirrors RenderWorker::submit): the screenshot capture touches main-thread
-        // game state, so it runs here on main while no job is in flight ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the armed job has
-        // completed, so its grab snapshot is final. A capture armed during this frame's
-        // update rides on the job submitted now and is taken at the next submit (or stop()).
-        if (shotArmed) { post(); shotArmed = false; }
-        else if (pending && pending()) shotArmed = true;
-        job.fp = fp;
-        ::litholattice::snapshotHudStreams(fp, job.fp, job.hud);  // D9: never borrow the game's HUD layers past submit
-        job.quads.assign(fp.spriteQuads, fp.spriteQuads + (fp.spriteQuads ? fp.spriteQuadCount : 0));
-        job.fp.spriteQuads = job.quads.empty() ? nullptr : job.quads.data();
-        job.fp.spriteQuadCount = job.quads.size();
-        if (fp.spriteAtlasVersion != pagesVer) { job.pages.assign(fp.spriteAtlasPages.begin(), fp.spriteAtlasPages.end()); pagesVer = fp.spriteAtlasVersion; }
-        job.fp.spriteAtlasPages = std::span<const SwRenderJob::Page>(job.pages.data(), job.pages.size());
-        job.drainTarget = r->uploadRingPublished();  // the seal: every upload staged by now belongs to this frame
-        uint64_t seq;
-        { ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m); jobActive = true; seq = ++submitted; }
-        // The job's copies stay untouched until completeJob(seq) has run: the next submit()
-        // waits for exactly that, so the one-slot discipline holds.
-        r->renderFrameDetached(job.fp, job.drainTarget, [this, seq](std::exception_ptr e) { completeJob(seq, e); });
-      }
-      // Runs on the pool executor the moment the frame is finished (or on the caller when
-      // the pool's detached mode is off). Swaps the finished pixels into the freest slot:
-      // a Free slot, else the oldest Shown (already presented), else the older Ready
-      // (superseded unpresented). A Presenting slot is never a target ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â main presents one
-      // slot at a time, so a target always exists.
-      void drain() {  // Archie Phase 2: wait out the job in flight (in-process world load)
-        ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m);
-        cv.wait(l, [&] { return !jobActive; });
-      }
-      void completeJob(uint64_t seq, std::exception_ptr err) {
-        ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m);
-        if (!err) {
+      LkErrHandoff err;
+      void start() { cSoftwareRenderer::setDetachedPump(this); installed = true; }
+      // Executor: one frame if a new job is waiting.
+      bool pumpOnce() override {
+        if (!jobs.take()) return false;
+        SwRenderJob& j = jobs.front();
+        try {
+          mbox->applyUpTo(j.cmdSeal);                      // P5 seal: the game's renderer calls
+          r->renderJobOnExecutor(j.fp, j.drainTarget);     // upload-ring seal + render
+          mbox->afterFrame();                              // read snapshot + grab
           SoftwareFramebuffer& fb = r->framebuffer();
-          SwFrameSlot* tgt = nullptr;
-          for (auto& s : slots) if (s.state == SwFrameSlot::Free) { tgt = &s; break; }
-          if (!tgt) for (auto& s : slots) if (s.state == SwFrameSlot::Shown && (!tgt || s.seq < tgt->seq)) tgt = &s;
-          if (!tgt) for (auto& s : slots) if (s.state == SwFrameSlot::Ready && (!tgt || s.seq < tgt->seq)) tgt = &s;
-          if (tgt) {
-            // The swap must preserve the renderer's invariant pixels.size() == width*height:
-            // size the slot's outgoing buffer first (first use / resolution change only).
-            if (tgt->fb.pixels.size() != fb.pixels.size()) tgt->fb.pixels.assign(fb.pixels.size(), 0u);
-            std::swap(tgt->fb.pixels, fb.pixels);
-            tgt->fb.width = fb.width;
-            tgt->fb.height = fb.height;
-            tgt->seq = seq;
-            tgt->storeGen = r->meshStoreGeneration();  // Stage 2: the post-drain seal, read here on the executor ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the thread that applied the drain, after it
-            tgt->state = SwFrameSlot::Ready;
-          }
+          SwFrameOut& o = outs.back();
+          // The swap keeps the renderer's invariant pixels.size() == width*height.
+          if (o.fb.pixels.size() != fb.pixels.size()) o.fb.pixels.assign(fb.pixels.size(), 0u);
+          std::swap(o.fb.pixels, fb.pixels);
+          o.fb.width = fb.width;
+          o.fb.height = fb.height;
+          o.seq = j.seq;
+          o.storeGen = r->meshStoreGeneration();
+          outs.publish();
           if (r->deviceLost()) lost.store(true);
           lastDrawn.store(r->meshesDrawnLastFrame());
-        } else if (!jobErr) {
-          jobErr = err;  // surfaced by the next submit() / stop()
+        } catch (...) {
+          err.put(std::current_exception());
         }
-        jobActive = false;
-        ++completed;
-        cv.notify_all();
+        completed.store(j.seq, std::memory_order_release);
+        return true;
       }
-      // Main thread, present path: the newest FINISHED frame (F-B4). The presenter never
-      // waits and never sees an in-flight buffer: with no new frame finished it re-presents
-      // the last shown slot, and before the first completion it returns an empty
-      // framebuffer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the caller's zero-size check skips the blit, as it does today.
-      const SoftwareFramebuffer& acquirePresent() {
-        ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m);
-        presentIdx = -1;
-        SwFrameSlot* best = nullptr;
-        for (int i = 0; i < 2; ++i)
-          if (slots[i].state == SwFrameSlot::Ready && (!best || slots[i].seq > best->seq)) { best = &slots[i]; presentIdx = i; }
-        if (!best)
-          for (int i = 0; i < 2; ++i)
-            if (slots[i].state == SwFrameSlot::Shown && (!best || slots[i].seq > best->seq)) { best = &slots[i]; presentIdx = i; }
-        if (!best) { static const SoftwareFramebuffer kEmpty; return kEmpty; }
-        best->state = SwFrameSlot::Presenting;
-        return best->fb;
+      void submit(const FrameParams& fp) {  // main thread
+        if (std::exception_ptr e = err.take()) std::rethrow_exception(e);  // a failed render surfaces on main one frame late
+        lkPaceUntilTaken([this] { return jobs.pending(); });
+        if (shotArmed && completed.load(std::memory_order_acquire) >= shotSeq) { post(); shotArmed = false; }
+        const bool arm = !shotArmed && pending && pending();
+        SwRenderJob& j = jobs.back();
+        j.fp = fp;
+        ::litholattice::snapshotHudStreams(fp, j.fp, j.hud);  // D9: never borrow the game's HUD layers past submit
+        j.quads.assign(fp.spriteQuads, fp.spriteQuads + (fp.spriteQuads ? fp.spriteQuadCount : 0));
+        j.fp.spriteQuads = j.quads.empty() ? nullptr : j.quads.data();
+        j.fp.spriteQuadCount = j.quads.size();
+        if (fp.spriteAtlasVersion != j.pagesVer) { j.pages.assign(fp.spriteAtlasPages.begin(), fp.spriteAtlasPages.end()); j.pagesVer = fp.spriteAtlasVersion; }
+        j.fp.spriteAtlasPages = std::span<const SwRenderJob::Page>(j.pages.data(), j.pages.size());
+        j.cmdSeal = mbox->seal();                // flushes the command spill (and a pending ring clear) first
+        j.drainTarget = r->uploadRingPublished();  // then the upload-ring seal
+        j.seq = ++submitted;
+        if (arm) { shotArmed = true; shotSeq = j.seq; }
+        jobs.publish();
       }
-      void releasePresent() {
-        ::litholattice::cGateGuard<::litholattice::cAtomicGate> l(m);
-        if (presentIdx >= 0 && slots[presentIdx].state == SwFrameSlot::Presenting) slots[presentIdx].state = SwFrameSlot::Shown;
-        presentIdx = -1;
-      }
-      void stop() {  // main thread, shutdown: drain the in-flight job, land a trailing capture (B61-1)
-        { ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m); cv.wait(l, [&] { return !jobActive; }); }
-        if (jobErr) {  // nowhere left to surface it: log and drop
-          try { std::rethrow_exception(jobErr); }
-          catch (const std::exception& e) { logError("threeway software: render job failed at shutdown: %s", e.what()); }
+      bool busy() const { return jobs.pending() || completed.load(std::memory_order_acquire) < submitted; }
+      void drain() { if (installed) lkDrainRender("threeway software", [this] { return busy(); }); }  // world load / shutdown
+      // Main, present path: the newest FINISHED frame (F-B4). Never waits; re-presents the last
+      // one when nothing new finished; empty before the first completion (caller skips the blit).
+      const SoftwareFramebuffer& acquirePresent() { outs.take(); return outs.front().fb; }
+      void releasePresent() {}  // main owns `front` until the next take(); nothing to hand back
+      void stop() {  // main thread, shutdown: drain, uninstall the pump, land a trailing capture (B61-1)
+        if (installed) {
+          drain();
+          cSoftwareRenderer::setDetachedPump(nullptr);  // returns once the executor is out of pumpOnce()
+          installed = false;
+        }
+        if (std::exception_ptr e = err.take()) {
+          try { std::rethrow_exception(e); }
+          catch (const std::exception& x) { logError("threeway software: render job failed at shutdown: %s", x.what()); }
           catch (...) { logError("threeway software: render job failed at shutdown (unknown exception)"); }
-          jobErr = nullptr;
         }
         if (shotArmed && post) { post(); shotArmed = false; }  // a capture armed for the last rendered frame still lands
       }
       ~SwRenderWorker() { stop(); }
     };
-
 // ---------------------------------------------------------------------------
 // Build 50 (2026-10-19): frame-loop state, heap-held.
 //
@@ -825,6 +858,8 @@ struct FrameCtx {
   std::string rname, present;
   // Owned by the context: constructed during main()'s setup (through the
   // aliases there), destroyed after the shutdown tail runs.
+  // t46u item 2: declared first so it outlives the Game and both render workers.
+  std::unique_ptr<litholattice::cRendererMailbox> mbox;
   std::unique_ptr<Game> game;
   std::unique_ptr<cInputSystem> input;
   std::unique_ptr<litholattice::mcp::cMcpServer> mcpServer;
@@ -1572,7 +1607,8 @@ int main(int argc, char** argv) {
     F.input = std::make_unique<cInputSystem>(loadBindings(argv[0]), inputContexts()); cInputSystem& input = *F.input;
     window->loadGamepadMappings((dataRoot(argv[0]) / "config" / "gamecontrollerdb.txt").string());  // optional
     cWindowClipboard clipboard(*window);  // UI text fields copy / paste through the OS; outlives the game
-    F.game = std::make_unique<Game>(cfg, *renderer, pool, resources, audio, input); Game& game = *F.game;
+    F.mbox = std::make_unique<litholattice::cRendererMailbox>(*renderer);  // t46u item 2: the game reaches the renderer only through this
+    F.game = std::make_unique<Game>(cfg, *F.mbox, pool, resources, audio, input); Game& game = *F.game;
     logInfo("%s | renderer: %s", lithokraft::buildInfo().c_str(), game.rendererInfo().c_str());  // 2026-10-16 (JD)
     if (!game.ok()) return 1;
     // --mcp-stdio (P2c, F-M9): the engine MCP server over stdin/stdout on
@@ -1710,8 +1746,9 @@ int main(int argc, char** argv) {
     // Main thread: window, OS events, input and game logic (the control & event handshake). Render thread: GPU and
     // memory work only (command recording, uploads, present) from its own copy of a finished FrameParams. Sim
     // thread: unchanged. No blending: the render thread always draws the newest finished frame. Handoff is a
-    // one-slot swap; main waits only while the previous frame is still rendering. The game's renderer calls take
-    // threeway::rendererMutex(), so they never overlap renderFrame. The render side never writes sim state.
+    // triple-buffered job mailbox (t46u item 2): main never waits on the render for correctness. The game's
+    // renderer calls go through the command mailbox (F.mbox) and apply at the frame seal on the render thread,
+    // so they never overlap renderFrame and no lock is taken. The render side never writes sim state.
 
     // ---- Three-way split, software path (Design B, Stage 1: asynchronous mailbox; same
     // LL_THREEWAY=1 toggle, default OFF). The software counterpart of RenderWorker: main submits
@@ -1727,9 +1764,9 @@ int main(int argc, char** argv) {
     // copied; depth_ and hizMax_ stay private to the renderer ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â renderFrame's post stages
     // have already consumed them by completion). The presenter takes the newest FINISHED
     // slot (F-B4, accepted by JD: ~1 frame of display latency; sim/input latency untouched).
-    // Renderer discipline mirrors the Vulkan worker exactly: the detached renderFrame runs
-    // under threeway::RendererGuard, so the game's remaining guarded renderer calls
-    // serialise with an in-flight render. Stage 2 removed the upload phase from that
+    // Renderer discipline (t46u item 2): the executor owns the renderer while the split
+    // runs; the game's renderer calls queue in the command mailbox and apply at the frame
+    // seal, so nothing overlaps an in-flight render and no lock is taken. Stage 2 removed the upload phase from that
     // discipline: uploads stage in the renderer's lock-free SPSC ring and the executor
     // applies them at the frame seal (drain target recorded per job below), so the game's
     // upload phase takes no guard and never waits on the render. Sim code is not touched
@@ -1743,16 +1780,21 @@ int main(int argc, char** argv) {
     const bool& swThreewayOn = F.swThreewayOn;
     if (threewayOn) {
       rw.r = renderer;
+      rw.mbox = F.mbox.get();
+      F.mbox->setDeferred(true);  // t46u item 2: the render thread owns the renderer from here on
       rw.post = [&F] { if (F.game) F.game->capturePendingScreenshot(); };  // Phase 2: follows an in-process world load
       rw.pending = [&F] { return (F.game && F.game->screenshotPending()) || lithokraft::cFrameDumpHub::instance().sink() || lithokraft::cMcpDisplayVision::instance().pending(); };  // --frame-hash/--frame-dump every frame
       rw.th = std::thread([&rw] { ::litholattice::setCurrentThreadName("lk-render-wrk"); rw.loop(); });
       logInfo("threeway: ON (LL_THREEWAY=1): main = window/input/game, render thread = GPU/memory + present, sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
     } else if (swThreewayOn) {
       sw.r = display.software;
+      sw.mbox = F.mbox.get();
       sw.post = [&F] { if (F.game) F.game->capturePendingScreenshot(); };  // Phase 2: follows an in-process world load
       sw.pending = [&F] { return (F.game && F.game->screenshotPending()) || lithokraft::cFrameDumpHub::instance().sink() || lithokraft::cMcpDisplayVision::instance().pending(); };  // --frame-hash/--frame-dump every frame
       cSoftwareRenderer::setDetachedPoolMode(true);  // Design B Stage 1: the pool spawns its executor worker (band count unchanged)
       display.software->setUploadRingEnabled(true);  // Design B Stage 2: game uploads stage in the lock-free ring; the executor applies them at the frame seal
+      F.mbox->setDeferred(true);  // t46u item 2: the executor owns the renderer from here on
+      sw.start();                 // t46u item 2: the executor polls the frame mailbox
       logInfo("threeway: ON (LL_THREEWAY=1): software path, stage 2 async mailbox + upload ring: main = window/input/game + present (newest finished frame), frame job copied and rendered on the band-pool executor, pixels-only slots, uploads lock-free via the ring (no upload guard), sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
     } else if (litholattice::threeway::enabled()) {
       logInfo("threeway: requested but renderer is %s; no split path for this backend, staying on the single-thread path", renderer->name());
@@ -1800,15 +1842,16 @@ int main(int argc, char** argv) {
       const bool hadMcp = F.mcpServer != nullptr;
       if (hadMcp) lkMcpStop(F);     // its backends point into the old Game
       if (swThreewayOn) F.sw.drain();  // the frame job in flight finishes on the executor first
+      if (threewayOn) F.rw.drain();
       F.game.reset();               // exit save on disk; sim, streamer, jobs joined
       const auto tlSave = Clock::now();
       // No mesh of the old world survives into the new one. Software threeway: the clear rides the
       // upload ring behind the old world's tombstones; Vulkan threeway: under the renderer guard.
-      if (swThreewayOn) renderer->enqueueClearChunkMeshes();
-      else if (threewayOn) { litholattice::threeway::RendererGuard rg; renderer->clearChunkMeshes(); }
-      else renderer->clearChunkMeshes();
+      // t46u item 2: one call for every path; the mailbox forwards (single-thread), stages it in
+      // the software upload ring, or queues it for the Vulkan render thread.
+      F.mbox->enqueueClearChunkMeshes();
       const auto tl1 = Clock::now();
-      F.game = std::make_unique<Game>(next, *renderer, pool, resources, audio, input);
+      F.game = std::make_unique<Game>(next, *F.mbox, pool, resources, audio, input);
       Game& ng = *F.game;
       if (!ng.ok()) { logError("world load '%s' FAILED: the new world did not build; exiting", req.label.c_str()); break; }
       if (hadMcp) mcpStart(ng);
@@ -1960,7 +2003,7 @@ static bool lkStepFrame(FrameCtx& F) {
                     rp.valid ? ::litholattice::tickprof::ms(rp.ns[::litholattice::tickprof::kAcquire]) : 0.0,
                     rp.valid ? ::litholattice::tickprof::ms(rp.ns[::litholattice::tickprof::kRecord]) : 0.0,
                     rp.valid ? ::litholattice::tickprof::ms(rp.ns[::litholattice::tickprof::kPresent]) : 0.0,
-                    double(renderer->gpuFrameMs()),
+                    double(F.mbox->gpuFrameMs()),
                     game.lastMeshDrainMs(), game.lastMeshDrained(), game.lastMeshDrainVerts(), game.lastMeshCommitMs(),
                     game.lastMeshBatchLanded(), game.lastMeshBatchVerts(), gt.paintDraws);
           }
@@ -2308,7 +2351,7 @@ static bool lkStepFrame(FrameCtx& F) {
       const double perfSince = secondsBetween(tPerf, now);
       if (perfSince >= 1.0) {
         // F56-4 (Proposed by JD; co-implemented by JD and Cortana): FPS / frame-time readout (Graphics setting, HUD text path).
-        float gpuMsNow; { litholattice::threeway::RendererGuard rg; gpuMsNow = float(renderer->gpuFrameMs()); }  // LL_THREEWAY
+        const float gpuMsNow = float(F.mbox->gpuFrameMs());  // t46u item 2: the render thread's published snapshot (no guard)
         game.setPerfReadout(float(percentile(perfMs, 0.99)), float(ovUpdN ? ovUpdSum / ovUpdN : 0.0), gpuMsNow);
         ovUpdSum = 0; ovUpdN = 0;
         logInfo("%s p99=%.2fms hitches=%d", game.perfLine(perfFrames / perfSince, perfFrames ? perfSumMs / perfFrames : 0.0, perfMaxMs).c_str(),
@@ -2425,6 +2468,10 @@ static void lkShutdownTail(FrameCtx& F) {
     }
     rw.stop();  // LL_THREEWAY: join the render thread before shutdown (Proposed by JD; co-implemented by JD and Cortana)
     sw.stop();  // LL_THREEWAY software path (stage 1): drain the in-flight job + land a trailing capture
+    F.mbox->setDeferred(false);  // t46u item 2: render side stopped; main applies leftovers and owns the renderer again
+    logInfo("threeway: renderer mailbox: %llu commands queued, %llu spilled past the ring, %llu upload-ring items backlogged",
+            (unsigned long long)F.mbox->commandsQueued(), (unsigned long long)F.mbox->commandsSpilled(),
+            (unsigned long long)F.mbox->ringBacklogged());
     if (swThreewayOn) {  // Design B Stage 2: ring accounting, then the ring closes (later teardown uploads apply directly again)
       const auto rs = display.software->uploadRingStats();
       logInfo("threeway upload ring: pushed=%llu refused=%llu max-occupancy=%llu drained=%llu applied=%llu coalesced=%llu clears=%llu (game spill: events=%llu max=%zu discarded-on-switch=%llu, depth-at-stop=%zu)",

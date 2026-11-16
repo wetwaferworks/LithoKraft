@@ -17,7 +17,6 @@
 #include <array>
 #include <vector>
 #include "litholattice/core/bitops.h"
-#include "litholattice/core/threeway.h"  // Design B Stage 1: detached renderFrame runs under RendererGuard, like RenderWorker::loop
 #include "font_data.h"  // Cortana 2026-10-15 1610: Debug Overlay strip glyphs
 #include "litholattice/render/model_dither.h"
 #include "litholattice/render/software_aa.h"
@@ -401,6 +400,15 @@ class cSwBandPool {
     detachedPending_.notify_all();
   }
   ~cSwBandPool() { stopAll(); }
+  // t46u item 2: the executor polls an installed pump (the app's frame mailbox) instead of
+  // waiting for runDetached posts. Dekker pair on (pump_, inPump_), both seq_cst: the
+  // executor raises inPump_ and re-reads pump_; the uninstaller clears pump_ and then
+  // sleeps until inPump_ drops, so it never returns while pumpOnce() is running.
+  void setPump(cSoftwareRenderer::IDetachedPump* p) {
+    pump_.store(p, std::memory_order_seq_cst);
+    if (p) return;
+    while (inPump_.load(std::memory_order_seq_cst)) std::this_thread::sleep_for(std::chrono::microseconds(100));
+  }
   static bool foldWanted() {
     static const bool on = [] {
       const char* e = std::getenv("LL_RENDER_POOL");
@@ -494,11 +502,36 @@ class cSwBandPool {
       records_.add(ThreadClass::Dedicated, ThreadRole::RenderBand, uint16_t(i), "sw-band");
     }
   }
+  // t46u item 2: one pass over the installed pump. True when it rendered something.
+  bool pumpPass() {
+    cSoftwareRenderer::IDetachedPump* p = pump_.load(std::memory_order_seq_cst);
+    if (!p) return false;
+    bool did = false;
+    inPump_.store(true, std::memory_order_seq_cst);
+    if (pump_.load(std::memory_order_seq_cst) == p) {
+      bool expected = false;
+      if (frameActive_.compare_exchange_strong(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+        tlDetachedBody_ = true;
+        try { did = p->pumpOnce(); } catch (...) { did = true; }  // the pump hands its own errors to main
+        tlDetachedBody_ = false;
+        releaseFrameSlot();
+      }
+    }
+    inPump_.store(false, std::memory_order_seq_cst);
+    return did;
+  }
   void executorLoop() {
+    unsigned idle = 0;
     for (;;) {
       for (;;) {
         if (stop_.load(std::memory_order_acquire)) return;
         if (detachedPending_.load(std::memory_order_acquire)) break;
+        if (pump_.load(std::memory_order_relaxed)) {  // t46u: pump mode, poll with backoff
+          if (pumpPass()) { idle = 0; continue; }
+          if (++idle < 64) std::this_thread::yield();
+          else std::this_thread::sleep_for(std::chrono::microseconds(100));
+          continue;
+        }
         { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwExecIdle); detachedPending_.wait(false, std::memory_order_relaxed); }
       }
       if (stop_.load(std::memory_order_acquire)) return;
@@ -551,6 +584,8 @@ class cSwBandPool {
   std::function<void()> detachedFn_;
   std::function<void(std::exception_ptr)> detachedDone_;
   std::atomic<bool> detachedPending_{false};
+  std::atomic<cSoftwareRenderer::IDetachedPump*> pump_{nullptr};  // t46u item 2
+  std::atomic<bool> inPump_{false};
   inline static thread_local bool tlInRun_ = false;
   inline static thread_local bool tlDetachedBody_ = false;
   std::atomic<uint64_t> gen_{0};
@@ -577,10 +612,10 @@ struct PairHash {
 };
 
 // Design B Stage 1: detached frame execution for the software threeway
-// split. The body runs on the band pool's executor worker; the
-// RendererGuard mirrors RenderWorker::loop on the Vulkan path, so the
-// game's remaining guarded renderer calls (which take the same guard)
-// stay serialised with the in-flight render.
+// split. The body runs on the band pool's executor worker. t46u item 2: no
+// lock any more; the game's renderer calls reach the renderer only
+// through the command mailbox (renderer_mailbox.h), applied by the executor
+// at the seal, so nothing on main touches renderer state mid-frame.
 //
 // Design B Stage 2: the body opens with the frame seal â€” the upload ring
 // drains (drainUploadRing) BEFORE the guard is taken and before
@@ -597,7 +632,6 @@ void cSoftwareRenderer::renderFrameDetached(const FrameParams& fp, uint64_t drai
         std::exception_ptr err;
         try {
           drainUploadRing(drainTarget);  // the seal (no-op unless the ring is enabled)
-          litholattice::threeway::RendererGuard rg;
           renderFrame(fp);
         } catch (...) {
           err = std::current_exception();
@@ -729,6 +763,18 @@ void cSoftwareRenderer::drainUploadRing(uint64_t target) {
   ringCoalesced_ += n - appliedNow;  // pre-clear wipe + superseded: drained but never applied
 }
 void cSoftwareRenderer::setDetachedPoolMode(bool on) { cSwBandPool::get().setDetachedMode(on); }
+void cSoftwareRenderer::setDetachedPump(IDetachedPump* p) { cSwBandPool::get().setPump(p); }
+void cSoftwareRenderer::renderJobOnExecutor(const FrameParams& fp, uint64_t drainTarget) {
+  std::exception_ptr err;
+  try {
+    drainUploadRing(drainTarget);  // the seal
+    renderFrame(fp);
+  } catch (...) {
+    err = std::current_exception();
+  }
+  retireDrainedMeshes();  // frees happen here, off the seal, throw or not
+  if (err) std::rethrow_exception(err);
+}
 
 void cSoftwareRenderer::clear(uint32_t color) {
   // Cortana 2026-10-15 1455: runtime-dispatched fill (AVX2 or baseline; identical bytes).
