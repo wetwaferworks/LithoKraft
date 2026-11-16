@@ -21,10 +21,17 @@
 #include <atomic>
 #include <charconv>
 #include <system_error>
+#if !defined(_WIN32) && !defined(__wasm__)
+// LK_MCP_POSIX_STDIO: the poll/fd MCP stdio transport below (POSIX desktop builds). Not on web
+// (2026-11-16): the browser has no poll() and no process stdio pipes; see mcpStart.
+#define LK_MCP_POSIX_STDIO 1
+#include <poll.h>
+#else
+#define LK_MCP_POSIX_STDIO 0
+#endif
 #if !defined(_WIN32)
 #include <cerrno>
-#include <poll.h>
-#include <unistd.h>
+#include <unistd.h>  // isatty (console colour) on every non-Windows build, web included
 #endif
 #if defined(_WIN32)
 #include <io.h>  // _isatty (wheel-ink console check, 2026-10-18 JD)
@@ -134,7 +141,7 @@ static lithokraft::cFrameHashRecorder* g_frameHashRec = nullptr;  // --frame-has
 
 using namespace lithokraft;
 
-#if !defined(_WIN32)
+#if LK_MCP_POSIX_STDIO
 // MCP stdio transport for --mcp-stdio (P2c, F-M9): raw-fd, poll-based.
 // Two properties the engine's cFdStdioTransport does not have, both needed
 // for a clean in-game wiring:
@@ -865,10 +872,10 @@ struct FrameCtx {
   std::unique_ptr<litholattice::mcp::cMcpServer> mcpServer;
   std::thread mcpThread;
   std::shared_ptr<std::atomic<bool>> mcpDone;  // set by the MCP thread as it exits (R-RACE-1)
-#if !defined(_WIN32)
+#if LK_MCP_POSIX_STDIO
   std::unique_ptr<cMcpStdioTransport> mcpTransport;
   int mcpSavedStdoutFd = -1;
-#else
+#elif defined(_WIN32)
   int mcpSavedStdoutFdWin = -1;  // MCP stdout fix (2026-11-10): saved real stdout under --mcp-stdio
 #endif
   RenderWorker rw;
@@ -1620,13 +1627,19 @@ int main(int argc, char** argv) {
     // is destroyed, because the backends point into it.
     auto& mcpServer = F.mcpServer;
     auto& mcpThread = F.mcpThread;
-#if !defined(_WIN32)
+#if LK_MCP_POSIX_STDIO
     auto& mcpTransport = F.mcpTransport;
     auto& mcpSavedStdoutFd = F.mcpSavedStdoutFd;
 #endif
     // Archie Phase 2: the MCP server is (re)started per Game; an in-process world load stops it with
     // the old Game and starts it again on the new one (the backends point into the Game).
     auto mcpStart = [&](Game& game) {
+#if defined(__wasm__)
+      // Web build (2026-11-16): a browser tab has no stdin/stdout pipes, so --mcp-stdio fails safe.
+      (void)game;
+      logWarn("mcp: --mcp-stdio is not available in the web build (no process stdio in the browser); MCP server off");
+      return;
+#endif
       mcpServer = std::make_unique<litholattice::mcp::cMcpServer>(game.mcpBackends());
       mcpServer->setLogSink([](std::string_view line) {
         std::fprintf(stderr, "[mcp] %.*s\n", int(line.size()), line.data());
@@ -1635,7 +1648,7 @@ int main(int argc, char** argv) {
       // MCP stdout fix (2026-11-10, JD t5117u): logInfo's console copy goes to stderr while
       // the MCP server owns stdout (both platforms; the log file and tap are unchanged).
       litholattice::logSetInfoToStderr(true);
-#if !defined(_WIN32)
+#if LK_MCP_POSIX_STDIO
       // stdout belongs to JSON-RPC now: save the real stdout for the
       // transport, then point fd 1 at stderr so logInfo (which writes to
       // stdout) and any stray printf cannot corrupt the protocol stream.
@@ -1647,7 +1660,7 @@ int main(int argc, char** argv) {
       litholattice::mcp::cMcpServer* srv = mcpServer.get();
       cMcpStdioTransport* tr = mcpTransport.get();
       mcpThread = std::thread([srv, tr] { ::litholattice::setCurrentThreadName("lk-mcp-stdio"); srv->runStdio(*tr); });
-#else
+#elif defined(_WIN32)
       // Windows: the engine's own stdio transport (blocking std::cin);
       // the thread is detached at shutdown ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â process exit ends it. The
       // poll-based clean join above is the POSIX path this build targets.
@@ -2396,16 +2409,16 @@ static bool lkStepFrame(FrameCtx& F) {
 static void lkMcpStop(FrameCtx& F) {
   auto& mcpServer = F.mcpServer;
   auto& mcpThread = F.mcpThread;
-#if !defined(_WIN32)
+#if LK_MCP_POSIX_STDIO
   auto& mcpTransport = F.mcpTransport;
   auto& mcpSavedStdoutFd = F.mcpSavedStdoutFd;
 #endif
     if (mcpServer) {
       if (F.game) F.game->setMcpServer(nullptr);
-#if !defined(_WIN32)
+#if LK_MCP_POSIX_STDIO
       if (mcpTransport) mcpTransport->requestStop();
       if (mcpThread.joinable()) mcpThread.join();
-#else
+#elif defined(_WIN32)
       // Fix run 2 (2026-10-23, R-RACE-1): was detach() + reset(), a use-after-free
       // while the thread sat in the blocking stdin read. Now: cancel the read,
       // join, THEN free. If the read cannot be cancelled in time the server is
@@ -2429,7 +2442,7 @@ static void lkMcpStop(FrameCtx& F) {
       }
 #endif
       litholattice::logSetInfoToStderr(false);
-#if !defined(_WIN32)
+#if LK_MCP_POSIX_STDIO
       mcpTransport.reset();
       if (mcpSavedStdoutFd >= 0) {
         std::fflush(stdout);
@@ -2457,7 +2470,7 @@ static void lkShutdownTail(FrameCtx& F) {
   std::vector<double>& benchMs = F.benchMs;
   auto& mcpServer = F.mcpServer;
   auto& mcpThread = F.mcpThread;
-#if !defined(_WIN32)
+#if LK_MCP_POSIX_STDIO
   auto& mcpTransport = F.mcpTransport;
   auto& mcpSavedStdoutFd = F.mcpSavedStdoutFd;
 #endif
