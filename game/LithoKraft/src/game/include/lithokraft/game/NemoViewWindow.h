@@ -13,6 +13,9 @@
 // 80x45. This window only consumes the finished frame; a later main-window ASCII play
 // mode can point the same renderer at the game view without changing this class.
 // Keys 1-5 in the pop-up pick those five sizes; [ and ] cycle them.
+// render.ascii_gamma (default 62) and render.ascii_luma_floor (default 96) are paint-only
+// display settings, shared with a later main-window ASCII play mode; they do not change
+// the hashed record or Nemo's prompt.
 // Windows only; elsewhere setWanted() is a no-op.
 #include <atomic>
 #include <thread>
@@ -38,6 +41,10 @@ class cNemoViewWindow {
     captureH_.store(captureH);
   }
   void setView(bool objects, int cols);
+  void setDisplay(int gammaHundredths, int lumaFloor) {
+    gammaHundredths_.store(gammaHundredths < 50 ? 50 : gammaHundredths > 100 ? 100 : gammaHundredths);
+    lumaFloor_.store(lumaFloor < 0 ? 0 : lumaFloor > 200 ? 200 : lumaFloor);
+  }
   /// Pop-up key request (1-5, [ ]): column count, or 0 if none. Game thread applies it to the cvar.
   void requestGrid(int cols) { gridRequest_.store(cols); }
   int takeGridRequest() { return gridRequest_.exchange(0); }
@@ -59,6 +66,8 @@ class cNemoViewWindow {
   std::atomic<int> captureW_{320};
   std::atomic<int> captureH_{180};
   std::atomic<int> gridRequest_{0};
+  std::atomic<int> gammaHundredths_{62};
+  std::atomic<int> lumaFloor_{96};
 };
 
 }  // namespace lithokraft

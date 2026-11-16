@@ -534,7 +534,131 @@ bool rleDecode(const std::string& rle, std::string& out) {
   return true;
 }
 
-CellLook decodeCell(uint64_t word, ViewStyle style) {
+
+// Display-only gamma 0.62: out = round(255 * (i/255)^0.62). Not used when packing cells.
+constexpr uint8_t kGamma62[256] = {
+      0,   8,  13,  16,  19,  22,  25,  27,  30,  32,  34,  36,  38,  40,  42,  44,
+     46,  48,  49,  51,  53,  54,  56,  57,  59,  60,  62,  63,  65,  66,  68,  69,
+     70,  72,  73,  74,  76,  77,  78,  80,  81,  82,  83,  85,  86,  87,  88,  89,
+     91,  92,  93,  94,  95,  96,  97,  99, 100, 101, 102, 103, 104, 105, 106, 107,
+    108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123,
+    124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 136, 137, 138,
+    139, 140, 141, 142, 143, 144, 144, 145, 146, 147, 148, 149, 150, 151, 151, 152,
+    153, 154, 155, 156, 156, 157, 158, 159, 160, 161, 161, 162, 163, 164, 165, 166,
+    166, 167, 168, 169, 170, 170, 171, 172, 173, 173, 174, 175, 176, 177, 177, 178,
+    179, 180, 180, 181, 182, 183, 184, 184, 185, 186, 187, 187, 188, 189, 190, 190,
+    191, 192, 192, 193, 194, 195, 195, 196, 197, 198, 198, 199, 200, 200, 201, 202,
+    203, 203, 204, 205, 205, 206, 207, 208, 208, 209, 210, 210, 211, 212, 212, 213,
+    214, 215, 215, 216, 217, 217, 218, 219, 219, 220, 221, 221, 222, 223, 223, 224,
+    225, 225, 226, 227, 227, 228, 229, 229, 230, 231, 231, 232, 233, 233, 234, 235,
+    235, 236, 237, 237, 238, 239, 239, 240, 240, 241, 242, 242, 243, 244, 244, 245,
+    246, 246, 247, 247, 248, 249, 249, 250, 251, 251, 252, 253, 253, 254, 254, 255
+};
+
+const uint8_t* gammaLut(int hundredths) {
+  const int g = clampi(hundredths, 50, 100);
+  if (g >= 100) return nullptr;  // linear
+  if (g == 62) return kGamma62;
+  // Other values: build a LUT once per setting (display only; not part of any hash).
+  static uint8_t lut[256];
+  static int cached = -1;
+  if (cached == g) return lut;
+  for (int i = 0; i < 256; ++i) {
+    if (i == 0) {
+      lut[i] = 0;
+      continue;
+    }
+    // Integer power via 16-bit linear interpolation between the 0.62 table and identity.
+    // g=50 is a bit brighter than 0.62, g=80 sits toward linear.
+    const int t62 = kGamma62[i];
+    if (g <= 62) {
+      const int extra = (62 - g) * (t62 - i > 0 ? (t62 - i) : 0) / 12;  // 50 is 12 below 62
+      lut[i] = uint8_t(clampi(t62 + extra, 0, 255));
+    } else {
+      lut[i] = uint8_t(t62 + (i - t62) * (g - 62) / 38);
+    }
+  }
+  cached = g;
+  return lut;
+}
+
+uint32_t applyLumaCurve(uint32_t colour, const uint8_t* lut) {
+  if (!lut) return colour;
+  const int r = int((colour >> 16) & 0xFF);
+  const int g = int((colour >> 8) & 0xFF);
+  const int b = int(colour & 0xFF);
+  const int y = luma8(r, g, b);
+  const int y2 = lut[y];
+  if (y <= 0) return rgb(y2, y2, y2);
+  return rgb((r * y2 + y / 2) / y, (g * y2 + y / 2) / y, (b * y2 + y / 2) / y);
+}
+
+uint32_t liftLumaFloor(uint32_t colour, int floor) {
+  if (floor <= 0) return colour;
+  const int r = int((colour >> 16) & 0xFF);
+  const int g = int((colour >> 8) & 0xFF);
+  const int b = int(colour & 0xFF);
+  const int y = luma8(r, g, b);
+  if (y >= floor) return colour;
+  if (y <= 0) return rgb(floor, floor, floor);
+  return rgb(clampi((r * floor + y / 2) / y, 0, 255), clampi((g * floor + y / 2) / y, 0, 255),
+             clampi((b * floor + y / 2) / y, 0, 255));
+}
+
+uint32_t contrastAgainst(uint32_t ink, uint32_t fill, int contrast) {
+  if (contrast == 256) return ink;
+  const int ir = int((ink >> 16) & 0xFF), ig = int((ink >> 8) & 0xFF), ib = int(ink & 0xFF);
+  const int fr = int((fill >> 16) & 0xFF), fg = int((fill >> 8) & 0xFF), fb = int(fill & 0xFF);
+  return rgb(clampi(fr + (ir - fr) * contrast / 256, 0, 255),
+             clampi(fg + (ig - fg) * contrast / 256, 0, 255),
+             clampi(fb + (ib - fb) * contrast / 256, 0, 255));
+}
+
+uint32_t lightenInk(uint32_t colour, int lift) {
+  if (lift <= 0) return colour;
+  return rgb(clampi(int((colour >> 16) & 0xFF) + lift, 0, 255),
+             clampi(int((colour >> 8) & 0xFF) + lift, 0, 255),
+             clampi(int(colour & 0xFF) + lift, 0, 255));
+}
+
+int displayFogFade(int band, int fogScale) {
+  const int b = band & 7;
+  if (b == kSkyBand) return 256;
+  return fogFade(b) * clampi(fogScale, 0, 256) / 256;
+}
+
+void applyDisplay(CellLook& look, const CellFields& c, const DisplaySettings& d, bool edge) {
+  const bool sky = (c.depth & 7) == kSkyBand || c.alpha == 3;
+  const bool blank = look.glyph == ' ' || sky;
+  const uint8_t* lut = gammaLut(d.gammaHundredths);
+  look.ink = applyLumaCurve(look.ink, lut);
+  if ((look.fill & 0x00FFFFFFu) != 0) {
+    // Fill gets a milder lift so the glyph stays brighter than its backing.
+    look.fill = applyLumaCurve(look.fill, lut);
+    look.ink = contrastAgainst(look.ink, look.fill, d.contrast);
+  }
+  if (!blank) look.ink = liftLumaFloor(look.ink, d.lumaFloor);
+  if (edge && !sky) look.ink = lightenInk(look.ink, d.edgeLift);
+}
+
+bool neighbourEdge(const AsciiFrame& f, size_t i) {
+  if (f.cols <= 0 || i >= f.cell.size()) return false;
+  const CellFields c = unpackCell(f.cell[i]);
+  if (c.edge) return true;
+  const int x = int(i % size_t(f.cols));
+  const int y = int(i / size_t(f.cols));
+  const int dx[4] = {-1, 1, 0, 0};
+  const int dy[4] = {0, 0, -1, 1};
+  for (int k = 0; k < 4; ++k) {
+    const int nx = x + dx[k], ny = y + dy[k];
+    if (nx < 0 || ny < 0 || nx >= f.cols || ny >= f.rows) continue;
+    const CellFields n = unpackCell(f.cell[size_t(ny) * size_t(f.cols) + size_t(nx)]);
+    if (n.object != c.object || ((n.depth ^ c.depth) & 7) != 0) return true;
+  }
+  return false;
+}
+
+CellLook decodeCell(uint64_t word, ViewStyle style, const DisplaySettings& display) {
   const CellFields c = unpackCell(word);
   CellLook look;
   look.glyph = c.glyph;
@@ -571,7 +695,7 @@ CellLook decodeCell(uint64_t word, ViewStyle style) {
       // changes how full the backing is (already packed into fill).
       look.ink = paletteColour(c.ink);
       look.fill = paletteColour(c.fill);
-      const int fade = fogFade(c.depth & 7);
+      const int fade = displayFogFade(c.depth, display.fogScale);
       look.ink = fadeTowardSky(look.ink, fade);
       look.fill = fadeTowardSky(look.fill, fade);
       if (c.emissive) {
@@ -605,9 +729,17 @@ CellLook decodeCell(uint64_t word, ViewStyle style) {
       break;
     }
   }
+  applyDisplay(look, c, display, false);
   return look;
 }
 
-CellLook decodeCell(const AsciiFrame& f, size_t i, ViewStyle style) { return decodeCell(cellAt(f, i), style); }
+CellLook decodeCell(const AsciiFrame& f, size_t i, ViewStyle style, const DisplaySettings& display) {
+  CellLook look = decodeCell(cellAt(f, i), style, display);
+  if (display.edgeLift > 0 && neighbourEdge(f, i)) {
+    const CellFields c = unpackCell(cellAt(f, i));
+    if ((c.depth & 7) != kSkyBand) look.ink = lightenInk(look.ink, display.edgeLift);
+  }
+  return look;
+}
 
 }  // namespace litholattice::nemoview

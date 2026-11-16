@@ -73,3 +73,22 @@ Build-time speed, single-threaded, same machine as the earlier 0.498 ms 80x45 ru
 ## Official frame hash
 
 `lithokraft_frame_hash_selftest` passed after the renderer, after the key/exit split, and after the selectable grids. No official frame-hash move was observed in this tree.
+
+## Display brightness (human-facing only)
+
+Paint only. The hashed `nemo_ascii.v2` record, the glyph plane, and Nemo's prompt are unchanged. After this change, every fixture hash above still matched, including 80x45 (`95c90f393878009ae385adf585f891b8b317857f2ccff79f7be0c677ef0989bc`) and the rendered scene (`2e050fbcd1b8b1b6649e2245c235496c3ddeab76552ec0565a70ad81e7412034`). `lithokraft_frame_hash_selftest` still passed.
+
+The player decoder now applies, in order:
+
+- a display gamma of 0.62 (hundredths, default 62; 100 is linear) on ink luma
+- a milder lift on the material fill, then a contrast push so the glyph stays brighter than its backing
+- a minimum foreground luma of 96 (about 38 percent) on visible glyphs; empty sky and spaces are skipped
+- gentler distance fade than the packed fog table (display scale 144/256); sky is still fully faded
+- lighter depth / object-id discontinuity edges (display only; the packed edge bit is not written)
+
+Settings, shared so a later main-window ASCII play mode can use the same knobs:
+
+- `render.ascii_gamma` (50..100, default 62). Launch override: `LL_ASCII_GAMMA`.
+- `render.ascii_luma_floor` (0..200, default 96).
+
+`render.ascii_display` is not a separate switch: `gamma 100` and `luma_floor 0` is the hash-faithful paint. The Nemo View footer shows the current gamma and floor. That playable main-window path is still not wired.

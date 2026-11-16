@@ -235,7 +235,32 @@ int main() {
       const CellLook look = decodeCell(f, i, ViewStyle::Solid);
       if (look.glyph != ' ' && (look.fill & 0x00FFFFFFu) != 0) solidFill = true;
     }
+
     check(solidFill, "solid decoder paints a non-black fill on visible cells");
+    {
+      // Display lift is paint-only: the hashed record and glyph plane stay put.
+      const std::string hashed = shaHex(f);
+      const std::string glyphs = glyphRows(f);
+      int rawY = 0, brightY = 0, n = 0, skyLifted = 0;
+      for (size_t i = 0; i < f.cell.size(); ++i) {
+        const CellFields cf = unpackCell(f.cell[i]);
+        const CellLook raw = decodeCell(f, i, ViewStyle::Solid, kRawDisplay);
+        const CellLook br = decodeCell(f, i, ViewStyle::Solid, kDefaultDisplay);
+        if (cf.depth != kSkyBand && raw.glyph != ' ') {
+          rawY += luma8(int((raw.ink >> 16) & 0xFF), int((raw.ink >> 8) & 0xFF), int(raw.ink & 0xFF));
+          brightY += luma8(int((br.ink >> 16) & 0xFF), int((br.ink >> 8) & 0xFF), int(br.ink & 0xFF));
+          ++n;
+        }
+        if (cf.depth == kSkyBand && br.glyph == ' ') {
+          const int y = luma8(int((br.ink >> 16) & 0xFF), int((br.ink >> 8) & 0xFF), int(br.ink & 0xFF));
+          if (y >= 16) ++skyLifted;
+        }
+      }
+      check(shaHex(f) == hashed && glyphRows(f) == glyphs,
+            "display settings do not change the hashed record or the glyph plane");
+      check(n > 0 && brightY > rawY, "default display luma is brighter than hash-faithful paint on visible cells");
+      check(skyLifted == 0, "empty sky cells are not lifted to the foreground floor");
+    }
     std::printf("[NEMO-VIEW] fixture 80x45 objects sha256 %s\n", shaHex(f).c_str());
     std::printf("%s\n", g.substr(0, 81 * 14).c_str());
   }

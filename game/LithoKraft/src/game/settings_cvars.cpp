@@ -496,6 +496,27 @@ void registerMcpSensesCvars(litholattice::console::cConsoleReg& r) {
       reg.setCVar("render.nemo_view_cols", std::to_string(g.cols), &err);
       syncing = false;
     });
+    {
+      const char* gammaDef = "62";
+      static char gammaBuf[8];
+      if (const char* ge = std::getenv("LL_ASCII_GAMMA")) {
+        int g = 0;
+        try { g = std::stoi(ge); } catch (...) { g = 0; }
+        if (g >= 50 && g <= 100) {
+          std::snprintf(gammaBuf, sizeof gammaBuf, "%d", g);
+          gammaDef = gammaBuf;
+        }
+      }
+      std::string err;
+      if (!r.registerCVar("render.ascii_gamma", CVarType::Int, gammaDef, false,
+                          "ASCII display gamma in hundredths (50..100, default 62). Paint only: does not change the hashed record or Nemo's prompt. Shared with a later main-window ASCII play mode.",
+                          CVarFlags{}, &err))
+        r.print(std::string("nemo view: cvar 'render.ascii_gamma' not registered: ") + err);
+      if (!r.registerCVar("render.ascii_luma_floor", CVarType::Int, "96", false,
+                          "ASCII display minimum foreground luma (0..200, default 96, about 38%). Paint only; sky and spaces are skipped.",
+                          CVarFlags{}, &err))
+        r.print(std::string("nemo view: cvar 'render.ascii_luma_floor' not registered: ") + err);
+    }
     r.setCVarChangeFn("render.nemo_view_cols", [](cConsoleReg& reg, const auto& c) {
       static bool syncing = false;
       if (syncing) return;

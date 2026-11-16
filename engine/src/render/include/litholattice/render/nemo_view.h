@@ -252,13 +252,29 @@ std::string rleEncode(const std::string& text);
 bool rleDecode(const std::string& rle, std::string& out);
 
 // ---- player decoder (paint only; does not change the hashed word) ----
+
+/// Paint-only look for a human reader. Never changes the hashed cell, the glyph
+/// plane, or Nemo's prompt. The same settings can be used by the Nemo View
+/// pop-up and by a later main-window ASCII play mode.
+struct DisplaySettings {
+  int gammaHundredths = 62;  ///< 50..100; 100 is linear. Default 62 (~0.62)
+  int lumaFloor = 96;        ///< minimum foreground luma (0..255, ~38%). 0 = off. Sky and spaces are skipped.
+  int contrast = 336;        ///< ink versus fill; 256 is unchanged, default about 1.31x
+  int fogScale = 144;        ///< display fog as 256ths of the packed fade (256 = as packed). Default is gentler.
+  int edgeLift = 80;         ///< extra luma on depth / object-id edges, display only
+};
+
+inline constexpr DisplaySettings kDefaultDisplay{};
+/// Hash-faithful paint: no gamma, no floor, packed fog, no edge lift.
+inline constexpr DisplaySettings kRawDisplay{100, 0, 256, 256, 0};
+
 struct CellLook {
   char glyph = ' ';
   uint32_t ink = 0xFF000000;   ///< 0xFFRRGGBB
   uint32_t fill = 0xFF000000;  ///< 0xFFRRGGBB; black when the style has no backing
 };
 
-CellLook decodeCell(uint64_t word, ViewStyle style);
-CellLook decodeCell(const AsciiFrame& f, size_t i, ViewStyle style);
+CellLook decodeCell(uint64_t word, ViewStyle style, const DisplaySettings& display = kDefaultDisplay);
+CellLook decodeCell(const AsciiFrame& f, size_t i, ViewStyle style, const DisplaySettings& display = kDefaultDisplay);
 
 }  // namespace litholattice::nemoview

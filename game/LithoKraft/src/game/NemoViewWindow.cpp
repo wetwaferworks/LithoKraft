@@ -142,7 +142,8 @@ void ensureFont(WindowState& st, int px) {
   st.fontPx = use;
 }
 
-void paintFrame(WindowState& st, HWND hwnd, const nv::AsciiFrame& f, const char* source, int style) {
+void paintFrame(WindowState& st, HWND hwnd, const nv::AsciiFrame& f, const char* source, int style,
+                const nv::DisplaySettings& display) {
   RECT rc;
   GetClientRect(hwnd, &rc);
   const int w = rc.right - rc.left, h = rc.bottom - rc.top;
@@ -189,10 +190,10 @@ void paintFrame(WindowState& st, HWND hwnd, const nv::AsciiFrame& f, const char*
     int x = 0;
     while (x < f.cols) {
       const size_t i0 = size_t(y) * size_t(f.cols) + size_t(x);
-      const nv::CellLook look = nv::decodeCell(f, i0, vs);
+      const nv::CellLook look = nv::decodeCell(f, i0, vs, display);
       int x1 = x + 1;
       while (x1 < f.cols) {
-        const nv::CellLook n = nv::decodeCell(f, size_t(y) * size_t(f.cols) + size_t(x1), vs);
+        const nv::CellLook n = nv::decodeCell(f, size_t(y) * size_t(f.cols) + size_t(x1), vs, display);
         if (n.ink != look.ink || n.fill != look.fill) break;
         ++x1;
       }
@@ -205,10 +206,10 @@ void paintFrame(WindowState& st, HWND hwnd, const nv::AsciiFrame& f, const char*
     }
   }
 
-  char footer[240];
-  std::snprintf(footer, sizeof footer, "%s   tick %llu   %s view   %dx%d   sha %.12s   style %s", source,
-                static_cast<unsigned long long>(f.tick), nv::viewModeName(f.mode), f.cols, f.rows,
-                nv::shaHex(f).c_str(), nv::viewStyleName(vs));
+  char footer[280];
+  std::snprintf(footer, sizeof footer, "%s   tick %llu   %s view   %dx%d   sha %.12s   style %s   gamma 0.%02d  floor %d",
+                source, static_cast<unsigned long long>(f.tick), nv::viewModeName(f.mode), f.cols, f.rows,
+                nv::shaHex(f).c_str(), nv::viewStyleName(vs), display.gammaHundredths, display.lumaFloor);
   SetBkMode(dc, TRANSPARENT);
   SetTextColor(dc, RGB(169, 112, 255));  // JD violet
   TextOutA(dc, 6, h - kFooterPx + 3, footer, int(std::strlen(footer)));
@@ -292,15 +293,18 @@ void cNemoViewWindow::run(cMcpSensesAdapter* adapter) {
       const int cols = cols_.load();
       const int rows = rows_.load();
       st.cols = cols;
+      nv::DisplaySettings display = nv::kDefaultDisplay;
+      display.gammaHundredths = gammaHundredths_.load();
+      display.lumaFloor = lumaFloor_.load();
       const cNemoViewHub::Entry& e = hub.latest();
       if (e.seq != 0 && cNemoViewHub::nowMs() - e.steadyMs < 3000) {
-        paintFrame(st, hwnd, e.frame, e.source.c_str(), style);
+        paintFrame(st, hwnd, e.frame, e.source.c_str(), style, display);
       } else if (adapter) {
         litholattice::mcp::AsciiRequest req;
         req.cols = cols;
         req.objects = objects_.load();
         if (adapter->previewAsciiFrame(sw, cull, req, preview))
-          paintFrame(st, hwnd, preview, "preview", style);
+          paintFrame(st, hwnd, preview, "preview", style, display);
       }
       (void)rows;
     }

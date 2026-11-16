@@ -5046,6 +5046,7 @@ void Game::update(float dt, int width, int height) {
     // at the game view (that path is not wired yet).
     nemoView.setGrid(cvarInt("render.nemo_view_objects", 1) != 0, asciiGrid.cols, asciiGrid.rows,
                      asciiGrid.captureW, asciiGrid.captureH);
+    nemoView.setDisplay(cvarInt("render.ascii_gamma", 62), cvarInt("render.ascii_luma_floor", 96));
     const int nemoViewMode = cvarInt("render.nemo_view", 0);
     nemoView.setWanted(nemoViewMode != 0, &mcpSenses_, nemoViewMode == 2);
   }
