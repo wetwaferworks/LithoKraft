@@ -389,6 +389,19 @@ template <class I> void stable_sort(I f, I l) { std::stable_sort(f, l, less<>())
 template <class I, class C> void inplace_merge(I f, I m, I l, C c) { __lk::merge_inplace(f, m, l, c); }
 template <class I> void inplace_merge(I f, I m, I l) { std::inplace_merge(f, m, l, less<>()); }
 
+/* Three-way lexicographic compare for container operator<=> (synthesised from < when needed). */
+namespace __lk {
+template <class T> constexpr auto synth3(const T& a, const T& b) {
+  if constexpr (requires { a <=> b; }) return a <=> b;
+  else return a < b ? weak_ordering::less : b < a ? weak_ordering::greater : weak_ordering::equivalent;
+}
+template <class I, class J> constexpr auto lex3(I f, I l, J f2, J l2) -> decltype(synth3(*f, *f2)) {
+  for (; f != l && f2 != l2; ++f, (void)++f2)
+    if (auto c = synth3(*f, *f2); c != 0) return c;
+  return f != l ? decltype(synth3(*f, *f2))(strong_ordering::greater) : f2 != l2 ? decltype(synth3(*f, *f2))(strong_ordering::less) : decltype(synth3(*f, *f2))(strong_ordering::equal);
+}
+}  // namespace __lk
+
 /* ---- sorted-range set operations and merge ---- */
 template <class I, class J, class O, class C> constexpr O merge(I f, I l, J f2, J l2, O o, C c) {
   for (; f != l; ++o) {

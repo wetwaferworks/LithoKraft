@@ -82,6 +82,7 @@ template <size_t I, class T> struct tuple_element;
 template <size_t I, class T> struct tuple_element<I, const T> { using type = add_const_t<typename tuple_element<I, T>::type>; };
 template <size_t I, class T> using tuple_element_t = typename tuple_element<I, T>::type;
 
+template <class... T> class tuple;  // <tuple>; for pair's piecewise constructor
 template <class T1, class T2>
 struct pair {
   using first_type = T1;
@@ -106,6 +107,11 @@ struct pair {
   template <class U1, class U2, enable_if_t<is_constructible_v<T1, U1> && is_constructible_v<T2, U2>, int> = 0>
   constexpr explicit(!is_convertible_v<U1, T1> || !is_convertible_v<U2, T2>)
   pair(pair<U1, U2>&& p) : first(std::forward<U1>(p.first)), second(std::forward<U2>(p.second)) {}
+  /* Piecewise: get<I> is found by ADL on std::tuple at instantiation (C++20 P0846), so
+   * this header needs only tuple's declaration; <tuple> must be included to use it. */
+  template <class... A1, class... A2>
+  constexpr pair(piecewise_construct_t, tuple<A1...> a, tuple<A2...> b)
+      : pair(a, b, make_index_sequence<sizeof...(A1)>(), make_index_sequence<sizeof...(A2)>()) {}
   pair(const pair&) = default;
   pair(pair&&) = default;
   constexpr pair& operator=(const pair& p) { first = p.first; second = p.second; return *this; }
@@ -113,6 +119,11 @@ struct pair {
     first = std::move(p.first); second = std::move(p.second); return *this;
   }
   template <class U1, class U2> constexpr pair& operator=(const pair<U1, U2>& p) { first = p.first; second = p.second; return *this; }
+ private:
+  template <class Ta, class Tb, size_t... I, size_t... J>
+  constexpr pair(Ta& a, Tb& b, index_sequence<I...>, index_sequence<J...>)
+      : first(get<I>(static_cast<Ta&&>(a))...), second(get<J>(static_cast<Tb&&>(b))...) {}
+ public:
   template <class U1, class U2> constexpr pair& operator=(pair<U1, U2>&& p) {
     first = std::forward<U1>(p.first); second = std::forward<U2>(p.second); return *this;
   }
