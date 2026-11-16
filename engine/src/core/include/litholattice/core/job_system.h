@@ -54,6 +54,7 @@
 #include "litholattice/core/thread_name.h"
 
 #include <atomic>
+#include "litholattice/core/idle_backoff.h"  // t46u item 5b
 #include <cstdlib>
 #include <cassert>
 #include <chrono>
@@ -188,15 +189,14 @@ class cJobSystem {
       cGateGuard<cAtomicGate> l(ioGate_);
       ioQueue_.push_back(std::move(job));
     }
-    ioWake_.fetch_add(1, std::memory_order_release);
-    ioWake_.notify_one();
+    ioWake_.fetch_add(1, std::memory_order_release);  // the I/O thread re-reads it (t46u 5b: no notify)
   }
 
   /// Block until every submitted job (workers + I/O) has finished. Must NOT be
   /// called from a worker/I/O job (thread-local assert: that would deadlock).
   void waitIdle() {
     assert(!t_onJobThread && "waitIdle() from a job thread would deadlock the pool");
-    // Archie PlayJ: no mutex/cv — wait on the in-flight atomics themselves.
+    // Archie PlayJ: no mutex/cv. t46u 5b: re-read the in-flight atomics with a backoff (no atomic::wait).
     auto idle = [this] {
       return inFlight_.load(std::memory_order_acquire) == 0 &&
              ioInFlight_.load(std::memory_order_acquire) == 0;
@@ -208,16 +208,14 @@ class cJobSystem {
         int a = inFlight_.load(std::memory_order_acquire);
         int b = ioInFlight_.load(std::memory_order_acquire);
         if (a == 0 && b == 0) break;
-        if (a != 0) inFlight_.wait(a, std::memory_order_acquire);
-        else ioInFlight_.wait(b, std::memory_order_acquire);
+        lkIdleWaitUntil([&] { return inFlight_.load(std::memory_order_acquire) != a || ioInFlight_.load(std::memory_order_acquire) != b; });  // t46u 5b
       }
     }
     while (!idle()) {
       int a = inFlight_.load(std::memory_order_acquire);
       int b = ioInFlight_.load(std::memory_order_acquire);
       if (a == 0 && b == 0) break;
-      if (a != 0) inFlight_.wait(a, std::memory_order_acquire);
-      else ioInFlight_.wait(b, std::memory_order_acquire);
+      lkIdleWaitUntil([&] { return inFlight_.load(std::memory_order_acquire) != a || ioInFlight_.load(std::memory_order_acquire) != b; });  // t46u 5b
     }
   }
 
@@ -289,8 +287,7 @@ class cJobSystem {
           int a = inFlight_.load(std::memory_order_acquire);
           int b = ioInFlight_.load(std::memory_order_acquire);
           if (a == 0 && b == 0) break;
-          if (a != 0) inFlight_.wait(a, std::memory_order_acquire);
-          else ioInFlight_.wait(b, std::memory_order_acquire);
+          lkIdleWaitUntil([&] { return inFlight_.load(std::memory_order_acquire) != a || ioInFlight_.load(std::memory_order_acquire) != b; });  // t46u 5b
         }
         if (!idle()) {
           cancel_.store(true, std::memory_order_release);
@@ -302,17 +299,15 @@ class cJobSystem {
         int a = inFlight_.load(std::memory_order_acquire);
         int b = ioInFlight_.load(std::memory_order_acquire);
         if (a == 0 && b == 0) break;
-        if (a != 0) inFlight_.wait(a, std::memory_order_acquire);
-        else ioInFlight_.wait(b, std::memory_order_acquire);
+        lkIdleWaitUntil([&] { return inFlight_.load(std::memory_order_acquire) != a || ioInFlight_.load(std::memory_order_acquire) != b; });  // t46u 5b
       }
     }
     {  // wait for pumps to exit
       for (unsigned v; (v = pumps_.load(std::memory_order_acquire)) != 0;)
-        pumps_.wait(v, std::memory_order_acquire);
+        lkIdleWaitUntil([&] { return pumps_.load(std::memory_order_acquire) != v; });  // t46u 5b
     }
     stop_.store(true, std::memory_order_release);
     ioWake_.fetch_add(1, std::memory_order_release);
-    ioWake_.notify_all();
     for (auto& t : ioThreads_) t.join();
     records_.retireAll();  // joined -> RETURNED
     LITHO_THREAD_LOG("thread", "shutdown: io threads joined, failed=%llu",
@@ -329,8 +324,8 @@ class cJobSystem {
     { cGateGuard<cAtomicGate> l(qGate_); for (auto& q : queue_) { for (auto& j : q) w.push_back(std::move(j)); q.clear(); } }
     { cGateGuard<cAtomicGate> l(ioGate_); io.swap(ioQueue_); }
     const int n = int(w.size() + io.size());
-    if (!w.empty() && inFlight_.fetch_sub(int(w.size()), std::memory_order_acq_rel) == int(w.size())) inFlight_.notify_all();
-    if (!io.empty() && ioInFlight_.fetch_sub(int(io.size()), std::memory_order_acq_rel) == int(io.size())) ioInFlight_.notify_all();
+    if (!w.empty()) inFlight_.fetch_sub(int(w.size()), std::memory_order_acq_rel);
+    if (!io.empty()) ioInFlight_.fetch_sub(int(io.size()), std::memory_order_acq_rel);
     dropped_.fetch_add(uint64_t(n), std::memory_order_relaxed);
     return n;
   }
@@ -350,7 +345,6 @@ class cJobSystem {
         while (p >= int(JobPriority::Low) && queue_[p].empty()) --p;
         if (p < int(JobPriority::Low)) {
           pumps_.fetch_sub(1, std::memory_order_acq_rel);
-          pumps_.notify_all();
           break;
         }
         job = std::move(queue_[p].front());
@@ -389,7 +383,7 @@ class cJobSystem {
           }
           if (stop_.load(std::memory_order_acquire)) return;
         }
-        ioWake_.wait(w, std::memory_order_acquire);
+        lkIdleWaitUntil([&] { return ioWake_.load(std::memory_order_acquire) != w || stop_.load(std::memory_order_acquire); });  // t46u 5b
       }
       executeJob(std::move(job), ioInFlight_, "io", self);
     }
@@ -424,8 +418,7 @@ class cJobSystem {
         LITHO_THREAD_LOG("job", "SLOW JOB id=%llu ran %llu us: worker jobs must never block",
                          (unsigned long long)id, (unsigned long long)dt);
     }
-    if (counter.fetch_sub(1, std::memory_order_acq_rel) == 1)
-      counter.notify_all();
+    counter.fetch_sub(1, std::memory_order_acq_rel);  // waiters re-read it (t46u 5b)
   }
 
   cJobPool* pool_ = nullptr;   // cJobPool::shared(), never destroyed
@@ -476,8 +469,7 @@ class JobFence {
             logError("job fence: job threw a non-std exception");
           }
           if (!ok) failed_.fetch_add(1, std::memory_order_relaxed);
-          if (pending_.fetch_sub(1, std::memory_order_acq_rel) == 1)
-            pending_.notify_all();
+          pending_.fetch_sub(1, std::memory_order_acq_rel);  // wait() re-reads it (t46u 5b)
         },
         prio);
   }
@@ -496,11 +488,11 @@ class JobFence {
         }
         int p = pending_.load(std::memory_order_acquire);
         if (p == 0) break;
-        pending_.wait(p, std::memory_order_acquire);
+        lkIdleWaitUntil([&] { return pending_.load(std::memory_order_acquire) != p; });  // t46u 5b
       }
     }
     for (int p; (p = pending_.load(std::memory_order_acquire)) != 0;)
-      pending_.wait(p, std::memory_order_acquire);
+      lkIdleWaitUntil([&] { return pending_.load(std::memory_order_acquire) != p; });  // t46u 5b
     return int(failed_.load(std::memory_order_relaxed));
   }
 

@@ -7,6 +7,7 @@
 // renderMesh path the headless consumers have always driven.
 #include "litholattice/render/software_renderer.h"
 #include "litholattice/core/thread_name.h"
+#include "litholattice/core/idle_backoff.h"  // t46u item 5b
 #include "litholattice/core/atomic_gate.h"
 #include "litholattice/render/sw_lod_rings.h"  // PlayB: the shared far-LOD ladder
 #include "litholattice/render/mesher.h"
@@ -356,12 +357,11 @@ class cSwBandPool {
     hasWorkerErr_.store(false, std::memory_order_relaxed);
     remaining_.store(bands_ - 1, std::memory_order_relaxed);
     fn_ = &fn;
-    gen_.fetch_add(1, std::memory_order_release);
-    gen_.notify_all();
+    gen_.fetch_add(1, std::memory_order_release);  // band workers re-read it (t46u 5b)
     std::exception_ptr mine;
     try { fn(0); } catch (...) { mine = std::current_exception(); }
     for (unsigned v; (v = remaining_.load(std::memory_order_acquire)) != 0;)
-      remaining_.wait(v, std::memory_order_acquire);
+      lkIdleWaitUntil([&] { return remaining_.load(std::memory_order_acquire) != v; });  // t46u 5b
     fn_ = nullptr;
     std::exception_ptr err = mine ? mine : workerErr_;
     workerErr_ = nullptr;
@@ -397,7 +397,6 @@ class cSwBandPool {
     detachedDone_ = std::move(onDone);
     detachedPending_.store(true, std::memory_order_release);
     runGate_.unlock();
-    detachedPending_.notify_all();
   }
   ~cSwBandPool() { stopAll(); }
   // t46u item 2: the executor polls an installed pump (the app's frame mailbox) instead of
@@ -435,11 +434,11 @@ class cSwBandPool {
           if (!st->failed.exchange(true, std::memory_order_acq_rel)) st->err = std::current_exception();
         }
         tlInRun_ = false;
-        if (st->remaining.fetch_sub(1, std::memory_order_acq_rel) == 1) st->remaining.notify_all();
+        st->remaining.fetch_sub(1, std::memory_order_acq_rel);  // t46u 5b: the caller re-reads it
       });
     std::exception_ptr mine;
     try { fn(0); } catch (...) { mine = std::current_exception(); }
-    for (unsigned v; (v = st->remaining.load(std::memory_order_acquire)) != 0;) st->remaining.wait(v, std::memory_order_acquire);
+    lkIdleWaitUntil([&] { return st->remaining.load(std::memory_order_acquire) == 0; });  // t46u 5b
     std::atomic_thread_fence(std::memory_order_acquire);
     std::exception_ptr err = mine ? mine : st->err;
     if (err) std::rethrow_exception(err);
@@ -449,12 +448,11 @@ class cSwBandPool {
       bool expected = false;
       if (frameActive_.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed))
         return;
-      { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwFrameSlot); frameActive_.wait(true, std::memory_order_relaxed); }
+      { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwFrameSlot); lkIdleWaitUntil([&] { return !frameActive_.load(std::memory_order_relaxed); }); }  // t46u 5b
     }
   }
   void releaseFrameSlot() {
     frameActive_.store(false, std::memory_order_release);
-    frameActive_.notify_all();
   }
   struct FrameSlot {
     cSwBandPool& p;
@@ -468,9 +466,7 @@ class cSwBandPool {
   void stopAll() {
     stop_.store(true, std::memory_order_release);
     gen_.fetch_add(1, std::memory_order_release);
-    gen_.notify_all();
     detachedPending_.store(true, std::memory_order_release);  // wake executor so it can see stop_
-    detachedPending_.notify_all();
     for (auto& t : threads_) if (t.joinable()) t.join();
     threads_.clear();
     records_.retireAll();
@@ -532,7 +528,7 @@ class cSwBandPool {
           else std::this_thread::sleep_for(std::chrono::microseconds(100));
           continue;
         }
-        { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwExecIdle); detachedPending_.wait(false, std::memory_order_relaxed); }
+        { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwExecIdle); lkIdleWaitUntil([&] { return detachedPending_.load(std::memory_order_acquire) || stop_.load(std::memory_order_acquire) || pump_.load(std::memory_order_relaxed); }); }  // t46u 5b
       }
       if (stop_.load(std::memory_order_acquire)) return;
       std::function<void()> fn = std::move(detachedFn_);
@@ -556,7 +552,7 @@ class cSwBandPool {
         if (stop_.load(std::memory_order_acquire)) return;
         g = gen_.load(std::memory_order_acquire);
         if (g != seen) break;
-        { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwBandIdle); gen_.wait(seen, std::memory_order_relaxed); }
+        { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwBandIdle); lkIdleWaitUntil([&] { return gen_.load(std::memory_order_acquire) != seen || stop_.load(std::memory_order_acquire); }); }  // t46u 5b
       }
       if (stop_.load(std::memory_order_acquire)) return;
       seen = g;
@@ -567,7 +563,7 @@ class cSwBandPool {
       try { (*fn)(band); } catch (...) { err = std::current_exception(); }
       tlInRun_ = false;
       if (err && !hasWorkerErr_.exchange(true, std::memory_order_acq_rel)) workerErr_ = err;
-      if (remaining_.fetch_sub(1, std::memory_order_acq_rel) == 1) remaining_.notify_all();
+      remaining_.fetch_sub(1, std::memory_order_acq_rel);  // the caller re-reads it (t46u 5b)
     }
   }
   unsigned bands_ = 1;
