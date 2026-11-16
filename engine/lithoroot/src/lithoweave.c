@@ -511,9 +511,18 @@ void lw_exit(void* retval) {
  * destructor landing pad, mark DONE, return. The host wrapper
  * completes the protocol from here: store 0 into the tid cell,
  * notify its address, retire the worker. */
+/* Plan §3.4 rule 1: memory.atomic.wait32 traps on the browser page thread
+ * and on unshared memory. Only threads this trampoline starts are host
+ * workers, so only they may block; the page thread and single-thread mode
+ * (no workers) never set the flag. LithoRoot's <atomic> and the static-local
+ * guard read it through __lk_can_block_here and spin instead when it is 0. */
+static _Thread_local int lw__can_block;
+int __lk_can_block_here(void) { return lw__can_block; }
+
 void lithosys_thread_start(uint32_t start_arg) {
   lw_control_t* ctl = (lw_control_t*)(uintptr_t)start_arg;
   lw__current = ctl;
+  lw__can_block = 1;
 
   if (setjmp(ctl->jmp_entry) == 0) {
     ctl->retval = ctl->entry(ctl->entry_arg);

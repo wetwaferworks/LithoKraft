@@ -181,6 +181,9 @@ template <class T, class A> void swap(deque<T, A>& a, deque<T, A>& b) noexcept {
 template <class T, class A, class P> size_t erase_if(deque<T, A>& d, P p) {
   auto it = std::remove_if(d.begin(), d.end(), p); size_t n = size_t(d.end() - it); d.erase(it, d.end()); return n;
 }
+template <class T, class A, class U> size_t erase(deque<T, A>& d, const U& v) {
+  return std::erase_if(d, [&](const T& x) { return x == v; });
+}
 
 }  // namespace std
 #endif

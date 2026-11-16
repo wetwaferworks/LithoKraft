@@ -6,8 +6,8 @@
  *
  * wait/notify (plan 3.4, rule 1): memory.atomic.wait32 traps on the page
  * thread and on unshared memory (single-thread mode), so atomic::wait only
- * blocks when the runtime says this thread may: the weak flag
- * __lk_can_block, which LithoThread sets for workers (S5). Without it,
+ * blocks when the runtime says this thread may: the weak hook
+ * __lk_can_block_here(), which LithoWeave answers 1 on spawned workers (S5). Without it,
  * wait spins a bounded number of rechecks, and if the value still has not
  * changed it reports the design bug once through lithosys_console_write and
  * returns: it never traps and never blocks the page. Callers loop on their
@@ -22,7 +22,7 @@
 #include <type_traits>
 #include <lithosys.h>
 
-extern "C" int __lk_can_block __attribute__((weak));  // defined by LithoThread (S5); absent = never block
+extern "C" int __lk_can_block_here(void) __attribute__((weak));  // LithoWeave (S5): 1 on spawned workers; absent = never block
 
 namespace std {
 
@@ -53,7 +53,7 @@ namespace __lk {
 constexpr int fail_order(memory_order m) noexcept {  // the failure order may not release
   return m == memory_order::acq_rel ? __ATOMIC_ACQUIRE : m == memory_order::release ? __ATOMIC_RELAXED : int(m);
 }
-inline bool can_block() noexcept { return &__lk_can_block != nullptr && __atomic_load_n(&__lk_can_block, __ATOMIC_RELAXED) != 0; }
+inline bool can_block() noexcept { return &__lk_can_block_here != nullptr && __lk_can_block_here() != 0; }
 inline void report_wait_bug() noexcept {
   static int once = 0;
   if (__atomic_exchange_n(&once, 1, __ATOMIC_RELAXED) == 0) {

@@ -44,7 +44,7 @@ template <class P> constexpr auto to_address(const P& p) noexcept { return std::
 
 /* ---- construct / destroy ---- */
 template <class T, class... A>
-constexpr T* construct_at(T* p, A&&... a) { return ::new (static_cast<void*>(p)) T(std::forward<A>(a)...); }
+constexpr T* construct_at(T* p, A&&... a) { return ::new (const_cast<void*>(static_cast<const volatile void*>(p))) T(std::forward<A>(a)...); }
 template <class T> constexpr void destroy_at(T* p) {
   if constexpr (is_array_v<T>) { for (auto& e : *p) std::destroy_at(addressof(e)); }
   else p->~T();
@@ -415,9 +415,9 @@ class shared_ptr {
   template <class Y, class D> void reset(Y* p, D d) { shared_ptr(p, d).swap(*this); }
   void swap(shared_ptr& r) noexcept { std::swap(p_, r.p_); std::swap(c_, r.c_); }
   element_type* get() const noexcept { return p_; }
-  template <class U = T, enable_if_t<!is_void_v<U> && !is_array_v<U>, int> = 0> U& operator*() const noexcept { return *p_; }
+  template <class U = T, enable_if_t<!is_void_v<U> && !is_array_v<U>, int> = 0> add_lvalue_reference_t<U> operator*() const noexcept { return *p_; }
   template <class U = T, enable_if_t<!is_array_v<U>, int> = 0> element_type* operator->() const noexcept { return p_; }
-  template <class U = T, enable_if_t<is_array_v<U>, int> = 0> element_type& operator[](ptrdiff_t i) const { return p_[i]; }
+  template <class U = T, enable_if_t<is_array_v<U>, int> = 0> remove_extent_t<U>& operator[](ptrdiff_t i) const { return p_[i]; }
   long use_count() const noexcept { return c_ ? c_->use_count() : 0; }
   explicit operator bool() const noexcept { return p_ != nullptr; }
   template <class U> bool owner_before(const shared_ptr<U>& o) const noexcept { return c_ < o.c_; }
