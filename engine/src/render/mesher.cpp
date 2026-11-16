@@ -1070,11 +1070,12 @@ ChunkMesh meshSubChunk(const MeshInput& in, const MeshContext& ctx) {
   // the between-ticks contract — so log loudly and keep the second pass
   // rather than loop forever.
   const uint64_t epoch0 = ctx.blocks.content().definitionEpoch();
+  const uint64_t gen0 = ctx.blocks.content().definitionWriteGen();  // t46u 5c: moves before any def swap
   const bool unified = unifiedMesherEnabled();  // render pipeline M2 (--unified-mesher)
   auto canon = unified ? std::make_shared<CanonicalMesh>() : nullptr;
   ChunkMesh out = meshSubChunkStable(in, ctx, canon.get());
   const uint64_t epoch1 = ctx.blocks.content().definitionEpoch();
-  if (epoch1 != epoch0) {
+  if (epoch1 != epoch0 || ctx.blocks.content().definitionWriteGen() != gen0) {
     out = meshSubChunkStable(in, ctx, canon.get());
     const uint64_t epoch2 = ctx.blocks.content().definitionEpoch();
     if (epoch2 != epoch1)
