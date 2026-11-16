@@ -101,8 +101,8 @@ struct CameraPose {
 
 /// Nemo View request (opt-in tool vision.capture_ascii, LL_MCP_NEMO_VIEW=1).
 struct AsciiRequest {
-  int cols = 80;                 ///< 40, 80 or 96 (full view); the fovea is always 32x12
-  bool fovea = false;            ///< centre crop of the 80x45 view at 32x12
+  int cols = 80;                 ///< hashing default 80; also 40, 96, 160, 180, 240. Fovea is always 32x12
+  bool fovea = false;            ///< centre crop of the 80x45 hashing view at 32x12 (prompt budget unchanged)
   bool objects = true;           ///< true: object characters (default); false: pixels and depth only
   /// Comma-separated channels to return. Default is glyph only (Nemo default, cheap).
   /// Also accepted: depth, class, fg, tex8, tex16, qword (the full 64-bit word as hex).

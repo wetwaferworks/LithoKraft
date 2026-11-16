@@ -253,18 +253,23 @@ bool cMcpSensesAdapter::captureVisionFrame(std::string_view pilot, int width, in
   return true;
 }
 
-// Nemo View. Capture sizes tile exactly into 4x4-pixel cells: 40 cols = 160x88 (22 rows),
-// 80 = 320x180 (45 rows), 96 = 384x216 (54 rows); the fovea is the centre 128x48 of the
-// 320x180 view (32x12). The object pass is on only for this render.
+// Nemo View. Capture size comes from the renderer Grid (not a 4x4 hard-wire): 80x45 and
+// 160x90 share a 320x180 source (4x4 vs 2x2 cells); 96x54 is 384x216; 180x80 is 360x160;
+// 240x135 is 480x270. The fovea is still the centre 128x48 of the 80-col 320x180 view
+// (32x12), so the prompt token budget is unchanged. The object pass is on only for this render.
 bool cMcpSensesAdapter::buildAscii(litholattice::cSoftwareRenderer& sw, litholattice::CullProtoState& cull,
                                    const CameraViewPose& res, const litholattice::mcp::AsciiRequest& req,
                                    litholattice::nemoview::AsciiFrame& out) const {
   namespace nv = litholattice::nemoview;
   const Snapshot snap = takeSnapshot();
-  const int cols = req.fovea ? 80 : req.cols;
-  const int w = cols * 4;
-  const int rows = cols == 40 ? 22 : cols == 96 ? 54 : 45;
-  const int h = rows * 4;
+  nv::Grid grid = nv::kHashGrid;
+  if (req.fovea) {
+    grid = nv::kHashGrid;  // fovea is always cropped from the 80x45 320x180 capture
+  } else if (!nv::parseGrid(std::to_string(req.cols), grid)) {
+    return false;
+  }
+  const int w = grid.captureW;
+  const int h = grid.captureH;
   const bool objects = req.objects && snap.objectTable && !snap.objectTable->empty();
   if (objects) sw.setObjectCapture(snap.objectTable->data(), snap.objectTable->size());
   renderCone(sw, cull, res, w, h, snap, objects);
@@ -277,18 +282,15 @@ bool cMcpSensesAdapter::buildAscii(litholattice::cSoftwareRenderer& sw, litholat
   src.faces = (objects && sw.faceBuffer().size() == sw.objectBuffer().size()) ? sw.faceBuffer().data()
                                                                                : nullptr;
   src.depthRemapMode = litholattice::swsimd::g_depthRemapMode;
-  nv::FrameConfig cfg;
-  cfg.cols = cols;
-  cfg.rows = rows;
+  nv::FrameConfig cfg =
+      nv::FrameConfig::forGrid(req.fovea ? nv::kFoveaGrid : grid,
+                              req.objects ? nv::ViewMode::Objects : nv::ViewMode::PixelsAndDepth);
   if (req.fovea) {
-    src.cropW = 128;
-    src.cropH = 48;
-    src.cropX = (w - 128) / 2;
-    src.cropY = (h - 48) / 2;
-    cfg.cols = 32;
-    cfg.rows = 12;
+    src.cropW = nv::kFoveaGrid.captureW;
+    src.cropH = nv::kFoveaGrid.captureH;
+    src.cropX = (w - src.cropW) / 2;
+    src.cropY = (h - src.cropH) / 2;
   }
-  cfg.mode = req.objects ? nv::ViewMode::Objects : nv::ViewMode::PixelsAndDepth;
   const bool ok = nv::build(src, cfg, out);
   if (objects) sw.setObjectCapture(nullptr, 0);
   out.tick = tick_ ? tick_() : 0;

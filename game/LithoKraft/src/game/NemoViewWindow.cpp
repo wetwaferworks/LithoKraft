@@ -23,6 +23,12 @@ cNemoViewWindow& cNemoViewWindow::instance() {
   return w;
 }
 
+void cNemoViewWindow::setView(bool objects, int cols) {
+  litholattice::nemoview::Grid g = litholattice::nemoview::kDisplayGrid;
+  if (!litholattice::nemoview::parseGrid(std::to_string(cols), g)) g = litholattice::nemoview::kDisplayGrid;
+  setGrid(objects, g.cols, g.rows, g.captureW, g.captureH);
+}
+
 cNemoViewWindow::~cNemoViewWindow() {
   quit_.store(true);
   if (thread_.joinable()) thread_.join();
@@ -62,7 +68,18 @@ struct WindowState {
   int backW = 0, backH = 0;
   HFONT font = nullptr;
   int fontPx = 0;
+  cNemoViewWindow* owner = nullptr;
+  int cols = 160;
 };
+
+int cycleGridCols(int cols, int dir) {
+  const nv::Grid* list = nv::selectableGrids();
+  int idx = 2;  // display default 160x90
+  for (int i = 0; i < nv::kSelectableGridCount; ++i)
+    if (list[i].cols == cols) idx = i;
+  idx = (idx + dir + nv::kSelectableGridCount) % nv::kSelectableGridCount;
+  return list[idx].cols;
+}
 
 void adoptThreadDpi() {
   // This thread only: never change the process, so the game window stays as it is.
@@ -91,6 +108,18 @@ LRESULT CALLBACK nemoWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                      SWP_NOZORDER | SWP_NOACTIVATE);
       }
       return 0;
+    case WM_KEYDOWN: {
+      int cols = 0;
+      if (wp == '1') cols = 80;
+      else if (wp == '2') cols = 96;
+      else if (wp == '3') cols = 160;
+      else if (wp == '4') cols = 180;
+      else if (wp == '5') cols = 240;
+      else if (wp == VK_OEM_4 || wp == VK_LEFT) cols = cycleGridCols(st ? st->cols : 160, -1);
+      else if (wp == VK_OEM_6 || wp == VK_RIGHT) cols = cycleGridCols(st ? st->cols : 160, 1);
+      if (cols && st && st->owner) st->owner->requestGrid(cols);
+      return 0;
+    }
     case WM_CLOSE:
       DestroyWindow(hwnd);
       return 0;
@@ -201,6 +230,8 @@ void cNemoViewWindow::run(cMcpSensesAdapter* adapter) {
   RegisterClassA(&wc);  // fails harmlessly when already registered
 
   WindowState st;
+  st.owner = this;
+  st.cols = cols_.load();
   ensureFont(st, 16);
   int cellW = 8, cellH = 16;
   {
@@ -215,7 +246,7 @@ void cNemoViewWindow::run(cMcpSensesAdapter* adapter) {
     ReleaseDC(nullptr, sdc);
   }
   const int cols = cols_.load();
-  const int rows = cols == 40 ? 22 : cols == 96 ? 54 : 45;
+  const int rows = rows_.load() > 0 ? rows_.load() : 90;
   RECT want{0, 0, cols * cellW + 16, rows * cellH + kFooterPx + 8};
   AdjustWindowRect(&want, WS_OVERLAPPEDWINDOW, FALSE);
   HWND hwnd = CreateWindowExA(0, "LithoKraftNemoView", "Nemo View - what Little Nemo sees", WS_OVERLAPPEDWINDOW,
@@ -258,16 +289,20 @@ void cNemoViewWindow::run(cMcpSensesAdapter* adapter) {
     if (now - lastFrame >= 100) {  // about ten frames a second
       lastFrame = now;
       const int style = style_.load();
+      const int cols = cols_.load();
+      const int rows = rows_.load();
+      st.cols = cols;
       const cNemoViewHub::Entry& e = hub.latest();
       if (e.seq != 0 && cNemoViewHub::nowMs() - e.steadyMs < 3000) {
         paintFrame(st, hwnd, e.frame, e.source.c_str(), style);
       } else if (adapter) {
         litholattice::mcp::AsciiRequest req;
-        req.cols = cols_.load();
+        req.cols = cols;
         req.objects = objects_.load();
         if (adapter->previewAsciiFrame(sw, cull, req, preview))
           paintFrame(st, hwnd, preview, "preview", style);
       }
+      (void)rows;
     }
     MsgWaitForMultipleObjects(0, nullptr, FALSE, 15, QS_ALLINPUT);
   }

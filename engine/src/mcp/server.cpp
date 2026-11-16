@@ -1679,19 +1679,19 @@ void cMcpServer::registerPilotSensesTools() {
     t.description =
         "Nemo View (opt-in): the pilot's own view as an ASCII picture built with integer math from "
         "the software renderer (colour, depth and per-pixel object ids, depth-tested winners only). "
-        "cols 40, 80 or 96 (full view) or region fovea (32x12 centre). view objects (wall #, door |, "
+        "cols 40, 80 (hashing default), 96, 160, 180 or 240 (full view) or region fovea (32x12 centre). view objects (wall #, door |, "
         "key k, light *, pit o) or pixels_depth. Default channel is glyph only (what Nemo reads). "
         "Opt-in channels: depth, class, fg, tex8, tex16, qword (the full 64-bit cell as hex), or all. "
         "Returns the requested rows plus the record SHA-256 and the heading (no position). Shares "
         "the vision rate limit and the pilot_senses grant.";
     t.params = {p("pilot", "string", "pilot id (v1: \"player\")", true),
-                p("cols", "integer", "40, 80 (default) or 96; ignored for the fovea"),
+                p("cols", "integer", "40, 80 (hashing default), 96, 160, 180 or 240; ignored for the fovea"),
                 p("region", "string", "full (default) or fovea"),
                 p("view", "string", "objects (default) or pixels_depth"),
                 p("channels", "string", "comma-separated; default glyph. Also depth,class,fg,tex8,tex16,qword,all"),
                 p("rle", "boolean", "run-length code the glyph rows (default true)")};
     t.params[1].hasMinimum = t.params[1].hasMaximum = true;
-    t.params[1].minimum = 40; t.params[1].maximum = 96;
+    t.params[1].minimum = 40; t.params[1].maximum = 240;
     t.requiredPerms = kPermPilotSenses;
     t.annotations.readOnlyHint = true;
     t.handler = [&b, this, reqPilot, needSensePilot](const cJsonValue& args,
@@ -1711,9 +1711,9 @@ void cMcpServer::registerPilotSensesTools() {
         return v->asString();
       };
       litholattice::mcp::AsciiRequest req;
-      req.cols = static_cast<int>(r.optInt("cols", 80, 40, 96));
-      if (req.cols != 40 && req.cols != 80 && req.cols != 96)
-        throw cRpcError(kRpcInvalidParams, "invalid argument 'cols': expected 40, 80 or 96");
+      req.cols = static_cast<int>(r.optInt("cols", 80, 40, 240));
+      if (req.cols != 40 && req.cols != 80 && req.cols != 96 && req.cols != 160 && req.cols != 180 && req.cols != 240)
+        throw cRpcError(kRpcInvalidParams, "invalid argument 'cols': expected 40, 80, 96, 160, 180 or 240 (default 80, the hashing format)");
       const std::string region = optText("region", "full");
       if (region != "full" && region != "fovea")
         throw cRpcError(kRpcInvalidParams, "invalid argument 'region': expected full or fovea");

@@ -20,6 +20,7 @@
 #include "lithokraft/game/McpDisplayVision.h"  // SCRATCH vulkfb (opt-in, LL_MCP_DISPLAY_VISION=1)
 #include "lithokraft/game/NemoViewObjects.h"
 #include "lithokraft/game/NemoViewWindow.h"
+#include "litholattice/render/nemo_view.h"
 #include "litholattice/core/threeway.h"  // LL_THREEWAY (Proposed by JD; co-implemented by JD and Cortana)
 #include "litholattice/mods/mod_interface.h"  // kPerm* for the script sandbox
 #include "litholattice/mods/mod_permissions.h"  // permissionBitForName (mcp grant/revoke)
@@ -5024,7 +5025,27 @@ void Game::update(float dt, int width, int height) {
     }
     cNemoViewWindow& nemoView = cNemoViewWindow::instance();
     nemoView.setStyle(cvarInt("render.nemo_view_style", 4));
-    nemoView.setView(cvarInt("render.nemo_view_objects", 1) != 0, cvarInt("render.nemo_view_cols", 80));
+    if (const int wantCols = nemoView.takeGridRequest()) {
+      litholattice::nemoview::Grid req;
+      if (litholattice::nemoview::parseGrid(std::to_string(wantCols), req)) {
+        consoleRegistry_.setCVar("render.ascii_grid", req.name);
+        consoleRegistry_.setCVar("render.nemo_view_cols", std::to_string(req.cols));
+      }
+    }
+    litholattice::nemoview::Grid asciiGrid = litholattice::nemoview::kDisplayGrid;
+    if (const litholattice::console::CVar* cv = consoleRegistry_.findCVar("render.ascii_grid")) {
+      litholattice::nemoview::Grid parsed;
+      if (litholattice::nemoview::parseGrid(cv->value, parsed)) asciiGrid = parsed;
+    } else {
+      litholattice::nemoview::Grid parsed;
+      if (litholattice::nemoview::parseGrid(std::to_string(cvarInt("render.nemo_view_cols", 160)), parsed))
+        asciiGrid = parsed;
+    }
+    // The grid is a renderer setting, not something the pop-up invents, so a later
+    // main-window ASCII play mode can read the same value and point the same builder
+    // at the game view (that path is not wired yet).
+    nemoView.setGrid(cvarInt("render.nemo_view_objects", 1) != 0, asciiGrid.cols, asciiGrid.rows,
+                     asciiGrid.captureW, asciiGrid.captureH);
     const int nemoViewMode = cvarInt("render.nemo_view", 0);
     nemoView.setWanted(nemoViewMode != 0, &mcpSenses_, nemoViewMode == 2);
   }

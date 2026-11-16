@@ -5,11 +5,13 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <string>
 
 #include "litholattice/console/concmd.h"
 #include "litholattice/core/log.h"
+#include "litholattice/render/nemo_view.h"
 #include "litholattice/sim/area_shape.h"  // Fix run 3: shared, case-insensitive shape parser
 
 namespace lithokraft {
@@ -442,21 +444,76 @@ void registerMcpSensesCvars(litholattice::console::cConsoleReg& r) {
   }
   // Nemo View pop-up window (not archived, so it never lands in the shared settings file).
   // LL_NEMO_VIEW=1 at launch opens the pop-up; 2 opens it maximised (playable full window).
+  // Grid size is a renderer / config option (render.ascii_grid), so a later main-window
+  // ASCII play mode can share it. Display default 160x90; hashing / record default stays 80x45.
+  // LL_ASCII_GRID overrides the display default at launch (e.g. 80x45, 96x54, 180x80, 240x135).
   {
     const char* e = std::getenv("LL_NEMO_VIEW");
     const char* launch = "0";
     if (e && (std::string(e) == "1" || std::string(e) == "2")) launch = e;  // 2 = maximised play window
+    litholattice::nemoview::Grid launchGrid = litholattice::nemoview::kDisplayGrid;
+    if (const char* ge = std::getenv("LL_ASCII_GRID")) {
+      litholattice::nemoview::Grid parsed;
+      if (litholattice::nemoview::parseGrid(ge, parsed)) launchGrid = parsed;
+    }
+    static char colsDef[16];
+    static char gridDef[16];
+    std::snprintf(colsDef, sizeof colsDef, "%d", launchGrid.cols);
+    std::snprintf(gridDef, sizeof gridDef, "%s", launchGrid.name);
     const Row nemo[] = {
         {"render.nemo_view", launch, "Nemo View window, the ASCII picture Little Nemo reads: 0 closed, 1 open, 2 open maximised (playable full window)"},
         {"render.nemo_view_style", "4", "Nemo View colours: 0 matrix green, 1 true palette, 2 depth heat, 3 object colours, 4 solid fill and ink (default)"},
         {"render.nemo_view_objects", "1", "Nemo View preview: 1 object characters (wall #, door |), 0 pixels and depth only"},
-        {"render.nemo_view_cols", "80", "Nemo View preview width in characters: 40, 80 or 96"},
+        {"render.nemo_view_cols", colsDef, "Nemo View preview width in characters (alias of render.ascii_grid): 80, 96, 160, 180 or 240"},
     };
     for (const auto& row : nemo) {
       std::string err;
       if (!r.registerCVar(row.name, CVarType::Int, row.def, false, row.help, CVarFlags{}, &err))
         r.print(std::string("nemo view: cvar '") + row.name + "' not registered: " + err);
     }
+    {
+      std::string err;
+      if (!r.registerCVar("render.ascii_grid", CVarType::String, gridDef, false,
+                          "ASCII renderer grid: 80x45 (hashing default), 96x54, 160x90 (display default), 180x80, 240x135. Shared so a later main-window ASCII play mode can use the same setting.",
+                          CVarFlags{}, &err))
+        r.print(std::string("nemo view: cvar 'render.ascii_grid' not registered: ") + err);
+    }
+    r.setCVarChangeFn("render.ascii_grid", [](cConsoleReg& reg, const auto& c) {
+      static bool syncing = false;
+      if (syncing) return;
+      litholattice::nemoview::Grid g;
+      if (!litholattice::nemoview::parseGrid(c.value, g) || std::string(g.name) == "40x22" ||
+          std::string(g.name) == "32x12") {
+        syncing = true;
+        std::string err;
+        reg.setCVar("render.ascii_grid", litholattice::nemoview::kDisplayGrid.name, &err);
+        syncing = false;
+        return;
+      }
+      syncing = true;
+      std::string err;
+      reg.setCVar("render.ascii_grid", g.name, &err);
+      reg.setCVar("render.nemo_view_cols", std::to_string(g.cols), &err);
+      syncing = false;
+    });
+    r.setCVarChangeFn("render.nemo_view_cols", [](cConsoleReg& reg, const auto& c) {
+      static bool syncing = false;
+      if (syncing) return;
+      litholattice::nemoview::Grid g;
+      if (!litholattice::nemoview::parseGrid(c.value, g) || std::string(g.name) == "40x22" ||
+          std::string(g.name) == "32x12") {
+        syncing = true;
+        std::string err;
+        reg.setCVar("render.nemo_view_cols", std::to_string(litholattice::nemoview::kDisplayGrid.cols), &err);
+        syncing = false;
+        return;
+      }
+      syncing = true;
+      std::string err;
+      reg.setCVar("render.nemo_view_cols", std::to_string(g.cols), &err);
+      reg.setCVar("render.ascii_grid", g.name, &err);
+      syncing = false;
+    });
   }
   // Fix 2026-10-11 (regression, LOW): mcp.audio_tier and camera.chunk_radius
   // are write-only today (the builder wires them later); clamp at registration

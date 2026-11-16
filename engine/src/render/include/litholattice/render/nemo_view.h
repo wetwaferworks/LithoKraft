@@ -80,6 +80,49 @@ const char* viewModeName(ViewMode m);
 bool viewModeFromName(const std::string& name, ViewMode& out);
 const char* viewStyleName(ViewStyle s);
 
+/// A cell grid the ASCII renderer can be pointed at. The size lives here, as a
+/// renderer / config option, not inside the Nemo View window, so the same
+/// builder can later paint the main LithoKraft window as a human-playable
+/// ASCII mode. That path is not wired yet; keep the window a consumer of the
+/// finished frame and of this Grid.
+///
+/// Named selectable grids (each is its own hash format, beside 80x45):
+///   80x45   hashing / record default, 320x180 capture, 4x4 cells
+///   96x54   384x216 capture, 4x4 cells
+///   160x90  display default, 320x180 capture, 2x2 cells
+///   180x80  360x160 capture, 2x2 cells
+///   240x135 480x270 capture, 2x2 cells
+/// A later playable mode may use a different capture (for example 1920x1080
+/// at 8x8 for 240x135) as long as the source tiles the grid exactly.
+struct Grid {
+  int cols = 80;
+  int rows = 45;
+  int captureW = 320;  ///< default Nemo / MCP capture for this grid; not the only legal source
+  int captureH = 180;
+  const char* name = "80x45";
+};
+
+inline constexpr int kSelectableGridCount = 5;
+inline constexpr Grid kGrid80x45{80, 45, 320, 180, "80x45"};
+inline constexpr Grid kGrid96x54{96, 54, 384, 216, "96x54"};
+inline constexpr Grid kGrid160x90{160, 90, 320, 180, "160x90"};
+inline constexpr Grid kGrid180x80{180, 80, 360, 160, "180x80"};
+inline constexpr Grid kGrid240x135{240, 135, 480, 270, "240x135"};
+/// Legacy MCP width, still accepted by vision.capture_ascii. Not a display choice.
+inline constexpr Grid kGrid40x22{40, 22, 160, 88, "40x22"};
+/// Fovea: centre 128x48 of an 80-col 320x180 capture, 32x12. Prompt budget unchanged.
+inline constexpr Grid kFoveaGrid{32, 12, 128, 48, "32x12"};
+inline constexpr Grid kHashGrid = kGrid80x45;
+inline constexpr Grid kDisplayGrid = kGrid160x90;
+
+const Grid* selectableGrids();  ///< kSelectableGridCount entries
+const Grid& hashGrid();
+const Grid& displayGrid();
+/// Parse "160x90", "160", "display" / "default", "hash" / "record". Also accepts 40 and fovea / 32x12.
+bool parseGrid(const std::string& spec, Grid& out);
+/// Look up a known grid by columns (and rows when non-zero).
+bool gridBySize(int cols, int rows, Grid& out);
+
 /// Read-only view of one finished frame. Pixels are 0xAARRGGBB, rows top first.
 struct SourceView {
   int width = 0, height = 0;
@@ -93,8 +136,15 @@ struct SourceView {
 };
 
 struct FrameConfig {
-  int cols = 80, rows = 45;
+  int cols = 80, rows = 45;  ///< hashing / record default (kHashGrid); not the display default
   ViewMode mode = ViewMode::Objects;
+  static FrameConfig forGrid(const Grid& g, ViewMode m = ViewMode::Objects) {
+    FrameConfig c;
+    c.cols = g.cols;
+    c.rows = g.rows;
+    c.mode = m;
+    return c;
+  }
 };
 
 struct AsciiFrame {

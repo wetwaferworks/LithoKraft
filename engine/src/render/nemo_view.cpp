@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <cstring>
 
 #include "litholattice/crypto/sha256.h"
@@ -186,6 +187,67 @@ std::string depthTableShaPrefix() {
     s += char(std::tolower(kHex[depthTableSha256()[size_t(i)] & 15]));
   }
   return s;
+}
+
+
+namespace {
+
+const Grid kSelectable[kSelectableGridCount] = {kGrid80x45, kGrid96x54, kGrid160x90, kGrid180x80, kGrid240x135};
+
+std::string compactSpec(const std::string& spec) {
+  std::string s;
+  s.reserve(spec.size());
+  for (unsigned char c : spec) {
+    if (!std::isspace(c)) s.push_back(char(std::tolower(c)));
+  }
+  return s;
+}
+
+}  // namespace
+
+const Grid* selectableGrids() { return kSelectable; }
+const Grid& hashGrid() { return kHashGrid; }
+const Grid& displayGrid() { return kDisplayGrid; }
+
+bool gridBySize(int cols, int rows, Grid& out) {
+  const Grid known[] = {kGrid80x45, kGrid96x54, kGrid160x90, kGrid180x80, kGrid240x135, kGrid40x22, kFoveaGrid};
+  for (const Grid& g : known) {
+    if (g.cols == cols && (rows == 0 || rows == g.rows)) {
+      out = g;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool parseGrid(const std::string& spec, Grid& out) {
+  const std::string s = compactSpec(spec);
+  if (s.empty()) return false;
+  if (s == "display" || s == "default") {
+    out = kDisplayGrid;
+    return true;
+  }
+  if (s == "hash" || s == "record") {
+    out = kHashGrid;
+    return true;
+  }
+  if (s == "fovea") {
+    out = kFoveaGrid;
+    return true;
+  }
+  int cols = 0, rows = 0;
+  const char* p = s.c_str();
+  char* end = nullptr;
+  cols = int(std::strtol(p, &end, 10));
+  if (end == p || cols <= 0) return false;
+  if (*end == 'x') {
+    const char* r = end + 1;
+    rows = int(std::strtol(r, &end, 10));
+    if (end == r || *end != '\0' || rows <= 0) return false;
+  } else if (*end != '\0') {
+    return false;
+  }
+  return gridBySize(cols, rows, out);
 }
 
 bool prepare(const SourceView& src, const FrameConfig& cfg, AsciiFrame& out, std::string* err) {

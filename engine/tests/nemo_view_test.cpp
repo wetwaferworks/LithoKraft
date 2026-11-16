@@ -158,6 +158,24 @@ int main() {
     check(rleDecode(r, back) && back == t && r.size() < t.size(), "run-length round trip");
     check(!rleDecode("3a", back), "a count with no character fails");
   }
+
+  {
+    Grid g;
+    check(parseGrid("display", g) && g.cols == 160 && g.rows == 90 && g.name == displayGrid().name,
+          "display default grid is 160x90");
+    check(parseGrid("hash", g) && g.cols == 80 && g.rows == 45, "hash / record grid stays 80x45");
+    check(parseGrid("160", g) && g.rows == 90 && parseGrid("240x135", g) && g.captureW == 480,
+          "grid specs accept a width or a width x height");
+    FrameConfig def;
+    check(def.cols == 80 && def.rows == 45, "FrameConfig default is the 80x45 hashing format");
+    bool allNamed = true;
+    for (int i = 0; i < kSelectableGridCount; ++i) {
+      Grid got;
+      allNamed = allNamed && parseGrid(selectableGrids()[i].name, got) && got.cols == selectableGrids()[i].cols;
+    }
+    check(allNamed && kSelectableGridCount == 5, "selectable grids: 80x45, 96x54, 160x90, 180x80, 240x135");
+    check(!parseGrid("81", g) && !parseGrid("80x90", g), "unknown or mismatched grids are refused");
+  }
   // ---- frames: geometry and worker-count identity ----
   const Fixture fx(320, 180);
   const SourceView src = fx.view();
@@ -262,6 +280,28 @@ int main() {
       if (unpackCell(w).face == uint8_t(FaceId::Top)) ++tops;
     check(tops > 0, "majority face id is packed into the cell");
   }
+
+  // ---- selectable grids: each size is its own hash format, beside 80x45 ----
+  {
+    for (int i = 0; i < kSelectableGridCount; ++i) {
+      const Grid& g = selectableGrids()[i];
+      const Fixture fx(g.captureW, g.captureH);
+      const SourceView src = fx.view();
+      const FrameConfig cfg = FrameConfig::forGrid(g);
+      const std::string ref = buildWithWorkers(src, cfg, 1);
+      bool same = true;
+      for (int wk : {2, 4, 8}) same = same && buildWithWorkers(src, cfg, wk) == ref;
+      AsciiFrame f;
+      build(src, cfg, f);
+      const std::string rec = canonicalRecord(f);
+      char expect[96];
+      std::snprintf(expect, sizeof expect, "nemo_ascii.v2|%d|%d|objects|ramp.v1|pal16.v1|c4b3f1700c0d9c94|", g.cols, g.rows);
+      char line[200];
+      std::snprintf(line, sizeof line, "%s: same SHA at 1/2/4/8 workers (%.16s)", g.name, ref.c_str());
+      check(same && rec.rfind(expect, 0) == 0 && f.cell.size() == size_t(g.cols) * size_t(g.rows), line);
+      std::printf("[NEMO-VIEW] fixture %s objects sha256 %s\n", g.name, ref.c_str());
+    }
+  }
   // ---- the software renderer's object-id buffer ----
   {
     std::vector<PackedVertex> mesh;
@@ -320,17 +360,28 @@ int main() {
     build(v, cfg, f2);
     check(glyphRows(f2).find('k') != std::string::npos, "with the wall gone the key shows as k");
   }
-  // ---- speed (report; fails only when far off the 0.5 ms target) ----
+
+  // ---- speed (report; fails only when far off the target) ----
   {
-    FrameConfig cfg;
-    AsciiFrame f;
-    const int reps = 200;
-    const auto t0 = std::chrono::steady_clock::now();
-    for (int i = 0; i < reps; ++i) build(src, cfg, f);
-    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / reps;
-    char line[160];
-    std::snprintf(line, sizeof line, "80x45 frame build %.3f ms single-threaded (target 0.5 ms)", ms);
-    check(ms < 5.0, line);
+    const Fixture fx80(320, 180);
+    const SourceView src80 = fx80.view();
+    for (int i = 0; i < kSelectableGridCount; ++i) {
+      const Grid& g = selectableGrids()[i];
+      Fixture fx(g.captureW, g.captureH);
+      const SourceView src = (g.cols == 80 && g.rows == 45) ? src80 : fx.view();
+      const FrameConfig cfg = FrameConfig::forGrid(g);
+      AsciiFrame f;
+      const int reps = g.cols * g.rows > 80 * 45 ? 80 : 200;
+      const auto t0 = std::chrono::steady_clock::now();
+      for (int n = 0; n < reps; ++n) build(src, cfg, f);
+      const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / reps;
+      const double cells = double(g.cols) * double(g.rows);
+      const double limit = 5.0 * (cells / (80.0 * 45.0) < 1.0 ? 1.0 : cells / (80.0 * 45.0));
+      char line[200];
+      std::snprintf(line, sizeof line, "%s frame build %.3f ms single-threaded (80x45 target 0.5 ms; fail above %.1f ms)",
+                    g.name, ms, limit);
+      check(ms < limit, line);
+    }
   }
   if (g_fail) {
     std::printf("[NEMO-VIEW] %d FAILED\n", g_fail);
