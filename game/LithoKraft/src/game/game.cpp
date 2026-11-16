@@ -51,6 +51,7 @@
 #include "litholattice/render/ground_pulse.h"
 #include "lithokraft/content/item_use.h"
 #include "lithokraft/content/signal_world.h"
+#include "lithokraft/game/tick_signal_posts.h"  // t46u 6b-3b
 #include "lithokraft/content/circuit_scene.h"
 #include "lithokraft/content/test_world.h"  // playtest 2026-10-16: --test-world
 #include "lithokraft/content/cBoltLabWorld.h"
@@ -1835,6 +1836,7 @@ void Game::loadActive() {
     worldSim->setSceneLevers(std::move(sceneLevers));
   }
   litholattice::setPickShapeFn(&pickShapeBoxes);  // 2026-10-25 (JD): model-shaped look / target ray
+  signalInit_.clear();  // t46u 6b-3b: tickets belong to the sim being replaced (its stop() ran its posts)
   sim_ = std::make_unique<cSimThread>(active_->chunks, blockRegistry(), std::move(worldSim), std::move(sc),
                                      submitMesh_);
   holdTicksForIo("load-sim");  // B9: the new sim is paused BEFORE components load and before it starts
@@ -2769,7 +2771,9 @@ void Game::pumpStreaming(float frameDtMs) {
       if (std::max(std::abs(col->cx - pcx), std::abs(col->cz - pcz)) > stagedPromoteR) continue;
       (void)key;
       const auto tSc = std::chrono::steady_clock::now();
-      signal.scanColumn(active_->chunks, col->cx, col->cz);
+      // t46u 6b-3b: the signal index is the tick thread's; it applies this at its next boundary. The stage
+      // word stays here (an atomic lifecycle word the game thread reads; the sim never reads it).
+      signalInit_.note(ChunkKey::make(col->cx, col->cz), postColumnSignalInit(*sim_, signal, active_->chunks, col->cx, col->cz, {}));
       msScan += pumpMsSince(tSc); ++nScan;
       col->state.setStage(litholattice::ChunkStage::Active);
       const auto tM = std::chrono::steady_clock::now();
@@ -2846,10 +2850,10 @@ void Game::pumpStreaming(float frameDtMs) {
       // nothing to index and no SGNL payload exists for them.
       ++nFromDisk;
       const auto tSc = std::chrono::steady_clock::now();
-      signal.scanColumn(active_->chunks, cx, cz);
+      // t46u 6b-3b: scan + restore run on the tick thread at its next boundary. Until then the column's
+      // signal state must not be read here (the pre-evict save checks signalInit_).
+      signalInit_.note(ChunkKey::make(cx, cz), postColumnSignalInit(*sim_, signal, active_->chunks, cx, cz, std::move(sc.signal)));
       msScan += pumpMsSince(tSc); ++nScan;
-      if (!sc.signal.empty() && !signal.importState(sc.signal))
-        logError("save: streamed column %d,%d signal state unreadable (components restart idle)", cx, cz);
     }
     const ChunkColumn* c = active_->chunks.column(cx, cz);
     c->state.setStage(litholattice::ChunkStage::Mesh);  // P5: STAGED_SIM -> MESH
@@ -3025,10 +3029,14 @@ void Game::evictFarColumns() {
   }
   cSignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   size_t evicted = 0;
+  signalInit_.prune(*sim_);
   for (uint64_t key : candidates) {
     const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
     ChunkColumn* col = active_->chunks.column(cx, cz);
     if (!col) continue;
+    // t46u 6b-3b: its signal init is still queued for the tick thread. Saving now would export the
+    // column without its restored component memory, so it stays resident until the tick side has run it.
+    if (signalInit_.pending(*sim_, key)) continue;
     // WORLD PERMANENCE: a column is droppable without a save ONLY when
     // it is clean (no ChunkMap mutation since generation/load) AND the
     // sim indexes nothing in it. Anything else saves first; when the
@@ -3056,7 +3064,7 @@ void Game::evictFarColumns() {
         continue;
       }
     }
-    signal.unscanColumn(cx, cz);       // drop sim indexes (ghost-component guard)
+    postColumnSignalDrop(*sim_, signal, cx, cz);  // drop sim indexes (ghost-component guard), tick side (6b-3b)
     retireColumnMeshes(cx, cz);        // meshes die with their column
     viewGate_.forget(cx, cz);          // Archie Phase 1
     swLodMeshed_.erase(key);           // Phase 3a

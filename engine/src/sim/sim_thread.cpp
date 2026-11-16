@@ -294,21 +294,23 @@ void cSimThread::serveOwnerJobsGated() {
   runOwnerJobs();
 }
 
-void cSimThread::postToTick(std::function<void()> fn) {
-  if (!fn) return;
+uint64_t cSimThread::postToTick(std::function<void()> fn) {
+  if (!fn) return tickPostsQueued_;
+  const uint64_t ticket = ++tickPostsQueued_;
   if (!tickLive_.load(std::memory_order_acquire)) {
     // No tick thread: the world is ours (owner thread). Older posts first, then this one. Gated like the
     // inline runBetweenTicks path (the gate is reentrant, so a caller already holding it is fine).
     litholattice::cGateGuard l(blockMutex_);
     if (tickPosts_.load(std::memory_order_acquire)) runTickPosts();
     fn();
-    tickPostsRun_.fetch_add(1, std::memory_order_relaxed);
-    return;
+    tickPostsRun_.fetch_add(1, std::memory_order_release);
+    return ticket;
   }
   TickPost* p = new TickPost{std::move(fn), nullptr};
   TickPost* head = tickPosts_.load(std::memory_order_relaxed);
   do { p->next = head; } while (!tickPosts_.compare_exchange_weak(head, p, std::memory_order_acq_rel, std::memory_order_relaxed));
   notifyWake();  // a parked (paused) loop runs one pass and adopts
+  return ticket;
 }
 
 void cSimThread::runTickPosts() {
@@ -323,7 +325,7 @@ void cSimThread::runTickPosts() {
     } catch (...) {
       logError("sim: a posted tick-side job threw; skipped");
     }
-    tickPostsRun_.fetch_add(1, std::memory_order_relaxed);
+    tickPostsRun_.fetch_add(1, std::memory_order_release);  // after the post's effects (tickPostDone acquires)
   }
 }
 

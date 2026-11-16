@@ -196,7 +196,10 @@ class cSimThread {
   /// once (after any older post). stop() runs whatever the tick thread did not reach. Use it for work
   /// on state the tick thread owns (signal sim indexes, cell stage flags) that follows a structural
   /// change the owner made: the tick side sees the change and the follow-up at the same boundary.
-  void postToTick(std::function<void()> fn);
+  /// Returns the post's ticket (1, 2, ...; owner thread). See tickPostDone.
+  uint64_t postToTick(std::function<void()> fn);
+  /// OWNER THREAD: true once the post with this ticket has run (posts run in ticket order).
+  bool tickPostDone(uint64_t ticket) const noexcept { return tickPostsRun_.load(std::memory_order_acquire) >= ticket; }
   /// Posts run so far (diagnostic; any thread).
   uint64_t tickPostsRun() const noexcept { return tickPostsRun_.load(std::memory_order_relaxed); }
   /// t46u item 6b: waits, bounded and lock-free, until the tick thread starts a new mutation window, so a
@@ -422,6 +425,7 @@ class cSimThread {
   struct TickPost { std::function<void()> fn; TickPost* next = nullptr; };
   alignas(64) std::atomic<TickPost*> tickPosts_{nullptr};
   std::atomic<uint64_t> tickPostsRun_{0};
+  uint64_t tickPostsQueued_ = 0;  // owner thread only: the last ticket handed out
   void runTickPosts();  // caller owns the world (tick thread at a boundary, or the owner with no tick thread)
   // Every phase boundary where the tick thread takes the world: adopt the directory, then run the posts.
   void adoptBoundary() {

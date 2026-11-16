@@ -75,6 +75,10 @@
 #include "lithokraft/game/world_save.h"
 #include "litholattice/script/script_engine.h"
 #include "lithokraft/content/signal.h"
+#include "lithokraft/content/signal_world.h"         // t46u 6b-3b: tick-side signal init test
+#include "lithokraft/game/tick_signal_posts.h"       // t46u 6b-3b
+#include "litholattice/core/gate_lock.h"
+#include "litholattice/sim/sim_thread.h"
 #include "lithokraft/content/item_use.h"
 #include "litholattice/projectile/projectile.h"
 #include "litholattice/world/dimension.h"
@@ -968,6 +972,82 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       for (int i = 0; i < 6; ++i) dstSim.tick(dst, 20, 20, 4, noDirty);
       check(dst.getState(328, gy, 322) == 1 && stValue(dst.getState(326, gy, 322)) == 62,
             "p1-stream (SW-H1): the streamed circuit is ALIVE after reload (lamp lit, memor still holds 62)");
+      // t46u item 6b-3b: the same disk column through the REAL tick-thread seam. pumpStreaming now posts
+      // scan + import to the tick thread (postColumnSignalInit); every save that follows at once must still
+      // see the restored component memory: the async save's boundary-job snapshot, the pre-evict save
+      // (which waits on the column's ticket), and the sync save (stop() runs the posts left over). Run with
+      // the sim ticking and with it paused (parked): the posts must not wait out the park.
+      for (const bool pausedRun : {false, true}) {
+        const std::string tag = pausedRun ? " (sim paused)" : " (sim running)";
+        ChunkMap tw;
+        tw.setRegistry(&blockRegistry());
+        auto ws = std::make_unique<cSignalWorldSim>();
+        cSignalWorldSim* wsp = ws.get();
+        litholattice::SimConfig tcfg;
+        tcfg.tickRate = 64;
+        tcfg.radiusChunks = 4;  // around chunk (0,0): column (20,20) is loaded but outside the tick area (state stays put)
+        litholattice::cSimThread st(tw, blockRegistry(), std::move(ws), std::move(tcfg), [](std::shared_ptr<litholattice::MeshInput>) {});
+        st.setPaused(pausedRun);
+        st.start();
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));  // running: a few passes; paused: parked
+        auto again = streamSave.loadColumn("wafer", 20, 20);
+        const std::vector<uint8_t> blob = again.signal;
+        uint64_t ticket = 0;
+        bool held = false, queued = false;
+        {  // as pumpStreaming: insert under the between-ticks hold, publish, post the signal init
+          litholattice::cGateLock<litholattice::cBlockGate> hold;
+          held = st.holdBetweenTicks(hold) && again.column != nullptr;
+          if (held) {
+            tw.insert(std::move(again.column));
+            tw.publishDirectory();
+            ticket = postColumnSignalInit(st, wsp->signal(), tw, 20, 20, std::move(again.signal));
+            queued = !st.tickPostDone(ticket);  // the tick thread cannot run it while we hold the world
+          }
+        }
+        check(held && queued, ("6b-3b tick seam" + tag + ": the disk column's scan + import is queued for the tick thread, not run here").c_str());
+        // (1) async save path: a boundary-job snapshot posted at once sees the restored memory.
+        std::atomic<bool> snapped{false};
+        std::map<uint64_t, std::vector<uint8_t>> snapState;
+        const bool posted = st.postBoundaryJob([&] { snapState = wsp->signal().exportState(); snapped.store(true); });
+        for (int i = 0; i < 2000 && posted && !snapped.load(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        check(posted && snapped.load() && snapState == srcState,
+              ("6b-3b tick seam" + tag + ": an immediate async-save snapshot (boundary job) has the restored component memory").c_str());
+        // (2) pre-evict save path: the ticket gates the read; once done, the saved column round-trips its circuit state.
+        cSignalInitTickets tickets;
+        tickets.note(litholattice::ChunkKey::make(20, 20), ticket);
+        for (int i = 0; i < 2000 && tickets.pending(st, litholattice::ChunkKey::make(20, 20)); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        const bool initDone = !tickets.pending(st, litholattice::ChunkKey::make(20, 20));
+        bool evSaved = false;
+        const auto evDir = dir / (pausedRun ? "p6b3b_evict_paused" : "p6b3b_evict_running");
+        {
+          litholattice::cGateLock<litholattice::cBlockGate> hold;
+          if (initDone && st.holdBetweenTicks(hold)) {
+            cWorldSave evSave(evDir);
+            evSaved = evSave.saveColumns("wafer", {tw.column(20, 20)}, wsp->signal(), /*wait=*/true) == 1 && evSave.lastSaveOk();
+          }
+        }
+        bool evRoundTrip = false;
+        if (evSaved) {
+          cWorldSave back(evDir);
+          auto rl = back.loadColumn("wafer", 20, 20);
+          if (rl.status == cWorldSave::ColumnLoad::Loaded && rl.column && !rl.signal.empty()) {
+            ChunkMap bm;
+            bm.setRegistry(&blockRegistry());
+            bm.insert(std::move(rl.column));
+            cSignalSim bs;
+            bs.scanColumn(bm, 20, 20);
+            evRoundTrip = bs.importState(rl.signal) && bs.exportState() == srcState;
+          }
+        }
+        check(initDone && evSaved && evRoundTrip,
+              ("6b-3b tick seam" + tag + ": the pre-evict save waits for the init, then saves the restored circuit state (round-trips bit for bit)").c_str());
+        // (3) sync save path: drop + re-init posted, then stop() at once (as saveWorld does): stop runs them in order.
+        postColumnSignalDrop(st, wsp->signal(), 20, 20);
+        const uint64_t t2 = postColumnSignalInit(st, wsp->signal(), tw, 20, 20, blob);
+        st.stop();
+        check(st.tickPostDone(t2) && wsp->signal().exportState() == srcState,
+              ("6b-3b tick seam" + tag + ": a sync save right after the posts (sim stopped) sees the restored circuit state").c_str());
+      }
       {  // Dimension path on the SAME cWorldSave instance, after streamed loads.
         ChunkMap dimMap = emptyLike(src);
         std::vector<uint8_t> blob;

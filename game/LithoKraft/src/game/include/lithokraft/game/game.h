@@ -37,6 +37,7 @@
 #include "lithokraft/game/actions.h"
 #include "lithokraft/game/world_save.h"
 #include "lithokraft/game/cAsyncSaver.h"
+#include "lithokraft/game/tick_signal_posts.h"  // t46u 6b-3b: cSignalInitTickets
 #include "lithokraft/game/cWorldLoadSoak.h"
 #include "lithokraft/game/cTickStabilityMeter.h"  // 2026-10-31 (JD): Save World, tick-boundary snapshot + pool write
 #include "lithokraft/game/lithography.h"  // Cortana 2026-10-15 1900
@@ -782,6 +783,7 @@ class Game {
   uint64_t meshHashLogged_ = 0;
   void p8MeshHashCheck();
   litholattice::cDeferredFreeQueue<litholattice::ChunkColumn> deferredFree_;  ///< evicted columns, freed outside the sim hold
+  cSignalInitTickets signalInit_;  ///< t46u 6b-3b: disk columns whose tick-side signal init is still queued
   int streamCx_ = 0, streamCz_ = 0;                    ///< centre of the last pumpStreaming request pass
   bool streamCentreSet_ = false;
   cL0NeighbourHold l0Hold_;                           ///< fix (b): first L0 mesh waits for edge neighbours
