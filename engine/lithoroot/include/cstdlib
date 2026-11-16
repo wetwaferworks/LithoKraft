@@ -43,6 +43,8 @@ using ::quick_exit;
 using ::abort;
 using ::_Exit;
 using ::getenv;
+using ::setenv;
+using ::unsetenv;
 using ::system;
 using ::mblen;
 using ::mbtowc;
