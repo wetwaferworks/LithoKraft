@@ -160,8 +160,8 @@ struct GameSettings {
                                ///< ("off" | "fxaa" | "cmaa" | "ssaa2x"),
                                ///< JD 2026-10-13. Default off — JD reviews
                                ///< the capture sets and picks the default.
-  bool asciiMode = false;      ///< render.ascii: ASCII output pipeline
-                               ///< (experiment tier, JD 2026-10-13).
+  bool asciiMode = false;      ///< render.ascii / render.ascii_mode: ASCII world + GUI
+                               ///< (default off). Launch override: LL_ASCII_MODE.
   int asciiCols = 160;         ///< render.ascii_cols: ASCII glyph columns,
                                ///< clamped 40..400.
   std::string asciiSet = "ascii";  ///< render.ascii_set: glyph set for the

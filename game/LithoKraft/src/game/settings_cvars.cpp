@@ -309,6 +309,12 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
        // default off. Applied live via IRenderer::setAsciiMode.
        [](GameSettings& s, const std::string& v) { s.asciiMode = toBool(v); },
        CVarType::Bool},
+      {"render.ascii_mode",
+       [](const GameSettings& s) { return s.asciiMode ? "1" : "0"; },
+       // Alias of render.ascii (JD 2026-11-15): switch the main window into
+       // ASCII renderer + ASCII GUI. Default off. LL_ASCII_MODE overrides at launch.
+       [](GameSettings& s, const std::string& v) { s.asciiMode = toBool(v); },
+       CVarType::Bool},
       {"render.ascii_cols",
        [](const GameSettings& s) { return std::to_string(s.asciiCols); },
        // ASCII glyph columns; clamped 40..400.
@@ -408,6 +414,7 @@ void SettingsCvars::syncFrom(const GameSettings& s) {
   registry_->setCVar("render.tex_filter", s.texFilter == 1 ? "bilinear" : s.texFilter == 2 ? "trilinear" : "sharp");
   registry_->setCVar("render.anisotropy", std::to_string(s.anisotropy));
   registry_->setCVar("render.ascii", s.asciiMode ? "1" : "0");
+  registry_->setCVar("render.ascii_mode", s.asciiMode ? "1" : "0");
   registry_->setCVar("render.ascii_cols", std::to_string(s.asciiCols));
   registry_->setCVar("render.ascii_set", s.asciiSet);
   registry_->setCVar("render.ascii_value_span", std::to_string(s.asciiValueSpan));

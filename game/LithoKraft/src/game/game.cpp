@@ -67,6 +67,7 @@
 #include "litholattice/core/time.h"
 #include "litholattice/render/mesher.h"
 #include "litholattice/render/software_renderer.h"  // 2026-10-16 (JD): F3 renderer line
+#include "litholattice/render/software_ascii.h"  // ASCII GUI pointer-to-cell mapping
 #include "litholattice/render/software_simd.h"     // swsimd::activePath (ISA tier)
 #include "lithokraft/game/build_version.h"         // 2026-10-16 (JD): Alpha build counter
 #include "lithokraft/content/signal.h"
@@ -815,7 +816,12 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
  //                 // Cortana 2026-10-16: render.tex_res
   renderer_.setMipmaps(settings_.mipmaps);               // Cortana 2026-10-16: render.mipmaps
   renderer_.setEmissiveLight(settings_.emissiveLight);   // Cortana 2026-10-16: render.emissive_light
-  renderer_.setAsciiMode(settings_.asciiMode, settings_.asciiCols);  // ASCII pipeline
+  if (const char* e = std::getenv("LL_ASCII_MODE")) {
+    const std::string v(e);
+    if (v == "1" || v == "on" || v == "true") settings_.asciiMode = true;
+    else if (v == "0" || v == "off" || v == "false") settings_.asciiMode = false;
+  }
+  renderer_.setAsciiMode(settings_.asciiMode, settings_.asciiCols);  // ASCII pipeline (render.ascii / render.ascii_mode)
   renderer_.setAsciiGlyphSet(settings_.asciiSet.c_str());            // ascii | systerian
   renderer_.setAsciiValueSpan(settings_.asciiValueSpan);  // JD amendment: full 0-255 span
   pushCullProtoConfig();  // culling-cache prototypes (JD 2026-10-11); all default off
@@ -4210,10 +4216,19 @@ void Game::pickInventoryItem(uint32_t itemId, bool shift) {
   ui_.refreshCarry(carrySnapshot());
 }
 
-void Game::routeUiInput(bool& pointerUsed, bool& escapeUsed) {
+void Game::routeUiInput(bool& pointerUsed, bool& escapeUsed, int width, int height) {
   pointerUsed = escapeUsed = false;
   uiEvents_.clear();
   translateUiEvents(input_.frameEvents(), input_.devices(), uiEvents_);
+  if (settings_.asciiMode && width >= 8 && height >= 8) {
+    litholattice::AsciiGridGeom grid;
+    if (litholattice::asciiGridGeometry(width, height, settings_.asciiCols, grid)) {
+      for (ui::UiEvent& ev : uiEvents_) {
+        if (ev.type == ui::UiEvent::Type::KeyDown || ev.type == ui::UiEvent::Type::Text) continue;
+        litholattice::asciiSnapPointer(grid, ev.pos.x, ev.pos.y);
+      }
+    }
+  }
   const int popupsAtStart = ui_.root().gui().context().popupCount();
   // With the mouse captured for play the cursor is hidden: only keys may reach the UI.
   // Cortana 2026-10-15 1213 (alt-tab click bug): paused_ added. A focus
@@ -4726,7 +4741,7 @@ void Game::update(float dt, int width, int height) {
   }
   bool uiClick = false, uiEscape = false;
   const bool modalWasOpen = ui_.root().modalOpen();
-  routeUiInput(uiClick, uiEscape);
+  routeUiInput(uiClick, uiEscape, width, height);
   // Keybind dispatch (HL1-style): the console owns the binding table; the
   // input pump dispatches here, after UI routing. Suppressed while the debug
   // console (or any text field) holds keyboard focus â€” text entry wins.

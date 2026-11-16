@@ -511,7 +511,7 @@ class Game {
   void pushCullProtoConfig();
   /// Feeds this frame's input to the UI. Sets `pointerUsed` if the UI took a click and
   /// `escapeUsed` if it took Escape (so gameplay ignores them).
-  void routeUiInput(bool& pointerUsed, bool& escapeUsed);
+  void routeUiInput(bool& pointerUsed, bool& escapeUsed, int width, int height);
   /// Input context for UI text entry, theme reloads, HUD model -> widgets, layout.
   void updateUi(float dt, int width, int height);
   HudModel hudModel() const;

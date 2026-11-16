@@ -118,3 +118,32 @@ Single-threaded frame build after this change (same machine):
 | 160x90  | 1.003    | 20.0 ms    |
 | 180x80  | 1.038    | 20.0 ms    |
 | 240x135 | 2.435    | 45.0 ms    |
+
+## ASCII GUI and main-window ASCII mode
+
+Display only. `render.ascii` / `render.ascii_mode` and `LL_ASCII_MODE` stay off unless asked, so ordinary pixel play and the official frame hashes are untouched. After this change, every Nemo fixture hash above still matched, including 80x45 (`95c90f393878009ae385adf585f891b8b317857f2ccff79f7be0c677ef0989bc`) and the rendered scene (`2e050fbcd1b8b1b6649e2245c235496c3ddeab76552ec0565a70ad81e7412034`). `lithokraft_frame_hash_selftest` still passed.
+
+The main window already had a software-only ASCII world pass (Daemon Sight, `render.ascii`). Menus and the HUD were still drawn as pixels on top of that grid, so the mode was not really operable. The same HUD commands are now painted onto the glyph grid: box-drawing for panels and thin strokes, the baked 8x16 font for labels, and a tinted cell plus `#` for icons. Pointer, hover, and wheel events snap to the centre of the cell they land in, using the same geometry as the paint (window size and `render.ascii_cols`). Keyboard navigation (Tab, arrows, Enter, Esc) was already there and is unchanged.
+
+Settings:
+
+- `render.ascii_mode` is an alias of `render.ascii`. Both write `GameSettings.asciiMode`. Default off.
+- `LL_ASCII_MODE=1` (or `on` / `true`) turns it on at launch; `0` / `off` / `false` forces it off. Applied just before `IRenderer::setAsciiMode`.
+- GPU backends still ignore `setAsciiMode` (that was already true). The scratch launcher therefore uses `--renderer software`.
+
+Software tests now check that cell mapping and snap agree, that a painted label lights pixels, and that a cell well away from the panel is left alone.
+
+What works today: main menu, pause menu, inventory / creative screen, and the in-play HUD (hotbar, crosshair, whatever else is already in the HUD layer). Settings comes along for free if it uses the same layer, but it has not been given a careful pass.
+
+Still left:
+
+- Settings typography and layout in ASCII (it should appear, but it has not been polished or shot).
+- World picker and the console.
+- A cleaner F3 / controls overlay; the debug text currently fights the grid.
+- Inventory icon and help-text spacing (slots often show as a tinted fill; long hints wrap badly).
+- ASCII-izing the in-world block highlight (the name can already show; the 3D outline is still a leftover).
+- GPU backends still do not run the ASCII world pass or the ASCII GUI.
+- A playable packed-cell (Nemo-style) world in the main window is still only a hook. Main-window ASCII remains a glyph visualization of the software framebuffer, now with an operable ASCII GUI on the same grid.
+
+The `--ui-view pause` debug shot opens the pause bar without leaving the launch menu, so that picture shows both. In ordinary play, Pause still opens on its own.
+

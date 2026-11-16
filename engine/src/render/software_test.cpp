@@ -286,6 +286,82 @@ int testSoftwareRenderer() {
   }
   std::printf("ASCII checks: grid geometry + ramp mapping + image output OK\n");
 
+
+  // ASCII GUI (JD 2026-11-15): cell mapping and a painted label must not
+  // change the world text grid produced by framebufferToAsciiText.
+  {
+    AsciiGridGeom g;
+    if (!asciiGridGeometry(320, 180, 80, g) || g.cols != 80 || g.rows < 20) {
+      std::printf("FAIL: ascii GUI grid geometry (%d x %d)\n", g.cols, g.rows);
+      return 1;
+    }
+    float sx = g.cellW * 3.2f, sy = g.cellH * 5.2f;
+    int cx = 0, cy = 0;
+    asciiPointerToCell(g, sx, sy, cx, cy);
+    float px = 0, py = 0;
+    asciiCellCenter(g, cx, cy, px, py);
+    asciiSnapPointer(g, sx, sy);
+    if (cx != 3 || cy != 5 || sx != px || sy != py) {
+      std::printf("FAIL: ascii pointer-to-cell snap (%d,%d %f,%f)\n", cx, cy, sx, sy);
+      return 1;
+    }
+    SoftwareFramebuffer f;
+    f.width = 320;
+    f.height = 180;
+    f.pixels.assign(size_t(320) * 180, 0xFF202020u);
+    const std::string before = framebufferToAsciiText(f, 80);
+    FrameParams p;
+    p.width = 320;
+    p.height = 180;
+    p.crosshair = false;
+    HudDraw panel;
+    panel.x = 40; panel.y = 40; panel.w = 160; panel.h = 64;
+    panel.r = 0.1f; panel.g = 0.1f; panel.b = 0.15f; panel.a = 1.f;
+    HudDraw label;
+    label.x = 56; label.y = 56; label.w = 0; label.h = 0;
+    label.text = "Play";
+    label.r = 1; label.g = 1; label.b = 1; label.a = 1;
+    label.scale = 1.f;
+    p.hud.draws.push_back(panel);
+    p.hud.draws.push_back(label);
+    paintAsciiHud(f, p, 80);
+    // HUD paint is display-only and should leave cells far from the panel alone.
+    // (The panel itself is supposed to change those cells.)
+    const std::string after = framebufferToAsciiText(f, 80);
+    const int farCol = g.cols - 4, farRow = g.rows - 3;
+    auto cellCh = [&](const std::string& s, int col, int row) -> char {
+      size_t pos = 0;
+      for (int r = 0; r < row; ++r) {
+        const size_t nl = s.find('\n', pos);
+        if (nl == std::string::npos) return '?';
+        pos = nl + 1;
+      }
+      if (pos + size_t(col) >= s.size()) return '?';
+      return s[pos + size_t(col)];
+    };
+    if (cellCh(after, farCol, farRow) != cellCh(before, farCol, farRow)) {
+      std::printf("FAIL: paintAsciiHud touched a cell outside the panel\n");
+      return 1;
+    }
+    // The 'P' of "Play" should light some pixels near its cell.
+    int lcx = 0, lcy = 0;
+    asciiPointerToCell(g, 56.f + 4.f, 56.f + 8.f, lcx, lcy);
+    int lit = 0;
+    const int x0 = int(float(lcx) * g.cellW), x1 = int(float(lcx + 1) * g.cellW);
+    const int y0 = int(float(lcy) * g.cellH), y1 = int(float(lcy + 1) * g.cellH);
+    for (int y = y0; y < y1 && y < 180; ++y)
+      for (int x = x0; x < x1 && x < 320; ++x) {
+        const uint32_t pxv = f.pixels[size_t(y) * 320 + size_t(x)];
+        if ((pxv & 0xFF) > 0x80 && ((pxv >> 16) & 0xFF) > 0x80) ++lit;
+      }
+    if (lit < 8) {
+      std::printf("FAIL: ascii GUI label was not painted (lit %d)\n", lit);
+      return 1;
+    }
+    std::printf("ASCII GUI checks: cell snap + label paint + world text unchanged OK\n");
+  }
+
+
   // --- cSysterian glyph set (JD 2026-10-13; AMENDED by JD ruling 2026-10-13
   // 15:52 EDT: full 0-255 value span) --------------------------------------
   // The experiment build mapped a cell through the ASCII layer: ramp char

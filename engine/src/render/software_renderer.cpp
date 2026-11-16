@@ -3675,13 +3675,19 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
   }
   if (bloom_) applyBloomPost(fb_, (depth_.size() == fb_.pixels.size()) ? depth_.data() : nullptr, ensureAaScratch());  // Cortana 2026-10-16
   if (asciiEnabled_) applyAsciiPass();
-  // Overlays (H3): highlight + crosshair lines, then the HUD layer â€” the
-  // same order the GPU backends draw them (lines before HUD).
-  drawOverlayLines(p);
-  {  // 2026-10-25 (Archie bucket 5): HUD alone, split out of post+hud (LL_SW_PROF)
-    const auto th = g_swProfOn ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
-    drawHud(p);
-    if (g_swProfOn) { g_hudMsAcc += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - th).count(); g_hudTris += hudVerts_.size() / 3; }
+  // Overlays (H3): highlight + crosshair lines, then the HUD layer - the
+  // same order the GPU backends draw them (lines before HUD). In ASCII
+  // mode the menus are painted onto the same glyph grid as the world, so
+  // a person can operate them without a pixel overlay sitting on top.
+  if (asciiEnabled_) {
+    paintAsciiHud(fb_, p, asciiCols_);
+  } else {
+    drawOverlayLines(p);
+    {  // 2026-10-25 (Archie bucket 5): HUD alone, split out of post+hud (LL_SW_PROF)
+      const auto th = g_swProfOn ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+      drawHud(p);
+      if (g_swProfOn) { g_hudMsAcc += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - th).count(); g_hudTris += hudVerts_.size() / 3; }
+    }
   }
   if (grabArmed_) {
     grabArmed_ = false;
