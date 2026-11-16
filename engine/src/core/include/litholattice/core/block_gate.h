@@ -68,6 +68,10 @@ class cBlockGate {
     return true;
   }
 
+  /// t46u item 6a: true when the calling thread holds the gate (any depth). Exact for the caller:
+  /// only this thread can store its own token, so a stale read can never claim a false yes.
+  bool heldByMe() const noexcept { return owner_.load(std::memory_order_relaxed) == selfToken(); }
+
   void unlock() noexcept {
     if (--depth_ != 0) return;
     owner_.store(0, std::memory_order_release);

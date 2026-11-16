@@ -24,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <exception>  // t46u item 6a: owner-job errors cross back to the caller
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -184,6 +185,10 @@ class cSimThread {
   /// Drops a still-pending boundary job (it never runs). True when one was dropped; false when
   /// none was pending (it already ran or is running on the tick thread).
   bool cancelBoundaryJob();
+  /// t46u item 6a: SIM THREAD ONLY. Runs any pending runBetweenTicks jobs now. A hook that parks the
+  /// tick thread for a long time (the pinned-shot freeze) calls this while it waits, so callers on
+  /// other threads are not held for the whole park.
+  void serviceOwnerJobs() { serveOwnerJobsGated(); }
   /// Stream hand-off (2026-10-15): lock the sim between iterations WITHOUT
   /// pausing or stopping it, so the game thread can insert/erase chunk
   /// columns. Returns false (nothing held) when the timing handshake is
@@ -391,6 +396,16 @@ class cSimThread {
   std::function<void(uint64_t)> tickHook_;
   struct BoundaryJob { std::function<void()> fn; };
   std::atomic<BoundaryJob*> boundaryJob_{nullptr};  ///< see postBoundaryJob (single slot, lock-free)
+  // t46u item 6a (JD 2026-11-16): runBetweenTicks jobs. Any thread pushes one onto a lock-free stack
+  // (the job lives in the caller's frame; the caller polls done). The tick thread runs every pending
+  // job, oldest first, at its phase boundaries: the start of its mutation window, its pacing tail,
+  // and serviceOwnerJobs() from a park hook. stop() runs whatever is left after the join.
+  struct OwnerJob { std::function<void()>* fn = nullptr; std::exception_ptr err; std::atomic<bool> done{false}; OwnerJob* next = nullptr; };
+  alignas(64) std::atomic<OwnerJob*> ownerJobs_{nullptr};
+  std::atomic<std::thread::id> simTid_{};   // the tick thread while run() is live
+  std::atomic<bool> tickLive_{false};       // start() .. stop()'s join: a tick thread may still take jobs
+  void runOwnerJobs();          // caller owns the world (tick thread inside its window)
+  void serveOwnerJobsGated();   // 6a interim: takes blockMutex_ around runOwnerJobs (readers still use the gate)
   std::function<void()> parkHook_;  // mutexfree 2a: runs gate-free after a pass that requested a park
   bool parkReq_ = false;            // mutexfree 2a: SIM THREAD ONLY (set by a hook, consumed by loopBody)
   std::function<void(uint64_t)> playerHook_;  // player body step (see setPlayerHook)  // LL_HASH_AT_TICK probe (measure only)

@@ -19,6 +19,7 @@
 #include "litholattice/core/log.h"
 #include "litholattice/core/tick_profile.h"  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
 #include "litholattice/core/atomic_gate.h"
+#include "litholattice/core/idle_backoff.h"  // t46u item 6a
 
 namespace litholattice {
 using Ns = std::chrono::nanoseconds;
@@ -226,17 +227,50 @@ bool cSimThread::cancelBoundaryJob() {
 }
 
 void cSimThread::runBetweenTicks(std::function<void()> fn) {
-  const bool wasPaused = paused();
-  setPaused(true);
-  // RAII pause guard: if fn() throws, the sim must not stay paused forever.
-  struct PauseGuard {
-    cSimThread* self;
-    bool wasPaused;
-    ~PauseGuard() { if (!wasPaused) self->setPaused(false); }
-  } guard{this, wasPaused};
-  // blockMutex_ is held across the sim's whole mutation window (edit drain +
-  // every tick of the iteration), so taking it here waits out any in-flight tick.
-  { locktiming::TimedGuard l(blockMutex_, locktiming::kBlock); fn(); }  // 0.0.1.60 timing (diagnostic)
+  // t46u item 6a (JD 2026-11-16): the tick thread runs fn itself at its next phase boundary (the start
+  // of its mutation window, or its pacing tail), so no other thread takes the world to do it and the
+  // sim no longer has to be paused around it. The caller polls its job's done flag with backoff.
+  // Inline when the sim is not running (the caller owns the world) or on the tick thread itself (a
+  // hook: already inside its own window), or when the caller already holds the world through
+  // holdBetweenTicks (frameHold, the save tick pause): the tick thread cannot reach a boundary until
+  // that hold is released, so queuing would deadlock. The gate stays in this step for the point readers.
+  if (!running_.load(std::memory_order_acquire) || simTid_.load(std::memory_order_acquire) == std::this_thread::get_id() ||
+      blockMutex_.heldByMe()) {
+    locktiming::TimedGuard l(blockMutex_, locktiming::kBlock);  // 0.0.1.60 timing (diagnostic)
+    fn();
+    return;
+  }
+  OwnerJob j;
+  j.fn = &fn;
+  OwnerJob* head = ownerJobs_.load(std::memory_order_relaxed);
+  do { j.next = head; } while (!ownerJobs_.compare_exchange_weak(head, &j, std::memory_order_acq_rel, std::memory_order_relaxed));
+  notifyWake();  // a parked (paused) loop runs one pass and picks it up
+  lkIdleWaitUntil([&] {
+    if (j.done.load(std::memory_order_acquire)) return true;
+    // stop() raced the push: no tick thread will take it, and stop() may already have drained.
+    // Once the thread is joined the world is ours again: run what is queued here (gated).
+    if (!tickLive_.load(std::memory_order_acquire)) serveOwnerJobsGated();
+    return j.done.load(std::memory_order_acquire);
+  });
+  if (j.err) std::rethrow_exception(j.err);
+}
+
+void cSimThread::runOwnerJobs() {
+  OwnerJob* list = ownerJobs_.exchange(nullptr, std::memory_order_acq_rel);
+  OwnerJob* fifo = nullptr;  // the stack is newest first; run oldest first
+  while (list) { OwnerJob* n = list->next; list->next = fifo; fifo = list; list = n; }
+  while (fifo) {
+    OwnerJob* j = fifo;
+    fifo = fifo->next;  // read before done: the caller's frame may end as soon as done is set
+    try { (*j->fn)(); } catch (...) { j->err = std::current_exception(); }
+    j->done.store(true, std::memory_order_release);
+  }
+}
+
+void cSimThread::serveOwnerJobsGated() {
+  if (!ownerJobs_.load(std::memory_order_acquire)) return;
+  litholattice::cGateGuard l(blockMutex_);
+  runOwnerJobs();
 }
 
 bool cSimThread::tryHoldBetweenTicks(::litholattice::cGateLock<cBlockGate>& hold, bool* busy) {
@@ -276,6 +310,7 @@ void cSimThread::start() {
     return;
   }
   if (running_.exchange(true)) return;  // already running: a second std::thread assignment would terminate
+  tickLive_.store(true, std::memory_order_release);  // t46u 6a: owner jobs go to the tick thread from here on
   if (handshake_) handshake_->start();  // pull workers first: phases may be published immediately
   // A-M5: a routine stop/start cleared the authority's freeze latch (see
   // cTimingHandshakeAuthority::start()); if no freeze is in effect now,
@@ -293,6 +328,8 @@ bool cSimThread::stop() {
   const bool wasRunning = running_.exchange(false);
   if (wasRunning) notifyWake();  // A-M7: a parked paused loop must wake to see the stop
   if (wasRunning && thread_.joinable()) thread_.join();
+  tickLive_.store(false, std::memory_order_release);  // t46u 6a: joined; the world is the caller's again
+  serveOwnerJobsGated();  // t46u 6a: jobs that missed the tick thread's last pass run here
   if (!thread_.joinable()) threadRecord_.retireAll();  // P2: joined -> RETURNED
   if (handshake_) return handshake_->stop();  // no-detach bounded join (P0a/C2); false = worker outstanding, poisoned
   return true;
@@ -605,7 +642,7 @@ void cSimThread::publishEvents() {
 }
 
 // Sleep most of the way, then yield-spin: sleep_until alone is too coarse for 512 Hz.
-static void waitUntil(Clock::time_point t) {
+[[maybe_unused]] static void waitUntil(Clock::time_point t) {  // t46u 6a: the tick tail now paces inline
   for (;;) {
     const auto left = t - Clock::now();
     if (left <= Ns(0)) return;
@@ -616,6 +653,8 @@ static void waitUntil(Clock::time_point t) {
 
 void cSimThread::run() {
   const HighResTimerScope timerResolution;  // 1 ms sleeps for the high-rate domains
+  simTid_.store(std::this_thread::get_id(), std::memory_order_release);  // t46u 6a: runBetweenTicks from a hook runs inline
+  struct TidClear { std::atomic<std::thread::id>& t; ~TidClear() { t.store(std::thread::id{}, std::memory_order_release); } } tidClear{simTid_};
   // CH-H8: masterStep_/worldTickN_/dropped_/acc_/window state are MEMBERS,
   // initialised once at construction — this function deliberately does NOT
   // reset them. Every stop()/start() (every save, every stream pump)
@@ -776,6 +815,9 @@ void cSimThread::run() {
       // acquire load per pass when idle; never runs while handshake work is in flight.
       if (boundaryJob_.load(std::memory_order_acquire) && !(handshake_ && (handshake_->frozen() || handshake_->workersOutstanding())))
         if (BoundaryJob* j = boundaryJob_.exchange(nullptr, std::memory_order_acq_rel)) { j->fn(); delete j; }
+      // t46u item 6a: runBetweenTicks jobs (hot swap, camera raycast, surface probes) run here, between
+      // ticks, by the thread that owns the world. Not deferred by a freeze: the old gate path was not either.
+      runOwnerJobs();
 
       // ---- control PRE phase (control serialization): drain every control
       // source's submissions once per iteration and stamp each event with
@@ -1009,7 +1051,8 @@ void cSimThread::run() {
       const uint64_t e = wakeEpoch_.load(std::memory_order_relaxed);
       while (running_.load(std::memory_order_relaxed) && paused_.load(std::memory_order_relaxed) &&
              stepRequested_.load(std::memory_order_relaxed) == 0 &&
-             wakeEpoch_.load(std::memory_order_relaxed) == e) {
+             wakeEpoch_.load(std::memory_order_relaxed) == e &&
+             !ownerJobs_.load(std::memory_order_acquire)) {  // t46u 6a: a job pushed before `e` was read must not wait out the park
         std::this_thread::sleep_for(std::chrono::microseconds(200));
       }
     } else if (passCut) {
@@ -1017,7 +1060,16 @@ void cSimThread::run() {
       // so a too-slow (Debug) sim runs slow; give lock waiters a turn instead of re-locking at once
       std::this_thread::yield();  // PlayI (JD): yield, not a 200 us sleep
     } else {
-      waitUntil(last + (stepDur_ - acc_));
+      // t46u item 6a: pace as waitUntil does, but serve runBetweenTicks jobs while waiting (main used
+      // to take the gate during this sleep; a once-per-frame camera raycast must not wait it out).
+      const auto until = last + (stepDur_ - acc_);
+      for (;;) {
+        serveOwnerJobsGated();
+        const auto left = until - Clock::now();
+        if (left <= Ns(0)) break;
+        if (left > std::chrono::microseconds(1500)) std::this_thread::sleep_for(std::min<Ns>(left - std::chrono::milliseconds(1), std::chrono::microseconds(250)));
+        else std::this_thread::yield();
+      }
     }
   };
 

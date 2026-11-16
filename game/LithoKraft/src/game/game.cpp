@@ -1899,8 +1899,10 @@ void Game::loadActive() {
     g_simFrozen.store(true, std::memory_order_release);
     const int freezeSec = [] { const char* e = std::getenv("LL_BENCH_FREEZE_SEC"); const int v = e ? std::atoi(e) : 30; return v > 0 ? v : 30; }();
     const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(freezeSec);
-    while (sim->running() && !litholattice::cSoftwareRenderer::shotTaken() && std::chrono::steady_clock::now() < until)
+    while (sim->running() && !litholattice::cSoftwareRenderer::shotTaken() && std::chrono::steady_clock::now() < until) {
+      sim->serviceOwnerJobs();  // t46u 6a: main's runBetweenTicks calls (camera raycast) are served during the park
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     g_shotFreezeTick.store(0);
   });
   // Measure-only windowed determinism probe (LL_HASH_AT_TICK=<world tick>; Proposed by JD; co-implemented by JD and Cortana).
