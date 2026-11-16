@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <string>
 #include <thread>
+#include "litholattice/core/thread_census.h"  // t46u: census cores
 #include <unordered_set>
 #include <vector>
 #include "lithokraft/content/appearance.h"
@@ -153,7 +154,7 @@ int runPerfHeadless(const std::string& jsonPath, const BenchSceneConfig& bench) 
   cDimensionReg reg = createDimensions();
   Dimension* wafer = reg.find("wafer");
   if (!wafer || !wafer->generator) { std::printf("perf: no wafer generator\n"); return 1; }
-  const unsigned all = std::max(1u, std::thread::hardware_concurrency());
+  const unsigned all = std::max(1u, litholattice::censusCores());  // t46u: honours --cores
 
   // (1) Thread scaling
   std::printf("== worldgen / mesh throughput by thread count (%u hardware threads)\n", all);

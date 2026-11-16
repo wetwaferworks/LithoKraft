@@ -1534,7 +1534,7 @@ int main(int argc, char** argv) {
     // the census (14 workers total on the phone). S5's principle is
     // unchanged (the cap lives here, never at creation); only the
     // number moves, by the same designer's word.
-    const unsigned hwCores = std::thread::hardware_concurrency();
+    const unsigned hwCores = litholattice::censusCores();  // t46u: census cores, not the raw hardware
     unsigned poolWorkers = std::max(1u, std::max(2u, hwCores) - 2);  // house default
     if (hwCores >= 1 && hwCores <= 8) {
       const unsigned smallCap = (unsigned)std::max(1, std::min(3, (int)hwCores - 2));
@@ -1555,7 +1555,7 @@ int main(int argc, char** argv) {
       dedPool = std::make_unique<cJobPool>(tbud.meshDedicated);
       poolWorkers = tbud.meshDedicated;
       logInfo("threads: LL_DED_LAYOUT=%c: %u dedicated mesh/vertex workers (%s), shared reserve pool %u "
-              "(render-side budget %u = remaining %u + 2, bands %u)",
+              "(render-side budget %u = remaining %u, bands %u; t46u allocator)",
               dedLayout[0], tbud.meshDedicated,
               dedPool->lockFree() ? "lock-free" : "LOCKED: set LL_POOL_LOCKFREE=1", tbud.pool,
               tbud.renderSideBudget, tbud.remaining, tbud.renderBands);
@@ -1563,7 +1563,7 @@ int main(int argc, char** argv) {
     logInfo("%s", cThreadLayout::describe().c_str());
     cJobPool pool(ded ? *dedPool : cJobPool::shared(), cJobPool::Lane::Background, poolWorkers);
     logInfo("jobs: game job pool (gen/mesh/load) is a background view on the shared pool: up to %u at once "
-            "(lend cap %u of %u shared workers; hardware_concurrency %u)",
+            "(lend cap %u of %u shared workers; census cores %u)",
             poolWorkers, pool.lendCap(), cJobPool::shared().size(), hwCores);
     // 2026-10-26 (Archie triage, streaming hitches): at most 2 background gen/mesh jobs run at
     // once, so streaming bursts stop preempting render threads mid-frame (stream bench r8 p99

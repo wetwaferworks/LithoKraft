@@ -67,7 +67,7 @@ bool cCpuTextureArray::upload(const cTextureReg& textures) {
   int cap = maxTile_;
   if (const char* e = std::getenv("LL_SW_TEXRES")) cap = std::atoi(e);
   if (cap != 16 && cap != 32 && cap != 64)
-    cap = (std::thread::hardware_concurrency() != 0 && std::thread::hardware_concurrency() <= 4) ? 32 : 64;
+    cap = censusCores() <= 4 ? 32 : 64;  // t46u: census cores (--cores), not the raw hardware
   int srcMax = kTileSize;
   for (const Texture& t : src) srcMax = std::max(srcMax, t.image.width());
   tile_ = srcMax >= 64 && cap >= 64 ? 64 : srcMax >= 32 && cap >= 32 ? 32 : 16;
@@ -474,10 +474,10 @@ class cSwBandPool {
   void start(unsigned n) {
     bands_ = n;
     {
-      const unsigned hw = std::thread::hardware_concurrency();
+      const unsigned hw = censusCores();  // t46u: the allocator's cores, not hardware_concurrency()
       const unsigned spawned = detachedMode_ ? n : (n ? n - 1 : 0);
-      std::fprintf(stderr, "software renderer: hardware_concurrency=%u, render bands=%u (%u spawned workers%s)\n", hw, n, spawned, detachedMode_ ? " incl. detached executor" : " + caller");
-      logInfo("software renderer: hardware_concurrency=%u, render bands=%u (%u spawned workers%s)", hw, n, spawned, detachedMode_ ? " incl. detached executor" : " + caller");
+      std::fprintf(stderr, "software renderer: census cores=%u, render bands=%u (%u spawned workers%s)\n", hw, n, spawned, detachedMode_ ? " incl. detached executor" : " + caller");
+      logInfo("software renderer: census cores=%u, render bands=%u (%u spawned workers%s)", hw, n, spawned, detachedMode_ ? " incl. detached executor" : " + caller");
     }
     const uint64_t g = gen_.load(std::memory_order_relaxed);
     if (detachedMode_) {

@@ -191,7 +191,7 @@ static litholattice::AmbientMode ambientModeFromInt(int m) {
 static bool resolvedLeavesFancy(const GameSettings& s) {
   if (const char* e = std::getenv("LL_LEAVES")) return std::string_view(e) != "fast";
   if (s.leaves >= 0) return s.leaves == 1;
-  return std::thread::hardware_concurrency() == 0 || std::thread::hardware_concurrency() > 4;
+  return litholattice::censusCores() > 4;  // t46u: census cores (--cores), not the raw hardware
 }
 // 2026-10-18 (Crew Canopy, F-B): render.foliage_density resolution.
 // LL_FOLIAGE_DENSITY=0|1 (bench / A-B) wins over the setting, like LL_LEAVES.
@@ -203,7 +203,7 @@ static int resolvedFoliageDensity(const GameSettings& s) {
 static bool resolvedBloom(const GameSettings& s) {
   if (const char* e = std::getenv("LL_BLOOM")) return std::atoi(e) != 0;
   if (s.bloom >= 0) return s.bloom == 1;
-  return std::thread::hardware_concurrency() == 0 || std::thread::hardware_concurrency() > 4;
+  return litholattice::censusCores() > 4;  // t46u: census cores (--cores), not the raw hardware
 }
 static int resolvedTwinkle(const GameSettings& s) {
   if (const char* e = std::getenv("LL_TWINKLE")) return std::clamp(std::atoi(e), 0, 2);
@@ -2514,7 +2514,7 @@ void Game::prewarmSwarm() {
   swarmPrewarmed_ = true;
   const auto t0 = std::chrono::steady_clock::now();
   meshSlab_.reserve(litholattice::kSlabRadius8Columns);
-  const unsigned n = std::max(1u, std::thread::hardware_concurrency());
+  const unsigned n = std::max(1u, litholattice::censusCores());  // t46u
   for (unsigned i = 0; i < n; ++i)
     pool_.submitBackground([] {
       volatile uint8_t stack[128 * 1024];  // first-touch the worker stack
@@ -4854,7 +4854,7 @@ void Game::update(float dt, int width, int height) {
       static const bool adaptive = !litholattice::BgThrottle::get().maxActiveSet &&
                                    !(std::getenv("LL_BG_ADAPTIVE") && std::getenv("LL_BG_ADAPTIVE")[0] == '0');
       if (adaptive) {
-        static const unsigned hw = std::thread::hardware_concurrency();
+        static const unsigned hw = litholattice::censusCores();  // t46u
         static Vec3 lastP{}; static float lastYaw = 0, lastPitch = 0;
         static int64_t lastMoveNs = 0; static int curCap = -1; static bool curYield = false;
         static uint64_t nSwitch = 0;

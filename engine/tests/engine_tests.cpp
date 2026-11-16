@@ -8703,10 +8703,10 @@ void testThreadCensus() {
   std::printf("core: thread census (Thread Handshake P1, record-only)\n");
   struct Want { unsigned hw, shards, bands, pool, cap; bool small; };
   // JD 2026-11-14: no LL_DED_LAYOUT in this process, so mesh is folded into the shared pool.
-  // remaining+2 budget: 4 hw -> 3 render-side, 12 hw -> 11. Auto bands share that budget.
+  // t46u: budget == remaining (no +2): 4 hw -> 1 render-side, 12 hw -> 9. Auto bands share it.
   const Want wants[] = {
-      {1, 1, 2, 1, 1, true},   {2, 1, 2, 1, 1, true},     {4, 3, 2, 1, 1, true},
-      {8, 4, 3, 4, 4, false},  {16, 4, 7, 8, 8, false}, {32, 4, 15, 16, 16, false},
+      {1, 1, 1, 1, 1, true},   {2, 1, 1, 1, 1, true},     {4, 3, 1, 1, 1, true},
+      {8, 4, 2, 3, 3, false},  {16, 4, 6, 7, 7, false}, {32, 4, 14, 15, 15, false},
   };
   bool mathOk = true;
   for (const Want& w : wants) {
@@ -8725,12 +8725,19 @@ void testThreadCensus() {
                 b.spawnedTotal());
     mathOk = mathOk && ok;
   }
-  check(mathOk, "thread census: budgets for 1/2/4/8/16/32 cores match the render-side remaining+2 rule");
+  check(mathOk, "thread census: budgets for 1/2/4/8/16/32 cores match the render-side == remaining rule (t46u)");
   check(computeThreadBudget(0).hw == 1 && computeThreadBudget(0).pool == computeThreadBudget(1).pool,
         "thread census: unknown core count (0) treated as 1");
-  check(renderSideBudget(4) == 3 && renderSideBudget(12) == 11 && remainingAfterPermanentThree(4) == 1 &&
+  check(renderSideBudget(4) == 1 && renderSideBudget(12) == 9 && remainingAfterPermanentThree(4) == 1 &&
             remainingAfterPermanentThree(12) == 9,
-        "thread census: TheReefs 4 hw -> remaining 1 budget 3; 12-hw workstation -> remaining 9 budget 11");
+        "thread census: TheReefs 4 hw -> remaining 1 budget 1; 12-hw workstation -> remaining 9 budget 9 (t46u)");
+  bool slotsOk = true;
+  for (unsigned hw : {4u, 5u, 8u, 12u, 16u, 32u, 64u}) {
+    const ThreadBudget b = computeThreadBudget(hw);
+    slotsOk = slotsOk && b.slotsUsed() <= b.hw && slotPlan(b).find("(in budget)") != std::string::npos;
+  }
+  check(slotsOk && computeThreadBudget(4).slotsUsed() == 4 && computeThreadBudget(4).lfWorkers == 0,
+        "thread allocator (t46u): 4..64 cores never hand out more slots than cores; 4 cores = exactly 4 threads");
   bool same = true;
   for (unsigned hw : {1u, 2u, 3u, 4u, 5u, 8u, 12u, 16u, 32u, 64u}) {
     const ThreadBudget b = computeThreadBudget(hw);
@@ -8742,9 +8749,9 @@ void testThreadCensus() {
   bool small = true;
   for (unsigned hw = 1; hw <= 4; ++hw) {
     const ThreadBudget b = computeThreadBudget(hw);
-    small = small && b.renderSideBudget == 3 && b.pool == 1 && b.renderBands == 2 && b.renderSideUsed() <= 3;
+    small = small && b.renderSideBudget == 1 && b.pool == 1 && b.renderBands == 1 && b.renderSideUsed() <= 1;
   }
-  check(small, "thread census: on <= 4 cores the render-side budget is 3 and stays filled in-budget");
+  check(small, "thread census: on <= 4 cores the render-side budget is 1 (4 threads total, t46u)");
   // hardware_concurrency is read once.
   const ThreadBudget& b1 = cThreadCensus::instance().budget();
   const ThreadBudget& b2 = cThreadCensus::instance().budget();
@@ -8815,11 +8822,11 @@ void testThreadCensusRulings() {
              c.pool == folded && c.meshDedicated == 0 && c.renderSideUsed() <= c.renderSideBudget &&
              (p.reservePool + p.meshDedicated <= kMaxPoolWorkers ? p.usedDetached() == p.budget : true);
   }
-  check(planOk && renderSideBudget(4) == 3 && renderSideBudget(12) == 11 && computeThreadBudget(4).pool == 1 &&
-            computeThreadBudget(12).pool == 6 && planRenderSide(4).swBands == 2 && planRenderSide(4).meshDedicated == 1 &&
-            planRenderSide(4).reservePool == 0 && planRenderSide(12).swBands == 5 && planRenderSide(12).meshDedicated == 4 &&
-            planRenderSide(12).reservePool == 2,
-        "census pool/bands: planRenderSide remaining+2 (4 hw -> budget 3, 12 hw -> 11); mesh folded into pool here");
+  check(planOk && renderSideBudget(4) == 1 && renderSideBudget(12) == 9 && computeThreadBudget(4).pool == 1 &&
+            computeThreadBudget(12).pool == 5 && planRenderSide(4).swBands == 1 && planRenderSide(4).meshDedicated == 0 &&
+            planRenderSide(4).reservePool == 0 && planRenderSide(12).swBands == 4 && planRenderSide(12).meshDedicated == 4 &&
+            planRenderSide(12).reservePool == 1,
+        "census pool/bands: planRenderSide == remaining (4 hw -> budget 1, 12 hw -> 9, t46u); mesh folded into pool here");
 #ifdef _WIN32
   _putenv_s("LK_RENDER_THREADS", "1");
 #else
@@ -8834,7 +8841,7 @@ void testThreadCensusRulings() {
 #else
   unsetenv("LK_RENDER_THREADS");
 #endif
-  check(compactOk && planRenderSide(4).swBands == 2 && planRenderSide(4).meshDedicated == 1,
+  check(compactOk && planRenderSide(12).swBands == 4 && planRenderSide(12).meshDedicated == 4,
         "census: LK_RENDER_THREADS=1 is 1 band + mesh caller-runs + reserve 0; unset restores the default plan");
   check(resolveRenderBands(0, 12, false) == planRenderSide(12, false).swBands &&
             resolveRenderBands(0, 2, false) == planRenderSide(2, false).swBands &&
@@ -8868,9 +8875,9 @@ void testThreadCensusRulings() {
     const unsigned cw = a.pool + a.meshDedicated + a.renderSpawned;
     check(threadTally(a).find("render-side budget " + std::to_string(a.renderSideBudget)) != std::string::npos &&
               threadTally(a).find("used " + std::to_string(cw)) != std::string::npos &&
-              computeWorkers(a, a.renderSpawned) == cw && a.renderSideBudget == 11 &&
+              computeWorkers(a, a.renderSpawned) == cw && a.renderSideBudget == 9 &&
               poolInvariantViolation(a.pool, a).empty() && !poolInvariantViolation(a.pool + 1, a).empty(),
-          "census: the tally counts render-side workers (mesh + pool + bands) against remaining+2; pool invariant check");
+          "census: the tally counts render-side workers (mesh + pool + bands) against remaining (t46u); pool invariant check");
   }
   {
     const uint64_t prev = cThreadCensus::lastCommittedTick();

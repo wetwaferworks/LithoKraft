@@ -118,10 +118,8 @@ struct ThreadUtil {
     LITHO_THREAD_LOG("thread", "named '%s'", name);
   }
 
-  static unsigned coreCount() {
-    const unsigned n = std::thread::hardware_concurrency();
-    return n == 0 ? 1 : n;
-  }
+  /// t46u: the census core count (--cores > LITHO_CORES > hardware), never the raw hardware.
+  static unsigned coreCount() { return ::litholattice::censusCores(); }
 };
 
 /// RAII named thread: names itself, joins on destruction (never detached). Never

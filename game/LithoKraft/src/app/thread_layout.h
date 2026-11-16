@@ -5,8 +5,8 @@
 // unchanged, hashes stay put); the control/event thread is the control half of that pair.
 // After those three, remaining = max(hw-3, 1) and all render/vertex/mesh work (dedicated mesh
 // pool, threeway render/executor, software raster bands, reserve job workers) shares a budget
-// of remaining+2, from planRenderSide() in the census. On 4 hw threads that is 3 render-side
-// threads; on a 12-thread workstation, 11.
+// of exactly remaining (t46u 2026-11-16: no +2 oversubscription), from planRenderSide() in the
+// census. On 4 cores that is 1 render-side thread (4 threads total); on 12 cores, 9.
 //   8 (default) = those env defaults (LL_HS_LAYOUT=original, LL_THREEWAY=1, LL_DED_LAYOUT=8);
 //                 actual worker counts come from the census plan, not fixed 3+2.
 //   0 / legacy  = previous env defaults (shared pool + handshake shards); the same render-side
@@ -34,7 +34,7 @@ class cThreadLayout {
     auto g = [](const char* k) { const char* e = std::getenv(k); return std::string(e ? e : "-"); };
     return "threads: layout 8 (default; LL_THREAD_LAYOUT=0 for legacy): permanent 3 = main game loop + "
            "timing-handshake/control + tick/sim (shards still inline on tick under original handshake); "
-           "render-side budget = remaining+2 from the census (mesh + reserve pool + software bands + "
+           "render-side budget = remaining (t46u) from the census (mesh + reserve pool + software bands + "
            "threeway executor share it) [LL_HS_LAYOUT=" + g("LL_HS_LAYOUT") +
            " LL_THREEWAY=" + g("LL_THREEWAY") + " LL_POOL_LOCKFREE=" + g("LL_POOL_LOCKFREE") +
            " LL_DED_LAYOUT=" + g("LL_DED_LAYOUT") + "]";
