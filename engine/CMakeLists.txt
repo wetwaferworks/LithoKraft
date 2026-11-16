@@ -73,7 +73,18 @@ FetchContent_Declare(angelscript
   URL https://www.angelcode.com/angelscript/sdk/files/angelscript_2.38.0.zip
   URL_HASH SHA256=b33b5dbcda10317ef67d628353d83246984ce6fcac102d4dc2aed121eba52e6f
   SOURCE_SUBDIR angelscript/projects/cmake)  # the zip's top folder sdk/ is stripped
+# LK_WEB (2026-11-16): the SDK's CMake project links Threads::Threads. On LithoRoot that would end
+# up as -lpthreads at the final link (FindThreads only try-compiles static libraries here), and the
+# web AngelScript runs without threads anyway, so the target is an empty stand-in.
+if(LK_WEB AND NOT TARGET Threads::Threads)
+  add_library(Threads::Threads INTERFACE IMPORTED GLOBAL)
+endif()
 FetchContent_MakeAvailable(angelscript)
+# LK_WEB: generic calling convention only, no AngelScript threads (as_config.h picks both for an
+# unknown platform; spelled out so every TU that includes angelscript.h agrees). PUBLIC on purpose.
+if(LK_WEB)
+  target_compile_definitions(angelscript PUBLIC AS_MAX_PORTABILITY AS_NO_THREADS=)
+endif()
 
 # stb_image v2.30 (single header), official github.com/nothings/stb, pinned commit + SHA256.
 # Not on LK_WEB (JD 12:41 ET: in-house PNG/SVG decoder; until then image.cpp fails safe there).
