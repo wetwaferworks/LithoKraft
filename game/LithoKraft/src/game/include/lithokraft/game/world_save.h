@@ -144,6 +144,11 @@ class cWorldSave {
   /// unsaved columns must NOT proceed.
   size_t saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols, const cSignalSim& signal,
                      bool wait);
+  /// t46u item 6b-4a: the same save with the SGNL state already exported (cSignalSim::exportState(), or any
+  /// subset holding at least these columns' entries). The game thread's pre-evict save uses this: the export
+  /// runs on the tick thread, so the game thread never reads the sim's component memory.
+  size_t saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
+                     const std::map<uint64_t, std::vector<uint8_t>>& signalState, bool wait);
   /// Outcome of the most recent saveDimension: false when the save was
   /// refused (fail-closed name table), the table/metadata write failed, or —
   /// for wait=true — a region flush failed (SV-H1). For wait=false, region
@@ -246,7 +251,8 @@ class cWorldSave {
 
  private:
   size_t commitLf(cWorldSnapshot& snap, bool wait);
-  size_t saveColumnsLf(const std::string& dim, const std::vector<const ChunkColumn*>& cols, const cSignalSim& signal, bool wait);
+  size_t saveColumnsLf(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
+                       const std::map<uint64_t, std::vector<uint8_t>>& signalState, bool wait);
   int loadDimensionLf(const std::string& dim, ChunkMap& world, std::vector<uint8_t>& signalState);
   LoadedColumn loadColumnLf(const std::string& dim, int cx, int cz);
   storage::cLfWorldStore& lfStore(const std::string& dim);

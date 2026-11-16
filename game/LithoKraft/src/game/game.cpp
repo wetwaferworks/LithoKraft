@@ -1837,6 +1837,8 @@ void Game::loadActive() {
   }
   litholattice::setPickShapeFn(&pickShapeBoxes);  // 2026-10-25 (JD): model-shaped look / target ray
   signalInit_.clear();  // t46u 6b-3b: tickets belong to the sim being replaced (its stop() ran its posts)
+  evictSignalQuery_.invalidate();   // 6b-4a': answers belong to that sim too
+  demoteSignalQuery_.invalidate();
   sim_ = std::make_unique<cSimThread>(active_->chunks, blockRegistry(), std::move(worldSim), std::move(sc),
                                      submitMesh_);
   holdTicksForIo("load-sim");  // B9: the new sim is paused BEFORE components load and before it starts
@@ -3012,7 +3014,22 @@ void Game::evictFarColumns() {
       });
   }
   if (candidates.size() > kEvictBudgetPerPump) candidates.resize(kEvictBudgetPerPump);
+  if (candidates.empty()) {
+    evictSignalQuery_.poll(*sim_, static_cast<cSignalWorldSim&>(sim_->simulation()).signal(), candidates);  // 6b-4a': drop stale answers
+    return;
+  }
+  // t46u item 6b-4a: the signal sim is the tick thread's. Which candidates it indexes, and their SGNL state
+  // for the pre-evict save, are read on the tick thread at a boundary (after any queued signal posts), not
+  // here. Candidates lie beyond the stream radius + hysteresis, outside the tick area, so their signal state
+  // does not change between this boundary and the hold below; a block change there would set col->dirty.
+  // 6b-4a': posted, not waited on. A candidate the tick side has not answered for yet is not evicted this
+  // pump; a key is not re-asked while it stays a candidate (see cSignalBearingQuery).
+  const cSignalBearingQuery::Answer& sigAns =
+      evictSignalQuery_.poll(*sim_, static_cast<cSignalWorldSim&>(sim_->simulation()).signal(), candidates);
+  std::erase_if(candidates, [&](uint64_t key) { return !sigAns.covers(key); });
   if (candidates.empty()) return;
+  const std::unordered_set<uint64_t>& signalBearing = sigAns.bearing;
+  const std::map<uint64_t, std::vector<uint8_t>>& signalExport = sigAns.exported;
   // Same hold discipline as insertion (P0a + build 80): nothing is
   // evicted under a running sim, and a refused hold defers the whole
   // batch â€” columns stay resident and are reconsidered on a later pump.
@@ -3042,7 +3059,7 @@ void Game::evictFarColumns() {
     // sim indexes nothing in it. Anything else saves first; when the
     // save cannot complete (no save dir, refused/failed write), the
     // column stays resident â€” never evict on uncertain state.
-    const bool needsSave = col->dirty || signal.hasIndexedCells(cx, cz);
+    const bool needsSave = col->dirty || signalBearing.count(key) != 0;  // 6b-4a: tick-side answer
     if (needsSave) {
       if (!save_) {
         // Cortana 2026-10-15 1455 (GAME): warn once per column. It used to
@@ -3058,7 +3075,7 @@ void Game::evictFarColumns() {
       // inside the call â€” strictly BEFORE the unscan below.
       advanceWorldClock();  // Cortana 2026-10-16 review fix: level.json carries the current clock
       save_->setWorldClock(worldClock_.tick, worldClock_.time);
-      const size_t saved = save_->saveColumns(active_->id, {col}, signal, /*wait=*/true);
+      const size_t saved = save_->saveColumns(active_->id, {col}, signalExport, /*wait=*/true);  // 6b-4a: tick-side export
       if (saved != 1 || !save_->lastSaveOk()) {
         logError("stream: column %d,%d NOT evicted: save-on-evict failed (%s)", cx, cz, save_->lastSaveError().c_str());
         continue;
@@ -3128,17 +3145,26 @@ void Game::demoteFarColumns() {
     }
     if (d > R && picks.size() < kDemoteBudgetPerPump && eligible(k, c)) picks.push_back(k);
   }
+  if (picks.empty()) {
+    demoteSignalQuery_.poll(*sim_, static_cast<cSignalWorldSim&>(sim_->simulation()).signal(), picks);  // drop stale answers
+    return;
+  }
+  // t46u item 6b-4a: ask the tick thread (at a boundary) which picks the signal sim indexes; see evictFarColumns.
+  // 6b-4a': non-blocking, as in evictFarColumns; no answer yet for these picks -> nothing demoted this pump.
+  const cSignalBearingQuery::Answer& sigAns =
+      demoteSignalQuery_.poll(*sim_, static_cast<cSignalWorldSim&>(sim_->simulation()).signal(), picks);
+  std::erase_if(picks, [&](uint64_t key) { return !sigAns.covers(key); });
   if (picks.empty()) return;
+  const std::unordered_set<uint64_t>& signalBearing = sigAns.bearing;
   ::litholattice::cGateLock<litholattice::cBlockGate> simHold;  // same between-ticks hold as eviction
   static int demoteSkips = 0;
   bool busy = false;
   if (!frameHold(*sim_, simHold, demoteSkips, busy, /*allowBlock=*/false)) return;  // retry next pump
-  cSignalSim& signal = static_cast<cSignalWorldSim&>(sim_->simulation()).signal();
   size_t n = 0;
   for (uint64_t key : picks) {
     const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
     const ChunkColumn* c = active_->chunks.column(cx, cz);
-    if (!c || !eligible(key, *c) || signal.hasIndexedCells(cx, cz)) continue;
+    if (!c || !eligible(key, *c) || signalBearing.count(key)) continue;  // 6b-4a: tick-side answer
     std::unique_ptr<ChunkColumn> body = active_->chunks.demote(cx, cz, withLod);
     if (!body) continue;
     deferredFree_.retire(std::move(body), streamPumps_ + 2);  // P5: freed outside the hold

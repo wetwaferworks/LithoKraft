@@ -369,7 +369,11 @@ size_t cWorldSave::commit(cWorldSnapshot& snap, bool wait) {
 
 size_t cWorldSave::saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
                               const cSignalSim& signal, bool wait) {
-  return saveColumnsLf(dim, cols, signal, wait);
+  return saveColumnsLf(dim, cols, signal.exportState(), wait);
+}
+size_t cWorldSave::saveColumns(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
+                              const std::map<uint64_t, std::vector<uint8_t>>& signalState, bool wait) {
+  return saveColumnsLf(dim, cols, signalState, wait);  // t46u 6b-4a: exported by the caller (tick side)
 }
 
 int cWorldSave::loadDimension(const std::string& dim, ChunkMap& world, std::vector<uint8_t>& signalState) {
@@ -451,7 +455,7 @@ size_t cWorldSave::commitLf(cWorldSnapshot& snap, bool wait) {  // 2026-11-01 LL
 }
 
 size_t cWorldSave::saveColumnsLf(const std::string& dim, const std::vector<const ChunkColumn*>& cols,
-                              const cSignalSim& signal, bool wait) {
+                              const std::map<uint64_t, std::vector<uint8_t>>& signalState, bool wait) {
   // A2 / B-M1 save-on-evict: saveDimension's discipline, scoped to the
   // eviction candidates. Same fail-closed name-table gate, same
   // table/metadata-first ordering, same exporting_ enqueue protocol —
@@ -472,7 +476,7 @@ size_t cWorldSave::saveColumnsLf(const std::string& dim, const std::vector<const
   // and is filtered to exactly the columns being saved.
   auto state = std::make_shared<std::map<uint64_t, std::vector<uint8_t>>>();
   {
-    const auto all = signal.exportState();
+    const auto& all = signalState;  // t46u 6b-4a: exported by the caller (before it unscans the columns)
     for (const ChunkColumn* col : cols) {
       if (!col) continue;
       const uint64_t key = ChunkKey::make(col->cx, col->cz);

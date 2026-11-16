@@ -784,6 +784,8 @@ class Game {
   void p8MeshHashCheck();
   litholattice::cDeferredFreeQueue<litholattice::ChunkColumn> deferredFree_;  ///< evicted columns, freed outside the sim hold
   cSignalInitTickets signalInit_;  ///< t46u 6b-3b: disk columns whose tick-side signal init is still queued
+  cSignalBearingQuery evictSignalQuery_{/*withExport=*/true};   ///< t46u 6b-4a': non-blocking signal-bearing query (evict)
+  cSignalBearingQuery demoteSignalQuery_{/*withExport=*/false};  ///< t46u 6b-4a': same, for far-demote picks
   int streamCx_ = 0, streamCz_ = 0;                    ///< centre of the last pumpStreaming request pass
   bool streamCentreSet_ = false;
   cL0NeighbourHold l0Hold_;                           ///< fix (b): first L0 mesh waits for edge neighbours

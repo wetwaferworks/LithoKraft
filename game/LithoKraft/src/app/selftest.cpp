@@ -1041,6 +1041,45 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         }
         check(initDone && evSaved && evRoundTrip,
               ("6b-3b tick seam" + tag + ": the pre-evict save waits for the init, then saves the restored circuit state (round-trips bit for bit)").c_str());
+        // (2b) t46u 6b-4a': the evict/demote pumps' non-blocking signal-bearing query. While the answer is not
+        // back the key is not covered (the pump skips it: a pending query never evicts); polling the same set
+        // never re-asks; a changed set asks only for the new key; a key that left and came back is asked again.
+        {
+          using litholattice::ChunkKey;
+          const uint64_t k20 = ChunkKey::make(20, 20), k21 = ChunkKey::make(21, 21);
+          cSignalBearingQuery q(/*withExport=*/true);
+          bool pendingSkips = false;
+          {
+            litholattice::cGateLock<litholattice::cBlockGate> hold;  // the tick side cannot answer while we hold
+            if (st.holdBetweenTicks(hold)) {
+              const auto& a0 = q.poll(st, wsp->signal(), {k20});
+              const auto& a1 = q.poll(st, wsp->signal(), {k20});
+              pendingSkips = !a0.covers(k20) && !a1.covers(k20) && q.inFlight() && q.asks() == 1;
+            }
+          }
+          check(pendingSkips, ("6b-4a' query" + tag + ": a pending query covers nothing (the pump evicts none of its keys) and is not re-posted").c_str());
+          bool answered = false;
+          for (int i = 0; i < 2000 && !answered; ++i) {
+            answered = q.poll(st, wsp->signal(), {k20}).covers(k20);
+            if (!answered) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+          }
+          for (int i = 0; i < 50; ++i) q.poll(st, wsp->signal(), {k20});  // a permanently refused candidate, polled every frame
+          const auto& a = q.poll(st, wsp->signal(), {k20});
+          check(answered && a.bearing.count(k20) && a.exported == srcState && q.asks() == 1,
+                ("6b-4a' query" + tag + ": the answer marks the column signal-bearing with its restored SGNL bytes; the same set is never re-asked").c_str());
+          const bool newKeyPending = !q.poll(st, wsp->signal(), {k20, k21}).covers(k21);
+          bool k21Answered = false;
+          for (int i = 0; i < 2000 && !k21Answered; ++i) {
+            k21Answered = q.poll(st, wsp->signal(), {k20, k21}).covers(k21);
+            if (!k21Answered) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+          }
+          const auto& b = q.poll(st, wsp->signal(), {k21, k20});
+          check(newKeyPending && k21Answered && q.asks() == 2 && b.covers(k20) && !b.bearing.count(k21),
+                ("6b-4a' query" + tag + ": a changed candidate set re-queries (only the new key, which is not evicted until answered)").c_str());
+          q.poll(st, wsp->signal(), {k21});  // 20,20 leaves the set (back in range, or evicted)...
+          const bool reasked = !q.poll(st, wsp->signal(), {k20, k21}).covers(k20) && q.asks() == 3;
+          check(reasked, ("6b-4a' query" + tag + ": a key that left the candidate set loses its answer and is asked again").c_str());
+        }
         // (3) sync save path: drop + re-init posted, then stop() at once (as saveWorld does): stop runs them in order.
         postColumnSignalDrop(st, wsp->signal(), 20, 20);
         const uint64_t t2 = postColumnSignalInit(st, wsp->signal(), tw, 20, 20, blob);
