@@ -19,9 +19,11 @@
 # will point wherever that tree's LLVM lives. Nothing else in this
 # file is machine-specific.
 #
-# Verified by the toolchain piece only against a trivial throwaway
-# project (the engine relink is frozen until JD lifts the test-build
-# suspension); see lithoroot/docs/TOOLCHAIN.md.
+# First verified by the toolchain piece against a trivial throwaway
+# project; see lithoroot/docs/TOOLCHAIN.md. The engine relink freeze is
+# LIFTED (JD, 2026-11-16 11:31 ET: "Yes, I approve Data making the mobile
+# build fix in the LithoKraft scratch, lifting the wasm relink freeze, and
+# rebuilding the web assets with LithoRoot for the phone.").
 
 # --- target identity ---------------------------------------------------
 set(CMAKE_SYSTEM_NAME      Generic)

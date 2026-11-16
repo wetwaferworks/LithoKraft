@@ -45,9 +45,17 @@ if(UNIX AND NOT APPLE)
   # X11 only keeps the Linux dependency list short; Wayland can be enabled later.
   set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "" FORCE)
 endif()
+# LK_WEB: the browser build, i.e. the LithoRoot wasm32 toolchain (cmake/lk-wasm32-toolchain.cmake,
+# stock clang). Keyed off the target processor, never the EMSCRIPTEN variable, as render/CMakeLists.txt
+# already does (JD's strict rule, 2026-10-28: no Emscripten, ever). Native builds: OFF, nothing changes.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(wasm32|wasm64)$")
+  set(LK_WEB ON)
+else()
+  set(LK_WEB OFF)
+endif()
 # WASM checkpoint (2026-10-18): no GLFW in the browser build — the platform
 # module swaps in window_web.cpp (see src/platform/CMakeLists.txt).
-if(NOT EMSCRIPTEN)
+if(NOT LK_WEB)
 FetchContent_Declare(glfw
   GIT_REPOSITORY https://github.com/glfw/glfw.git
   GIT_TAG 7b6aead9fb88b3623e3b3725ebb42670cbe4c579  # Cortana 2026-10-15 1500 (TOOLS, MC-06): GLFW 3.4, pinned by commit
@@ -104,7 +112,7 @@ set(GLSLANG_TESTS OFF CACHE BOOL "" FORCE)
 set(GLSLANG_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 # WASM checkpoint (2026-10-18): glslang is a host tool for the Vulkan backend's
 # SPIR-V step; neither is built for the browser (render_vk is skipped below).
-if(NOT EMSCRIPTEN)
+if(NOT LK_WEB)
 FetchContent_Declare(glslang
   URL https://github.com/KhronosGroup/glslang/archive/refs/tags/16.6.0.tar.gz
   URL_HASH SHA256=9c09b901149c729df745057dafa815278aaa101b84d2b6e14f16a42de52f97f2)
@@ -165,7 +173,7 @@ function(litholattice_module_options target)
   else()
     target_compile_options(${target} PRIVATE -Wall -Wextra $<$<NOT:$<CONFIG:Debug>>:-O2>
                            $<$<BOOL:${LITHOLATTICE_WERROR}>:-Werror>)
-    if(NOT EMSCRIPTEN)
+    if(NOT LK_WEB)
       target_compile_options(${target} PRIVATE -Wshadow -Wnon-virtual-dtor
                              -Werror=shift-count-overflow -Werror=return-type)
     endif()
@@ -211,7 +219,7 @@ add_subdirectory(src/subdiv)  # sparse-octree sub-block subdivision (render/deta
 add_subdirectory(src/texture)  # clean-room procedural texture generation (recipes, tileable noise/voronoi)
 add_subdirectory(src/render)
 # WASM checkpoint (2026-10-18): no Vulkan backend in the browser build.
-if(NOT EMSCRIPTEN)
+if(NOT LK_WEB)
 add_subdirectory(src/render_vk)
 endif()
 # The game (LithoKraft/) builds on the engine modules above; nothing in src/ depends on it.
@@ -302,7 +310,7 @@ endif()
 # targets, no code, and no behavior. The stub backend proves the ILithoCEF
 # contract standalone; it never links into the engine or the game.
 option(LL_WITH_LITHOCEF "Build the LithoCEF host-shell stub backend (host/lithocef)" OFF)
-if(LL_WITH_LITHOCEF AND NOT EMSCRIPTEN)
+if(LL_WITH_LITHOCEF AND NOT LK_WEB)
   get_filename_component(LITHOCEF_TREE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}" DIRECTORY)
   add_subdirectory("${LITHOCEF_TREE_ROOT}/host/lithocef" "${CMAKE_BINARY_DIR}/host/lithocef")
 endif()

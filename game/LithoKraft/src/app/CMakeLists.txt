@@ -15,7 +15,7 @@ target_link_libraries(lithokraft PRIVATE lithokraft_game litholattice_audio_devi
 # WASM checkpoint (2026-10-18): no Vulkan backend in the browser build; the
 # stub answers createVulkanRenderer/probeVulkan with the same "unavailable"
 # result a Vulkan-less machine gives, so the app's fallback path is unchanged.
-if(NOT EMSCRIPTEN)
+if(NOT LK_WEB)  # LK_WEB: the LithoRoot wasm32 toolchain (engine/CMakeLists.txt), never EMSCRIPTEN
   target_link_libraries(lithokraft PRIVATE litholattice_render_vk)
 else()
   target_sources(lithokraft PRIVATE vulkan_stub_web.cpp)
@@ -25,9 +25,8 @@ else()
   # library registers them, so the driver's glue symbol checker must
   # not error on them. A genuinely missing import still fails loudly:
   # lkboot refuses instantiation, and the build's import census gate
-  # verifies the exact set. (This driver flag retires with the
-  # toolchain in stage 2; stock wasm-ld has no such checker.)
-  target_link_options(lithokraft PRIVATE "-sERROR_ON_UNDEFINED_SYMBOLS=0")
+  # verifies the exact set. Stage 2 (2026-11-16): the vendor driver flag
+  # that silenced its glue checker is gone with the vendor toolchain; stock wasm-ld resolves annotated imports itself and fails on any other undefined symbol.
   # malloc stays an export: lkboot allocates its static strings and
   # boot structures through it. Nothing in the (retired) JS libraries
   # references it any more, so the driver no longer exports it by
