@@ -47,6 +47,8 @@ using ::pow;
 using ::atan2;
 using ::hypot;
 using ::lround;
+using ::llround;
+using ::llroundf;
 using ::ldexp;
 using ::frexp;
 using ::modf;
@@ -75,6 +77,7 @@ inline float pow(float x, float y) noexcept { return ::powf(x, y); }
 inline float atan2(float x, float y) noexcept { return ::atan2f(x, y); }
 inline float hypot(float x, float y) noexcept { return ::hypotf(x, y); }
 inline long lround(float x) noexcept { return ::lroundf(x); }
+inline long long llround(float x) noexcept { return ::llroundf(x); }
 inline float ldexp(float x, int e) noexcept { return ::ldexpf(x, e); }
 inline float frexp(float x, int* e) noexcept { return ::frexpf(x, e); }
 inline float modf(float x, float* ip) noexcept { return ::modff(x, ip); }

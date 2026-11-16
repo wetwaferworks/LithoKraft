@@ -89,6 +89,10 @@ double round(double x);
 float roundf(float x);
 long lround(double x);
 long lroundf(float x);
+/* 2026-11-16 (S5): llround/llroundf over round (halfway cases away from zero, as C requires;
+ * out-of-range results are unspecified, as in C). */
+static inline long long llround(double x) { return (long long)round(x); }
+static inline long long llroundf(float x) { return (long long)round((double)x); }
 double fmod(double x, double y);
 float fmodf(float x, float y);
 double remainder(double x, double y);

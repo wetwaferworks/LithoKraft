@@ -76,7 +76,11 @@ inline constexpr piecewise_construct_t piecewise_construct{};
 
 /* tuple protocol (the primary templates live here so pair and array can specialize them) */
 template <class T> struct tuple_size;
-template <class T> struct tuple_size<const T> : integral_constant<size_t, tuple_size<T>::value> {};
+namespace __lk {  // LWG 2770: tuple_size<const T> is complete only when tuple_size<T>::value is
+template <class T, class = void> struct tsize_cv {};  // (so structured bindings fall back to aggregates)
+template <class T> struct tsize_cv<T, void_t<decltype(tuple_size<T>::value)>> : integral_constant<size_t, tuple_size<T>::value> {};
+}  // namespace __lk
+template <class T> struct tuple_size<const T> : __lk::tsize_cv<T> {};
 template <class T> inline constexpr size_t tuple_size_v = tuple_size<T>::value;
 template <size_t I, class T> struct tuple_element;
 template <size_t I, class T> struct tuple_element<I, const T> { using type = add_const_t<typename tuple_element<I, T>::type>; };

@@ -196,7 +196,116 @@ class vector {
   }
 };
 
-template <class A> class vector<bool, A>;  // deliberately undefined (plan L6): no web use found
+// 2026-11-16 (S5): packed vector<bool> (32-bit words), with the standard proxy reference.
+// Four uses in the tree (sim_thread.h domainInitial_ and three selftests): index, push_back, ==.
+template <class A>
+class vector<bool, A> {
+  using W = unsigned int;
+  static constexpr size_t kB = 32;
+public:
+  using value_type = bool;
+  using size_type = size_t;
+  using difference_type = ptrdiff_t;
+  using allocator_type = A;
+  class reference {
+    friend class vector;
+    W* w_; W m_;
+    reference(W* w, W m) noexcept : w_(w), m_(m) {}
+  public:
+    reference(const reference&) = default;
+    operator bool() const noexcept { return (*w_ & m_) != 0; }
+    reference& operator=(bool x) noexcept { if (x) *w_ |= m_; else *w_ &= ~m_; return *this; }
+    reference& operator=(const reference& o) noexcept { return *this = bool(o); }
+    bool operator~() const noexcept { return !bool(*this); }
+    void flip() noexcept { *w_ ^= m_; }
+  };
+  using const_reference = bool;
+  template <bool C>
+  class iter {
+    friend class vector;
+    using WP = conditional_t<C, const W*, W*>;
+    WP w_ = nullptr; size_t i_ = 0;
+    iter(WP w, size_t i) noexcept : w_(w), i_(i) {}
+  public:
+    using iterator_category = random_access_iterator_tag;
+    using value_type = bool;
+    using difference_type = ptrdiff_t;
+    using pointer = void;
+    using reference = conditional_t<C, bool, typename vector::reference>;
+    iter() = default;
+    template <bool D> requires (C && !D) iter(const iter<D>& o) noexcept : w_(o.w_), i_(o.i_) {}
+    reference operator*() const noexcept {
+      if constexpr (C) return (w_[i_ / kB] >> (i_ % kB)) & 1u;
+      else return typename vector::reference(w_ + i_ / kB, W(1) << (i_ % kB));
+    }
+    reference operator[](difference_type n) const noexcept { return *(*this + n); }
+    iter& operator++() noexcept { ++i_; return *this; }
+    iter operator++(int) noexcept { iter t = *this; ++i_; return t; }
+    iter& operator--() noexcept { --i_; return *this; }
+    iter operator--(int) noexcept { iter t = *this; --i_; return t; }
+    iter& operator+=(difference_type n) noexcept { i_ += size_t(n); return *this; }
+    iter& operator-=(difference_type n) noexcept { i_ -= size_t(n); return *this; }
+    friend iter operator+(iter a, difference_type n) noexcept { return a += n; }
+    friend iter operator+(difference_type n, iter a) noexcept { return a += n; }
+    friend iter operator-(iter a, difference_type n) noexcept { return a -= n; }
+    friend difference_type operator-(const iter& a, const iter& b) noexcept { return difference_type(a.i_) - difference_type(b.i_); }
+    friend bool operator==(const iter& a, const iter& b) noexcept { return a.i_ == b.i_; }
+    friend auto operator<=>(const iter& a, const iter& b) noexcept { return a.i_ <=> b.i_; }
+  };
+  using iterator = iter<false>;
+  using const_iterator = iter<true>;
+
+  vector() = default;
+  explicit vector(size_type n, bool v = false) { assign(n, v); }
+  vector(initializer_list<bool> il) { reserve(il.size()); for (bool b : il) push_back(b); }
+  vector(const vector&) = default;
+  vector(vector&& o) noexcept : w_(static_cast<vector<W>&&>(o.w_)), n_(o.n_) { o.n_ = 0; }
+  vector& operator=(const vector&) = default;
+  vector& operator=(vector&& o) noexcept { w_ = static_cast<vector<W>&&>(o.w_); n_ = o.n_; o.n_ = 0; return *this; }
+
+  [[nodiscard]] bool empty() const noexcept { return n_ == 0; }
+  size_type size() const noexcept { return n_; }
+  size_type capacity() const noexcept { return w_.capacity() * kB; }
+  void reserve(size_type n) { w_.reserve((n + kB - 1) / kB); }
+  void clear() noexcept { w_.clear(); n_ = 0; }
+  void assign(size_type n, bool v) { w_.assign((n + kB - 1) / kB, v ? ~W(0) : W(0)); n_ = n; trim(); }
+  void resize(size_type n, bool v = false) {
+    if (n <= n_) { n_ = n; w_.resize((n + kB - 1) / kB); trim(); return; }
+    const size_type old = n_;
+    w_.resize((n + kB - 1) / kB, v ? ~W(0) : W(0));
+    n_ = n;
+    for (size_type i = old; i < n && i % kB; ++i) (*this)[i] = v;  // the partly used old word
+    trim();
+  }
+  void push_back(bool v) { if (n_ % kB == 0) w_.push_back(0); ++n_; (*this)[n_ - 1] = v; }
+  void pop_back() { --n_; if (n_ % kB == 0) w_.pop_back(); else trim(); }
+  reference operator[](size_type i) noexcept { return reference(&w_[i / kB], W(1) << (i % kB)); }
+  bool operator[](size_type i) const noexcept { return (w_[i / kB] >> (i % kB)) & 1u; }
+  reference at(size_type i) { if (i >= n_) __lk::throw_out_of_range("vector<bool>::at"); return (*this)[i]; }
+  bool at(size_type i) const { if (i >= n_) __lk::throw_out_of_range("vector<bool>::at"); return (*this)[i]; }
+  reference front() noexcept { return (*this)[0]; }
+  bool front() const noexcept { return (*this)[0]; }
+  reference back() noexcept { return (*this)[n_ - 1]; }
+  bool back() const noexcept { return (*this)[n_ - 1]; }
+  void flip() noexcept { for (W& w : w_) w = ~w; trim(); }
+  void swap(vector& o) noexcept { w_.swap(o.w_); size_type t = n_; n_ = o.n_; o.n_ = t; }
+  iterator begin() noexcept { return iterator(w_.data(), 0); }
+  iterator end() noexcept { return iterator(w_.data(), n_); }
+  const_iterator begin() const noexcept { return const_iterator(w_.data(), 0); }
+  const_iterator end() const noexcept { return const_iterator(w_.data(), n_); }
+  const_iterator cbegin() const noexcept { return begin(); }
+  const_iterator cend() const noexcept { return end(); }
+  // Unused tail bits are kept zero, so == can compare words.
+  friend bool operator==(const vector& a, const vector& b) noexcept {
+    if (a.n_ != b.n_) return false;
+    for (size_type i = 0; i < a.w_.size(); ++i) if (a.w_[i] != b.w_[i]) return false;
+    return true;
+  }
+private:
+  void trim() noexcept { if (n_ % kB) w_.back() &= (W(1) << (n_ % kB)) - 1; }
+  vector<W> w_;
+  size_type n_ = 0;
+};
 template <class It, class = enable_if_t<!is_integral_v<It>>> vector(It, It) -> vector<iter_value_t<It>>;
 
 template <class T, class A> bool operator==(const vector<T, A>& a, const vector<T, A>& b) { return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin()); }
