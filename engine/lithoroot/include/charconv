@@ -1,0 +1,88 @@
+/* charconv ... LithoRoot std L5 (S3, 2026-11-16): to_chars / from_chars for
+ * the integer types (bases 2..36). Floating-point forms are not provided
+ * yet (plan L5: ints only); a TU that needs them fails to compile, loudly. */
+#ifndef LITHOROOT_CHARCONV
+#define LITHOROOT_CHARCONV
+#if !defined(__wasm__)
+#error "LithoRoot std headers are wasm32-only; native builds use their own C++ library"
+#endif
+#include <cerrno>
+#include <lithoroot_errc.h>
+#include <cstddef>
+#include <type_traits>
+
+namespace std {
+
+enum class chars_format { scientific = 1, fixed = 2, hex = 4, general = fixed | scientific };
+struct to_chars_result {
+  char* ptr;
+  errc ec;
+  friend bool operator==(const to_chars_result&, const to_chars_result&) = default;
+  constexpr explicit operator bool() const noexcept { return ec == errc{}; }
+};
+struct from_chars_result {
+  const char* ptr;
+  errc ec;
+  friend bool operator==(const from_chars_result&, const from_chars_result&) = default;
+  constexpr explicit operator bool() const noexcept { return ec == errc{}; }
+};
+
+namespace __lk {
+template <class I> inline constexpr bool cc_int = is_integral_v<I> && !is_same_v<remove_cv_t<I>, bool>;
+}  // namespace __lk
+
+template <class I, enable_if_t<__lk::cc_int<I>, int> = 0>
+constexpr to_chars_result to_chars(char* first, char* last, I value, int base = 10) {
+  using U = make_unsigned_t<I>;
+  U u = static_cast<U>(value);
+  if constexpr (is_signed_v<I>) {
+    if (value < 0) {
+      if (first == last) return {last, errc::value_too_large};
+      *first++ = '-';
+      u = U(0) - u;
+    }
+  }
+  char tmp[sizeof(U) * 8];
+  int n = 0;
+  do { const unsigned d = unsigned(u % U(base)); tmp[n++] = char(d < 10 ? '0' + d : 'a' + d - 10); u /= U(base); } while (u);
+  if (last - first < n) return {last, errc::value_too_large};
+  while (n) *first++ = tmp[--n];
+  return {first, errc{}};
+}
+to_chars_result to_chars(char*, char*, bool, int = 10) = delete;
+
+template <class I, enable_if_t<__lk::cc_int<I>, int> = 0>
+constexpr from_chars_result from_chars(const char* first, const char* last, I& value, int base = 10) {
+  using U = make_unsigned_t<I>;
+  const char* p = first;
+  bool neg = false;
+  if constexpr (is_signed_v<I>) {
+    if (p != last && *p == '-') { neg = true; ++p; }
+  }
+  const char* digits = p;
+  U acc = 0;
+  bool overflow = false;
+  for (; p != last; ++p) {
+    const char c = *p;
+    unsigned d = c >= '0' && c <= '9' ? unsigned(c - '0') : c >= 'a' && c <= 'z' ? unsigned(c - 'a' + 10) : c >= 'A' && c <= 'Z' ? unsigned(c - 'A' + 10) : 99u;
+    if (d >= unsigned(base)) break;
+    if (!overflow) {
+      U next;
+      if (__builtin_mul_overflow(acc, U(base), &next) || __builtin_add_overflow(next, U(d), &next)) overflow = true;
+      else acc = next;
+    }
+  }
+  if (p == digits) return {first, errc::invalid_argument};
+  if (overflow) return {p, errc::result_out_of_range};
+  if constexpr (is_signed_v<I>) {
+    const U lim = neg ? U(U(1) << (sizeof(U) * 8 - 1)) : U((U(1) << (sizeof(U) * 8 - 1)) - 1);
+    if (acc > lim) return {p, errc::result_out_of_range};
+    value = neg ? I(U(0) - acc) : I(acc);
+  } else {
+    value = acc;
+  }
+  return {p, errc{}};
+}
+
+}  // namespace std
+#endif

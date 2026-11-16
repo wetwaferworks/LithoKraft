@@ -194,6 +194,7 @@ template <class T, class U, class V, class... R>
 struct common_type<T, U, V, R...> : common_type<common_type_t<T, U>, V, R...> {};
 
 /* ---- invoke_result (callables and member pointers) ---- */
+template <class T> class reference_wrapper;  // <functional>; named here for the INVOKE ref-wrapper rule
 namespace __lk {
 template <class T> struct mp_class {};
 template <class M, class C> struct mp_class<M C::*> { using type = C; };
@@ -205,6 +206,11 @@ template <class F, class O, class... A, class = enable_if_t<__is_member_function
 auto inv(F&& f, O&& o, A&&... a) -> decltype(((*static_cast<O&&>(o)).*f)(static_cast<A&&>(a)...));
 template <class F, class O, class = enable_if_t<__is_member_object_pointer(__decay(F))>>
 auto inv(F&& f, O&& o) -> decltype(static_cast<O&&>(o).*f);
+/* INVOKE on a reference_wrapper object: call through .get() ([func.require] 1.2/1.5). */
+template <class F, class O, class... A, class = enable_if_t<__is_member_function_pointer(__decay(F))>>
+auto inv(F&& f, reference_wrapper<O> o, A&&... a) -> decltype((o.get().*f)(static_cast<A&&>(a)...));
+template <class F, class O, class = enable_if_t<__is_member_object_pointer(__decay(F))>>
+auto inv(F&& f, reference_wrapper<O> o) -> decltype(o.get().*f);
 template <class F, class O, class = enable_if_t<__is_member_object_pointer(__decay(F))>, class = void>
 auto inv(F&& f, O&& o) -> decltype((*static_cast<O&&>(o)).*f);
 template <class V, class F, class... A> struct invres {};
