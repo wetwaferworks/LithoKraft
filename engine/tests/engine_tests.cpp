@@ -32,6 +32,7 @@
 #endif
 #include "litholattice/core/tick_arena.h"
 #include "litholattice/core/slice_free_list.h"
+#include "litholattice/world/column_directory.h"  // t46u item 6b-2
 #include "litholattice/core/fail_fast.h"
 #include "litholattice/core/counter_hash.h"
 #if !defined(_WIN32)
@@ -202,6 +203,7 @@ uint64_t fnv(const void* p, size_t n, uint64_t h = 1469598103934665603ULL) {
 
 void testTickArena();  // defined below testCore
 void testSliceFreeList();  // Voxy #5
+void testColumnDirectory();  // t46u item 6b-2
 void testDetSched();   // defined below testRandomTicks
 void testTraceJitCompose();  // defined below testDetSched
 void testSignalPropagate();  // defined below testTraceJitCompose
@@ -377,6 +379,7 @@ void testCore() {
   testJobSystem();
   testTickArena();
   testSliceFreeList();
+  testColumnDirectory();
   testArchieHandshakeH1H3();
 }
 
@@ -725,6 +728,79 @@ void testJobSystem() {
     js.waitIdle();
     check(n == 100 && js.workerCount() == cThreadCensus::instance().budget().pool,
           "jobsystem: default config takes the census pool ceiling clamp(cores-2, 1, 64), unpinned");
+  }
+}
+
+void testColumnDirectory() {  // t46u item 6b-2: published column directory (adopt + ack + deferred free)
+  using litholattice::cColumnDirectory;
+  auto mk = [](int cx, int cz) { auto c = std::make_unique<ChunkColumn>(); c->cx = cx; c->cz = cz; return c; };
+  {
+    cColumnDirectory d;
+    check(d.adopt() == nullptr && d.ackedSeq() == 0, "column directory: nothing to adopt before the first publish");
+    auto a = mk(1, 2);
+    const uint64_t ka = ChunkKey::make(1, 2);
+    check(d.publish({{ka, a.get()}}) == 1, "column directory: first publish is sequence 1");
+    const cColumnDirectory::Dir* cur = d.adopt();
+    check(cur && cur->seq == 1 && cur->find(ka) == a.get() && d.ackedSeq() == 1, "column directory: adopt sees the published column and acknowledges it");
+    check(d.adopt() == cur, "column directory: adopt with nothing new keeps the current directory");
+    auto b = mk(3, 4);
+    d.publish({{ka, a.get()}});
+    d.publish({{ka, a.get()}, {ChunkKey::make(3, 4), b.get()}});
+    cur = d.adopt();
+    check(cur && cur->seq == 3 && cur->cols.size() == 2 && d.ackedSeq() == 3, "column directory: two publishes before an adopt coalesce to the newest");
+    // Remove `a`: retired until a directory without it is acknowledged.
+    ChunkColumn* aRaw = a.get();
+    d.retire(std::move(a));
+    check(d.retired() == 1 && d.reclaim() == 0, "column directory: a retired column is not freed while the tick thread can still reach it");
+    d.publish({{ChunkKey::make(3, 4), b.get()}});
+    check(d.reclaim() == 0 && d.retired() == 1, "column directory: publishing alone does not free it (not yet adopted)");
+    cur = d.adopt();
+    check(cur && cur->find(ka) == nullptr && cur->find(ChunkKey::make(3, 4)) == b.get(), "column directory: the adopted directory no longer has the removed column");
+    check(d.reclaim() == 1 && d.retired() == 0, "column directory: acknowledged -> the retired column is freed");
+    (void)aRaw;
+    d.retire(mk(5, 6));
+    check(d.reclaimAllStopped() == 1, "column directory: with no tick thread, everything retired can be freed");
+  }
+  {  // two threads: the owner churns columns, the tick thread adopts and reads every entry each round
+    cColumnDirectory d;
+    std::atomic<bool> done{false};
+    std::atomic<uint64_t> bad{0}, reads{0}, adopts{0};
+    std::thread tick([&] {
+      uint64_t last = 0;
+      while (!done.load(std::memory_order_acquire)) {
+        if (const cColumnDirectory::Dir* cur = d.adopt()) {
+          if (cur->seq != last) { last = cur->seq; adopts.fetch_add(1, std::memory_order_relaxed); }
+          for (const auto& [k, c] : cur->cols) {
+            if (ChunkKey::make(c->cx, c->cz) != k) bad.fetch_add(1, std::memory_order_relaxed);
+            reads.fetch_add(1, std::memory_order_relaxed);
+          }
+        }
+        std::this_thread::yield();
+      }
+      d.adopt();
+    });
+    std::unordered_map<uint64_t, std::unique_ptr<ChunkColumn>> live;
+    size_t freed = 0;
+    for (int i = 0; i < 4000; ++i) {
+      auto c = mk(i, -i);
+      live[ChunkKey::make(i, -i)] = std::move(c);
+      if (i >= 8) {  // keep 8 resident: remove the oldest
+        auto it = live.find(ChunkKey::make(i - 8, -(i - 8)));
+        d.retire(std::move(it->second));
+        live.erase(it);
+      }
+      std::unordered_map<uint64_t, ChunkColumn*> dir;
+      for (auto& [k, c2] : live) dir.emplace(k, c2.get());
+      d.publish(std::move(dir));
+      freed += d.reclaim();
+      if ((i & 63) == 0) std::this_thread::yield();
+    }
+    done.store(true, std::memory_order_release);
+    tick.join();
+    freed += d.reclaim();
+    check(bad.load() == 0 && reads.load() > 0, "column directory: concurrent adopt never sees a freed or mismatched column");
+    check(freed == 4000 - 8 && d.retired() == 0, "column directory: every removed column is freed once acknowledged");
+    std::printf("  column directory stress: %llu adopts, %llu entry reads, %zu freed\n", (unsigned long long)adopts.load(), (unsigned long long)reads.load(), freed);
   }
 }
 
