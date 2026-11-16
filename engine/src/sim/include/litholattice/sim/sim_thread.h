@@ -382,12 +382,12 @@ class cSimThread {
   // burst the sim hands blockMutex_ over for their short read instead of making them wait out the
   // whole burst. A reader never sees a half-applied tick. Off: identical to the old path.
   const bool threewayYield_ = ::litholattice::threeway::enabled();
-  std::atomic<int> pointReaders_{0};
+  alignas(64) std::atomic<int> pointReaders_{0};  // t46u item 5: own cache line
   // LL_HANDOFF_COUNT=1 (measure only; 311): counts between-tick handoffs and the reads / inserts
   // that were waiting when each one fired. Off: nothing is counted.
   const bool handoffCount_ = [] { const char* e = std::getenv("LL_HANDOFF_COUNT"); return e && e[0] == '1'; }();
-  std::atomic<int> readWaiting_{0}, insertWaiting_{0};
-  std::atomic<uint64_t> handoffs_{0}, servedReads_{0}, servedInserts_{0};
+  alignas(64) std::atomic<int> readWaiting_{0}, insertWaiting_{0};  // t46u item 5: hot words, apart from pointReaders_
+  alignas(64) std::atomic<uint64_t> handoffs_{0}, servedReads_{0}, servedInserts_{0};  // stats: one shared line, apart from the hot words
   std::function<void(uint64_t)> tickHook_;
   struct BoundaryJob { std::function<void()> fn; };
   std::atomic<BoundaryJob*> boundaryJob_{nullptr};  ///< see postBoundaryJob (single slot, lock-free)

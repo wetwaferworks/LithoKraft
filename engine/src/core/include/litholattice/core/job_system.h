@@ -431,17 +431,17 @@ class cJobSystem {
   cJobPool* pool_ = nullptr;   // cJobPool::shared(), never destroyed
   unsigned cap_ = 1;
   std::deque<Job> queue_[kJobPriorityCount];  // guarded by qGate_
-  std::atomic<unsigned> pumps_{0};             // Archie PlayJ: atomic + wait (was mutex+cv)
+  alignas(64) std::atomic<unsigned> pumps_{0}; // t46u item 5: padded. Archie PlayJ: atomic + wait (was mutex+cv)
   cAtomicGate qGate_;                          // Archie PlayJ: replaces qM_
   std::vector<std::thread> ioThreads_;
   cThreadRecordSet records_;  // io threads, class System
 
   std::deque<Job> ioQueue_;
   cAtomicGate ioGate_;                 // Archie PlayJ: replaces ioM_
-  std::atomic<uint64_t> ioWake_{0};    // Archie PlayJ: replaces ioCv_
+  alignas(64) std::atomic<uint64_t> ioWake_{0}; // t46u item 5: padded. Archie PlayJ: replaces ioCv_
   std::atomic<bool> stop_{false};
-  std::atomic<int> inFlight_{0};
-  std::atomic<int> ioInFlight_{0};
+  alignas(64) std::atomic<int> inFlight_{0};  // t46u item 5: padded
+  alignas(64) std::atomic<int> ioInFlight_{0};
   std::atomic<uint64_t> failed_{0};
   std::atomic<bool> cancel_{false};    // PlayM: set when the timed shutdown drain expires
   std::atomic<uint64_t> dropped_{0};   // PlayM: queued jobs dropped by the timed drain

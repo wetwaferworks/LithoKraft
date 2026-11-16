@@ -221,7 +221,7 @@ class cLockFreePool {
   alignas(64) mutable std::atomic<int> inFlight_{0};
   std::atomic<int> bgActive_{0}, bgCount_{0};
   std::atomic<unsigned> lendCap_{1};
-  std::atomic<size_t> rr_{0};
+  alignas(64) std::atomic<size_t> rr_{0};  // t46u item 5: every submitter bumps it; keep it off the bg counters' line
   std::atomic<bool> stop_{false};
   std::atomic<uint64_t> failed_{0}, steals_{0};
   std::unique_ptr<cThreadReadout> readout_;  // LL_THREAD_READOUT=1 only; null otherwise
