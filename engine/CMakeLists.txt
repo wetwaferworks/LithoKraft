@@ -64,6 +64,8 @@ FetchContent_MakeAvailable(glfw)
 endif()
 
 # AngelScript 2.38.0, official SDK zip from angelcode.com, pinned by SHA256.
+# LK_WEB: AngelScript is the ONE sanctioned third-party library in the web build (JD 2026-11-16
+# 12:41 ET, "grant an exception"); everything else third-party stays off LK_WEB.
 set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)   # honour the static MSVC runtime in the SDK's older CMake project
 set(AS_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -74,8 +76,9 @@ FetchContent_Declare(angelscript
 FetchContent_MakeAvailable(angelscript)
 
 # stb_image v2.30 (single header), official github.com/nothings/stb, pinned commit + SHA256.
+# Not on LK_WEB (JD 12:41 ET: in-house PNG/SVG decoder; until then image.cpp fails safe there).
 set(LITHOLATTICE_STB_DIR ${CMAKE_BINARY_DIR}/_deps/stb)
-if(NOT EXISTS ${LITHOLATTICE_STB_DIR}/stb_image.h)
+if(NOT LK_WEB AND NOT EXISTS ${LITHOLATTICE_STB_DIR}/stb_image.h)
   file(DOWNLOAD
     https://raw.githubusercontent.com/nothings/stb/2c980bb59875b0d32144a71867fbdebb2f77cd20/stb_image.h
     ${LITHOLATTICE_STB_DIR}/stb_image.h
@@ -84,8 +87,9 @@ if(NOT EXISTS ${LITHOLATTICE_STB_DIR}/stb_image.h)
 endif()
 
 # miniaudio 0.11.25 (single header), official github.com/mackron/miniaudio release tag + SHA256.
+# Not on LK_WEB (JD 12:41 ET: our own AudioWorklet output; until then the web build runs muted).
 set(LITHOLATTICE_MINIAUDIO_DIR ${CMAKE_BINARY_DIR}/_deps/miniaudio)
-if(NOT EXISTS ${LITHOLATTICE_MINIAUDIO_DIR}/miniaudio.h)
+if(NOT LK_WEB AND NOT EXISTS ${LITHOLATTICE_MINIAUDIO_DIR}/miniaudio.h)
   file(DOWNLOAD
     https://raw.githubusercontent.com/mackron/miniaudio/0.11.25/miniaudio.h
     ${LITHOLATTICE_MINIAUDIO_DIR}/miniaudio.h
@@ -96,10 +100,12 @@ endif()
 # Vulkan backend dependencies (official KhronosGroup release archives, pinned by SHA256).
 # Headers only: the backend loads the system Vulkan loader (vulkan-1.dll / libvulkan.so.1, shipped
 # with the GPU driver) at run time, so nothing Vulkan is linked and the game still starts without it.
+if(NOT LK_WEB)  # no Vulkan backend in the browser build (render_vk is off LK_WEB too)
 FetchContent_Declare(vulkan_headers
   URL https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.363.0.tar.gz
   URL_HASH SHA256=4a078be12bef21cfebc09d878b77a63cff9d68f899254a0b00d0e37ef73e7f7e)
 FetchContent_MakeAvailable(vulkan_headers)
+endif()
 
 # glslang 16.6.0: the reference GLSL -> SPIR-V compiler, built as a host tool so the Vulkan
 # shaders (assets/shaders/vk) compile at build time. No optimizer / HLSL / tests / install.

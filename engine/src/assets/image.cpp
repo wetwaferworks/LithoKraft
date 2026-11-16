@@ -6,9 +6,11 @@
 #include <cmath>
 #include <fstream>
 #include <iterator>
+#if !defined(__wasm__)
 #include "stb_image.h"
 #include "vendor/nanosvg.h"
 #include "vendor/nanosvgrast.h"
+#endif
 
 namespace litholattice {
 
@@ -17,6 +19,14 @@ Image::Image(int width, int height, std::vector<uint8_t> rgba) : w_(width), h_(h
 }
 
 std::optional<Image> Image::decode(std::span<const uint8_t> bytes, std::string* err) {
+#if defined(__wasm__)
+  // WEB-ONLY FAIL-SAFE STUB (S1, 2026-11-16): no stb_image in the web build (JD 12:41 ET: in-house
+  // PNG decoder, its own safety-critical stage). Rejects every input; callers already handle a
+  // decode failure (missing-texture path). Replace with the in-house decoder; do not grow this.
+  (void)bytes;
+  if (err) *err = "image decode not available on web yet (in-house PNG decoder stage pending)";
+  return std::nullopt;
+#else
   if (bytes.empty() || bytes.size() > size_t(64) << 20) {  // stb takes an int length; textures are far below 64 MB
     if (err) *err = bytes.empty() ? "empty file" : "file too large";
     return std::nullopt;
@@ -41,6 +51,7 @@ std::optional<Image> Image::decode(std::span<const uint8_t> bytes, std::string* 
   Image img(w, h, std::vector<uint8_t>(px, px + size_t(w) * size_t(h) * 4));
   stbi_image_free(px);
   return img;
+#endif
 }
 
 namespace {
@@ -59,6 +70,11 @@ std::optional<Image> Image::decodeSvg(std::span<const uint8_t> bytes, int width,
     if (err) *err = why;
     return std::nullopt;
   };
+#if defined(__wasm__)
+  // WEB-ONLY FAIL-SAFE STUB (S1, 2026-11-16): no nanosvg in the web build (in-house SVG stage).
+  (void)bytes; (void)width; (void)height;
+  return fail("SVG decode not available on web yet (in-house SVG decoder stage pending)");
+#else
   if (bytes.empty() || bytes.size() > size_t(64) << 20)
     return fail(bytes.empty() ? "empty file" : "file too large");
   std::string src(bytes.begin(), bytes.end());  // nsvgParse parses in place: private NUL-terminated copy
@@ -92,6 +108,7 @@ std::optional<Image> Image::decodeSvg(std::span<const uint8_t> bytes, int width,
   nsvgDeleteRasterizer(rast);
   nsvgDelete(svg);
   return Image(w, h, std::move(px));
+#endif
 }
 
 namespace {

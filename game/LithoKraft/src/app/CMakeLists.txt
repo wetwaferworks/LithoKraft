@@ -37,6 +37,9 @@ else()
   # names), while --export=malloc is surgical (142 imports, malloc
   # exported).
   target_link_options(lithokraft PRIVATE "-Wl,--export=malloc")
+  # S1 (2026-11-16): an 8 MiB main stack, placed first so an overflow traps at address 0
+  # instead of running into static data (wasm-ld's default stack is 64 KiB).
+  target_link_options(lithokraft PRIVATE "-Wl,-z,stack-size=8388608" "-Wl,--stack-first")
   # The render_vk target (and with it its PUBLIC include dir) is not built
   # here, but main.cpp/selftest.cpp still #include its header for the factory
   # declarations the stub implements. Lend the target the include path only.

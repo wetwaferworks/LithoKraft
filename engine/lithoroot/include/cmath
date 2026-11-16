@@ -90,6 +90,7 @@ inline float rint(float x) noexcept { return __builtin_rintf(x); }
 inline float rintf(float x) noexcept { return __builtin_rintf(x); }
 inline double nearbyint(double x) noexcept { return __builtin_rint(x); }
 inline float nearbyint(float x) noexcept { return __builtin_rintf(x); }
+inline float nearbyintf(float x) noexcept { return __builtin_rintf(x); }
 /* The classification macros become functions, as <cmath> requires. */
 inline int fpclassify(float x) noexcept { return __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, x); }
 inline int fpclassify(double x) noexcept { return __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, x); }

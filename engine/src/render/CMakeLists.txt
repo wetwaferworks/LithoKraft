@@ -65,5 +65,5 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(wasm32|wasm64)$")
   target_sources(litholattice_render PRIVATE software_simd_sse2.cpp software_simd_sse41.cpp)
   set_property(SOURCE software_simd.cpp APPEND PROPERTY COMPILE_DEFINITIONS LL_SW_SSE_TU=1)
   set_property(SOURCE software_simd.cpp software_simd_sse2.cpp software_simd_sse41.cpp
-               APPEND PROPERTY COMPILE_OPTIONS -msimd128 -msse4.1)
+               APPEND PROPERTY COMPILE_OPTIONS -msimd128)  # S1 2026-11-16: no -msse4.1; the kernels take lk_simd_wasm.h
 endif()
