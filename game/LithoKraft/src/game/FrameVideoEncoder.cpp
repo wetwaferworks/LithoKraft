@@ -3,7 +3,9 @@
 #include <filesystem>
 #include "litholattice/core/log.h"
 
-#if defined(_WIN32)
+#if defined(__wasm__)
+#define LK_PCLOSE(p) ((void)(p), 0)  // never opened on web (open() fails safe)
+#elif defined(_WIN32)
 #define LK_POPEN _popen
 #define LK_PCLOSE _pclose
 #else
@@ -27,7 +29,14 @@ bool cFrameVideoEncoder::open(int width, int height) {
                     std::to_string(width) + "x" + std::to_string(height) + " -r " + std::to_string(fps_) +
                     " -i - -c:v libx264 -preset ultrafast -tune animation -crf 12 -threads 4 -pix_fmt yuv420p -movflags +faststart \"" +
                     out + "\"";
-#if defined(_WIN32)
+#if defined(__wasm__)
+  // 2026-11-16 (S5 web): no processes in the browser, so no ffmpeg pipe. Fail safe: the
+  // frame dump is off for the run, with one clear log line (close() sees no pipe).
+  (void)cmd;
+  litholattice::logError("frame-dump: video encoding is not available in the web build (no ffmpeg process); frame dump off");
+  failed_ = true;
+  return false;
+#elif defined(_WIN32)
   cmd = "\"" + cmd + "\"";  // cmd.exe /c quoting
   pipe_ = LK_POPEN(cmd.c_str(), "wb");
 #else

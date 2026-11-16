@@ -23,6 +23,24 @@ add_custom_target(lk_build_counter ALL
   BYPRODUCTS ${LK_BUILD_COUNTER_HEADER_DIR}/lithokraft_build_counter.h
   COMMENT "LithoKraft build counter bump"
   VERBATIM)
+# 2026-11-16 (S5 web): the web configure writes lithokraft_build_counter.h up front with the same script,
+# run on a held copy of the counter (a .hold file next to it), so configuring never bumps the real
+# counter; the build target above still bumps it per build. Native configure: unchanged.
+if(LK_WEB)
+  set(_lk_cfg_counter "${LK_BUILD_COUNTER_HEADER_DIR}/configure_counter.txt")
+  if(EXISTS "${LK_BUILD_COUNTER_FILE}")
+    configure_file("${LK_BUILD_COUNTER_FILE}" "${_lk_cfg_counter}" COPYONLY)
+  else()
+    file(WRITE "${_lk_cfg_counter}" "0\n")
+  endif()
+  file(WRITE "${_lk_cfg_counter}.hold" "")
+  execute_process(COMMAND ${CMAKE_COMMAND} -DCOUNTER=${_lk_cfg_counter} -DHEADER=${LK_BUILD_COUNTER_HEADER_DIR}/lithokraft_build_counter.h -DVERSION_FILE=${LK_VERSION_FILE}
+                          -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bump_build_counter.cmake
+                  RESULT_VARIABLE _lk_gen_rc)
+  if(NOT _lk_gen_rc EQUAL 0)
+    message(FATAL_ERROR "web configure: writing lithokraft_build_counter.h failed (${_lk_gen_rc})")
+  endif()
+endif()
 add_subdirectory(src/content)
 add_subdirectory(src/game)
 add_subdirectory(src/app)

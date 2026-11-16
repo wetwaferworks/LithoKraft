@@ -41,6 +41,7 @@ using ::at_quick_exit;
 using ::exit;
 using ::quick_exit;
 using ::abort;
+using ::_Exit;
 using ::getenv;
 using ::system;
 using ::mblen;

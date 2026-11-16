@@ -8,6 +8,17 @@ add_custom_command(OUTPUT ${LITHOKRAFT_BUILTIN_WORLDGEN}
           -DSTRUCT=BuiltinWorldgenFile -DARRAY=kBuiltinWorldgenFiles -P ${LithoLattice_SOURCE_DIR}/cmake/embed_text_files.cmake
   DEPENDS ${LITHOLATTICE_WORLDGEN_FILES} ${LithoLattice_SOURCE_DIR}/cmake/embed_text_files.cmake
   COMMENT "Embedding built-in world generators")
+# 2026-11-16 (S5 web): the web configure also writes this header up front, with the same script and
+# arguments, so configure-only tooling (the compile_commands census) sees it. The build rule above still
+# regenerates it. Native configure: unchanged.
+if(LK_WEB)
+  execute_process(COMMAND ${CMAKE_COMMAND} -DDIR=${LITHOKRAFT_WORLDGEN_DIR} "-DPATTERNS=*.json" -DOUT=${LITHOKRAFT_BUILTIN_WORLDGEN}
+                          -DSTRUCT=BuiltinWorldgenFile -DARRAY=kBuiltinWorldgenFiles -P ${LithoLattice_SOURCE_DIR}/cmake/embed_text_files.cmake
+                  RESULT_VARIABLE _lk_gen_rc)
+  if(NOT _lk_gen_rc EQUAL 0)
+    message(FATAL_ERROR "web configure: embedding built-in world generators failed (${_lk_gen_rc})")
+  endif()
+endif()
 
 # 2026-10-16 (JD): release info for the F3 overlay / title bar (commit, version); "nogit" outside a repo.
 execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

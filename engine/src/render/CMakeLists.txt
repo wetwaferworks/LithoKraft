@@ -18,6 +18,17 @@ add_custom_command(OUTPUT ${LITHOLATTICE_BUILTIN_SHADERS}
           -DSTRUCT=BuiltinShaderFile -DARRAY=kBuiltinShaderFiles -P ${LithoLattice_SOURCE_DIR}/cmake/embed_text_files.cmake
   DEPENDS ${LITHOLATTICE_SHADER_FILES} ${LithoLattice_SOURCE_DIR}/cmake/embed_text_files.cmake
   COMMENT "Embedding base shaders")
+# 2026-11-16 (S5 web): the web configure also writes this header up front, with the same script and
+# arguments, so configure-only tooling (the compile_commands census) sees it. The build rule above still
+# regenerates it. Native configure: unchanged.
+if(LK_WEB)
+  execute_process(COMMAND ${CMAKE_COMMAND} -DDIR=${LITHOLATTICE_SHADER_DIR} "-DPATTERNS=*.vert,*.frag,*.glsl" -DOUT=${LITHOLATTICE_BUILTIN_SHADERS}
+                          -DSTRUCT=BuiltinShaderFile -DARRAY=kBuiltinShaderFiles -P ${LithoLattice_SOURCE_DIR}/cmake/embed_text_files.cmake
+                  RESULT_VARIABLE _lk_gen_rc)
+  if(NOT _lk_gen_rc EQUAL 0)
+    message(FATAL_ERROR "web configure: embedding base shaders failed (${_lk_gen_rc})")
+  endif()
+endif()
 
 add_library(litholattice_render STATIC mesher.cpp WorkerScratch.cpp MeshPipeline.cpp MesherSelector.cpp FallbackReasonStats.cpp unified_mesher.cpp binary_greedy_mesher.cpp micro_mesher.cpp block_materials.cpp pbr_materials.cpp pbr_brdf.cpp pbr_quad_mesh.cpp overlay_geometry.cpp hud_ui_renderer.cpp software_renderer.cpp SwDecodeCache.cpp SwCanonStore.cpp software_simd.cpp software_aa.cpp software_ascii.cpp nemo_view.cpp ground_traces.cpp
             gl33/gl_loader.cpp gl33/gl_program.cpp gl33/gl_texture_array.cpp gl33/TexelFreeList.cpp gl33/GlTboSlabPool.cpp gl33/GlTboSlabUploader.cpp gl33/gl33_renderer.cpp gl33/software_presenter.cpp gl33/software_presenter_webgl.cpp gl33/gl_web_shims.cpp
