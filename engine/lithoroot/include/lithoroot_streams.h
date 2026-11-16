@@ -228,6 +228,9 @@ public:
     return *this;
   }
   istream& operator>>(char& ch) { if (sentry()) get(ch); return *this; }
+  // [istream.extractors]: signed/unsigned char read one character, like char.
+  istream& operator>>(signed char& c) { char ch = 0; *this >> ch; if (!fail()) c = static_cast<signed char>(ch); return *this; }
+  istream& operator>>(unsigned char& c) { char ch = 0; *this >> ch; if (!fail()) c = static_cast<unsigned char>(ch); return *this; }
   istream& operator>>(short& v) { return num(v); }
   istream& operator>>(int& v) { return num(v); }
   istream& operator>>(long& v) { return num(v); }
