@@ -2,9 +2,9 @@
 #include "lithokraft/game/silica_biome.h"
 
 #include <array>
-#include <atomic>
 #include <memory>
 #include <unordered_map>
+#include "lithokraft/game/cow_publish.h"
 #include "lithokraft/game/wafer_biomes.h"
 #include "litholattice/procgen/pipeline.h"
 #include "litholattice/world/column_generator.h"
@@ -21,8 +21,10 @@ int64_t chunkKey(int cx, int cz) {
 struct SilicaShadeCache::Impl {
   std::shared_ptr<const litholattice::cColumnGen> gen;
   // Archie Phase 3c: COW map, atomic publish (mesher hot path, no mutex).
+  // Published as a raw pointer (cow_publish.h): atomic<shared_ptr> hides a lock.
+  // Lookup only, never iterated, so the unordered order cannot reach a hash.
   using Map = std::unordered_map<int64_t, SilicaShade>;
-  std::atomic<std::shared_ptr<const Map>> cache_{std::make_shared<const Map>()};
+  CowPublished<Map> cache_{new Map()};
   // Cache bound: past this many chunks, a publish starts from an empty map
   // instead of copying the whole one (values are a pure function of the
   // chunk coords, so cleared entries just recompute on their next lookup).
@@ -57,21 +59,24 @@ SilicaShadeCache::~SilicaShadeCache() = default;
 
 SilicaShade SilicaShadeCache::shade(int cx, int cz) {
   const int64_t k = chunkKey(cx, cz);
-  for (;;) {
-    auto snap = std::atomic_load_explicit(&impl_->cache_, std::memory_order_acquire);
-    if (const auto it = snap->find(k); it != snap->end()) return it->second;
-    const SilicaShade fresh = impl_->blend(cx, cz);
-    auto next = snap->size() >= Impl::kMaxEntries
-                    ? std::make_shared<Impl::Map>()
-                    : std::make_shared<Impl::Map>(*snap);
-    const auto [it, inserted] = next->emplace(k, fresh);
-    (void)inserted;
-    std::shared_ptr<const Impl::Map> expected = snap;
-    if (std::atomic_compare_exchange_weak_explicit(
-            &impl_->cache_, &expected, std::shared_ptr<const Impl::Map>(std::move(next)),
-            std::memory_order_release, std::memory_order_acquire))
-      return it->second;
-  }
+  SilicaShade hit{};
+  const bool found = impl_->cache_.read([&](const Impl::Map& m) {
+    const auto it = m.find(k);
+    if (it == m.end()) return false;
+    hit = it->second;
+    return true;
+  });
+  if (found) return hit;
+  // Miss: blend unpinned (slow), then publish a copy holding it. The value is a
+  // pure function of (cx, cz), so a racing writer's entry for k is the same value.
+  const SilicaShade fresh = impl_->blend(cx, cz);
+  impl_->cache_.update([&](const Impl::Map& snap) {
+    if (snap.count(k)) return static_cast<Impl::Map*>(nullptr);  // a racing writer got there first
+    Impl::Map* next = snap.size() >= Impl::kMaxEntries ? new Impl::Map() : new Impl::Map(snap);
+    next->emplace(k, fresh);
+    return next;
+  });
+  return fresh;
 }
 
 float silicaScatterDensity(const litholattice::procgen::ColumnMaps& maps, size_t column) {

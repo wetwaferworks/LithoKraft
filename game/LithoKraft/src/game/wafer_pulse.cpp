@@ -3,9 +3,9 @@
 #include "lithokraft/game/wafer_pulse.h"
 
 #include <array>
-#include <atomic>
 #include <memory>
 #include <unordered_map>
+#include "lithokraft/game/cow_publish.h"
 #include "lithokraft/game/wafer_biomes.h"
 #include "litholattice/render/ground_pulse.h"
 #include "litholattice/render/ground_traces.h"
@@ -38,9 +38,11 @@ int64_t chunkKey(int cx, int cz) {
 
 struct WaferPulseCache::Impl {
   std::shared_ptr<const litholattice::cColumnGen> gen;
-  // Archie Phase 3c: COW map published by atomic shared_ptr (mesher hot path, no mutex).
+  // Archie Phase 3c: COW map, atomic publish (mesher hot path, no mutex).
+  // Published as a raw pointer (cow_publish.h): atomic<shared_ptr> hides a lock.
+  // Lookup only, never iterated, so the unordered order cannot reach a hash.
   using Map = std::unordered_map<int64_t, std::array<float, 13>>;
-  std::atomic<std::shared_ptr<const Map>> cache_{std::make_shared<const Map>()};
+  CowPublished<Map> cache_{new Map()};
   // Cache bound: past this many chunks, a publish starts from an empty map
   // instead of copying the whole one (values are a pure function of the
   // chunk coords, so cleared entries just recompute on their next lookup).
@@ -73,21 +75,24 @@ struct WaferPulseCache::Impl {
 
   std::array<float, 13> lookup(int cx, int cz) {
     const int64_t k = chunkKey(cx, cz);
-    for (;;) {
-      auto snap = std::atomic_load_explicit(&cache_, std::memory_order_acquire);
-      if (const auto it = snap->find(k); it != snap->end()) return it->second;
-      const std::array<float, 13> fresh = blend(cx, cz);
-      auto next = snap->size() >= kMaxEntries ? std::make_shared<Map>()
-                                              : std::make_shared<Map>(*snap);
-      const auto [it, inserted] = next->emplace(k, fresh);
-      (void)inserted;
-      std::shared_ptr<const Map> expected = snap;
-      if (std::atomic_compare_exchange_weak_explicit(
-              &cache_, &expected, std::shared_ptr<const Map>(std::move(next)),
-              std::memory_order_release, std::memory_order_acquire))
-        return it->second;
-      // lost the race: retry (winner's value or ours on the next snap)
-    }
+    std::array<float, 13> hit{};
+    const bool found = cache_.read([&](const Map& m) {
+      const auto it = m.find(k);
+      if (it == m.end()) return false;
+      hit = it->second;
+      return true;
+    });
+    if (found) return hit;
+    // Miss: blend unpinned (slow), then publish a copy holding it. The value is a
+    // pure function of (cx, cz), so a racing writer's entry for k is the same value.
+    const std::array<float, 13> fresh = blend(cx, cz);
+    cache_.update([&](const Map& snap) {
+      if (snap.count(k)) return static_cast<Map*>(nullptr);  // a racing writer got there first
+      Map* next = snap.size() >= kMaxEntries ? new Map() : new Map(snap);
+      next->emplace(k, fresh);
+      return next;
+    });
+    return fresh;
   }
 
 };
