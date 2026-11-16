@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cctype>
 #include "lithokraft/game/game_ui.h"
 #include <algorithm>
 #include <charconv>

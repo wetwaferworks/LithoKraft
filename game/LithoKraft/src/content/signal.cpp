@@ -1,6 +1,7 @@
 #include <chrono>
 #include <unordered_set>
 #include <deque>
+#include <format>
 #include <vector>
 #include "lithokraft/content/randor_rng.h"  // 2026-10-31 (JD): Randor
 #include "lithokraft/content/signal.h"

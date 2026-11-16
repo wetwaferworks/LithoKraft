@@ -8,6 +8,9 @@
 #include "litholattice/core/spin_stats.h"
 #include <atomic>
 #include <cstdint>
+#if defined(__wasm__)
+#include <lithoweave.h>  // lw_current_tid (web build only)
+#endif
 #if defined(_MSC_VER)
 #  include <intrin.h>
 #  define LL_BLOCK_GATE_PAUSE() _mm_pause()
@@ -83,6 +86,11 @@ class cBlockGate {
 #ifdef _WIN32
     const unsigned long tid = ::GetCurrentThreadId();
     return tid ? uint32_t(tid) : 1u;  // never 0 (0 = unlocked)
+#elif defined(__wasm__)
+    // 2026-11-16 (S5 web): pthread_t is LithoWeave's handle struct there, not an integer or
+    // pointer, so use the weave's own thread id (positive; 0 only if attaching failed).
+    const int32_t tid = lw_current_tid();
+    return tid > 0 ? uint32_t(tid) : 1u;
 #else
     const auto p = reinterpret_cast<uintptr_t>(pthread_self());
     uint32_t t = uint32_t(p ^ (p >> 32));
