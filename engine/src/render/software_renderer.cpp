@@ -699,6 +699,13 @@ cSoftwareRenderer::UploadRingStats cSoftwareRenderer::uploadRingStats() const {
   st.applied = ringApplied_;
   st.coalesced = ringCoalesced_;
   st.clears = ringClears_;
+  st.refusedSlots = uploadRing_.refusedSlots();
+  st.refusedBytes = uploadRing_.refusedBytes();
+  st.maxBytesInFlight = uploadRing_.maxBytesInFlight();
+  st.maxDrainPerSeal = uploadRing_.maxDrainPerSeal();
+  st.pushedBytes = uploadRing_.pushedBytesTotal();
+  st.slots = cSwUploadRing::kSlots;
+  st.byteBudget = cSwUploadRing::kByteBudget;
   return st;
 }
 

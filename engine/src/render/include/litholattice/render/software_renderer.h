@@ -123,6 +123,8 @@ class cSoftwareRenderer : public IRenderer {
   struct UploadRingStats {
     uint64_t pushed = 0, pushFull = 0, maxOccupancy = 0;
     uint64_t drained = 0, applied = 0, coalesced = 0, clears = 0;
+    uint64_t refusedSlots = 0, refusedBytes = 0, maxBytesInFlight = 0, maxDrainPerSeal = 0, pushedBytes = 0;  // t46u item 4
+    uint64_t slots = 0, byteBudget = 0;
   };
   UploadRingStats uploadRingStats() const;
   void uploadEntityMesh(const std::vector<PackedVertex>& verts) override;  // dynamic triangle verts, replaced per upload

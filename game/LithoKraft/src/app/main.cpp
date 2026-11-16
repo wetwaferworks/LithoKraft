@@ -2479,6 +2479,11 @@ static void lkShutdownTail(FrameCtx& F) {
               (unsigned long long)rs.drained, (unsigned long long)rs.applied, (unsigned long long)rs.coalesced,
               (unsigned long long)rs.clears, (unsigned long long)game.ringSpillEvents(), game.ringSpillMax(),
               (unsigned long long)game.ringSpillDroppedOnSwitch(), game.ringSpillDepth());
+      logInfo("threeway upload ring demand (t46u item 4): slots=%llu (%zu B each) byte-budget=%llu MiB | refused by slots=%llu by bytes=%llu (rate %.1f%% of attempts) | peak bytes in flight=%.2f MiB, peak entries per seal=%llu, payload pushed=%.1f MiB (avg %.0f B/entry)",
+              (unsigned long long)rs.slots, sizeof(litholattice::cSwUploadRing::Slot), (unsigned long long)(rs.byteBudget >> 20), (unsigned long long)rs.refusedSlots, (unsigned long long)rs.refusedBytes,
+              rs.pushed + rs.pushFull ? 100.0 * double(rs.pushFull) / double(rs.pushed + rs.pushFull) : 0.0,
+              double(rs.maxBytesInFlight) / 1048576.0, (unsigned long long)rs.maxDrainPerSeal, double(rs.pushedBytes) / 1048576.0,
+              rs.pushed ? double(rs.pushedBytes) / double(rs.pushed) : 0.0);
       display.software->setUploadRingEnabled(false);
     }
     if (swThreewayOn) cSoftwareRenderer::setDetachedPoolMode(false);  // pool returns to its pre-split worker shape before teardown
