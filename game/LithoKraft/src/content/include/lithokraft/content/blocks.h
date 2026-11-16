@@ -153,6 +153,8 @@ extern const BlockId kFoliageCrystalShrub;  ///< Crystal Shrub (Litho Formula vo
 extern const BlockId kFoliageMoss;          ///< Routing Moss (id 87, Cortana 2026-10-15 2110)
 extern const BlockId kHighwayRamp;           ///< Highway Ramp (2-block 1:2 slope, highways only; Proposed by JD, Built by Cortana)
 extern const BlockId kAluminumRamp;          ///< Aluminum Ramp (slope, corner snapping; Cortana 2026-10-16)
+extern const BlockId kMazeKey;               ///< PCHIE maze key: lamp look, own id so Nemo can label it k
+extern const BlockId kMazeExit;              ///< PCHIE maze exit: lamp look, own id so Nemo can label it E
 
 /// Game flags (BlockDef::flags, above the engine's kFirstGameFlag).
 constexpr uint32_t kPowerable = uint32_t(kFirstGameFlag) << 0;  // can be powered by wire or a torch below (then turns torches on it off)
@@ -233,7 +235,7 @@ inline int viaAxis(BlockId b) {
 inline bool isSideVia(BlockId b) { return viaAxis(b) > 0; }
 /// 2026-10-25: blocks kept out of the creative palette, test-world kit and block grid (placement
 /// variants, or no art yet). Still placeable by id / command and in scenes.
-inline bool isPaletteHidden(BlockId b) { return isSideVia(b) || b == kTimerBuffer; }
+inline bool isPaletteHidden(BlockId b) { return isSideVia(b) || b == kTimerBuffer || b == kMazeKey || b == kMazeExit; }
 /// 2026-10-31 (JD): the creative palette list, built from the block registry in registry order (new blocks
 /// append themselves). Skips air; internal / placement-variant blocks only when `includeHidden` is false.
 std::vector<BlockId> paletteBlocks(bool includeHidden = false);

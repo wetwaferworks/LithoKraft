@@ -13,7 +13,8 @@ std::shared_ptr<const std::vector<uint8_t>> buildNemoObjectTable(const litholatt
   const std::pair<litholattice::BlockId, ObjectId> rules[] = {
       {kStone, ObjectId::Wall},          {kStoneSlab, ObjectId::Wall},
       {kFrostedGlass, ObjectId::Door},   {kGlass, ObjectId::Translucent},
-      {kLamp, ObjectId::Light},          {kRedTorch, ObjectId::Light},
+      {kLamp, ObjectId::Light},          {kMazeKey, ObjectId::Key},
+      {kMazeExit, ObjectId::Exit},       {kRedTorch, ObjectId::Light},
       {kBlueTorch, ObjectId::Light},     {kColorLamp16, ObjectId::Light},
       {kColorLamp32, ObjectId::Light},   {kColorLamp64, ObjectId::Light},
       {kAluminumBlock, ObjectId::Floor}, {kCopperBlock, ObjectId::Floor},

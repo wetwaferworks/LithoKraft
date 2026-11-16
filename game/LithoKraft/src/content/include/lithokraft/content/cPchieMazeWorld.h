@@ -8,8 +8,8 @@
 //   PCHIE-B1 <width> <height> <seed>
 //   <height rows of <width> chars>   # wall  . floor  S start  K key  D door  E exit  P pit
 // Cell (x, y) is the block column (originX + x, originZ + y). Layers (floorY = the plain's top):
-//   floorY      floor (Aluminum Block; Start = Copper Block; Exit = Lamp; Pit = air down 2)
-//   floorY+1,+2 wall = Stone x2; door = Frosted Glass x2; key = Lamp at floorY+1 only
+//   floorY      floor (Aluminum Block; Start = Copper Block; Exit = Maze Exit; Pit = air down 2)
+//   floorY+1,+2 wall = Stone x2; door = Frosted Glass x2; key = Maze Key at floorY+1 only
 #pragma once
 #include <string>
 #include "lithokraft/engine.h"

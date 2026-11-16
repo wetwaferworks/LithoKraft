@@ -288,6 +288,9 @@ cBlockReg& mutableRegistry() {
   r.add(def("lithokraft:pushor", "Pushor", kDir, S::Cube, "pushor", "pushor", R::Pushor, 0, 0, 45));
   // B9 2026-11-12 (JD row B, CloudAtlas gear ring + resin mount, full block): revised Swivelor. Appended (stable ids). No use.
   r.add(def("lithokraft:swivelor", "Swivelor", kDir, S::Cube, "swivelor", "swivelor", R::Swivelor, 0, 0, 45));
+  // 2026-11-15 (JD): maze key and exit get their own blocks so Nemo can tell them apart from a Lamp.
+  r.add(def("lithokraft:maze_key", "Maze Key", kTerrain, S::Cube, "lamp", "on_off", R::Lamp, 0, 0, 40));
+  r.add(def("lithokraft:maze_exit", "Maze Exit", kTerrain, S::Cube, "lamp", "on_off", R::Lamp, 0, 0, 40));
     // Save migration: pre-rename ids remap to the -OR names (2026-10-10).
     r.addAlias("lithokraft:pulsar", "lithokraft:pulsor");
     r.addAlias("lithokraft:redirector_select", "lithokraft:routor");  // PlayB (JD t4346u): old saves
@@ -485,6 +488,8 @@ const BlockId kFoliageCrystalShrub = resolveId(blockRegistry(), "lithokraft:foli
 const BlockId kFoliageMoss          = resolveId(blockRegistry(), "lithokraft:foliage_moss");
 const BlockId kAluminumRamp       = resolveId(blockRegistry(), "lithokraft:aluminum_ramp");  // Cortana 2026-10-16
 const BlockId kHighwayRamp        = resolveId(blockRegistry(), "lithokraft:highway_ramp");   // Proposed by JD, Built by Cortana
+const BlockId kMazeKey             = resolveId(blockRegistry(), "lithokraft:maze_key");   // 2026-11-15 (JD)
+const BlockId kMazeExit            = resolveId(blockRegistry(), "lithokraft:maze_exit");  // 2026-11-15 (JD)
 
 namespace {
 // F-M4 namespace format: `<namespace>:<path>` where namespace is

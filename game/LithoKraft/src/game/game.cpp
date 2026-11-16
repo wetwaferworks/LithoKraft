@@ -1604,7 +1604,7 @@ void Game::loadActive() {
       sp.x = ml.spawnX; sp.z = ml.spawnZ; sp.y = float(floorY + 1); sp.yaw = 0.f; sp.pitch = -0.32f;
       tpMarks_.push_back({"maze", Vec3{sp.x, sp.y, sp.z}});
       logInfo("pchie maze: legend floor=%u wall=%u start=%u exit=%u key=%u door=%u origin=(%d,%d,%d) size=%dx%d start=(%d,%d) blocks=%d (/tp maze)",
-              unsigned(kAluminumBlock), unsigned(kStone), unsigned(kCopperBlock), unsigned(kLamp), unsigned(kLamp),
+              unsigned(kAluminumBlock), unsigned(kStone), unsigned(kCopperBlock), unsigned(kMazeExit), unsigned(kMazeKey),
               unsigned(kFrostedGlass), ml.originX, ml.floorY, ml.originZ, ml.width, ml.height, ml.startX, ml.startY, ml.placed);
     } else {
       logError("pchie maze: '%s' not built: %s", cfg_.pchieMazeFile.c_str(), ml.err.c_str());

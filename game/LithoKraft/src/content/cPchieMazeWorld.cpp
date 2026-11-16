@@ -57,8 +57,8 @@ cPchieMazeWorld::Layout cPchieMazeWorld::build(ChunkMap& world, const std::strin
       switch (rows[size_t(y)][size_t(x)]) {
         case '#': put(bx, floorY + 1, bz, kStone); put(bx, floorY + 2, bz, kStone); break;
         case 'S': put(bx, floorY, bz, kCopperBlock); break;
-        case 'E': put(bx, floorY, bz, kLamp); break;
-        case 'K': put(bx, floorY + 1, bz, kLamp); break;
+        case 'E': put(bx, floorY, bz, kMazeExit); break;
+        case 'K': put(bx, floorY + 1, bz, kMazeKey); break;
         case 'D': put(bx, floorY + 1, bz, kFrostedGlass); put(bx, floorY + 2, bz, kFrostedGlass); break;
         case 'P': world.set(bx, floorY, bz, kAir); world.set(bx, floorY - 1, bz, kAir); break;
         default: break;  // '.' floor
