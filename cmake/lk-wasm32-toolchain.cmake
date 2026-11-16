@@ -83,11 +83,13 @@ set(CMAKE_CXX_FLAGS_INIT "${CMAKE_CXX_FLAGS_INIT} -fwasm-exceptions")
 # --- linker posture --------------------------------------------------------
 # Imported, shared linear memory: the host (lkboot) creates the
 # WebAssembly.Memory and owns growth through lithosys_memory_grow.
-# Sizes mirror lkboot's current memory object (initial 8192 pages =
-# 512 MiB, maximum 32768 pages = 2 GiB); a relink may retune them
-# here, in one place, with the host object changed to match.
+# Sized for the phone (moto g 5G 2024: ~450-500 MiB working budget,
+# 600 MiB hard cap): initial 4096 pages = 256 MiB, maximum 9600 pages
+# = 600 MiB. The host object in lkboot must be created with the same
+# limits ({ initial: 4096, maximum: 9600, shared: true }); the older
+# 8192/32768 (512 MiB / 2 GiB) object is for the pre-relink build only.
 set(LK_WASM_LINK_FLAGS
-  "-Wl,--import-memory -Wl,--shared-memory -Wl,--initial-memory=536870912 -Wl,--max-memory=2147483648")
+  "-Wl,--import-memory -Wl,--shared-memory -Wl,--initial-memory=268435456 -Wl,--max-memory=629145600")
 set(CMAKE_EXE_LINKER_FLAGS_INIT "${LK_WASM_LINK_FLAGS}")
 
 # The module's entry exports beyond _start/main are declared at the
