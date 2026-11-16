@@ -5023,9 +5023,10 @@ void Game::update(float dt, int width, int height) {
       mcpSenses_.setObjectTable(buildNemoObjectTable(*mats));
     }
     cNemoViewWindow& nemoView = cNemoViewWindow::instance();
-    nemoView.setStyle(cvarInt("render.nemo_view_style", 0));
+    nemoView.setStyle(cvarInt("render.nemo_view_style", 4));
     nemoView.setView(cvarInt("render.nemo_view_objects", 1) != 0, cvarInt("render.nemo_view_cols", 80));
-    nemoView.setWanted(cvarInt("render.nemo_view", 0) == 1, &mcpSenses_);
+    const int nemoViewMode = cvarInt("render.nemo_view", 0);
+    nemoView.setWanted(nemoViewMode != 0, &mcpSenses_, nemoViewMode == 2);
   }
   // cCamera system (presentation only): sync the camera.* cvars into the
   // camera configs, then advance the cameras â€” samples the player's true

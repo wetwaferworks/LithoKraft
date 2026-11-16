@@ -274,6 +274,8 @@ bool cMcpSensesAdapter::buildAscii(litholattice::cSoftwareRenderer& sw, litholat
   src.pixels = sw.framebuffer().pixels.data();
   src.depth = sw.depthBuffer().data();
   src.objects = objects ? sw.objectBuffer().data() : nullptr;
+  src.faces = (objects && sw.faceBuffer().size() == sw.objectBuffer().size()) ? sw.faceBuffer().data()
+                                                                               : nullptr;
   src.depthRemapMode = litholattice::swsimd::g_depthRemapMode;
   nv::FrameConfig cfg;
   cfg.cols = cols;
@@ -308,10 +310,28 @@ bool cMcpSensesAdapter::captureAsciiFrame(std::string_view pilot, const litholat
   out.tick = f.tick;
   out.mode = nv::viewModeName(f.mode);
   out.lutSha = nv::depthTableShaPrefix();
-  out.glyph = nv::glyphRows(f);
-  out.fg = nv::fgRows(f);
-  out.depth = nv::bandRows(f);
-  out.cls = nv::objectRows(f);
+  auto wanted = [&](const char* name) {
+    const std::string& ch = req.channels;
+    if (ch.empty()) return std::string(name) == "glyph";
+    if (ch == "all") return true;
+    std::string wrapped = ",";
+    for (char c : ch) {
+      if (c != ' ') wrapped += c;
+    }
+    wrapped += ",";
+    auto has = [&](const char* n) { return wrapped.find(std::string(",") + n + ",") != std::string::npos; };
+    if (std::string(name) == "class") return has("class") || has("cls") || has("object");
+    if (std::string(name) == "qword") return has("qword") || has("cell");
+    if (std::string(name) == "fg") return has("fg") || has("ink");
+    return has(name);
+  };
+  if (wanted("glyph")) out.glyph = nv::glyphRows(f);
+  if (wanted("fg")) out.fg = nv::fgRows(f);
+  if (wanted("depth")) out.depth = nv::bandRows(f);
+  if (wanted("class")) out.cls = nv::objectRows(f);
+  if (wanted("tex8")) out.tex8 = nv::tex8Rows(f);
+  if (wanted("tex16")) out.tex16 = nv::tex16Rows(f);
+  if (wanted("qword")) out.qword = nv::qwordRows(f);
   out.sha256 = nv::shaHex(f);
   out.yaw = float(res.yaw * kRadToDeg);
   out.pitch = float(res.pitch * kRadToDeg);

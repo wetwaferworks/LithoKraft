@@ -115,6 +115,27 @@ int main() {
   }
   check(paletteIndex(0, 0, 0) == 0 && paletteIndex(255, 255, 255) == 15, "palette ends");
   check(paletteIndex(64, 0, 0) == 0, "palette tie (64,0,0) keeps the lower index");
+  {
+    CellFields f;
+    f.glyph = '#';
+    f.ink = 15;
+    f.fill = 8;
+    f.depth = 2;
+    f.alpha = 1;
+    f.object = 2;
+    f.light = 11;
+    f.face = uint8_t(FaceId::Top);
+    f.emissive = true;
+    const uint64_t w = packCell(f);
+    check((w & kCellReservedMask) == 0, "packCell clears reserved bits");
+    const CellFields b = unpackCell(w | kCellReservedMask);
+    check(b.glyph == '#' && b.ink == 15 && b.fill == 8 && b.depth == 2 && b.alpha == 1 && b.object == 2 &&
+              b.light == 11 && b.face == uint8_t(FaceId::Top) && b.emissive && !b.edge && !b.wet,
+          "pack/unpack round trip; reserved bits are ignored");
+    check(fillScale(uint8_t(FaceId::Top)) > fillScale(uint8_t(FaceId::Bottom)) &&
+              fillScale(uint8_t(FaceId::Top)) > fillScale(uint8_t(FaceId::PosX)),
+          "top faces keep a fuller material fill than sides or bottoms");
+  }
   check(std::strlen(kRamp) == size_t(kRampSteps) && kRamp[0] == ' ', "ramp.v1 has 12 steps, space first");
   check(depthTableShaPrefix() == "c4b3f1700c0d9c94", "baked depth-band table SHA-256 c4b3f1700c0d9c94...");
   {
@@ -180,7 +201,23 @@ int main() {
     for (char ch : g) noDigits = noDigits && !(ch >= '0' && ch <= '9');
     check(noDigits, "glyph text carries no digits (no coordinates can leak)");
     const std::string rec = canonicalRecord(f);
-    check(rec.rfind("nemo_ascii.v1|80|45|objects|ramp.v1|pal16.v1|c4b3f1700c0d9c94|", 0) == 0, "canonical record header");
+    check(rec.rfind("nemo_ascii.v2|80|45|objects|ramp.v1|pal16.v1|c4b3f1700c0d9c94|", 0) == 0, "canonical record header");
+    bool reservedZero = true, hasFill = false;
+    for (uint64_t w : f.cell) {
+      reservedZero = reservedZero && ((w & kCellReservedMask) == 0);
+      const CellFields cf = unpackCell(w);
+      if (cf.depth != kSkyBand && cf.fill != 0) hasFill = true;
+    }
+    check(reservedZero && f.cell.size() == size_t(80 * 45), "fixture cells are packed and reserved bits are zero");
+    check(hasFill, "non-sky cells carry a material fill");
+    check(channelRows(f, "glyph") == glyphRows(f) && !tex8Rows(f).empty() && !qwordRows(f).empty(),
+          "glyph is the default channel; tex8 and qword slices are available");
+    bool solidFill = false;
+    for (size_t i = 0; i < f.cell.size(); ++i) {
+      const CellLook look = decodeCell(f, i, ViewStyle::Solid);
+      if (look.glyph != ' ' && (look.fill & 0x00FFFFFFu) != 0) solidFill = true;
+    }
+    check(solidFill, "solid decoder paints a non-black fill on visible cells");
     std::printf("[NEMO-VIEW] fixture 80x45 objects sha256 %s\n", shaHex(f).c_str());
     std::printf("%s\n", g.substr(0, 81 * 14).c_str());
   }
@@ -208,6 +245,22 @@ int main() {
     build(a, cfg, fa);
     build(b, cfg, fb);
     check(fa.sha256 == fb.sha256, "out-of-view change leaves the fovea frame unchanged");
+  }
+  {
+    // Face ids ride along the same cells; majority wins, lower id keeps a tie.
+    Fixture faced(320, 180);
+    std::vector<uint8_t> faces(size_t(320) * 180, uint8_t(FaceId::Unknown));
+    for (int y = 45; y < 180; ++y)
+      for (int x = 0; x < 160; ++x) faces[size_t(y) * 320 + x] = uint8_t(FaceId::Top);
+    SourceView v = faced.view();
+    v.faces = faces.data();
+    FrameConfig cfg;
+    AsciiFrame f;
+    build(v, cfg, f);
+    int tops = 0;
+    for (uint64_t w : f.cell)
+      if (unpackCell(w).face == uint8_t(FaceId::Top)) ++tops;
+    check(tops > 0, "majority face id is packed into the cell");
   }
   // ---- the software renderer's object-id buffer ----
   {

@@ -299,6 +299,9 @@ class cSoftwareRenderer : public IRenderer {
   /// Object id for everything drawn until cleared (-1 = use the layer table).
   void setObjectOverride(int id) { objectOverride_ = id; }
   const std::vector<uint8_t>& objectBuffer() const { return objects_; }
+  /// Face id of the depth-test winner (0-5, same numbering as PackedVertex faceAo); empty when
+  /// object capture is off. Colour and depth output are unchanged either way.
+  const std::vector<uint8_t>& faceBuffer() const { return faces_; }
   const std::vector<uint16_t>& depthBuffer() const { return depth_; }
 
   /// Enable/disable per-pixel shading (default: flat for speed).
@@ -408,6 +411,7 @@ class cSoftwareRenderer : public IRenderer {
   bool objectsOn_ = false;            ///< Nemo View object ids (setObjectCapture)
   int objectOverride_ = -1;
   std::vector<uint8_t> objects_;      ///< per-pixel object id, parallel to depth_ (only when objectsOn_)
+  std::vector<uint8_t> faces_;        ///< per-pixel face id 0-5, parallel to objects_ (only when objectsOn_)
   std::vector<uint8_t> layerObject_;  ///< texture layer -> object id
   SoftwareShadingTier shadingTier_ = SoftwareShadingTier::Basic;  ///< fragment tier (per-pixel path)
   const PbrFragmentContext* pbrContext_ = nullptr;  ///< PBR context (registry/lights/camera); may be null

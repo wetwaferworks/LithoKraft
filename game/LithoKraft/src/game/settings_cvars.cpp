@@ -441,13 +441,14 @@ void registerMcpSensesCvars(litholattice::console::cConsoleReg& r) {
       r.print(std::string("mcp senses: cvar '") + row.name + "' not registered: " + err);
   }
   // Nemo View pop-up window (not archived, so it never lands in the shared settings file).
-  // LL_NEMO_VIEW=1 at launch opens it from the start.
+  // LL_NEMO_VIEW=1 at launch opens the pop-up; 2 opens it maximised (playable full window).
   {
     const char* e = std::getenv("LL_NEMO_VIEW");
-    const bool atLaunch = e && std::string(e) == "1";
+    const char* launch = "0";
+    if (e && (std::string(e) == "1" || std::string(e) == "2")) launch = e;  // 2 = maximised play window
     const Row nemo[] = {
-        {"render.nemo_view", atLaunch ? "1" : "0", "Nemo View pop-up window, the ASCII picture Little Nemo reads: 0 closed, 1 open"},
-        {"render.nemo_view_style", "0", "Nemo View colours: 0 matrix green, 1 true palette, 2 depth heat, 3 object colours"},
+        {"render.nemo_view", launch, "Nemo View window, the ASCII picture Little Nemo reads: 0 closed, 1 open, 2 open maximised (playable full window)"},
+        {"render.nemo_view_style", "4", "Nemo View colours: 0 matrix green, 1 true palette, 2 depth heat, 3 object colours, 4 solid fill and ink (default)"},
         {"render.nemo_view_objects", "1", "Nemo View preview: 1 object characters (wall #, door |), 0 pixels and depth only"},
         {"render.nemo_view_cols", "80", "Nemo View preview width in characters: 40, 80 or 96"},
     };
