@@ -108,7 +108,8 @@ struct CowColumn {
 
 /// Lock-free column table (Archie sketch: ColumnTable). Readers pin a column version
 /// with an acquire load; GEN versions publish at once (release), sim edits are staged
-/// and published together at commitEpoch() (the sim-tick barrier, Archie Q2).
+/// and published together at commitEpoch() (the sim-tick barrier, Archie Q2); staging is a
+/// lock-free push list (no gate).
 /// Deviation: lookupPinned checks the coords (a hash collision returns null instead of
 /// the wrong column); a colliding publish overwrites the slot (16384 slots ~ radius 63).
 /// 2026-11-16 (JD: no locks of any kind): slots hold raw Holder pointers, not
@@ -126,6 +127,7 @@ class cColumnTable {
   ~cColumnTable() {
     for (size_t i = 0; i < kTableSlots; ++i) delete slots_[i].load(std::memory_order_relaxed);
     freeChain(retired_.exchange(nullptr, std::memory_order_relaxed));
+    for (Staged* n = staged_.exchange(nullptr, std::memory_order_relaxed); n;) { Staged* nx = n->next; delete n; n = nx; }
   }
   Ptr lookupPinned(int32_t cx, int32_t cz) const noexcept {
     std::atomic<size_t>& pin = pins_[pinStripe()].n;
@@ -145,14 +147,18 @@ class cColumnTable {
     }
     reclaim();
   }
+  /// 2026-11-16 (JD: no spin gates): staging is a lock-free MPSC list (postToTick style). Any
+  /// thread pushes; commitEpoch takes the whole list with one exchange at the boundary and
+  /// publishes it oldest first, so the last edit staged for a column wins, as before.
   void stageEdit(Ptr col) {
-    litholattice::cGateGuard l(stageMu_);
-    staged_.push_back(std::move(col));
+    Staged* n = new Staged{std::move(col), staged_.load(std::memory_order_relaxed)};
+    while (!staged_.compare_exchange_weak(n->next, n, std::memory_order_release, std::memory_order_relaxed)) {}
   }
   uint64_t commitEpoch() {
-    std::vector<Ptr> batch;
-    { litholattice::cGateGuard l(stageMu_); batch.swap(staged_); }
-    for (auto& c : batch) publishGen(std::move(c));
+    Staged* lifo = staged_.exchange(nullptr, std::memory_order_acquire);
+    Staged* fifo = nullptr;
+    while (lifo) { Staged* nx = lifo->next; lifo->next = fifo; fifo = lifo; lifo = nx; }
+    while (fifo) { Staged* nx = fifo->next; publishGen(std::move(fifo->col)); delete fifo; fifo = nx; }
     return epoch_.fetch_add(1, std::memory_order_acq_rel) + 1;
   }
   uint64_t epoch() const { return epoch_.load(std::memory_order_acquire); }
@@ -190,8 +196,8 @@ class cColumnTable {
   std::unique_ptr<std::atomic<Holder*>[]> slots_ = std::make_unique<std::atomic<Holder*>[]>(kTableSlots);
   std::atomic<Holder*> retired_{nullptr};
   mutable PinStripe pins_[kPinStripes];
-  litholattice::cAtomicGate stageMu_;
-  std::vector<Ptr> staged_;
+  struct Staged { Ptr col; Staged* next; };
+  std::atomic<Staged*> staged_{nullptr};  ///< MPSC push list (newest first), drained by commitEpoch
   std::atomic<uint64_t> epoch_{0};
 };
 /// FNV-1a 64 over raw bytes (render-only MeshHash input).
