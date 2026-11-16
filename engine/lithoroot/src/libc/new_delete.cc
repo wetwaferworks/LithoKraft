@@ -136,6 +136,13 @@ void operator delete[](void* p, std::size_t, std::align_val_t) noexcept {
   free(p);
 }
 
+/* S2: the nothrow delete forms <new> now declares (called when a
+ * nothrow-new'd object's constructor throws). */
+void operator delete(void* p, const std::nothrow_t&) noexcept { free(p); }
+void operator delete[](void* p, const std::nothrow_t&) noexcept { free(p); }
+void operator delete(void* p, std::align_val_t, const std::nothrow_t&) noexcept { free(p); }
+void operator delete[](void* p, std::align_val_t, const std::nothrow_t&) noexcept { free(p); }
+
 /* ---- the nothrow object and the handler accessors ------------------------- */
 
 namespace std {
