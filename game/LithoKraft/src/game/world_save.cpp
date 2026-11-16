@@ -219,11 +219,12 @@ bool cWorldSave::writeWorldMeta(std::string* err) const {
     j.add("streamAreaShape", litholattice::Json::string(litholattice::areaShapeName(area_.stream)));
     j.add("tickRadius", litholattice::Json::number(double(area_.tickRadius)));
   }
-  {  // 2026-10-25 (JD): named /tp spots — Archie Phase 3b: atomic snapshot, no tpMutex_
-    const auto marks = std::atomic_load_explicit(&tpMarks_, std::memory_order_acquire);
-    if (marks && !marks->empty()) {
+  {  // 2026-10-25 (JD): named /tp spots — Archie Phase 3b: snapshot, no tpMutex_
+    // 2026-11-16 (JD): copy out under a CowPublished pin (lock-free), then build the JSON unpinned.
+    const std::vector<TpMark> marks = tpMarks_.read([](const std::vector<TpMark>& v) { return v; });
+    if (!marks.empty()) {
       litholattice::Json arr = litholattice::Json::array();
-      for (const TpMark& m : *marks) {
+      for (const TpMark& m : marks) {
         litholattice::Json o = litholattice::Json::object();
         o.add("name", litholattice::Json::string(m.name));
         o.add("dim", litholattice::Json::string(m.dim));

@@ -3388,9 +3388,8 @@ void Game::setMcpServer(litholattice::mcp::cMcpServer* server) {
 
 // Gameplay context only (contexts already hide these while typing or in the inventory).
 cMcpPlayerView::GameState Game::snapshotMcpPlayer() const {
-  // Archie PlayI: lock-free COW snapshot (atomic shared_ptr); no mcpStateMutex_.
-  if (auto p = std::atomic_load_explicit(&mcpPlayerState_, std::memory_order_acquire)) return *p;
-  return cMcpPlayerView::GameState{};
+  // Archie PlayI: COW snapshot, no mcpStateMutex_. 2026-11-16 (JD): CowPublished copy-out (lock-free).
+  return mcpPlayerState_.read([](const cMcpPlayerView::GameState& s) { return s; });
 }
 
 litholattice::LocomotionInput Game::sampleLocomotionInput() const {
@@ -5019,8 +5018,8 @@ void Game::update(float dt, int width, int height) {
                          std::memory_order_relaxed);
   mcpWorldTick_.store(sim_ ? sim_->stats().worldTick : 0, std::memory_order_relaxed);  // Cortana 2026-10-15 1658: F-2
   {
-    // Archie PlayI: publish a fresh shared GameState; readers take a snapshot via atomic_load.
-    auto next = std::make_shared<cMcpPlayerView::GameState>();
+    // Archie PlayI: publish a fresh GameState; readers copy it out. 2026-11-16 (JD): CowPublished.
+    auto next = std::make_unique<cMcpPlayerView::GameState>();
     const litholattice::PlayerState& ps = playerAdapter_.enginePlayer().state();
     next->x = ps.x;
     next->y = ps.y;
@@ -5037,8 +5036,7 @@ void Game::update(float dt, int width, int height) {
     for (const ItemStack& s : player_.inventory.hotbar())
       next->hotbar.push_back(uint16_t(placedBlockForItem(s.itemId)));
     next->selectedSlot = hot_;
-    std::atomic_store_explicit(&mcpPlayerState_, std::shared_ptr<cMcpPlayerView::GameState>(std::move(next)),
-                               std::memory_order_release);
+    mcpPlayerState_.publish(next.release());
   }
   // MCP pilot senses: refresh the adapter's cvar knobs once per frame (the
   // console registry is main-thread-only; the MCP thread never reads it).

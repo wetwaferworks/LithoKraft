@@ -36,6 +36,7 @@
 #include "litholattice/input/input_system.h"
 #include "lithokraft/game/actions.h"
 #include "lithokraft/game/world_save.h"
+#include "lithokraft/game/cow_publish.h"
 #include "lithokraft/game/cAsyncSaver.h"
 #include "lithokraft/game/tick_signal_posts.h"  // t46u 6b-3b: cSignalInitTickets
 #include "lithokraft/game/cWorldLoadSoak.h"
@@ -872,8 +873,9 @@ class Game {
   litholattice::cProjectileMgr projectiles_;
   std::atomic<bool> mcpControllable_{false};  ///< set per frame in update()
   std::atomic<uint64_t> mcpWorldTick_{0};  ///< Cortana 2026-10-15 1658: F-2 [GAME] sim tick copy for MCP threads, set per frame in update()
-  // Archie PlayI: lock-free COW MCP player snapshot (atomic shared_ptr); no mutex.
-  mutable std::shared_ptr<cMcpPlayerView::GameState> mcpPlayerState_;
+  // Archie PlayI: COW MCP player snapshot; no mutex. 2026-11-16 (JD): CowPublished, since
+  // atomic<shared_ptr> hid a lock. Starts as a default GameState (what the null case returned).
+  mutable CowPublished<cMcpPlayerView::GameState> mcpPlayerState_{new cMcpPlayerView::GameState()};
   cMcpPlayerView::GameState snapshotMcpPlayer() const;
   MenuState menuState_ = MenuState::cMenu;
   GameSettings settings_;

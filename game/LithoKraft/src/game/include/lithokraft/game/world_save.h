@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include "lithokraft/content/signal.h"
+#include "lithokraft/game/cow_publish.h"  // 2026-11-16 (JD): no locks; replaces atomic<shared_ptr>
 #include "lithokraft/game/engine.h"
 #include "lithokraft/game/inventory.h"  // PlayerMeta's v4 inventory block (P2b-1)
 #include "litholattice/render/pbr_materials.h"  // cMaterialReg* (MATS payload registration)
@@ -192,8 +193,7 @@ class cWorldSave {
   struct TpMark { std::string name, dim; float x = 0, y = 0, z = 0; };
   /// Archie Phase 3b: lock-free publish (game thread writes, save reads a snapshot). No tpMutex_.
   void setTpMarks(std::vector<TpMark> m) {
-    std::atomic_store_explicit(&tpMarks_, std::make_shared<const std::vector<TpMark>>(std::move(m)),
-                               std::memory_order_release);
+    tpMarks_.publish(new std::vector<TpMark>(std::move(m)));  // 2026-11-16 (JD): CowPublished, no hidden lock
   }
   static std::vector<TpMark> readTpMarks(const std::filesystem::path& root, std::string* err);
   /// The persisted seed for the save at `root`, or nullopt when there is no
@@ -264,8 +264,9 @@ class cWorldSave {
   std::atomic<bool> hasClock_{false};
   WorldAreaMeta area_;    ///< Fix run 3: level.json v3 area (set once by Game before any save)
   bool hasArea_ = false;
-  /// Archie Phase 3b: published snapshot; setTpMarks CAS-publishes, writeWorldMeta loads.
-  std::shared_ptr<const std::vector<TpMark>> tpMarks_{std::make_shared<const std::vector<TpMark>>()};
+  /// Archie Phase 3b: published snapshot; setTpMarks publishes, writeWorldMeta copies it out.
+  /// 2026-11-16 (JD): CowPublished (lock-free); atomic<shared_ptr> hid a lock in the std library.
+  CowPublished<std::vector<TpMark>> tpMarks_{new std::vector<TpMark>()};
   bool lastSaveOk_ = true;  ///< outcome of the last saveDimension (see above)
   std::string lastSaveError_;
   // ---- Archie Phase 3c: LF stores only (declared last: destroyed first, before payloads_)

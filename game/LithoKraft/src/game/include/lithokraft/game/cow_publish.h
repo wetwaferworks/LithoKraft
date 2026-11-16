@@ -66,6 +66,14 @@ class CowPublished {
     }
   }
 
+  /// Replace the value outright (no copy of the old one): next must be non-null and
+  /// becomes owned here. The old value is retired like update()'s.
+  void publish(T* next) {
+    const T* old = cur_.exchange(next);
+    retire(old);
+    reclaim();
+  }
+
   size_t retiredCount() const {
     size_t n = 0;
     for (Node* p = retired_.load(); p; p = p->next) ++n;
