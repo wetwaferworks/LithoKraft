@@ -3,6 +3,7 @@
 // the census threads not yet RETURNED plus the OS thread count to logs/lithokraft.exitwatch.log and
 // hard-exits. Lock-free: atomics plus a sleeping (not spinning) detached thread. LL_EXIT_WATCHDOG=0 kill.
 #pragma once
+#include "litholattice/core/thread_name.h"
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -27,7 +28,7 @@ class cExitWatchdog {
   static void arm(const std::string& logDir) {
     if (!enabled() || armed().exchange(true)) return;
     std::string path = logDir.empty() ? std::string("lithokraft.exitwatch.log") : logDir + "/lithokraft.exitwatch.log";
-    std::thread([path] { run(path); }).detach();
+    std::thread([path] { ::litholattice::setCurrentThreadName("lk-exit-watch"); run(path); }).detach();
   }
   /// Game teardown, right after the exit save is on disk.
   static void noteSaved() { savedAt().store(nowMs(), std::memory_order_release); }

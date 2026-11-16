@@ -1,5 +1,6 @@
 // Cortana 2026-10-15 0825: CHUNK-STALL postLock (SIM-H1 tried 1010, reverted 1035)
 #include <unordered_map>
+#include "litholattice/core/thread_name.h"
 #include "litholattice/core/gate_lock.h"
 #include "litholattice/sim/sim_thread.h"
 #include "litholattice/sim/control_stream.h"
@@ -284,7 +285,7 @@ void cSimThread::start() {
     stepRefusalLogged_.store(false);
   }
   logInfo("threads: sim thread starting");  // Q5b census naming (2026-10-28)
-  thread_ = std::thread([this] { raiseCurrentThreadForSim(); run(); });  // 0.0.1.57 F57-1 (R21)
+  thread_ = std::thread([this] { ::litholattice::setCurrentThreadName("lk-tick-sim"); raiseCurrentThreadForSim(); run(); });  // 0.0.1.57 F57-1 (R21)
   threadRecord_.add(ThreadClass::Dedicated, ThreadRole::SimClock, 0, "sim-clock");
 }
 

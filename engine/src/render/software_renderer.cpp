@@ -6,6 +6,7 @@
 // Implements IRenderer (mesh stores + renderFrame) on top of the same direct
 // renderMesh path the headless consumers have always driven.
 #include "litholattice/render/software_renderer.h"
+#include "litholattice/core/thread_name.h"
 #include "litholattice/core/atomic_gate.h"
 #include "litholattice/render/sw_lod_rings.h"  // PlayB: the shared far-LOD ladder
 #include "litholattice/render/mesher.h"
@@ -440,7 +441,7 @@ class cSwBandPool {
       bool expected = false;
       if (frameActive_.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed))
         return;
-      frameActive_.wait(true, std::memory_order_relaxed);
+      { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwFrameSlot); frameActive_.wait(true, std::memory_order_relaxed); }
     }
   }
   void releaseFrameSlot() {
@@ -480,7 +481,7 @@ class cSwBandPool {
     }
     const uint64_t g = gen_.load(std::memory_order_relaxed);
     if (detachedMode_) {
-      threads_.emplace_back([this] { executorLoop(); });
+      threads_.emplace_back([this] { ::litholattice::setCurrentThreadName("lk-sw-exec"); executorLoop(); });
       records_.add(ThreadClass::Dedicated, ThreadRole::RenderExecutor, 0, "sw-executor");
     }
     folded_ = n > 1 && foldWanted();
@@ -489,7 +490,7 @@ class cSwBandPool {
       return;
     }
     for (unsigned i = 1; i < bands_; ++i) {
-      threads_.emplace_back([this, i, g] { loop(i, g); });
+      threads_.emplace_back([this, i, g] { char nm[16]; std::snprintf(nm, sizeof nm, "lk-sw-band-%u", i); ::litholattice::setCurrentThreadName(nm); loop(i, g); });
       records_.add(ThreadClass::Dedicated, ThreadRole::RenderBand, uint16_t(i), "sw-band");
     }
   }
@@ -498,7 +499,7 @@ class cSwBandPool {
       for (;;) {
         if (stop_.load(std::memory_order_acquire)) return;
         if (detachedPending_.load(std::memory_order_acquire)) break;
-        detachedPending_.wait(false, std::memory_order_relaxed);
+        { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwExecIdle); detachedPending_.wait(false, std::memory_order_relaxed); }
       }
       if (stop_.load(std::memory_order_acquire)) return;
       std::function<void()> fn = std::move(detachedFn_);
@@ -522,7 +523,7 @@ class cSwBandPool {
         if (stop_.load(std::memory_order_acquire)) return;
         g = gen_.load(std::memory_order_acquire);
         if (g != seen) break;
-        gen_.wait(seen, std::memory_order_relaxed);
+        { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwBandIdle); gen_.wait(seen, std::memory_order_relaxed); }
       }
       if (stop_.load(std::memory_order_acquire)) return;
       seen = g;

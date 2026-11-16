@@ -5,6 +5,7 @@
 // Owner token is a non-zero uint32_t thread id (MSVC wait/notify on thread::id
 // was not reliably integral; failed re-enter while sim held the gate deadlocked).
 #pragma once
+#include "litholattice/core/spin_stats.h"
 #include <atomic>
 #include <cstdint>
 #if defined(_MSC_VER)
@@ -35,14 +36,23 @@ class cBlockGate {
       ++depth_;
       return;
     }
-    for (;;) {
-      uint32_t expected = 0;
-      if (owner_.compare_exchange_weak(expected, self, std::memory_order_acquire, std::memory_order_relaxed)) {
-        depth_ = 1;
-        return;
-      }
-      LL_BLOCK_GATE_PAUSE();  // spin; never owner_.wait
+    uint32_t expected = 0;
+    if (owner_.compare_exchange_weak(expected, self, std::memory_order_acquire, std::memory_order_relaxed)) {
+      depth_ = 1;
+      return;
     }
+    // Same CAS + pause sequence as before; LL_SPIN_STATS only counts it (JD t40u, instrumentation).
+    const bool st = spinstats::enabled();
+    const uint64_t t0 = st ? spinstats::nowNs() : 0;
+    uint64_t spins = 0;
+    for (;;) {
+      LL_BLOCK_GATE_PAUSE();  // spin; never owner_.wait
+      ++spins;
+      expected = 0;
+      if (owner_.compare_exchange_weak(expected, self, std::memory_order_acquire, std::memory_order_relaxed)) break;
+    }
+    depth_ = 1;
+    if (st) spinstats::record(spinstats::kBlockGate, spinstats::nowNs() - t0, spins);
   }
 
   bool try_lock() noexcept {

@@ -14,6 +14,7 @@
 // wait helpers: callers wait on their own atomic counter and help by running queued jobs,
 // so a wait can never deadlock even with 0 workers.
 #pragma once
+#include "litholattice/core/thread_name.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -48,7 +49,7 @@ class cLfJobQueue {
     const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
     workers = std::min(workers, hw);
     threads_.reserve(workers);
-    for (unsigned i = 0; i < workers; ++i) threads_.emplace_back([this] { run(); });
+    for (unsigned i = 0; i < workers; ++i) threads_.emplace_back([this] { ::litholattice::setCurrentThreadName("lk-lfjobs"); run(); });
   }
   ~cLfJobQueue() { stop(0); }
 

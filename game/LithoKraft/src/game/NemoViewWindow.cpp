@@ -1,5 +1,6 @@
 // Nemo View pop-up window (see NemoViewWindow.h).
 #include "lithokraft/game/NemoViewWindow.h"
+#include "litholattice/core/thread_name.h"
 
 #include "lithokraft/game/NemoViewHub.h"
 #include "lithokraft/game/mcp_senses_adapter.h"
@@ -43,7 +44,7 @@ void cNemoViewWindow::setWanted(bool wanted, cMcpSensesAdapter* adapter, bool ma
   if (wanted) {
     if (thread_.joinable()) thread_.join();  // a window the user closed earlier has already finished
     quit_.store(false);
-    thread_ = std::thread([this, adapter] { run(adapter); });
+    thread_ = std::thread([this, adapter] { ::litholattice::setCurrentThreadName("lk-nemo-view"); run(adapter); });
   } else {
     quit_.store(true);
     if (thread_.joinable()) thread_.join();

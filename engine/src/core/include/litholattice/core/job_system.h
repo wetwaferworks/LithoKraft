@@ -51,6 +51,7 @@
 // the -OR suffix is for game-style components, not engine infrastructure, and is
 // deliberately not used).
 #pragma once
+#include "litholattice/core/thread_name.h"
 
 #include <atomic>
 #include <cstdlib>
@@ -108,18 +109,12 @@ inline constexpr bool kThreadDebug = false;
 #endif
 
 // ---- thread utilities -----------------------------------------------------------
-/// Platform-guarded thread naming. Linux: pthread_setname_np; elsewhere a no-op.
+/// Platform-guarded thread naming: SetThreadDescription on Windows, pthread_setname_np on Linux (thread_name.h).
 /// Names are truncated to 15 chars (Linux limit). JD t3349u item 9 / Archie ruling 6:
 /// the engine never pins, so the affinity helpers are gone.
 struct ThreadUtil {
   static void setName(const char* name) {
-#if defined(__linux__)
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%s", name);
-    pthread_setname_np(pthread_self(), buf);
-#else
-    (void)name;
-#endif
+    ::litholattice::setCurrentThreadName(name);  // JD t40u 2026-11-16: Windows names too (instrumentation only)
     LITHO_THREAD_LOG("thread", "named '%s'", name);
   }
 

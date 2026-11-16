@@ -1,5 +1,6 @@
 // Folder picker: see cFolderPicker.h. 2026-10-31 (JD: Load World).
 #include "lithokraft/game/cFolderPicker.h"
+#include "litholattice/core/thread_name.h"
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -22,7 +23,7 @@ std::string g_out;
 bool cFolderPicker::start(const std::string& title, const std::string& startDir) {
   int idle = 0;
   if (!g_state.compare_exchange_strong(idle, 1, std::memory_order_acq_rel)) return false;
-  std::thread([title, startDir] {
+  std::thread([title, startDir] { ::litholattice::setCurrentThreadName("lk-folder-pick");
     std::string o;
     const bool ok = pick(title, startDir, o);
     g_out = std::move(o);

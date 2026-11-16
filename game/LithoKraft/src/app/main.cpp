@@ -5,6 +5,7 @@
 // falling back to gl33) -> game.
 // Input runs on the main thread only (see docs/ARCHITECTURE.md, "Input").
 #include "litholattice/core/lf_job_queue.h"
+#include "litholattice/core/thread_name.h"
 #include "litholattice/core/atomic_gate.h"
 #include "litholattice/core/gate_lock.h"
 #include "litholattice/core/atomic_condition.h"
@@ -701,7 +702,7 @@ struct SwRenderWorker {
       std::atomic<size_t> lastDrawn{0};  // meshes drawn by the last completed frame (overlay readout)
       void submit(const FrameParams& fp) {  // main thread: copy the job in, hand it to the executor, return
         std::exception_ptr err;
-        { ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m); cv.wait(l, [&] { return !jobActive; }); err = jobErr; jobErr = nullptr; }
+        { ::litholattice::spinstats::WaitScope ws(::litholattice::spinstats::kSwSubmitWait); ::litholattice::cGateLock<::litholattice::cAtomicGate> l(m); cv.wait(l, [&] { return !jobActive; }); err = jobErr; jobErr = nullptr; }
         if (err) std::rethrow_exception(err);  // a failed render surfaces on main one frame late (the sync path throws out of renderFrame itself)
         // B61-1 (mirrors RenderWorker::submit): the screenshot capture touches main-thread
         // game state, so it runs here on main while no job is in flight ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â the armed job has
@@ -1609,7 +1610,7 @@ int main(int argc, char** argv) {
       mcpTransport = std::make_unique<cMcpStdioTransport>(outFd);
       litholattice::mcp::cMcpServer* srv = mcpServer.get();
       cMcpStdioTransport* tr = mcpTransport.get();
-      mcpThread = std::thread([srv, tr] { srv->runStdio(*tr); });
+      mcpThread = std::thread([srv, tr] { ::litholattice::setCurrentThreadName("lk-mcp-stdio"); srv->runStdio(*tr); });
 #else
       // Windows: the engine's own stdio transport (blocking std::cin);
       // the thread is detached at shutdown ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â process exit ends it. The
@@ -1632,7 +1633,7 @@ int main(int argc, char** argv) {
       // the blocking stdin read and JOIN it before the server is freed.
       F.mcpDone = std::make_shared<std::atomic<bool>>(false);
       auto done = F.mcpDone;
-      mcpThread = std::thread([srv, done] { srv->runStdio(); done->store(true, std::memory_order_release); });
+      mcpThread = std::thread([srv, done] { ::litholattice::setCurrentThreadName("lk-mcp-stdio"); srv->runStdio(); done->store(true, std::memory_order_release); });
 #endif
       logWarn("mcp: stdio server running (agent starts with NO permissions; approve with `mcp grant <perm...>` in the console)");
     };
@@ -1703,6 +1704,7 @@ int main(int argc, char** argv) {
     auto& ovMs = F.ovMs;  ovMs.reserve(240);  // ring for the 1% low
     F.ovPrev = Clock::now(); F.ovT = F.ovPrev;
     if (appliedFpsCap > 0) logInfo("fps cap: %d FPS (render.fps_cap)", appliedFpsCap);
+    ::litholattice::setCurrentThreadName("lk-main");  // JD t40u 2026-11-16: thread names (instrumentation only)
     litholattice::locktiming::markMainThread();  // 0.0.1.60 diagnostic lock timing (LL_LOCK_TIMING=1; Proposed by JD; co-implemented by JD and Cortana)
     // ---- Three-way split timing handshake (LL_THREEWAY=1, default OFF; Vulkan only). Proposed by JD; co-implemented by JD and Cortana.
     // Main thread: window, OS events, input and game logic (the control & event handshake). Render thread: GPU and
@@ -1743,7 +1745,7 @@ int main(int argc, char** argv) {
       rw.r = renderer;
       rw.post = [&F] { if (F.game) F.game->capturePendingScreenshot(); };  // Phase 2: follows an in-process world load
       rw.pending = [&F] { return (F.game && F.game->screenshotPending()) || lithokraft::cFrameDumpHub::instance().sink() || lithokraft::cMcpDisplayVision::instance().pending(); };  // --frame-hash/--frame-dump every frame
-      rw.th = std::thread([&rw] { rw.loop(); });
+      rw.th = std::thread([&rw] { ::litholattice::setCurrentThreadName("lk-render-wrk"); rw.loop(); });
       logInfo("threeway: ON (LL_THREEWAY=1): main = window/input/game, render thread = GPU/memory + present, sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
     } else if (swThreewayOn) {
       sw.r = display.software;
@@ -1906,6 +1908,7 @@ static bool lkStepFrame(FrameCtx& F) {
       }
       pacer.beginFrame();
       litholattice::locktiming::frameEnd();  // 0.0.1.60: per-frame lock-wait totals (no-op unless LL_LOCK_TIMING=1)
+      litholattice::spinstats::frameEnd();   // JD t40u: per-thread spin/wait readout (no-op unless LL_SPIN_STATS=1 or LL_LOCK_TIMING=1)
       window->pollDisplayToggle();  // Alt+Enter
       const auto tIn = Clock::now();
       input.update(window->input());  // pumps OS events; actions for this frame

@@ -14,6 +14,7 @@
 // in-flight atomic. Jobs are heap-allocated std::function (Job*), one owner at a time.
 // cJobPool (threading.h) forwards to this when LL_POOL_LOCKFREE=1.
 #pragma once
+#include "litholattice/core/thread_name.h"
 
 #include <algorithm>
 #include <atomic>
@@ -57,7 +58,7 @@ class cLockFreePool {
     workers_.reserve(n);
     for (unsigned i = 0; i < n; ++i) workers_.push_back(std::make_unique<Worker>());
     for (unsigned i = 0; i < n; ++i)
-      workers_[i]->thread = std::thread([this, i, threadInit] { if (threadInit) threadInit(); run(i); });
+      workers_[i]->thread = std::thread([this, i, threadInit] { char nm[16]; std::snprintf(nm, sizeof nm, "lk-lfpool-%u", unsigned(i)); ::litholattice::setCurrentThreadName(nm); if (threadInit) threadInit(); run(i); });
   }
   ~cLockFreePool() {
     stop_.store(true, std::memory_order_release);

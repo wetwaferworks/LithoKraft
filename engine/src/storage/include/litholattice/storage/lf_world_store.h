@@ -12,6 +12,7 @@
 //     I/O thread (replaces cWorldSave's mutex-guarded exporting_ / signalSink_ handoff).
 // No mutex, no condition variable.
 #pragma once
+#include "litholattice/core/thread_name.h"
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -43,7 +44,7 @@ class cLfWorldStore {
 
   cLfWorldStore(std::filesystem::path dir, const cPayloadReg& payloads) : dir_(std::move(dir)), payloads_(payloads) {
     std::filesystem::create_directories(dir_);
-    thread_ = std::thread([this] { run(); });
+    thread_ = std::thread([this] { ::litholattice::setCurrentThreadName("lk-world-store"); run(); });
   }
   ~cLfWorldStore() {
     flush();

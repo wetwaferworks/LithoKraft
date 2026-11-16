@@ -4,6 +4,7 @@
 // see phase N+1 until the authority has committed N, and the barrier — not
 // the poll — is the synchroniser.
 #include "litholattice/core/timer_resolution.h"  // 0.0.1.57 F57-1
+#include "litholattice/core/thread_name.h"
 #include "litholattice/core/gate_lock.h"
 #include "litholattice/sim/timing_handshake.h"
 
@@ -396,7 +397,7 @@ bool cTimingHandshakeAuthority::start() {
     ledger_.abandonOpenTick();
     ledger_.reserve(comps_.size());
     lfThreads_.reserve(size_t(workerCount_));
-    for (int s = 0; s < workerCount_; ++s) lfThreads_.emplace_back([this, s] { lfWorkerLoop(s); });
+    for (int s = 0; s < workerCount_; ++s) lfThreads_.emplace_back([this, s] { char nm[16]; std::snprintf(nm, sizeof nm, "lk-hs-%d", s); ::litholattice::setCurrentThreadName(nm); lfWorkerLoop(s); });
     logInfo("threads: timing handshake LOCK-FREE: %d dedicated shard threads, atomic arrival barrier, no mutex on the tick path", workerCount_);
     return true;
   }
