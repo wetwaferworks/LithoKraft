@@ -22,14 +22,15 @@ set(_lr_c_tus
   src/libc/bigint.c src/libc/ctype.c src/libc/dtoa.c src/libc/malloc.c src/libc/math.c
   src/libc/memory.c src/libc/printf.c src/libc/scanf.c src/libc/setjmp.c src/libc/stdio.c
   src/libc/stdlib.c src/libc/strerror.c src/libc/string.c src/libc/strings.c src/libc/strtod.c
-  src/libc/time.c
+  src/libc/time.c src/libc/lithovfs.c
   src/lithoweave.c src/lithothread.c src/lithothread_errno.c src/lithothread_heap.c
   src/rt/int128.c)
 set(_lr_cxx_tus
   src/libc/new_delete.cc
   src/lithoabi/atexit.cc src/lithoabi/backend_wasm.cc src/lithoabi/eh_runtime.cc
   src/lithoabi/exception.cc src/lithoabi/guard.cc src/lithoabi/personality.cc
-  src/lithoabi/std_exceptions.cc src/lithoabi/stubs.cc src/lithoabi/typeinfo.cc)
+  src/lithoabi/std_exceptions.cc src/lithoabi/stubs.cc src/lithoabi/typeinfo.cc
+  src/lithovfs_fs.cc)
 list(TRANSFORM _lr_c_tus PREPEND ${_lr}/)
 list(TRANSFORM _lr_cxx_tus PREPEND ${_lr}/)
 
@@ -37,6 +38,8 @@ list(TRANSFORM _lr_cxx_tus PREPEND ${_lr}/)
 # compiler must not turn their loops back into self-calls), LithoThread owns errno.
 set(_lr_c_flags -std=c99 -O1 -ffreestanding -fno-builtin)
 set(_lr_cxx_flags -std=c++17 -O1)
+# S7 std::filesystem ops: <filesystem> needs the engine's C++20 (chrono, <compare>).
+set_source_files_properties(${_lr}/src/lithovfs_fs.cc PROPERTIES COMPILE_OPTIONS -std=c++20)
 
 add_library(lithoroot_crt1 STATIC ${_lr}/src/crt/crt1.c)
 target_compile_options(lithoroot_crt1 PRIVATE ${_lr_c_flags} -Wno-prio-ctor-dtor)

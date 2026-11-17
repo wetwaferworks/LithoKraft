@@ -6,24 +6,19 @@
 # import it from "env", which no host provides, so instantiation fails until the stage lands and
 # deletes its lines. This file must end up empty. Lines starting with # are comments.
 #
-# S7 file layer (std::filesystem subset, __lk_list_dir, POSIX fd calls), over lk_store / OPFS:
-_ZNSt10filesystem6statusERKNS_4pathERSt10error_code
-_ZNSt10filesystem14symlink_statusERKNS_4pathERSt10error_code
-_ZNSt10filesystem18create_directoriesERKNS_4pathERSt10error_code
-_ZNSt10filesystem14create_symlinkERKNS_4pathES2_RSt10error_code
-_ZNSt10filesystem9copy_fileERKNS_4pathES2_NS_12copy_optionsERSt10error_code
-_ZNSt10filesystem9file_sizeERKNS_4pathERSt10error_code
-_ZNSt10filesystem15last_write_timeERKNS_4pathERSt10error_code
-_ZNSt10filesystem6removeERKNS_4pathERSt10error_code
-_ZNSt10filesystem10remove_allERKNS_4pathERSt10error_code
-_ZNSt10filesystem6renameERKNS_4pathES2_RSt10error_code
-_ZNSt10filesystem11resize_fileERKNS_4pathEyRSt10error_code
-_ZNSt10filesystem19temp_directory_pathERSt10error_code
-_ZNSt10filesystem16weakly_canonicalERKNS_4pathERSt10error_code
-_ZNSt10filesystem9canonicalERKNS_4pathERSt10error_code
-_ZNSt10filesystem12current_pathERSt10error_code
-_ZNSt10filesystem13__lk_list_dirERKNS_4pathERSt6vectorISsSaISsEERSt10error_code
-fileno
-fsync
-ftruncate
-isatty
+# S7 file layer: DONE (LithoVFS, src/libc/lithovfs.c + src/lithovfs_fs.cc).
+#
+# lkboot-owned: the S7 host storage calls (include/lk_store.h, module "env"). These are
+# NOT a pending stage: lkboot must provide them (OPFS). They stay listed until lkboot ships
+# them, so the link keeps naming exactly what the host still owes.
+lk_store_open
+lk_store_read
+lk_store_write
+lk_store_truncate
+lk_store_flush
+lk_store_close
+lk_store_stat
+lk_store_mkdir
+lk_store_list
+lk_store_remove
+lk_store_rename
