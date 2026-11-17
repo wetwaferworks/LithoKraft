@@ -16,9 +16,9 @@
  *    Path strings are interned for the process life (snapshots share
  *    them), so only arrays are ever freed.
  *  - lookup order: snapshot (store) first, then the pack. The store
- *    shadows the pack; the pack is never written (EROFS paths are
- *    impossible: a write to a pack path creates a store copy-free
- *    shadow file, which is the overlay semantics).
+ *    shadows the pack; the pack is never written. Opening a pack-only
+ *    file to modify it (r+, a, a+) is EROFS; a truncating open (w,
+ *    w+) creates a store file that shadows it.
  * File data lives in lk_store only; sizes come from lk_store_stat. */
 #include <errno.h>
 #include <fcntl.h>
@@ -345,6 +345,14 @@ int lv_open(const char* path, int oflags) {
     return -ENOENT;
   }
   if (t == LV_NONE) {
+    uint64_t psz;
+    /* A pack-only file opened to modify its contents (r+, a, a+) is
+     * read-only: EROFS, not ENOENT. Only a truncating open (w, w+)
+     * may shadow it with a fresh store file. */
+    if (!(oflags & O_TRUNC) && lv__pack_probe(n, &psz)) {
+      __atomic_store_n(&lv__fds[slot].state, 0u, REL);
+      return -EROFS;
+    }
     if (!(oflags & O_CREAT)) { __atomic_store_n(&lv__fds[slot].state, 0u, REL); return -ENOENT; }
     if ((r = lv__ensure_parent(n)) < 0) { __atomic_store_n(&lv__fds[slot].state, 0u, REL); return r; }
   }

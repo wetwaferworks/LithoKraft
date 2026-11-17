@@ -67,6 +67,24 @@ extern "C" int __main_void() {
   CHECK(32, fopen("/nothing/here", "rb") == nullptr && errno == ENOENT);
   CHECK(33, fopen("/nothing/here", "wb") == nullptr && errno == ENOENT); // parent missing
   CHECK(34, fsync(99) == -1 && errno == EBADF);
+  // the pack (mock: /pack/readme.txt = "from the pack"): readable,
+  // modify-in-place is EROFS, a truncating open shadows it
+  f = fopen("/pack/readme.txt", "rb");
+  CHECK(38, f != nullptr);
+  CHECK(39, fread(buf, 1, 13, f) == 13 && std::memcmp(buf, "from the pack", 13) == 0);
+  fclose(f);
+  CHECK(40, fs::file_size("/pack/readme.txt", ec) == 13 && !ec);
+  errno = 0;
+  CHECK(41, fopen("/pack/readme.txt", "r+b") == nullptr && errno == EROFS);
+  errno = 0;
+  CHECK(42, fopen("/pack/readme.txt", "ab") == nullptr && errno == EROFS);
+  CHECK(43, !fs::remove("/pack/readme.txt", ec) && ec.value() == EROFS);
+  fs::create_directories("/pack", ec);
+  f = fopen("/pack/readme.txt", "wb");
+  CHECK(44, f && fwrite("mine", 1, 4, f) == 4 && fclose(f) == 0);
+  CHECK(45, fs::file_size("/pack/readme.txt", ec) == 4); // store shadows pack
+  CHECK(46, fs::remove_all("/pack", ec) == 2 && !ec);
+  CHECK(47, fs::file_size("/pack/readme.txt", ec) == 13); // pack visible again
   // remove_all counts files and directories
   CHECK(35, fs::remove_all("/saves", ec) == 4 && !ec);
   CHECK(36, fs::status("/saves", ec).type() == fs::file_type::not_found);
