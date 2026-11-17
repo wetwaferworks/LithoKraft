@@ -39,9 +39,12 @@ ROOTS = [
     ("wasm/stage/engine-assets", "/assets"),
     ("game/LithoKraft/assets", "/LithoKraft/assets"),
     ("game/LithoKraft/scripts", "/scripts"),
-    ("game/LithoKraft/config", "/config"),
+    ("game/LithoKraft/config", "/config"),  # optional: absent in current trees
     ("game/LithoKraft/mod.json", "/mod.json"),  # single file, not a dir
 ]
+
+
+OPTIONAL_ROOTS = {"/config"}
 
 
 def varint(n: int) -> bytes:
@@ -75,6 +78,9 @@ def main() -> int:
                 parent = os.path.dirname(parent)
             continue
         if not os.path.isdir(src):
+            if dest in OPTIONAL_ROOTS:
+                print(f"note: optional preload root absent, skipped: {src}")
+                continue
             print(f"error: preload root missing: {src}")
             return 1
         for base, dirnames, filenames in os.walk(src):

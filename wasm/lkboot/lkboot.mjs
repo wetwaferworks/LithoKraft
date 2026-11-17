@@ -50,7 +50,20 @@ export function makeShared({ mode, memory, volume, budgetMiB, channel, cpuCount 
   for (const n of names) pk.set(volume.get(n), dir.get(n.replace(/^\/+/, ''))[0]);
   // Volume fd table: [state, fileIndex, posLo, posHi] per slot, claimed by CAS.
   const volTab = new Buf(4 * 4 * VOL_SLOTS);
-  return { mode, memory, packBuf, dir: [...dir], volTab, budgetMiB: clampBudgetMiB(budgetMiB), channel, cpuCount };
+  // clockBase: the creating thread's time origin, so every worker's lk_now_ms
+  // reads the same clock (each worker's performance.now has its own origin).
+  return { mode, memory, packBuf, dir: [...dir], volTab, budgetMiB: clampBudgetMiB(budgetMiB), channel, cpuCount,
+    clockBase: performance.timeOrigin };
+}
+
+// The host calls a non-main thread may make: pure, no page state. Anything else
+// stays main-only (the thread gets the 'host does not provide' trap for it).
+export function threadHost(sh) {
+  const off = performance.timeOrigin - (sh.clockBase ?? performance.timeOrigin);
+  return {
+    lk_now_ms: () => off + performance.now(),
+    lk_host_is_node: () => (typeof process !== 'undefined' && process.versions?.node ? 1 : 0),
+  };
 }
 
 // Build the env import object for one thread.

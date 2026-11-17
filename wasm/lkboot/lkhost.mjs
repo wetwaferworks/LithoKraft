@@ -21,7 +21,7 @@ export function makeHost(ctx, o) {
   const q = new URLSearchParams(o.search ?? '');
   const post = o.post ?? (() => {});
   const S = { loop: null, ringOn: false, ringBase: 0, ringCap: 0, ringWords: 0, css: [o.canvas?.width ?? 0, o.canvas?.height ?? 0],
-    queue: [], dropped: 0, frames: 0, title: '', captureWanted: 0 };
+    queue: [], dropped: 0, frames: 0, title: '', captureWanted: 0, events: 0, ringWrites: 0 };
   const enc = new TextEncoder(), dec = new TextDecoder();
   const cstr = p => { const m = new Uint8Array(ctx.memory.buffer); let e = p; while (m[e]) e++; return dec.decode(m.slice(p, e)); };
   const tsF = new Float64Array(1), tsU = new Uint32Array(tsF.buffer);
@@ -42,7 +42,7 @@ export function makeHost(ctx, o) {
     if (s1) u8.set(enc.encode(s1).subarray(0, 15), 0);
     if (s2) u8.set(enc.encode(s2).subarray(0, 15), 16);
     tsF[0] = performance.now(); v[base + 16] = tsU[0] | 0; v[base + 17] = tsU[1] | 0; v[base + 18] = 0; v[base + 19] = 0;
-    Atomics.store(v, base, type); Atomics.store(v, 1, w + 1);
+    Atomics.store(v, base, type); Atomics.store(v, 1, w + 1); S.ringWrites++;
     return true;
   }
   const E = encodeURIComponent;
@@ -52,7 +52,7 @@ export function makeHost(ctx, o) {
     7: () => `plc|${f}`, 8: () => 'ple', 9: () => 'fo', 10: () => 'bl' }[t]?.());
   function onPageMessage(d) {
     if (d.css) S.css = d.css;
-    if (d.ev) { const e = d.ev; if (!emit(...e) && e[0] !== 0) { const l = legacy(...e); if (l) S.queue.push(l); } }
+    if (d.ev) { S.events++; const e = d.ev; if (!emit(...e) && e[0] !== 0) { const l = legacy(...e); if (l) S.queue.push(l); } }
   }
   const imports = {
     lk_host_is_node: () => 0,

@@ -21,7 +21,7 @@
 // OPFS sync access handles take an exclusive lock on their file while
 // open: that is the OS lock on save files, the one lock JD's doctrine
 // allows.
-export const E = { EAGAIN: 6, EBADF: 8, EBUSY: 10, EEXIST: 20, EINVAL: 28, EIO: 29, EISDIR: 31, ENOENT: 44, ENOSPC: 51, ENOSYS: 52, ENOTDIR: 54, ENOTEMPTY: 55 };
+export const E = { EAGAIN: 6, EBADF: 8, EBUSY: 10, EEXIST: 20, EINVAL: 28, EIO: 29, EISDIR: 31, ENOENT: 44, ENOSPC: 51, ENOSYS: 52, ENOTDIR: 54, ENOTEMPTY: 55, EROFS: 69 };
 export const OPS = ['lk_store_open', 'lk_store_read', 'lk_store_write', 'lk_store_truncate', 'lk_store_flush',
   'lk_store_close', 'lk_store_stat', 'lk_store_mkdir', 'lk_store_list', 'lk_store_remove', 'lk_store_rename'];
 const td = new TextDecoder();
@@ -111,8 +111,17 @@ export class OpfsBackend {
 
 export class MemoryBackend {
   constructor(mem) { this.mem = mem; this.files = new Map(); this.dirs = new Set(['/']); this.handles = new Map(); this.nextH = 1; }
+  // Seed read-only files from a parsed LKP2 pack (lkpack.mjs). The bytes stay in
+  // the pack buffer (views, no copy) and outside wasm memory; writes, truncation,
+  // removal and renames of pack files answer EROFS.
+  seedPack(pk) {
+    for (const d of pk.dirs) { let a = ''; for (const part of d.split('/').filter(Boolean)) { a += '/' + part; this.dirs.add(a); } }
+    for (const f of pk.files) this.files.set(f.path, { data: pk.bytes.subarray(f.start, f.start + f.len), mtime: 0, ro: true });
+    return pk.files.length;
+  }
   lk_store_open(p, n, fl) { const k = str(this.mem, p, n);
     if (this.dirs.has(k)) return -E.EISDIR;
+    if (this.files.get(k)?.ro && (fl & (2 | 8))) return -E.EROFS;
     if (!this.files.has(k)) { if (!(fl & 4) || !this.dirs.has(parentOf(k))) return -E.ENOENT; this.files.set(k, { data: new Uint8Array(0), mtime: now() }); }
     else if ((fl & 4) && (fl & 16)) return -E.EEXIST;
     if (fl & 8) this.files.get(k).data = new Uint8Array(0);
@@ -122,10 +131,12 @@ export class MemoryBackend {
     const m = Math.min(len, d.length - o); new Uint8Array(this.mem.buffer, buf, m).set(d.subarray(o, o + m)); return m; }
   lk_store_write(h, buf, len, off) { const k = this.handles.get(h); if (!k) return -E.EBADF;
     const f = this.files.get(k), o = Number(off);
+    if (f.ro) return -E.EROFS;
     if (o + len > f.data.length) { const nd = new Uint8Array(o + len); nd.set(f.data); f.data = nd; }
     f.data.set(new Uint8Array(this.mem.buffer, buf, len).slice(), o); f.mtime = now(); return len; }
   lk_store_truncate(h, size) { const k = this.handles.get(h); if (!k) return -E.EBADF;
-    const f = this.files.get(k), nd = new Uint8Array(Number(size)); nd.set(f.data.subarray(0, Number(size))); f.data = nd; return 0; }
+    const f = this.files.get(k); if (f.ro) return -E.EROFS;
+    const nd = new Uint8Array(Number(size)); nd.set(f.data.subarray(0, Number(size))); f.data = nd; return 0; }
   lk_store_flush(h) { return this.handles.has(h) ? 0 : -E.EBADF; }
   lk_store_close(h) { return this.handles.delete(h) ? 0 : -E.EBADF; }
   lk_store_stat(p, n, out) { const k = str(this.mem, p, n);
@@ -139,12 +150,14 @@ export class MemoryBackend {
     for (const f of this.files.keys()) if (f.startsWith(pre) && !f.slice(pre.length).includes('/')) out.push(f.slice(pre.length));
     return writeList(this.mem, buf, cap, out); }
   lk_store_remove(p, n) { const k = str(this.mem, p, n);
+    if (this.files.get(k)?.ro) return -E.EROFS;
     if ([...this.handles.values()].includes(k)) return -E.EBUSY;
     if (this.files.delete(k)) return 0;
     if (this.dirs.has(k) && k !== '/') { for (const x of [...this.dirs, ...this.files.keys()]) if (x.startsWith(k + '/')) return -E.ENOTEMPTY; this.dirs.delete(k); return 0; }
     return -E.ENOENT; }
   lk_store_rename(a, an, b, bn) { const s = str(this.mem, a, an), d = str(this.mem, b, bn);
     if (!this.dirs.has(parentOf(d))) return -E.ENOENT;
+    if (this.files.get(s)?.ro || this.files.get(d)?.ro) return -E.EROFS;
     if (this.files.has(s)) { this.files.set(d, this.files.get(s)); this.files.delete(s); return 0; }
     if (!this.dirs.has(s)) return -E.ENOENT;
     for (const x of [...this.dirs]) if (x === s || x.startsWith(s + '/')) { this.dirs.delete(x); this.dirs.add(d + x.slice(s.length)); }
@@ -217,4 +230,29 @@ export class StoreClient {
     const r = i[base + 10]; Atomics.store(i, base, 0); return r;
   }
   imports() { const o = {}; for (const op of OPS) o[op] = (...a) => this.call(op, ...a); return o; }
+}
+
+// ---- read-only pack in front of a writable backend ----------------------------
+// Paths the pack owns (its files and directories) are answered from the pack
+// (MemoryBackend.seedPack, read-only: EROFS on any change); every other path goes
+// to the writable backend (OPFS for saves). Handles are told apart by a high bit.
+const PACK_H = 1 << 24;
+export class PackOverlay {
+  constructor(mem, pack, rw) { this.mem = mem; this.ro = new MemoryBackend(mem); this.ro.seedPack(pack); this.rw = rw; }
+  owns(p, n) { const k = str(this.mem, p, n); return this.ro.files.has(k) || (k !== '/' && this.ro.dirs.has(k)); }
+  lk_store_open(p, n, fl) {
+    if (!this.owns(p, n)) return this.rw.lk_store_open(p, n, fl);
+    const h = this.ro.lk_store_open(p, n, fl); return h < 0 ? h : h + PACK_H;
+  }
+  pick(h) { return h >= PACK_H ? [this.ro, h - PACK_H] : [this.rw, h]; }
+  lk_store_read(h, b, l, o) { const [x, y] = this.pick(h); return x.lk_store_read(y, b, l, o); }
+  lk_store_write(h, b, l, o) { const [x, y] = this.pick(h); return x.lk_store_write(y, b, l, o); }
+  lk_store_truncate(h, s) { const [x, y] = this.pick(h); return x.lk_store_truncate(y, s); }
+  lk_store_flush(h) { const [x, y] = this.pick(h); return x.lk_store_flush(y); }
+  lk_store_close(h) { const [x, y] = this.pick(h); return x.lk_store_close(y); }
+  lk_store_stat(p, n, out) { return this.owns(p, n) ? this.ro.lk_store_stat(p, n, out) : this.rw.lk_store_stat(p, n, out); }
+  lk_store_mkdir(p, n) { return this.owns(p, n) ? -E.EEXIST : this.rw.lk_store_mkdir(p, n); }
+  lk_store_list(p, n, b, c) { return this.owns(p, n) ? this.ro.lk_store_list(p, n, b, c) : this.rw.lk_store_list(p, n, b, c); }
+  lk_store_remove(p, n) { return this.owns(p, n) ? -E.EROFS : this.rw.lk_store_remove(p, n); }
+  lk_store_rename(a, an, b, bn) { return (this.owns(a, an) || this.owns(b, bn)) ? -E.EROFS : this.rw.lk_store_rename(a, an, b, bn); }
 }

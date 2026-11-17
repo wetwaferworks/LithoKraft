@@ -10,12 +10,15 @@ import { lkPageAttach } from '../lkpage.mjs';
 const memory = new WebAssembly.Memory({ initial: 4096, maximum: 9600, shared: true });
 const channel = makeChannel();
 const store = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' });
-store.postMessage({ lkKind: 'store', backend: new URLSearchParams(location.search).get('store') || 'opfs', memory, channel });
+const Q = new URLSearchParams(location.search);
+store.postMessage({ lkKind: 'store', backend: Q.get('store') || 'opfs', memory, channel, packUrl: Q.has('nopack') ? null : new URL('./LithoKraft.lkp2', import.meta.url).href });
+const storeReady = new Promise(res => store.onmessage = e => { if ('storeReady' in e.data) { console.log('KRAFT store ' + JSON.stringify(e.data)); res(e.data); } });
 const main = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' });
 const page = lkPageAttach(document.getElementById('canvas'), main);
 window.__kraft = null;
 main.onmessage = e => { if (e.data.kraft) { window.__kraft = e.data.kraft; console.log('KRAFT ' + JSON.stringify(e.data.kraft).slice(0, 3000)); } else page.onMessage(e.data); };
 main.onerror = e => console.log('KRAFT worker error ' + e.message);
+await storeReady;
 main.postMessage({ lkKind: 'kraft', url: new URL('./LithoKraft.wasm', import.meta.url).href, memory, channel, cpuCount: 4, pool: 12,
-  canvas: page.offscreen, search: location.search, argv: ['LithoKraft'] }, [page.offscreen]);
+  canvas: page.offscreen, search: location.search, argv: ['LithoKraft', ...(Q.get('args') ?? '').split(' ').filter(Boolean)] }, [page.offscreen]);
 </script>

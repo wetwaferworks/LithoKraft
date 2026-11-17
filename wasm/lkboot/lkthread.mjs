@@ -4,14 +4,15 @@
 // __stack_pointer to the block lkboot allocated, __wasm_init_tls(tls),
 // lithosys_thread_start(start_arg), free the block, then the frozen
 // tid-cell protocol: Atomics.store(cell, 0) and Atomics.notify(cell).
-import { makeImports, storeImports, spawnThread, LkExit } from './lkboot.mjs';
-import { StoreServer, MemoryBackend, OpfsBackend } from './lkstore.mjs';
+import { makeImports, storeImports, spawnThread, threadHost, LkExit } from './lkboot.mjs';
+import { StoreServer, MemoryBackend, OpfsBackend, PackOverlay } from './lkstore.mjs';
 
 export async function runThread(d, post = () => {}) {
   if (globalThis.process?.env?.LKB_DEBUG) (await import('node:fs')).writeSync(2, 'thread start ' + d.tid + '\n');
   const t = { canBlock: true, onConsole: (s, e) => post({ console: s, err: e }) };
   t.store = storeImports(d.shared, true);
   const env = makeImports(d.shared, t);
+  Object.assign(env, threadHost(d.shared));
   for (const i of WebAssembly.Module.imports(d.module)) if (i.kind === 'function' && !(i.name in env)) env[i.name] = () => { throw new Error('host does not provide ' + i.name); };
   t.spawn = null; // nested spawns go through the same path:
   const inst = new WebAssembly.Instance(d.module, { env });
@@ -51,7 +52,9 @@ export async function runKraft(d, post) {
   const { makeGL } = await import('./lkgl.mjs');
   const { makeHost, isUnwindTrap } = await import('./lkhost.mjs');
   const errors = [], log = [];
-  const onConsole = (s, e) => { (e ? errors : log).push(s); if (log.length > 400) log.shift(); };
+  const ilog = [];
+  globalThis.__lkThreadLog = m => { if (m.error) errors.push('thread: ' + m.error); else if (m.console) onConsole(m.console, m.err); };
+  const onConsole = (s, e) => { (e ? errors : log).push(s); if (log.length > 400) log.shift(); if (/input|screen|world|menu/i.test(s) && ilog.length < 200) ilog.push(s); };
   const module = new WebAssembly.Module(await (await fetch(d.url)).arrayBuffer());
   let gl, host;
   const providers = ctx => {
@@ -68,8 +71,8 @@ export async function runKraft(d, post) {
       startWorker, onConsole, providers, argv: d.argv, isUnwind: e => isUnwindTrap(e, host) });
   } catch (e) { post({ kraft: { fatal: String(e && e.stack || e), errors, log: log.slice(-40) } }); return; }
   const report = extra => post({ kraft: { unwound: r.unwound, code: r.code, frames: host.state.frames, draws: gl.stats.draws,
-    glCalls: gl.stats.calls, glErrors: gl.stats.glErrors, gaps: gl.stats.gaps, contexts: gl.stats.contexts, title: host.state.title,
-    ms: Math.round(performance.now() - t0), errors: errors.slice(0, 20), errorCount: errors.length, log: log.slice(-25), ...extra } });
+    glCalls: gl.stats.calls, glErrors: gl.stats.glErrors, gaps: gl.stats.gaps, contexts: gl.stats.contexts, title: host.state.title, events: host.state.events, ringWrites: host.state.ringWrites, queued: host.state.queue.length, ringOn: host.state.ringOn, ringHdr: host.state.ringOn ? Array.from(new Int32Array(d.memory.buffer, host.state.ringBase, 4)) : null, threadsLeft: pool.length,
+    ms: Math.round(performance.now() - t0), errors: errors.slice(0, 20), errorCount: errors.length, log: log.slice(-25), ilog, ...extra } });
   if (!r.unwound) { report({ exited: true }); return; }
   const raf = self.requestAnimationFrame ? self.requestAnimationFrame.bind(self) : f => setTimeout(f, 16);
   let last = 0;
@@ -82,8 +85,18 @@ export async function runKraft(d, post) {
   raf(tick);
 }
 
-export async function runStore(d) {
-  const backend = d.backend === 'opfs' ? new OpfsBackend(await navigator.storage.getDirectory(), d.memory) : new MemoryBackend(d.memory);
+export async function runStore(d, post = () => {}) {
+  let backend = d.backend === 'opfs' ? new OpfsBackend(await navigator.storage.getDirectory(), d.memory) : new MemoryBackend(d.memory);
+  let packFiles = 0;
+  if (d.packUrl) { // the read-only asset pack (LKP2), fetched once, kept outside wasm memory
+    const { parseLKP2 } = await import('./lkpack.mjs');
+    try {
+      const pk = parseLKP2(await (await fetch(d.packUrl)).arrayBuffer());
+      if (backend instanceof MemoryBackend) packFiles = backend.seedPack(pk);
+      else { backend = new PackOverlay(d.memory, pk, backend); packFiles = pk.files.length; }
+    } catch (e) { post({ storeReady: false, error: String(e && e.message || e) }); return; }
+  }
+  post({ storeReady: true, packFiles });
   const srv = new StoreServer(backend, d.channel);
   globalThis.__lkStoreServer = srv;
   await srv.run();
@@ -102,7 +115,9 @@ export function startWorker(kind, data) {
   }
   // Browser: a Worker created while its creator is blocked never starts, so take a
   // pre-started one from the pool (see prewarm) and fall back to a fresh one.
-  const w = pool.shift() ?? new Worker(url, { type: 'module' }); w.postMessage(msg); return w;
+  const w = pool.shift() ?? new Worker(url, { type: 'module' });
+  w.onmessage = e => { if (e.data && (e.data.error || e.data.console)) globalThis.__lkThreadLog?.(e.data); };
+  w.postMessage(msg); return w;
 }
 
 // Browser worker pool: start n workers and wait until each one is listening, before
@@ -131,5 +146,5 @@ if (nodeWT) {
     if (d.lkKind === 'ping') post({ lkReady: true }); else if (d.lkKind === 'thread') runThread(d, post); else runStore(d);
   }
 } else if (typeof WorkerGlobalScope !== 'undefined') {
-  self.onmessage = e => { const d = e.data; const post = m => self.postMessage(m); if (d.lkKind === 'ping') post({ lkReady: true }); else if (d.lkKind === 'thread') runThread(d, post); else if (d.lkKind === 'main') runMain(d, post); else if (d.lkKind === 'kraft') runKraft(d, post); else if (d.lkKind === 'store') runStore(d); };
+  self.onmessage = e => { const d = e.data; const post = m => self.postMessage(m); if (d.lkKind === 'ping') post({ lkReady: true }); else if (d.lkKind === 'thread') runThread(d, post); else if (d.lkKind === 'main') runMain(d, post); else if (d.lkKind === 'kraft') runKraft(d, post); else if (d.lkKind === 'store') runStore(d, post); };
 }
