@@ -892,6 +892,53 @@ int testSoftwareRenderer() {
                   bsame ? "bit-identical" : "DIFFER", tickOk ? "closed between frames" : "WRONG");
       if (!bsame || !tickOk || refOff == refFx) return 1;
     }
+    // JD 2026-11-17: borrow only when the last frame was heavy (hysteresis), so light
+    // frames keep the single-band cost. The forced-count checks above stay always-on.
+    {
+      bool ok = true;
+      cSoftwareRenderer::setBorrowedBandsAdaptiveOverride(2);
+      cSoftwareRenderer::resetBorrowHysteresis();
+      mt.setAaMode("off");
+      mt.renderFrame(fp);  // last time is 0, so this frame must not borrow
+      if (cSoftwareRenderer::borrowedRenderThreads() != 0) {
+        ok = false;
+        std::printf("FAIL: first/light frame borrowed %u, wanted 0\n", cSoftwareRenderer::borrowedRenderThreads());
+      }
+      const std::vector<uint32_t> lightPx = mt.framebuffer().pixels;
+      cSoftwareRenderer::noteRenderTimeNs(15'000'000ull);  // 15 ms: over the 10 ms on-threshold
+      mt.renderFrame(fp);
+      if (cSoftwareRenderer::borrowedRenderThreads() != 2) {
+        ok = false;
+        std::printf("FAIL: heavy frame borrowed %u, wanted 2\n", cSoftwareRenderer::borrowedRenderThreads());
+      }
+      if (mt.framebuffer().pixels != lightPx) {
+        ok = false;
+        std::printf("FAIL: adaptive borrow changed pixels\n");
+      }
+      cSoftwareRenderer::noteRenderTimeNs(9'000'000ull);  // mid gap: hold on
+      mt.renderFrame(fp);
+      if (cSoftwareRenderer::borrowedRenderThreads() != 2) {
+        ok = false;
+        std::printf("FAIL: hysteresis mid gap dropped borrow (%u)\n", cSoftwareRenderer::borrowedRenderThreads());
+      }
+      cSoftwareRenderer::noteRenderTimeNs(7'000'000ull);  // under the 8 ms off-threshold
+      mt.renderFrame(fp);
+      if (cSoftwareRenderer::borrowedRenderThreads() != 0) {
+        ok = false;
+        std::printf("FAIL: light frame after heavy still borrowed %u\n", cSoftwareRenderer::borrowedRenderThreads());
+      }
+      cSoftwareRenderer::noteRenderTimeNs(9'000'000ull);  // mid gap: hold off
+      mt.renderFrame(fp);
+      if (cSoftwareRenderer::borrowedRenderThreads() != 0) {
+        ok = false;
+        std::printf("FAIL: hysteresis mid gap armed borrow (%u)\n", cSoftwareRenderer::borrowedRenderThreads());
+      }
+      cSoftwareRenderer::setBorrowedBandsOverride(-1);
+      cSoftwareRenderer::resetBorrowHysteresis();
+      std::printf("Adaptive render-band borrow: on at 15 ms, hold at 9 ms, off at 7 ms, mid-gap holds, pixels %s\n",
+                  ok ? "unchanged" : "WRONG");
+      if (!ok) return 1;
+    }
   }
 
   {  // Cortana 2026-10-15 1335: traces fast path == reference, bit for bit.

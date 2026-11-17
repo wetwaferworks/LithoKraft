@@ -275,11 +275,19 @@ class cSoftwareRenderer : public IRenderer {
   static void setRenderScale(float s);
   /// Effective thread count after rounding/clamping.
   static unsigned renderThreads();
-  /// JD 2026-11-17: idle reserved cores the renderer borrows during the render phase only
-  /// (0 when off: explicit --render-threads, LK_RENDER_THREADS=1, LL_SW_BORROW=0, < 3 cores).
+  /// JD 2026-11-17: idle reserved cores the renderer is using in the current / last render
+  /// phase (0 when off, or when the last frame was light enough that borrow stayed latched off).
+  /// Capacity is 0 for an explicit --render-threads, LK_RENDER_THREADS=1, LL_SW_BORROW=0, or < 3 cores.
   static unsigned borrowedRenderThreads();
-  /// Selftests only: force n borrowed bands (-1 = the normal rule). Applies at the next run().
+  /// Selftests only: force n borrowed bands, always used (-1 = the normal adaptive rule).
+  /// Applies at the next run().
   static void setBorrowedBandsOverride(int n);
+  /// Selftests only: force n available borrow workers, but still arm them by last-frame hysteresis.
+  static void setBorrowedBandsAdaptiveOverride(int n);
+  /// Selftests only: seed the last render-frame wall time used by borrow hysteresis.
+  static void noteRenderTimeNs(uint64_t ns);
+  /// Selftests only: clear the borrow latch and last-frame time (next frame starts unarmed).
+  static void resetBorrowHysteresis();
   /// Render-phase ticket: odd while a frame is rendering, even once the cores are handed back.
   static uint64_t renderPhaseTicket();
   /// Cortana 2026-10-26 (item 5): while held, LL_SW_SHOT does not count frames (the game holds

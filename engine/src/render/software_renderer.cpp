@@ -332,6 +332,16 @@ unsigned swResolveThreads(unsigned req) {
 // explicit --render-threads, for LK_RENDER_THREADS=1 (JD's four-thread-total opt-in), on
 // WASM, below 3 cores, and with LL_SW_BORROW=0. Never past kMaxRenderBands.
 std::atomic<int> g_swBorrowOverride{-1};  // selftests: force N borrowed bands (-1 = the rule above)
+// When true, every available borrow worker is used in the render phase (forced-count
+// selftests). When false, borrow is armed only if the previous frame's render was heavy.
+std::atomic<bool> g_swBorrowAlwaysOn{false};
+// JD 2026-11-17 (adaptive borrow): iRB1 rebench on TheWorkstation, 83395cfd, software,
+// --cores 4, 1280x720 scale 0.5. Always-on borrow halved a heavy still (render 59.0 ->
+// 29.5 ms) but cost ~3.3 ms on a light forward walk (render 2.58 -> 5.89 ms, frame
+// 4.30 -> 7.53). Arm at >= 10 ms (fwd-fxaa ~19-21 ms still wants the help), drop below
+// 8 ms, hold in the gap so a single mid frame does not flap.
+static constexpr uint64_t kBorrowOnNs  = 10'000'000ull;
+static constexpr uint64_t kBorrowOffNs =  8'000'000ull;
 unsigned swBorrowBands(unsigned bands) {
   const unsigned room = kSwMaxRenderThreads > bands ? kSwMaxRenderThreads - bands : 0u;
   if (const int o = g_swBorrowOverride.load(std::memory_order_relaxed); o >= 0) return std::min(unsigned(o), room);
@@ -355,17 +365,42 @@ class cSwBandPool {
   // the census bands, plus the borrowed reserved cores while a render phase is open.
   unsigned bands() const { return curBands_.load(std::memory_order_relaxed); }
   unsigned baseBands() const { return bands_; }
-  unsigned borrowedBands() const { return borrow_; }
+  unsigned borrowedBands() const { return activeBorrow_.load(std::memory_order_relaxed); }
   uint64_t phaseTicket() const { return phase_.load(std::memory_order_relaxed); }
+  void noteRenderNs(uint64_t ns) { lastRenderNs_.store(ns, std::memory_order_relaxed); }
+  void resetBorrowHysteresis() {
+    lastRenderNs_.store(0, std::memory_order_relaxed);
+    borrowArmed_ = false;
+    activeBorrow_.store(0, std::memory_order_relaxed);
+  }
   // Open / close the render phase. Caller-owned (the render caller: main or the detached
   // executor), never from a band callback. While open, the borrow workers spawned at start()
-  // take band indices bands_ .. bands_+borrow_-1 in every run(); at close they go back to
-  // idle and stop taking work, so the lent cores are handed back at the phase boundary.
-  // Atomics and a ticket only: no lock, no thread creation, no allocation.
+  // take band indices bands_ .. bands_+borrow_-1 in every run() only when borrow is armed;
+  // at close they go back to idle and stop taking work, so the lent cores are handed back
+  // at the phase boundary. Atomics and a ticket only: no lock, no thread creation, no allocation.
+  // Armed when the previous frame's render time was over kBorrowOnNs, cleared below
+  // kBorrowOffNs (hysteresis). Forced-count selftests (g_swBorrowAlwaysOn) stay always on.
   void beginRenderPhase() {
     if (tlInRun_ || phaseDepth_++) return;
     phaseOpen_ = true;
-    curBands_.store(folded_ ? bands_ : bands_ + borrow_, std::memory_order_relaxed);
+    unsigned extra = 0;
+    if (borrow_ && !folded_) {
+      if (g_swBorrowAlwaysOn.load(std::memory_order_relaxed)) {
+        borrowArmed_ = true;
+      } else {
+        const uint64_t last = lastRenderNs_.load(std::memory_order_relaxed);
+        if (borrowArmed_) {
+          if (last < kBorrowOffNs) borrowArmed_ = false;
+        } else if (last >= kBorrowOnNs) {
+          borrowArmed_ = true;
+        }
+      }
+      extra = borrowArmed_ ? borrow_ : 0;
+    } else {
+      borrowArmed_ = false;
+    }
+    activeBorrow_.store(extra, std::memory_order_relaxed);
+    curBands_.store(folded_ ? bands_ : bands_ + extra, std::memory_order_relaxed);
     phase_.fetch_add(1, std::memory_order_acq_rel);  // odd: open
   }
   void endRenderPhase() {
@@ -546,10 +581,15 @@ class cSwBandPool {
       records_.add(ThreadClass::Dedicated, ThreadRole::RenderBand, uint16_t(i), "sw-borrow");
     }
     if (borrow_) {
-      std::fprintf(stderr, "software renderer: +%u borrowed band(s) during the render phase (%u in render phase, %u otherwise)\n", borrow_, bands_ + borrow_, bands_);
-      logInfo("software renderer: +%u borrowed band(s) during the render phase (%u in render phase, %u otherwise)", borrow_, bands_ + borrow_, bands_);
+      std::fprintf(stderr, "software renderer: +%u borrow band(s) available (used when the last frame's render is heavy; %u in a heavy render phase, %u otherwise)\n", borrow_, bands_ + borrow_, bands_);
+      logInfo("software renderer: +%u borrow band(s) available (used when the last frame's render is heavy; %u in a heavy render phase, %u otherwise)", borrow_, bands_ + borrow_, bands_);
     }
-    curBands_.store(phaseOpen_ ? bands_ + borrow_ : bands_, std::memory_order_relaxed);
+    // If start() runs while a render phase is already open (thread-count change this frame),
+    // keep the armed decision from beginRenderPhase, except forced-count tests which stay on.
+    if (phaseOpen_ && g_swBorrowAlwaysOn.load(std::memory_order_relaxed) && borrow_) borrowArmed_ = true;
+    const unsigned extra = (phaseOpen_ && !folded_ && borrowArmed_) ? borrow_ : 0;
+    activeBorrow_.store(extra, std::memory_order_relaxed);
+    curBands_.store(folded_ ? bands_ : bands_ + extra, std::memory_order_relaxed);
   }
   // t46u item 2: one pass over the installed pump. True when it rendered something.
   bool pumpPass() {
@@ -626,7 +666,10 @@ class cSwBandPool {
   static constexpr unsigned genActive(uint64_t w) { return unsigned(w & 0xFFu); }
   unsigned bands_ = 1;
   unsigned borrow_ = 0;              // persistent borrow workers (JD 2026-11-17)
-  std::atomic<unsigned> curBands_{1};  // bands for the current phase (bands_ or bands_ + borrow_)
+  bool borrowArmed_ = false;         // caller-owned: hysteresis latch for this phase
+  std::atomic<uint64_t> lastRenderNs_{0};  // previous renderFrame wall time
+  std::atomic<unsigned> activeBorrow_{0};  // armed borrow count for the open / last phase
+  std::atomic<unsigned> curBands_{1};  // bands for the current phase (bands_ or bands_ + active borrow)
   std::atomic<uint64_t> phase_{0};     // render-phase ticket: odd = open, even = closed
   unsigned phaseDepth_ = 0;          // caller-owned nesting count
   bool phaseOpen_ = false;           // caller-owned
@@ -661,7 +704,16 @@ static std::atomic<bool> g_swShotTaken{false};
 bool cSoftwareRenderer::shotTaken() { return g_swShotTaken.load(std::memory_order_acquire); }
 unsigned cSoftwareRenderer::renderThreads() { return swResolveThreads(g_swRequestedThreads.load()); }
 unsigned cSoftwareRenderer::borrowedRenderThreads() { return cSwBandPool::get().borrowedBands(); }
-void cSoftwareRenderer::setBorrowedBandsOverride(int n) { g_swBorrowOverride.store(n < 0 ? -1 : n, std::memory_order_relaxed); }
+void cSoftwareRenderer::setBorrowedBandsOverride(int n) {
+  g_swBorrowOverride.store(n < 0 ? -1 : n, std::memory_order_relaxed);
+  g_swBorrowAlwaysOn.store(n >= 0, std::memory_order_relaxed);
+}
+void cSoftwareRenderer::setBorrowedBandsAdaptiveOverride(int n) {
+  g_swBorrowOverride.store(n < 0 ? -1 : n, std::memory_order_relaxed);
+  g_swBorrowAlwaysOn.store(false, std::memory_order_relaxed);
+}
+void cSoftwareRenderer::noteRenderTimeNs(uint64_t ns) { cSwBandPool::get().noteRenderNs(ns); }
+void cSoftwareRenderer::resetBorrowHysteresis() { cSwBandPool::get().resetBorrowHysteresis(); }
 uint64_t cSoftwareRenderer::renderPhaseTicket() { return cSwBandPool::get().phaseTicket(); }
 
 // Design B Stage 2: forward declaration (defined with the store, below) +
@@ -3076,11 +3128,22 @@ SwProf g_swProf;
 }  // namespace
 
 void cSoftwareRenderer::renderFrame(const FrameParams& p) {
-  // JD 2026-11-17: the render phase borrows the idle reserved cores and hands them back
-  // when the frame ends (RAII, so an exception still closes the phase).
+  // JD 2026-11-17: the render phase may borrow the idle reserved cores (when the last
+  // frame was heavy) and hands them back when the frame ends (RAII, so an exception
+  // still closes the phase). The measured wall time arms or clears borrow for next frame.
   cSwBandPool& phasePool = cSwBandPool::get();
   phasePool.beginRenderPhase();
-  struct PhaseEnd { cSwBandPool& p; ~PhaseEnd() { p.endRenderPhase(); } } phaseEnd{phasePool};
+  const auto phaseT0 = std::chrono::steady_clock::now();
+  struct PhaseEnd {
+    cSwBandPool& p;
+    std::chrono::steady_clock::time_point t0;
+    ~PhaseEnd() {
+      const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::steady_clock::now() - t0).count();
+      p.noteRenderNs(ns > 0 ? uint64_t(ns) : 0ull);
+      p.endRenderPhase();
+    }
+  } phaseEnd{phasePool, phaseT0};
   // Ginny (Argon) 2026-10-16 Pass 2 A/B proof (Cortana): LL_SW_AB=<n> renders frame n with
   // the LL_SW_AB_A mask (default 0 = pre-Pass-2), then again with the active mask, and logs
   // how many pixels differ. Off (zero cost beyond one branch) unless the env var is set.
