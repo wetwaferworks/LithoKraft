@@ -403,8 +403,12 @@ class cSoftwareRenderer : public IRenderer {
   float shimmerTime_ = 0.f;  ///< render clock (s) for the shimmer wave
   std::unique_ptr<SoftwareAaScratch> aaScratch_;  ///< lazily built post-pass scratch
   std::vector<uint32_t> swScaleX_;                ///< pass sw3: upscale column map
-  SoftwareFramebuffer aaOut_;                     ///< SSAA resolve target (renderFrame)
+  SoftwareFramebuffer aaOut_;                     ///< SSAA resolve / present-size colour
+  SoftwareFramebuffer ssaaHi_;                    ///< retained 2x colour so SSAA does not realloc each frame
+  std::vector<uint16_t> ssaaHiDepth_;             ///< retained 2x depth, paired with ssaaHi_
+  std::vector<uint16_t> aaId_;                    ///< per-pixel primitive stamp (FXAA/CMAA geometry gate)
   SoftwareAaScratch& ensureAaScratch();
+  void ensureAaId(uint32_t w, uint32_t h);        ///< size aaId_ when FXAA/CMAA is on
   // ASCII state (JD 2026-10-13); see setAsciiMode / setAsciiValueSpan.
   bool asciiEnabled_ = false;
   int asciiCols_ = 160;

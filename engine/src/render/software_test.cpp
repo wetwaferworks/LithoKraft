@@ -204,7 +204,7 @@ int testSoftwareRenderer() {
     if (useCmaa)
       applyCmaaPost(f, depthQv.data(), scratch);
     else
-      applyFxaaPost(f, scratch);
+      applyFxaaPost(f, scratch, depthQv.data());
     // Flat interiors untouched (columns far from the boundary).
     for (int y = 0; y < 16; ++y)
       for (int x : {0, 2, 29, 31})
@@ -253,6 +253,164 @@ int testSoftwareRenderer() {
     }
   }
   std::printf("AA ladder checks: names OK, fxaa/cmaa soften edges + keep flats, ssaa resolve OK\n");
+
+  // --- AA, JD 2026-11-17: geometry-only FXAA, pinned hashes, thread determinism ---
+  auto hashPixels = [](const std::vector<uint32_t>& px) -> uint64_t {
+    uint64_t h = 1469598103934665603ull;  // FNV-1a 64
+    for (uint32_t p : px) {
+      for (int i = 0; i < 4; ++i) {
+        h ^= uint64_t((p >> (8 * i)) & 0xFF);
+        h *= 1099511628211ull;
+      }
+    }
+    return h;
+  };
+  auto paintTexturedFlat = [](SoftwareFramebuffer& f, std::vector<uint16_t>& depthQ,
+                              std::vector<uint16_t>& prim, bool stepAtMid) {
+    const int w = int(f.width), h = int(f.height);
+    depthQ.assign(size_t(w) * h, 0);
+    prim.assign(size_t(w) * h, 0);
+    for (int y = 0; y < h; ++y)
+      for (int x = 0; x < w; ++x) {
+        // 4x4 pixel-art checker (high luma contrast) on a flat surface.
+        const int cx = (x / 4) & 1, cy = (y / 4) & 1;
+        const uint32_t lo = 0xFF2060A0u, hi = 0xFFE0C040u;
+        f.pixels[size_t(y) * w + size_t(x)] = (cx ^ cy) ? hi : lo;
+        const bool far = stepAtMid && x >= w / 2;
+        depthQ[size_t(y) * w + size_t(x)] = far ? uint16_t(40000) : uint16_t(20000);
+        prim[size_t(y) * w + size_t(x)] = far ? uint16_t(2) : uint16_t(1);
+      }
+  };
+  {
+    SoftwareFramebuffer f;
+    f.resize(64, 32);
+    std::vector<uint16_t> depthQ, prim;
+    paintTexturedFlat(f, depthQ, prim, false);  // one surface, high-contrast texture
+    const auto before = f.pixels;
+    SoftwareAaScratch scratch;
+    applyFxaaPost(f, scratch, depthQ.data(), prim.data());
+    if (f.pixels != before) {
+      std::printf("FAIL: fxaa touched a flat textured interior\n");
+      return 1;
+    }
+    // Geometry step down the middle must soften at least one boundary pixel
+    // and still leave the far interiors (columns 0-4 and 59-63) untouched.
+    paintTexturedFlat(f, depthQ, prim, true);
+    const auto before2 = f.pixels;
+    applyFxaaPost(f, scratch, depthQ.data(), prim.data());
+    bool changedInterior = false, softened = false;
+    const int w = 64, h = 32;
+    for (int y = 0; y < h; ++y) {
+      for (int x = 0; x < w; ++x) {
+        const uint32_t a = before2[size_t(y) * w + size_t(x)];
+        const uint32_t b = f.pixels[size_t(y) * w + size_t(x)];
+        if (a == b) continue;
+        if (x <= 4 || x >= w - 5) changedInterior = true;
+        else softened = true;
+      }
+    }
+    if (changedInterior) {
+      std::printf("FAIL: fxaa changed a textured interior far from the geometry edge\n");
+      return 1;
+    }
+    if (!softened) {
+      std::printf("FAIL: fxaa left a depth+prim geometry edge untouched\n");
+      return 1;
+    }
+  }
+  {
+    // Pinned hashes + 1/2/4-thread and across-run determinism for each mode.
+    auto makeScene = [](SoftwareFramebuffer& f, std::vector<uint16_t>& depthQ, std::vector<uint16_t>& prim) {
+      f.resize(48, 24);
+      depthQ.resize(size_t(48) * 24);
+      prim.resize(size_t(48) * 24);
+      for (int y = 0; y < 24; ++y)
+        for (int x = 0; x < 48; ++x) {
+          const bool right = x >= 24;
+          const int cx = (x / 3) & 1, cy = (y / 3) & 1;
+          const uint32_t a = 0xFF102030u, b = 0xFFF0D080u, c = 0xFF208040u, d = 0xFFC0E0FFu;
+          f.pixels[size_t(y) * 48 + size_t(x)] = right ? ((cx ^ cy) ? d : c) : ((cx ^ cy) ? b : a);
+          depthQ[size_t(y) * 48 + size_t(x)] = right ? uint16_t(42000) : uint16_t(18000);
+          prim[size_t(y) * 48 + size_t(x)] = right ? uint16_t(7) : uint16_t(3);
+        }
+    };
+    SoftwareFramebuffer f, f2;
+    std::vector<uint16_t> depthQ, prim;
+    makeScene(f, depthQ, prim);
+    SoftwareAaScratch scratch;
+    const auto offPix = f.pixels;
+    const uint64_t offH = hashPixels(offPix);
+
+    applyFxaaPost(f, scratch, depthQ.data(), prim.data());
+    const uint64_t fxaaH = hashPixels(f.pixels);
+    if (fxaaH == offH) {
+      std::printf("FAIL: fxaa pinned scene was a no-op\n");
+      return 1;
+    }
+    // Run again from the same input: identical.
+    makeScene(f2, depthQ, prim);
+    applyFxaaPost(f2, scratch, depthQ.data(), prim.data());
+    if (f2.pixels != f.pixels) {
+      std::printf("FAIL: fxaa not deterministic across runs\n");
+      return 1;
+    }
+    // 1 vs 2 vs 4 row bands, same input (serial bands must match, and so must
+    // a fresh prepare + disjoint row writes).
+    auto runBands = [&](int bands, SoftwareFramebuffer& out) {
+      makeScene(out, depthQ, prim);
+      SoftwareAaScratch sc;
+      prepareFxaa(out, sc);
+      const int h = int(out.height);
+      for (int b = 0; b < bands; ++b) {
+        const int y0 = (h * b) / bands;
+        const int y1 = (h * (b + 1)) / bands;
+        applyFxaaRows(out, sc, depthQ.data(), prim.data(), y0, y1);
+      }
+    };
+    SoftwareFramebuffer t1, t2, t4;
+    runBands(1, t1);
+    runBands(2, t2);
+    runBands(4, t4);
+    if (t1.pixels != f.pixels || t2.pixels != f.pixels || t4.pixels != f.pixels) {
+      std::printf("FAIL: fxaa 1/2/4-band hashes differ (1=%016llx 2=%016llx 4=%016llx full=%016llx)\n",
+                  (unsigned long long)hashPixels(t1.pixels), (unsigned long long)hashPixels(t2.pixels),
+                  (unsigned long long)hashPixels(t4.pixels), (unsigned long long)fxaaH);
+      return 1;
+    }
+
+    SoftwareFramebuffer hi, out, out2;
+    hi.resize(96, 48);
+    out.resize(48, 24);
+    out2.resize(48, 24);
+    for (int y = 0; y < 48; ++y)
+      for (int x = 0; x < 96; ++x) {
+        const int cx = (x / 2) & 1, cy = (y / 2) & 1;
+        hi.pixels[size_t(y) * 96 + size_t(x)] = (cx ^ cy) ? 0xFFE8C060u : 0xFF184878u;
+      }
+    resolveSsaa2x(hi, out);
+    resolveSsaa2x(hi, out2);
+    if (out.pixels != out2.pixels) {
+      std::printf("FAIL: ssaa2x resolve not deterministic across runs\n");
+      return 1;
+    }
+    const uint64_t ssaaH = hashPixels(out.pixels);
+
+    // Pinned values are printed on mismatch so a deliberate algorithm change
+    // can update them. Default (off) is the input hash; fxaa/ssaa must stay put.
+    std::printf("AA hashes: off=%016llx fxaa=%016llx ssaa2x=%016llx\n",
+                (unsigned long long)offH, (unsigned long long)fxaaH, (unsigned long long)ssaaH);
+    // Pinned 2026-11-17 on the box Linux DebugOpt build of the geometry-edge fixed-point path.
+    const uint64_t kOff  = 0x3008422cca928783ull;
+    const uint64_t kFxaa = 0x2a113a20cd02913cull;
+    const uint64_t kSsaa = 0xec27646a53b65d83ull;
+    if (offH != kOff || fxaaH != kFxaa || ssaaH != kSsaa) {
+      std::printf("FAIL: AA pinned hash moved (off %016llx want %016llx, fxaa %016llx want %016llx, ssaa %016llx want %016llx)\n",
+                  (unsigned long long)offH, (unsigned long long)kOff,
+                  (unsigned long long)fxaaH, (unsigned long long)kFxaa,
+                  (unsigned long long)ssaaH, (unsigned long long)kSsaa);
+      return 1;
+    }
+  }
 
   // --- ASCII pipeline (JD 2026-10-13) ---------------------------------------
   {

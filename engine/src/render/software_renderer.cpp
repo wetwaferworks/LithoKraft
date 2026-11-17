@@ -202,6 +202,7 @@ void cSoftwareRenderer::resize(uint32_t w, uint32_t h) {
     faces_.assign(size_t(w) * h, 7);
     layers_.assign(size_t(w) * h, 0);
   }
+  if (aaMode_ == SoftwareAaMode::Fxaa || aaMode_ == SoftwareAaMode::Cmaa) ensureAaId(w, h);
   hizFbW_ = 0;  // Cortana 2026-10-15 1715: Hi-Z off until the next clear()
 }
 
@@ -772,6 +773,7 @@ void cSoftwareRenderer::clear(uint32_t color) {
   // Cortana 2026-10-15 1455: runtime-dispatched fill (AVX2 or baseline; identical bytes).
   swsimd::fill32(fb_.pixels.data(), fb_.pixels.size(), color);
   swsimd::fill16(depth_.data(), depth_.size(), 0xFFFF);
+  if (!aaId_.empty() && aaId_.size() == depth_.size()) swsimd::fill16(aaId_.data(), aaId_.size(), 0);
   if (objectsOn_) {
     objects_.assign(depth_.size(), 0);
     faces_.assign(depth_.size(), 7);
@@ -932,6 +934,7 @@ void cSoftwareRenderer::rasterizeTriangle(const float* v0, const float* v1,
       }
       depth_[idx] = q;
       fb_.pixels[idx] = color;
+      if (!aaId_.empty()) aaId_[idx] = uint16_t(tlLayer) | (uint16_t(tlFace & 7) << 10) | (uint16_t(tlObject) << 13);
       if (objectsOn_) {
         objects_[idx] = tlObject;
         faces_[idx] = tlFace;
@@ -1551,6 +1554,8 @@ void cSoftwareRenderer::rasterizeTrisShaded(int nt, const float* const (*tv)[3],
           }
           depth_[idx] = q;
           fb_.pixels[idx] = color;
+          if (!aaId_.empty())
+            aaId_[idx] = uint16_t(fin.varyings.layer) | (uint16_t(tlFace & 7) << 10) | (uint16_t(tlObject) << 13);
           if (x < wxLo) wxLo = x;
           wxHi = x;
         }
@@ -1630,7 +1635,7 @@ void cSoftwareRenderer::renderFlatQuads(const PackedVertex* verts, size_t count,
            screen[(i+2)*4+3] > 0 && screen[(i+3)*4+3] > 0;
   };
   for (size_t i = 0; i + 3 < count; i += 4) {
-    if (objectsOn_) {
+    if (objectsOn_ || !aaId_.empty()) {
       const uint32_t layer = verts[i].layerIndex();
       tlLayer = uint16_t(layer);
       tlObject = objectOverride_ >= 0 ? uint8_t(objectOverride_)
@@ -2192,25 +2197,41 @@ SoftwareAaScratch& cSoftwareRenderer::ensureAaScratch() {
 
 void cSoftwareRenderer::setAo(bool on) { g_swAo = on; }  // Cortana 2026-10-16: render.ao
 
+void cSoftwareRenderer::ensureAaId(uint32_t w, uint32_t h) {
+  const size_t n = size_t(w) * size_t(h);
+  if (aaId_.size() < n) aaId_.assign(n, 0);
+  else if (aaId_.size() > n) aaId_.resize(n);
+}
+
 void cSoftwareRenderer::setAaMode(const char* modeName) {
   SoftwareAaMode mode;
   if (modeName && softwareAaModeFromName(modeName, mode)) aaMode_ = mode;
+  if ((aaMode_ == SoftwareAaMode::Fxaa || aaMode_ == SoftwareAaMode::Cmaa) && fb_.width && fb_.height)
+    ensureAaId(fb_.width, fb_.height);
 }
 
 const char* cSoftwareRenderer::aaModeName() const { return softwareAaModeName(aaMode_); }
 
 void cSoftwareRenderer::applyAaPostPass() {
   if (aaMode_ == SoftwareAaMode::Fxaa) {
-    // Cortana 2026-10-16 (texture-preserving AA): depth gates FXAA to geometry edges.
-    applyFxaaPost(fb_, ensureAaScratch(), (depth_.size() == fb_.pixels.size()) ? depth_.data() : nullptr);
+    const uint16_t* depth = (depth_.size() == fb_.pixels.size()) ? depth_.data() : nullptr;
+    const uint16_t* prim = (aaId_.size() == fb_.pixels.size()) ? aaId_.data() : nullptr;
+    SoftwareAaScratch& scratch = ensureAaScratch();
+    prepareFxaa(fb_, scratch);
+    cSwBandPool& pool = cSwBandPool::get();
+    const int h = int(fb_.height);
+    const unsigned nb = std::max(1u, pool.bands());
+    pool.run([&](unsigned b) {
+      const int y0 = int((uint64_t(h) * b) / nb);
+      const int y1 = int((uint64_t(h) * (b + 1)) / nb);
+      applyFxaaRows(fb_, scratch, depth, prim, y0, y1);
+    });
   } else if (aaMode_ == SoftwareAaMode::Cmaa) {
-    // depth_ matches fb_ on the direct surface (resize keeps them paired);
-    // pass it only when the pairing holds, else run luma-only.
     const uint16_t* depth =
         (depth_.size() == fb_.pixels.size()) ? depth_.data() : nullptr;
     applyCmaaPost(fb_, depth, ensureAaScratch());
   }
-  // Off: no-op. Ssaa2x: render-time mode â€” nothing to post-apply.
+  // Off: no-op. Ssaa2x: render-time mode — nothing to post-apply.
 }
 
 void cSoftwareRenderer::setAsciiMode(bool enabled, int cols) {
@@ -3007,6 +3028,13 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
   const bool scaled = rscale < 0.999f;
   const uint32_t renderW = ssaa ? targetW * 2 : scaled ? std::max(1u, uint32_t(float(targetW) * rscale + 0.5f)) : targetW;
   const uint32_t renderH = ssaa ? targetH * 2 : scaled ? std::max(1u, uint32_t(float(targetH) * rscale + 0.5f)) : targetH;
+  // Reclaim the retained 2x colour/depth before resize, so SSAA does not heap-allocate every frame.
+  if (ssaa && ssaaHi_.width == renderW && ssaaHi_.height == renderH && !ssaaHi_.pixels.empty()) {
+    std::swap(fb_.pixels, ssaaHi_.pixels);
+    fb_.width = ssaaHi_.width;
+    fb_.height = ssaaHi_.height;
+    if (ssaaHiDepth_.size() == size_t(renderW) * renderH) depth_.swap(ssaaHiDepth_);
+  }
   if (fb_.width != renderW || fb_.height != renderH) resize(renderW, renderH);
   {  // 2026-10-25 (Archie step 0): LL_SW_BLANK=1 skips the scene and HUD; the frame is a solid
      // colour cycling every frame, so present/blit cost can be measured alone. Off unless set.
@@ -3407,6 +3435,7 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
        const size_t o = size_t(y) * fb_.width + size_t(cx0), n = size_t(cx1 - cx0);
        swsimd::fill32(fb_.pixels.data() + o, n, skyColor);
        swsimd::fill16(depth_.data() + o, n, 0xFFFF);
+       if (!aaId_.empty() && aaId_.size() == depth_.size()) swsimd::fill16(aaId_.data() + o, n, 0);
      }
    }
    // Cortana 2026-10-15 1755 [ENGINE]: pass 0 = opaque front-to-back (as before); pass 1 =
@@ -3542,9 +3571,14 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
   } else if (ssaa) {
     aaOut_.resize(targetW, targetH);
     resolveSsaa2x(fb_, aaOut_);
+    // Stash the 2x colour and depth (swap, no new alloc once warmed up) and present at native size.
+    ssaaHi_.width = fb_.width;
+    ssaaHi_.height = fb_.height;
+    std::swap(ssaaHi_.pixels, fb_.pixels);
+    ssaaHiDepth_.swap(depth_);
+    std::swap(fb_.pixels, aaOut_.pixels);
     fb_.width = targetW;
     fb_.height = targetH;
-    fb_.pixels = std::move(aaOut_.pixels);
     depth_.assign(size_t(targetW) * targetH, 0xFFFF);  // overlay depth tests start fresh
     hizFbW_ = 0;  // Cortana 2026-10-15 1715: Hi-Z bounds no longer valid (depth went UP)
   } else {

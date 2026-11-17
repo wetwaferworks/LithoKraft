@@ -980,6 +980,7 @@ int main(int argc, char** argv) {
   int renderThreadsArg = 0;  // Cortana 2026-10-15 1156: --render-threads N
   double swScaleArg = 0.5;  // Cortana 2026-10-25 (pass sw3): --sw-scale 0.5|0.75|1.0; default 0.5 (540p at 1080p, exact 2x nearest upscale; Archie 2026-10-25), 1.0 opt-in
   int fpsCapArg = -2; bool noVsync = false; bool noOverlay = false;  // Cortana 2026-10-15 1440: --no-overlay (A/B)  // Cortana 2026-10-15 1610: --fps-cap 30|60|off|auto (-2 = not given), --no-vsync
+  std::string aaArg;  // --aa off|fxaa|ssaa2x (CLI wins over settings; default stays off)
   bool tpsGiven = false, radiusGiven = false, displayGiven = false, streamGiven = false; int streamingArg = -1;  // CLI wins over settings.json
   bool simAreaGiven = false, streamAreaGiven = false;  // diamond (JD 2026-10-23)
   int vkFxArg = -1;  // JD Vulkan push
@@ -1076,6 +1077,12 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--vsync")) vsync = true;
     else if (!std::strcmp(argv[i], "--no-vsync")) noVsync = true;  // Cortana 2026-10-15 1610
     else if (!std::strcmp(argv[i], "--no-overlay")) noOverlay = true;  // Cortana 2026-10-15 1440: Debug Overlay off (bench A/B)
+    else if (!std::strcmp(argv[i], "--aa") && i + 1 < argc) {
+      aaArg = argv[++i];
+      if (aaArg != "off" && aaArg != "fxaa" && aaArg != "ssaa2x" && aaArg != "cmaa") {
+        std::fprintf(stderr, "--aa: off|fxaa|ssaa2x\n"); badArg = true;
+      }
+    }
     else if (!std::strcmp(argv[i], "--fps-cap") && i + 1 < argc) {  // Cortana 2026-10-15 1610 (ENGINE)
       const std::string v = argv[++i];
       if (v == "off" || v == "0") fpsCapArg = 0; else if (v == "auto") fpsCapArg = -1;
@@ -1262,7 +1269,7 @@ int main(int argc, char** argv) {
     else {
       std::printf("usage: LithoKraft [--version] [--selftest] [--dim wafer|organic] [--size chunks] "
                   "[--tps 32|64|128|256|512] [--tps-unlock (debug: --tps up to 8192, powers of 2)] [--no-euv] [--radius chunks] [--render-threads 1|2|4|8|16|32|64] [--sw-scale 0.5|0.75|1.0] [--seconds s] [--vsync] [--display windowed|maximized|borderless|fullscreen] [--monitor N] [--resolution WxH] [--refresh Hz] [--log file] "
-                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--showcase wafer] [--frame-dump dir] [--frame-hash dir] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--flat-lab] [--bolt-lab] [--component-test] [--pchie-maze file] [--spawn name] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--stream-bench [file.json]] [--det-budget] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--no-verify] [--mcp-stdio] "
+                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--aa off|fxaa|ssaa2x] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--showcase wafer] [--frame-dump dir] [--frame-hash dir] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--flat-lab] [--bolt-lab] [--component-test] [--pchie-maze file] [--spawn name] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--stream-bench [file.json]] [--det-budget] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--no-verify] [--mcp-stdio] "
                   "[--vk-validation] [--vk-arena host|device|rebar] [--gl-arena on|off] [--handshake-workers n] [--stub-models] [--seed n] [--cities on|off] [--noise-preview graph.json [--preview-out f.png] "
                   "[--preview-output name] [--preview-size px] [--preview-scale blocks/px] [--preview-y y]]\n");
       return 0;
@@ -1360,6 +1367,7 @@ int main(int argc, char** argv) {
   if (backend == "software" && benchSeconds <= 0) vsync = true;
   if (noVsync || benchSeconds > 0) vsync = false;
   if (fpsCapArg != -2) settings.fpsCap = fpsCapArg;  // CLI wins for this run
+  if (!aaArg.empty()) settings.aaMode = aaArg;       // --aa wins over settings.json for this run
   if (!displayGiven) {
     DisplayMode mode = display0.mode;
     if (parseDisplayMode(kSettingsDisplayModes[settings.displayMode], mode)) display0.mode = mode;

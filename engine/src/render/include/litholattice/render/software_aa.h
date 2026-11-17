@@ -44,16 +44,28 @@ bool softwareAaModeFromName(const char* name, SoftwareAaMode& out);
 struct SoftwareAaScratch {
   std::vector<uint32_t> src;     ///< source frame copy (post passes gather from it)
   std::vector<float> luma;       ///< per-pixel luma (cmaa edge detection)
+  std::vector<uint16_t> lumaQ;   ///< integer luma 0-255 (fxaa, fixed-point path)
   std::vector<uint8_t> edgeR;    ///< cmaa: edge between (x,y) and (x+1,y)
   std::vector<uint8_t> edgeB;    ///< cmaa: edge between (x,y) and (x,y+1)
   std::vector<float> acc;        ///< cmaa: 4 floats per pixel (rgb, weight)
   std::vector<float> bloomA, bloomB;  ///< bloom: quarter-res RGB bright pass + blur ping-pong
 };
 
-/// FXAA-class post filter, in place on fb (gathers from a scratch copy).
-/// Cortana 2026-10-16 (texture-preserving AA): with a depth buffer, only pixels whose 3x3
-/// neighbourhood straddles a depth step (a geometry edge) are filtered; texture interiors pass.
-void applyFxaaPost(SoftwareFramebuffer& fb, SoftwareAaScratch& scratch, const uint16_t* depth = nullptr);
+/// Copy fb into scratch and compute integer luma. Grows scratch as needed, never shrinks
+/// (zero heap traffic once the buffer has reached this resolution).
+void prepareFxaa(const SoftwareFramebuffer& fb, SoftwareAaScratch& scratch);
+
+/// FXAA-class post filter on rows [y0, y1). Gathers from scratch (call prepareFxaa first).
+/// Geometry-edge gate (JD 2026-11-17): a pixel is filtered only if its 3x3 neighbourhood
+/// has a depth step and/or a primitive-id step. Texture interiors stay bit-identical.
+/// Math is fixed-point. depth and/or prim may be null; if both are null the pass is a no-op
+/// (no luma-only filtering).
+void applyFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& scratch,
+                   const uint16_t* depth, const uint16_t* prim, int y0, int y1);
+
+/// Full-frame convenience: prepareFxaa + applyFxaaRows over the whole image (1 thread).
+void applyFxaaPost(SoftwareFramebuffer& fb, SoftwareAaScratch& scratch,
+                   const uint16_t* depth = nullptr, const uint16_t* prim = nullptr);
 
 /// Cortana 2026-10-16 (render.bloom): bright-pass (luma threshold, sky excluded via depth) at
 /// quarter resolution, separable 9-tap blur, additive composite. Presentational only.
