@@ -65,6 +65,7 @@
 #include "lithokraft/game/sprite_host.h"
 #include "litholattice/world/chunk_swarm.h"  // R4: cSlackHarvester
 #include "lithokraft/game/frame_budget.h"  // R4
+#include "lithokraft/game/view_mesh_gate.h"  // R4
 #include "lithokraft/game/settings.h"        // A4: render.fps_cap Settings field
 #include "lithokraft/game/settings_cvars.h"  // A4: render.fps_cap cvar row
 #include "litholattice/console/concmd.h"     // A4: cConsoleReg for the cvar flow check
@@ -1421,6 +1422,46 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         bool unique = true;
         for (size_t i = 1; i < a.size(); ++i) if (!(a[i - 1].first < a[i].first)) unique = false;
         check(a == b && unique, "stream rank: a strict total order (no ties), the same from any input order");
+      }
+      {  // R4 (B8, 2026-11-17): view-gate hysteresis and mesh handover
+        lithokraft::cViewMeshGate g;
+        using St = lithokraft::cViewMeshGate::Step;
+        if (g.enabled()) {
+          g.setCentre(0, 0, 4, false);
+          check(!g.inView(5, 0) && g.inKeep(5, 0) && !g.inKeep(6, 0) && g.inKeep(4, 4) && !g.inKeep(6, 1),
+                "view gate: keep band is one ring past the view");
+          // Model one meshed column at the view edge while the player strafes across the gate line.
+          bool drawn = true; int tombstones = 0, remeshes = 0, holes = 0;
+          auto sweep = [&] {
+            switch (g.step(4, 0)) {
+              case St::Stay: break;
+              case St::Keep: g.keep(4, 0); break;
+              case St::Retire: drawn = false; ++tombstones; g.retired(4, 0); break;
+              case St::Enter: g.undefer(4, 0); ++remeshes; drawn = true; break;  // old mesh (if any) up until the new one
+            }
+            if (g.inView(4, 0) && !drawn) ++holes;
+          };
+          for (int i = 0; i < 10; ++i) { g.setCentre(i % 2 ? -1 : 0, 0, 4, false); sweep(); }
+          check(tombstones == 0 && holes == 0 && drawn && remeshes == 4,
+                "view gate: strafing across the edge never retires (no tombstones, no holes); it re-meshes on return with handover");
+          g.setCentre(-1, 0, 4, false); sweep();
+          check(g.kept(4, 0) && g.deferred(4, 0) && drawn, "view gate: one ring out: kept drawn, deferred (no new meshes)");
+          g.setCentre(-2, 0, 4, false); sweep();
+          check(!g.kept(4, 0) && g.deferred(4, 0) && !drawn && tombstones == 1, "view gate: past the band: retired once, still deferred");
+          g.setCentre(-1, 0, 4, false); sweep();
+          check(!drawn && g.step(4, 0) == St::Stay, "view gate: a retired column back in the band stays unmeshed (no meshing beyond the view)");
+          g.setCentre(0, 0, 4, false); sweep();
+          check(drawn && !g.deferred(4, 0) && !g.kept(4, 0), "view gate: back in view it meshes again");
+          g.defer(6, 0);
+          g.setCentre(1, 0, 4, false);
+          check(g.step(6, 0) == St::Stay, "view gate: a never-meshed column in the band is not meshed (view radius unchanged)");
+          g.setCentre(-1, 0, 4, false); sweep(); g.setCentre(10, 0, 4, false);
+          check(g.step(4, 0) == St::Retire, "view gate: a big jump retires a kept column directly");
+          g.keep(7, 7); g.forget(7, 7);
+          check(!g.kept(7, 7) && !g.deferred(7, 7), "view gate: forget clears kept too");
+          g.keep(7, 7); g.clear();
+          check(g.keptCount() == 0 && g.deferredCount() == 0 && g.inView(99, 99), "view gate: clear empties both sets and un-centres");
+        }
       }
       {  // R4 (B5/B6, 2026-11-17): stream budgets priced against the frame target, not 60 Hz
         using lithokraft::cFrameBudget;

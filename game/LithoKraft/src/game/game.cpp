@@ -2254,14 +2254,21 @@ void Game::pumpViewGate() {
   for (const auto& [key, col] : active_->chunks.columns()) {
     if (!col) continue;
     const int cx = col->cx, cz = col->cz;
-    const bool in = viewGate_.inView(cx, cz), held = viewGate_.deferred(cx, cz);
-    if (!in && !held) {  // left the view: its meshes go (tombstones), it re-meshes on return
-      retireColumnMeshes(cx, cz, /*force=*/true);
-      viewGate_.defer(cx, cz);
-      ++viewGateRetired_;
-    } else if (in && held) {
-      if (col->edgeShell) continue;  // Q12: promotes first (demoteFarColumns), then meshes
-      entering.emplace_back(cStreamRank::Key{}, col.get());
+    switch (viewGate_.step(cx, cz)) {
+      case cViewMeshGate::Step::Stay: break;
+      case cViewMeshGate::Step::Keep:  // R4 (B8): just outside the view: still drawn, no new meshes
+        viewGate_.keep(cx, cz);
+        ++viewGateKept_;
+        break;
+      case cViewMeshGate::Step::Retire:  // past the keep band: its meshes go (tombstones), it re-meshes on return
+        retireColumnMeshes(cx, cz, /*force=*/true);
+        viewGate_.retired(cx, cz);
+        ++viewGateRetired_;
+        break;
+      case cViewMeshGate::Step::Enter:
+        if (col->edgeShell) continue;  // Q12: promotes first (demoteFarColumns), then meshes
+        entering.emplace_back(cStreamRank::Key{}, col.get());
+        break;
     }
   }
   if (!entering.empty()) {
@@ -2272,6 +2279,7 @@ void Game::pumpViewGate() {
     for (const auto& e : entering) {
       const int cx = e.second->cx, cz = e.second->cz;
       ++viewGateEntered_;
+      if (viewGate_.kept(cx, cz)) ++viewGateHandovers_;  // R4 (B8): old meshes stay up until these replace them
       viewGate_.undefer(cx, cz);
       for (int sy = 0; sy < kSubChunks; ++sy) { meshSeq_.erase(packPos(cx, sy, cz)); pbrMeshSeq_.erase(packPos(cx, sy, cz)); }
       startFirstMesh(cx, cz);
@@ -2279,8 +2287,9 @@ void Game::pumpViewGate() {
   }
   static int logEvery = 0;  // game thread only
   if (++logEvery % 120 == 1)
-    logInfo("view gate: centre %d,%d radius %d | held %zu, retired %llu, entered %llu", pcx, pcz, viewGate_.radius(),
-            viewGate_.deferredCount(), (unsigned long long)viewGateRetired_, (unsigned long long)viewGateEntered_);
+    logInfo("view gate: centre %d,%d radius %d | held %zu (kept drawn %zu), retired %llu, entered %llu (handovers %llu), kept %llu",
+            pcx, pcz, viewGate_.radius(), viewGate_.deferredCount(), viewGate_.keptCount(), (unsigned long long)viewGateRetired_,
+            (unsigned long long)viewGateEntered_, (unsigned long long)viewGateHandovers_, (unsigned long long)viewGateKept_);
 }
 
 // ---- Thread Handshake P5: chunk handshake bookkeeping (game thread) ----

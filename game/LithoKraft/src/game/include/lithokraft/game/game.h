@@ -737,6 +737,7 @@ class Game {
   cViewMeshGate viewGate_;          ///< Archie Phase 1: nothing beyond the view radius meshes
   bool viewGateBacklog_ = false;    ///< entering columns left over from a bounded sweep
   uint64_t viewGateRetired_ = 0, viewGateEntered_ = 0;  ///< Phase 1 counters (log)
+  uint64_t viewGateKept_ = 0, viewGateHandovers_ = 0;   ///< R4 (B8) counters (log)
   bool useBinaryMesher_ = false;  // mesher option, boot-applied from settings_.mesher
   // Design B Stage 2: ring spill. When the renderer's lock-free upload ring
   // is momentarily full, an upload the ring refused waits here â€” in order,
