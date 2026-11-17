@@ -87,21 +87,6 @@ bool softwareAaModeFromName(const char* name, SoftwareAaMode& out) {
 static constexpr int depthEdgeQ(float t) { return int(double(t) * 65535.0) + 1; }
 static int absI(int v) { return v < 0 ? -v : v; }
 
-void prepareFxaa(const SoftwareFramebuffer& fb, SoftwareAaScratch& s) {
-  const size_t n = size_t(fb.width) * size_t(fb.height);
-  if (s.src.size() < n) s.src.resize(n);
-  if (s.lumaQ.size() < n) s.lumaQ.resize(n);
-  if (n == 0) return;
-  std::memcpy(s.src.data(), fb.pixels.data(), n * sizeof(uint32_t));
-  const uint32_t* px = s.src.data();
-  uint16_t* L = s.lumaQ.data();
-  for (size_t i = 0; i < n; ++i) {
-    const uint32_t p = px[i];
-    // Rec.601 coefficients in Q8: 77/256, 150/256, 29/256 (77+150+29 = 256).
-    L[i] = uint16_t((77 * ((p >> 16) & 0xFF) + 150 * ((p >> 8) & 0xFF) + 29 * (p & 0xFF)) >> 8);
-  }
-}
-
 static uint32_t bilinearQ8(const uint32_t* src, int w, int h, int fx, int fy) {
   // fx, fy in 1/256 pixel units, origin at the pixel center index.
   if (fx < 0) fx = 0;
@@ -130,6 +115,48 @@ static uint32_t bilinearQ8(const uint32_t* src, int w, int h, int fx, int fy) {
   return 0xFF000000u | (uint32_t(r) << 16) | (uint32_t(g) << 8) | uint32_t(b);
 }
 
+void prepareFxaaRows(const SoftwareFramebuffer& fb, SoftwareAaScratch& s, int y0, int y1) {
+  const int w = int(fb.width), h = int(fb.height);
+  if (y0 < 0) y0 = 0;
+  if (y1 > h) y1 = h;
+  if (y0 >= y1 || w <= 0) return;
+  const uint32_t* px = fb.pixels.data();
+  uint16_t* L = s.lumaQ.data();
+  uint8_t* E = s.edge.data();
+  for (int y = y0; y < y1; ++y) {
+    const size_t row = size_t(y) * size_t(w);
+    for (int x = 0; x < w; ++x) {
+      const uint32_t p = px[row + size_t(x)];
+      // Rec.601 coefficients in Q8: 77/256, 150/256, 29/256 (77+150+29 = 256).
+      L[row + size_t(x)] = uint16_t((77 * ((p >> 16) & 0xFF) + 150 * ((p >> 8) & 0xFF) + 29 * (p & 0xFF)) >> 8);
+      E[row + size_t(x)] = 0;
+    }
+  }
+}
+
+void prepareFxaa(const SoftwareFramebuffer& fb, SoftwareAaScratch& s) {
+  const size_t n = size_t(fb.width) * size_t(fb.height);
+  if (s.src.size() < n) s.src.resize(n);
+  if (s.lumaQ.size() < n) s.lumaQ.resize(n);
+  if (s.edge.size() < n) s.edge.resize(n);
+  if (n == 0) return;
+  prepareFxaaRows(fb, s, 0, int(fb.height));
+}
+
+static bool depthDiscon(int a, int b) {
+  if (a == b) return false;
+  // Clear/sky (0xFFFF) vs any written depth is a silhouette at any distance.
+  if (a == 0xFFFF || b == 0xFFFF) return true;
+  const int dMin = a < b ? a : b;
+  const int dMax = a < b ? b : a;
+  // Relative test in leftover far-code (65535 - dMin). Hyperbolic [0,1] depth
+  // with near 0.05 / far 1000 clusters near 0xFFFF, so a fixed 164 (~0.0025)
+  // missed block-vs-sky past about 20 blocks (z=50 is only ~62 LSBs from sky).
+  // *16 is about a 6% jump — steep close-range face gradients stay under it,
+  // occlusion and sky breaks stay over it.
+  return (dMax - dMin) * 16 >= (0xFFFF - dMin);
+}
+
 void applyFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& s,
                    const uint16_t* depth, const uint16_t* prim, int y0, int y1) {
   const int w = int(fb.width), h = int(fb.height);
@@ -137,33 +164,52 @@ void applyFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& s,
   if (y0 < 0) y0 = 0;
   if (y1 > h) y1 = h;
   if (y0 >= y1) return;
-  const uint32_t* src = s.src.data();
+  const uint32_t* src = fb.pixels.data();
   const uint16_t* L = s.lumaQ.data();
+  uint32_t* dest = s.src.data();
+  uint8_t* edge = s.edge.data();
   auto lum = [&](int x, int y) -> int {
     if (x < 0) x = 0; else if (x >= w) x = w - 1;
     if (y < 0) y = 0; else if (y >= h) y = h - 1;
     return int(L[size_t(y) * size_t(w) + size_t(x)]);
   };
   constexpr int kSearch = 12;
-  constexpr int kDepthEdgeQ = 164;  // depthEdgeQ(0.0025f)
 
   for (int y = y0; y < y1; ++y) {
     for (int x = 0; x < w; ++x) {
       // Geometry-edge gate first: depth and/or primitive-id discontinuities.
       bool geom = false;
       if (depth) {
-        int dMin = 0xFFFF, dMax = 0;
-        for (int dy = -1; dy <= 1; ++dy) {
-          int yy = y + dy; if (yy < 0) yy = 0; else if (yy >= h) yy = h - 1;
-          const uint16_t* row = depth + size_t(yy) * size_t(w);
-          for (int dx = -1; dx <= 1; ++dx) {
-            int xx = x + dx; if (xx < 0) xx = 0; else if (xx >= w) xx = w - 1;
-            const int d = int(row[xx]);
-            if (d < dMin) dMin = d;
-            if (d > dMax) dMax = d;
+        // Fast reject: 4-connected neighbours usually match on a flat surface
+        // or open sky. Only then walk the 3x3 with the relative/sky test.
+        const uint16_t mid = depth[size_t(y) * size_t(w) + size_t(x)];
+        const int xl = x > 0 ? x - 1 : 0, xr = x + 1 < w ? x + 1 : w - 1;
+        const int yu = y > 0 ? y - 1 : 0, yd = y + 1 < h ? y + 1 : h - 1;
+        const size_t rw = size_t(w);
+        if (depth[size_t(y) * rw + size_t(xl)] != mid ||
+            depth[size_t(y) * rw + size_t(xr)] != mid ||
+            depth[size_t(yu) * rw + size_t(x)] != mid ||
+            depth[size_t(yd) * rw + size_t(x)] != mid ||
+            depth[size_t(yu) * rw + size_t(xl)] != mid ||
+            depth[size_t(yu) * rw + size_t(xr)] != mid ||
+            depth[size_t(yd) * rw + size_t(xl)] != mid ||
+            depth[size_t(yd) * rw + size_t(xr)] != mid) {
+          int dMin = 0xFFFF, dMax = 0;
+          bool sawSky = false, sawSolid = false;
+          for (int dy = -1; dy <= 1; ++dy) {
+            int yy = y + dy; if (yy < 0) yy = 0; else if (yy >= h) yy = h - 1;
+            const uint16_t* row = depth + size_t(yy) * rw;
+            for (int dx = -1; dx <= 1; ++dx) {
+              int xx = x + dx; if (xx < 0) xx = 0; else if (xx >= w) xx = w - 1;
+              const int d = int(row[xx]);
+              if (d == 0xFFFF) sawSky = true;
+              else sawSolid = true;
+              if (d < dMin) dMin = d;
+              if (d > dMax) dMax = d;
+            }
           }
+          geom = (sawSky && sawSolid) || depthDiscon(dMin, dMax);
         }
-        if (dMax - dMin >= kDepthEdgeQ) geom = true;
       }
       if (!geom && prim) {
         int yy0 = y > 0 ? y - 1 : 0, yy1 = y + 1 < h ? y + 1 : h - 1;
@@ -225,6 +271,8 @@ void applyFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& s,
 
       int offQ8 = subOff;
       int sign = 1;
+      uint32_t blended = 0;
+      bool write = false;
       if (horzEdge) {
         const int stepN = absI(lN - lM), stepS = absI(lS - lM);
         sign = stepN >= stepS ? -1 : 1;
@@ -239,9 +287,10 @@ void applyFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& s,
           if (edgeQ8 > 128) edgeQ8 = 128;
           if (edgeQ8 > offQ8) offQ8 = edgeQ8;
         }
-        if (offQ8 > 0)
-          fb.pixels[size_t(y) * size_t(w) + size_t(x)] =
-              bilinearQ8(src, w, h, x << 8, (y << 8) + sign * offQ8);
+        if (offQ8 > 0) {
+          blended = bilinearQ8(src, w, h, x << 8, (y << 8) + sign * offQ8);
+          write = true;
+        }
       } else {
         const int stepW = absI(lW - lM), stepE = absI(lE - lM);
         sign = stepW >= stepE ? -1 : 1;
@@ -256,9 +305,35 @@ void applyFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& s,
           if (edgeQ8 > 128) edgeQ8 = 128;
           if (edgeQ8 > offQ8) offQ8 = edgeQ8;
         }
-        if (offQ8 > 0)
-          fb.pixels[size_t(y) * size_t(w) + size_t(x)] =
-              bilinearQ8(src, w, h, (x << 8) + sign * offQ8, y << 8);
+        if (offQ8 > 0) {
+          blended = bilinearQ8(src, w, h, (x << 8) + sign * offQ8, y << 8);
+          write = true;
+        }
+      }
+      if (write) {
+        const size_t idx = size_t(y) * size_t(w) + size_t(x);
+        dest[idx] = blended;
+        edge[idx] = 1;
+      }
+    }
+  }
+}
+
+void commitFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& s, int y0, int y1) {
+  const int w = int(fb.width), h = int(fb.height);
+  if (y0 < 0) y0 = 0;
+  if (y1 > h) y1 = h;
+  if (y0 >= y1 || w <= 0) return;
+  uint32_t* px = fb.pixels.data();
+  const uint32_t* dest = s.src.data();
+  uint8_t* edge = s.edge.data();
+  for (int y = y0; y < y1; ++y) {
+    const size_t row = size_t(y) * size_t(w);
+    for (int x = 0; x < w; ++x) {
+      const size_t i = row + size_t(x);
+      if (edge[i]) {
+        px[i] = dest[i];
+        edge[i] = 0;
       }
     }
   }
@@ -268,21 +343,9 @@ void applyFxaaPost(SoftwareFramebuffer& fb, SoftwareAaScratch& s,
                    const uint16_t* depth, const uint16_t* prim) {
   prepareFxaa(fb, s);
   applyFxaaRows(fb, s, depth, prim, 0, int(fb.height));
+  commitFxaaRows(fb, s, 0, int(fb.height));
 }
 
-// ---------------------------------------------------------------------------
-// Conservative morphological coverage AA (MLAA -> SMAA -> CMAA2 lineage,
-// clean-room variant). Pass 1 marks edges between pixels (luma steps and
-// depth steps; monotone-ramp texture gradients are rejected unless the
-// depth buffer vouches for a geometry step). Pass 2 walks each edge run,
-// reconstructs the edge line's subpixel offset at the run ends from the
-// adjacent-column/row edges (the turn signal), and integrates the line's
-// coverage over each touched pixel analytically — the restored coverage
-// IS the blend weight. Pass 3 composites from the source copy.
-// Deviations from full CMAA2 (documented in the AA report): the shape
-// library is reduced to long-edge runs + end turns (no Z-pattern special
-// cases), and weights are analytic instead of SMAA's area texture.
-// ---------------------------------------------------------------------------
 void applyCmaaPost(SoftwareFramebuffer& fb, const uint16_t* depth, SoftwareAaScratch& s) {
   const int w = int(fb.width), h = int(fb.height);
   if (w < 2 || h < 2) return;

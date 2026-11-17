@@ -773,7 +773,7 @@ void cSoftwareRenderer::clear(uint32_t color) {
   // Cortana 2026-10-15 1455: runtime-dispatched fill (AVX2 or baseline; identical bytes).
   swsimd::fill32(fb_.pixels.data(), fb_.pixels.size(), color);
   swsimd::fill16(depth_.data(), depth_.size(), 0xFFFF);
-  if (!aaId_.empty() && aaId_.size() == depth_.size()) swsimd::fill16(aaId_.data(), aaId_.size(), 0);
+  if (!aaId_.empty() && aaId_.size() == depth_.size()) swsimd::fill16(aaId_.data(), aaId_.size(), 0xFFFF);
   if (objectsOn_) {
     objects_.assign(depth_.size(), 0);
     faces_.assign(depth_.size(), 7);
@@ -1352,6 +1352,7 @@ void cSoftwareRenderer::rasterizeTrisShaded(int nt, const float* const (*tv)[3],
         span.texShift = int(mipShift(tileSz)); span.texScale = float(tileSz - 1);
       }
       span.morton = fin.texMorton;
+      span.aaStamp = uint16_t(s0->layer) | (uint16_t(tlFace & 7) << 10) | (uint16_t(tlObject) << 13);
     }
     Y0 = std::min(Y0, y0); Y1 = std::max(Y1, y1);
   }
@@ -1427,6 +1428,7 @@ void cSoftwareRenderer::rasterizeTrisShaded(int nt, const float* const (*tv)[3],
     if (simdSpan && x1 >= x0) {
       span.sw0 = sw0; span.sw1 = sw1; span.sw2 = sw2; span.sdepth = sdepth;
       span.depth = depth_.data() + sidx; span.pixels = fb_.pixels.data() + sidx; span.n = x1 - x0 + 1;
+      span.aaId = aaId_.empty() ? nullptr : aaId_.data() + sidx;
       swsimd::shadeSpanBasic(span);
       lc = span.lc; ls = span.ls;
       if (span.wxHi >= 0) { wxLo = x0 + span.wxLo; wxHi = x0 + span.wxHi; }
@@ -2199,7 +2201,7 @@ void cSoftwareRenderer::setAo(bool on) { g_swAo = on; }  // Cortana 2026-10-16: 
 
 void cSoftwareRenderer::ensureAaId(uint32_t w, uint32_t h) {
   const size_t n = size_t(w) * size_t(h);
-  if (aaId_.size() < n) aaId_.assign(n, 0);
+  if (aaId_.size() < n) aaId_.assign(n, 0xFFFF);
   else if (aaId_.size() > n) aaId_.resize(n);
 }
 
@@ -2217,14 +2219,31 @@ void cSoftwareRenderer::applyAaPostPass() {
     const uint16_t* depth = (depth_.size() == fb_.pixels.size()) ? depth_.data() : nullptr;
     const uint16_t* prim = (aaId_.size() == fb_.pixels.size()) ? aaId_.data() : nullptr;
     SoftwareAaScratch& scratch = ensureAaScratch();
-    prepareFxaa(fb_, scratch);
     cSwBandPool& pool = cSwBandPool::get();
     const int h = int(fb_.height);
     const unsigned nb = std::max(1u, pool.bands());
+    // Grow once on the caller (never shrinks; no per-frame heap once warm).
+    // Luma, blend, and commit are three disjoint row splits over the same
+    // band pool. With one render band the pool has no extra workers to
+    // enlist without changing the thread census, so all three run on the caller.
+    const size_t n = size_t(fb_.width) * size_t(fb_.height);
+    if (scratch.src.size() < n) scratch.src.resize(n);
+    if (scratch.lumaQ.size() < n) scratch.lumaQ.resize(n);
+    if (scratch.edge.size() < n) scratch.edge.resize(n);
+    pool.run([&](unsigned b) {
+      const int y0 = int((uint64_t(h) * b) / nb);
+      const int y1 = int((uint64_t(h) * (b + 1)) / nb);
+      prepareFxaaRows(fb_, scratch, y0, y1);
+    });
     pool.run([&](unsigned b) {
       const int y0 = int((uint64_t(h) * b) / nb);
       const int y1 = int((uint64_t(h) * (b + 1)) / nb);
       applyFxaaRows(fb_, scratch, depth, prim, y0, y1);
+    });
+    pool.run([&](unsigned b) {
+      const int y0 = int((uint64_t(h) * b) / nb);
+      const int y1 = int((uint64_t(h) * (b + 1)) / nb);
+      commitFxaaRows(fb_, scratch, y0, y1);
     });
   } else if (aaMode_ == SoftwareAaMode::Cmaa) {
     const uint16_t* depth =
@@ -3435,7 +3454,7 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
        const size_t o = size_t(y) * fb_.width + size_t(cx0), n = size_t(cx1 - cx0);
        swsimd::fill32(fb_.pixels.data() + o, n, skyColor);
        swsimd::fill16(depth_.data() + o, n, 0xFFFF);
-       if (!aaId_.empty() && aaId_.size() == depth_.size()) swsimd::fill16(aaId_.data() + o, n, 0);
+       if (!aaId_.empty() && aaId_.size() == depth_.size()) swsimd::fill16(aaId_.data() + o, n, 0xFFFF);
      }
    }
    // Cortana 2026-10-15 1755 [ENGINE]: pass 0 = opaque front-to-back (as before); pass 1 =
@@ -3540,13 +3559,31 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
   // visualization. Overlays/HUD draw after, at native resolution.
   if (scaled) {
     // Pass sw3: nearest-neighbour upscale of the scaled world frame to the target size,
-    // split across the band threads by row. Depth resets like the SSAA path.
-    aaOut_.resize(targetW, targetH);
-    swScaleX_.resize(targetW);
+    // split across the band threads by row. Colour, depth, and prim-id all upscale
+    // together so FXAA/CMAA still see geometry edges (wiping depth first made the
+    // post pass a pixel no-op, while still paying for a full-frame walk). Overlay
+    // depth is reset after the post pass, same as the SSAA path.
+    // Grow-only present-size colour (do not assign-black via resize; do not
+    // move the vector out, or the next frame reallocates).
+    if (aaOut_.pixels.size() < size_t(targetW) * size_t(targetH))
+      aaOut_.pixels.resize(size_t(targetW) * size_t(targetH));
+    aaOut_.width = targetW;
+    aaOut_.height = targetH;
+    if (swScaleX_.size() != targetW) swScaleX_.resize(targetW);
     for (uint32_t x = 0; x < targetW; ++x) swScaleX_[x] = std::min(renderW - 1, uint32_t((uint64_t(x) * renderW) / targetW));
+    const size_t srcN = size_t(renderW) * size_t(renderH);
+    const size_t dstN = size_t(targetW) * size_t(targetH);
+    const bool upDepth = depth_.size() == srcN;
+    const bool upId = aaId_.size() == srcN;
+    if (upDepth && scaleDepth_.size() < dstN) scaleDepth_.resize(dstN);
+    if (upId && scaleAaId_.size() < dstN) scaleAaId_.resize(dstN);
     const uint32_t* src = fb_.pixels.data();
     uint32_t* dstPx = aaOut_.pixels.data();
     const uint32_t* xm = swScaleX_.data();
+    const uint16_t* srcD = upDepth ? depth_.data() : nullptr;
+    const uint16_t* srcI = upId ? aaId_.data() : nullptr;
+    uint16_t* dstD = upDepth ? scaleDepth_.data() : nullptr;
+    uint16_t* dstI = upId ? scaleAaId_.data() : nullptr;
     std::atomic<uint32_t> nextRow{0};
     bandPool.run([&](unsigned) {
       for (uint32_t y0; (y0 = nextRow.fetch_add(16, std::memory_order_relaxed)) < targetH;) {
@@ -3554,20 +3591,46 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
           const uint32_t sy = std::min(renderH - 1, uint32_t((uint64_t(y) * renderH) / targetH));
           const uint32_t* s = src + size_t(sy) * renderW;
           uint32_t* d = dstPx + size_t(y) * targetW;
-          if (y > 0 && sy == std::min(renderH - 1, uint32_t((uint64_t(y - 1) * renderH) / targetH)) && y != y0) {
+          uint16_t* dd = dstD ? dstD + size_t(y) * targetW : nullptr;
+          uint16_t* di = dstI ? dstI + size_t(y) * targetW : nullptr;
+          const bool repeat = y > 0 && sy == std::min(renderH - 1, uint32_t((uint64_t(y - 1) * renderH) / targetH)) && y != y0;
+          if (repeat) {
             std::memcpy(d, d - targetW, size_t(targetW) * sizeof(uint32_t));  // repeated source row
+            if (dd) std::memcpy(dd, dd - targetW, size_t(targetW) * sizeof(uint16_t));
+            if (di) std::memcpy(di, di - targetW, size_t(targetW) * sizeof(uint16_t));
           } else {
-            for (uint32_t x = 0; x < targetW; ++x) d[x] = s[xm[x]];
+            const uint16_t* sD = srcD ? srcD + size_t(sy) * renderW : nullptr;
+            const uint16_t* sI = srcI ? srcI + size_t(sy) * renderW : nullptr;
+            for (uint32_t x = 0; x < targetW; ++x) {
+              const uint32_t sx = xm[x];
+              d[x] = s[sx];
+              if (dd) dd[x] = sD[sx];
+              if (di) di[x] = sI[sx];
+            }
           }
         }
       }
     });
+    // Present-size colour into fb_ by swap; park the render-size vector in aaOut_
+    // and grow it back so the retained present-size storage stays put.
+    std::swap(fb_.pixels, aaOut_.pixels);
     fb_.width = targetW;
     fb_.height = targetH;
-    fb_.pixels = std::move(aaOut_.pixels);
-    depth_.assign(size_t(targetW) * targetH, 0xFFFF);
+    if (aaOut_.pixels.size() < dstN) aaOut_.pixels.resize(dstN);
+    aaOut_.width = targetW;
+    aaOut_.height = targetH;
+    // Swap the upscaled gates in for the post pass, then swap them back so
+    // scaleDepth_/scaleAaId_ stay at dstN (a one-way swap would realloc next frame).
+    if (upDepth) depth_.swap(scaleDepth_);
+    if (upId) aaId_.swap(scaleAaId_);
     hizFbW_ = 0;
     applyAaPostPass();
+    if (upDepth) depth_.swap(scaleDepth_);
+    if (upId) aaId_.swap(scaleAaId_);
+    if (depth_.size() != dstN) depth_.resize(dstN);
+    swsimd::fill16(depth_.data(), dstN, 0xFFFF);  // overlay depth tests start fresh
+    // Restore aaOut_ to present size so the next frame does not realloc
+  } else if (ssaa) {
   } else if (ssaa) {
     aaOut_.resize(targetW, targetH);
     resolveSsaa2x(fb_, aaOut_);

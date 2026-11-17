@@ -319,6 +319,226 @@ int testSoftwareRenderer() {
     }
   }
   {
+    // Far block-vs-sky silhouette: depth 65420 vs clear 0xFFFF is only 115 LSBs
+    // (a block at ~50 units with near 0.05 / far 1000). The old fixed 164
+    // threshold missed this, and the same prim id (0) models a SIMD span that
+    // never stamped aaId. FXAA must soften the silhouette and leave the
+    // textured interior alone.
+    SoftwareFramebuffer f;
+    f.resize(64, 32);
+    std::vector<uint16_t> depthQ(size_t(64) * 32), prim(size_t(64) * 32, 0);
+    for (int y = 0; y < 32; ++y)
+      for (int x = 0; x < 64; ++x) {
+        const bool sky = x >= 40;
+        const int cx = (x / 4) & 1, cy = (y / 4) & 1;
+        const uint32_t lo = 0xFF2060A0u, hi = 0xFFE0C040u, skyCol = 0xFF87CEFAu;
+        f.pixels[size_t(y) * 64 + size_t(x)] = sky ? skyCol : ((cx ^ cy) ? hi : lo);
+        depthQ[size_t(y) * 64 + size_t(x)] = sky ? uint16_t(0xFFFF) : uint16_t(65420);
+      }
+    const auto before = f.pixels;
+    SoftwareAaScratch scratch;
+    applyFxaaPost(f, scratch, depthQ.data(), prim.data());
+    bool changedInterior = false, softened = false;
+    for (int y = 0; y < 32; ++y) {
+      for (int x = 0; x < 64; ++x) {
+        const uint32_t a = before[size_t(y) * 64 + size_t(x)];
+        const uint32_t b = f.pixels[size_t(y) * 64 + size_t(x)];
+        if (a == b) continue;
+        if (x <= 4 || x >= 59) changedInterior = true;
+        else softened = true;
+      }
+    }
+    if (changedInterior) {
+      std::printf("FAIL: fxaa changed a textured interior on a far block-vs-sky silhouette\n");
+      return 1;
+    }
+    if (!softened) {
+      std::printf("FAIL: fxaa left a far block-vs-sky silhouette untouched\n");
+      return 1;
+    }
+    std::printf("FXAA far block-vs-sky silhouette: softened, textured interior untouched\n");
+  }
+  {
+    // Scaled path (the default play path, --sw-scale 0.5): nearest-upscale
+    // colour, depth, and prim-id, then FXAA, then wipe depth. A far
+    // block-vs-sky silhouette at render resolution must still soften at
+    // present resolution; textured interiors and open sky must not move.
+    // (Wiping depth before the post pass, the 07:40 bug, leaves every
+    // present-size depth at 0xFFFF and FXAA is a no-op.)
+    auto nnScale2x = [](const SoftwareFramebuffer& src, const std::vector<uint16_t>& srcD,
+                        const std::vector<uint16_t>& srcI, SoftwareFramebuffer& dst,
+                        std::vector<uint16_t>& dstD, std::vector<uint16_t>& dstI) {
+      const int sw = int(src.width), sh = int(src.height);
+      const int dw = sw * 2, dh = sh * 2;
+      dst.resize(uint32_t(dw), uint32_t(dh));
+      dstD.assign(size_t(dw) * size_t(dh), 0);
+      dstI.assign(size_t(dw) * size_t(dh), 0);
+      for (int y = 0; y < dh; ++y) {
+        const int sy = (y * sh) / dh;
+        for (int x = 0; x < dw; ++x) {
+          const int sx = (x * sw) / dw;
+          const size_t si = size_t(sy) * size_t(sw) + size_t(sx);
+          const size_t di = size_t(y) * size_t(dw) + size_t(x);
+          dst.pixels[di] = src.pixels[si];
+          dstD[di] = srcD[si];
+          dstI[di] = srcI[si];
+        }
+      }
+    };
+    SoftwareFramebuffer low;
+    low.resize(32, 16);
+    std::vector<uint16_t> lowD(size_t(32) * 16), lowI(size_t(32) * 16, 0);
+    for (int y = 0; y < 16; ++y)
+      for (int x = 0; x < 32; ++x) {
+        const bool sky = x >= 20;
+        const int cx = (x / 4) & 1, cy = (y / 4) & 1;
+        const uint32_t lo = 0xFF2060A0u, hi = 0xFFE0C040u, skyCol = 0xFF87CEFAu;
+        low.pixels[size_t(y) * 32 + size_t(x)] = sky ? skyCol : ((cx ^ cy) ? hi : lo);
+        lowD[size_t(y) * 32 + size_t(x)] = sky ? uint16_t(0xFFFF) : uint16_t(65420);
+      }
+    SoftwareFramebuffer up, wiped;
+    std::vector<uint16_t> upD, upI, wipedD, wipedI;
+    nnScale2x(low, lowD, lowI, up, upD, upI);
+    nnScale2x(low, lowD, lowI, wiped, wipedD, wipedI);
+    wipedD.assign(wipedD.size(), 0xFFFF);  // the 07:40 bug
+    const auto before = up.pixels;
+    SoftwareAaScratch scratch, scratchW;
+    applyFxaaPost(up, scratch, upD.data(), upI.data());
+    applyFxaaPost(wiped, scratchW, wipedD.data(), wipedI.data());
+    if (wiped.pixels != before) {
+      std::printf("FAIL: fxaa changed a scaled frame whose depth was wiped to sky\n");
+      return 1;
+    }
+    bool changedInterior = false, softened = false, skyTouched = false;
+    for (int y = 0; y < 32; ++y) {
+      for (int x = 0; x < 64; ++x) {
+        const uint32_t a = before[size_t(y) * 64 + size_t(x)];
+        const uint32_t b = up.pixels[size_t(y) * 64 + size_t(x)];
+        if (a == b) continue;
+        if (x <= 8) changedInterior = true;
+        else if (x >= 50) skyTouched = true;
+        else softened = true;
+      }
+    }
+    if (changedInterior) {
+      std::printf("FAIL: fxaa changed a textured interior on the scaled far silhouette\n");
+      return 1;
+    }
+    if (skyTouched) {
+      std::printf("FAIL: fxaa changed open sky on the scaled far silhouette\n");
+      return 1;
+    }
+    if (!softened) {
+      std::printf("FAIL: fxaa left a scaled far block-vs-sky silhouette untouched\n");
+      return 1;
+    }
+    // Integration: the same silhouette through renderFrame at --sw-scale 0.5.
+    // A far axis-aligned wall sits against a known sky; present size is 2x the
+    // world stage. FXAA must differ from off at the silhouette and match in
+    // the wall interior and open sky. Scale is restored even on failure.
+    struct RestoreScale {
+      RestoreScale() { cSoftwareRenderer::setRenderScale(0.5f); }
+      ~RestoreScale() { cSoftwareRenderer::setRenderScale(1.0f); }
+    } restoreScale;
+    auto makeWall = [](cSoftwareRenderer& r) {
+      r.setModelDither(false);
+      r.setPerPixelShading(false);
+      ChunkMesh cm;
+      cm.cx = 0;
+      cm.sy = 0;
+      cm.cz = 3;  // world z = 48
+      // Both windings of a 16x16 wall in the XY plane at the near face, so
+      // back-face culling cannot drop it. Packed units are 1/16 block.
+      const uint16_t p[4][3] = {{0, 0, 0}, {256, 0, 0}, {256, 256, 0}, {0, 256, 0}};
+      for (int wind = 0; wind < 2; ++wind) {
+        for (int v = 0; v < 4; ++v) {
+          const int s = wind ? 3 - v : v;
+          PackedVertex pv{};
+          pv.x = p[s][0];
+          pv.y = p[s][1];
+          pv.z = p[s][2];
+          pv.faceAo = 4;
+          pv.value = 200;
+          pv.u = uint8_t(v == 1 || v == 2 ? 255 : 0);
+          pv.v = uint8_t(v >= 2 ? 255 : 0);
+          pv.mode = kShadeTex;
+          cm.verts.push_back(pv);
+        }
+      }
+      r.uploadChunkMesh(cm);
+    };
+    FrameParams fp;
+    fp.width = 128;
+    fp.height = 64;
+    fp.camPos = {8.f, 8.f, 32.f};
+    fp.sky = {0.529f, 0.808f, 0.980f};
+    fp.viewProj = mul(perspective(1.2f, 128.f / 64.f, 0.05f, 1000.f),
+                      lookDir(fp.camPos, normalize(Vec3{0.f, 0.f, 1.f})));
+    fp.crosshair = false;
+    fp.groundPulseOn = false;
+    fp.groundTraceOn = false;
+    cSoftwareRenderer rOff, rFx;
+    makeWall(rOff);
+    makeWall(rFx);
+    rOff.setAaMode("off");
+    rFx.setAaMode("fxaa");
+    rOff.renderFrame(fp);
+    rFx.renderFrame(fp);
+    const auto& offPx = rOff.framebuffer().pixels;
+    const auto& fxPx = rFx.framebuffer().pixels;
+    if (offPx.size() != size_t(128) * 64 || fxPx.size() != offPx.size() ||
+        rOff.framebuffer().width != 128 || rOff.framebuffer().height != 64) {
+      std::printf("FAIL: scaled path present size is %ux%u, expected 128x64\n",
+                  rOff.framebuffer().width, rOff.framebuffer().height);
+      return 1;
+    }
+    const uint32_t skyCol = offPx[0];
+    size_t solid = 0, changed = 0, interiorHit = 0, skyHit = 0;
+    for (int y = 0; y < 64; ++y) {
+      for (int x = 0; x < 128; ++x) {
+        const size_t i = size_t(y) * 128 + size_t(x);
+        const bool isSky = offPx[i] == skyCol;
+        if (!isSky) ++solid;
+        if (offPx[i] == fxPx[i]) continue;
+        ++changed;
+        // A 6-pixel margin from any opposite-class pixel is the silhouette;
+        // farther than that is interior / open sky and must not move.
+        bool nearSky = isSky;
+        bool nearSolid = !isSky;
+        for (int dy = -6; dy <= 6 && !(nearSky && nearSolid); ++dy) {
+          const int yy = y + dy;
+          if (yy < 0 || yy >= 64) continue;
+          for (int dx = -6; dx <= 6; ++dx) {
+            const int xx = x + dx;
+            if (xx < 0 || xx >= 128) continue;
+            if (offPx[size_t(yy) * 128 + size_t(xx)] == skyCol) nearSky = true;
+            else nearSolid = true;
+          }
+        }
+        if (isSky && !nearSolid) ++skyHit;
+        if (!isSky && !nearSky) ++interiorHit;
+      }
+    }
+    rFx.renderFrame(fp);
+    if (rFx.framebuffer().pixels != fxPx) {
+      std::printf("FAIL: scaled-path fxaa is not stable across two frames\n");
+      return 1;
+    }
+    if (solid < 200) {
+      std::printf("FAIL: scaled-path wall covered only %zu pixels\n", solid);
+      return 1;
+    }
+    if (changed == 0) {
+      std::printf("FAIL: scaled-path fxaa matched off (upscale gate missed the wall)\n");
+      return 1;
+    }
+    if (interiorHit || skyHit) {
+      std::printf("FAIL: scaled-path fxaa touched interior=%zu open-sky=%zu\n", interiorHit, skyHit);
+      return 1;
+    }
+    std::printf("FXAA scaled path (NN-upscale depth and prim-id): softened, textured interior untouched\n");
+  }
+  {
     // Pinned hashes + 1/2/4-thread and across-run determinism for each mode.
     auto makeScene = [](SoftwareFramebuffer& f, std::vector<uint16_t>& depthQ, std::vector<uint16_t>& prim) {
       f.resize(48, 24);
@@ -366,6 +586,7 @@ int testSoftwareRenderer() {
         const int y1 = (h * (b + 1)) / bands;
         applyFxaaRows(out, sc, depthQ.data(), prim.data(), y0, y1);
       }
+      commitFxaaRows(out, sc, 0, h);
     };
     SoftwareFramebuffer t1, t2, t4;
     runBands(1, t1);

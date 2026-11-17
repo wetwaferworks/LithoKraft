@@ -42,28 +42,40 @@ bool softwareAaModeFromName(const char* name, SoftwareAaMode& out);
 
 /// Reusable scratch for the post passes (avoids per-frame allocation).
 struct SoftwareAaScratch {
-  std::vector<uint32_t> src;     ///< source frame copy (post passes gather from it)
+  std::vector<uint32_t> src;     ///< FXAA: pending blended pixels (indexed); also CMAA/bloom scratch
   std::vector<float> luma;       ///< per-pixel luma (cmaa edge detection)
   std::vector<uint16_t> lumaQ;   ///< integer luma 0-255 (fxaa, fixed-point path)
+  std::vector<uint8_t> edge;     ///< FXAA: 1 = pending commit into fb (grow-only)
   std::vector<uint8_t> edgeR;    ///< cmaa: edge between (x,y) and (x+1,y)
   std::vector<uint8_t> edgeB;    ///< cmaa: edge between (x,y) and (x,y+1)
   std::vector<float> acc;        ///< cmaa: 4 floats per pixel (rgb, weight)
   std::vector<float> bloomA, bloomB;  ///< bloom: quarter-res RGB bright pass + blur ping-pong
 };
 
-/// Copy fb into scratch and compute integer luma. Grows scratch as needed, never shrinks
-/// (zero heap traffic once the buffer has reached this resolution).
+/// Grow FXAA scratch (never shrinks) and compute integer luma. Does not copy the
+/// colour buffer: applyFxaaRows gathers from fb and parks blends in scratch until
+/// commitFxaaRows (so concurrent bands never read a half-updated frame).
 void prepareFxaa(const SoftwareFramebuffer& fb, SoftwareAaScratch& scratch);
 
-/// FXAA-class post filter on rows [y0, y1). Gathers from scratch (call prepareFxaa first).
+/// Integer luma for rows [y0, y1). Used to thread prepareFxaa over the band pool.
+void prepareFxaaRows(const SoftwareFramebuffer& fb, SoftwareAaScratch& scratch, int y0, int y1);
+
+/// FXAA-class post filter on rows [y0, y1). Call prepareFxaa first. Gathers from fb,
+/// writes pending pixels into scratch (fb is untouched until commitFxaaRows).
 /// Geometry-edge gate (JD 2026-11-17): a pixel is filtered only if its 3x3 neighbourhood
 /// has a depth step and/or a primitive-id step. Texture interiors stay bit-identical.
+/// Sky (depth 0xFFFF) vs any written depth is always an edge; other depth jumps use a
+/// relative leftover-far-code test, because a fixed 0.0025 threshold misses far silhouettes.
 /// Math is fixed-point. depth and/or prim may be null; if both are null the pass is a no-op
 /// (no luma-only filtering).
 void applyFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& scratch,
                    const uint16_t* depth, const uint16_t* prim, int y0, int y1);
 
-/// Full-frame convenience: prepareFxaa + applyFxaaRows over the whole image (1 thread).
+/// Scatter pending FXAA blends into fb for rows [y0, y1). Call after every band has
+/// finished applyFxaaRows (disjoint row writes, no locks).
+void commitFxaaRows(SoftwareFramebuffer& fb, SoftwareAaScratch& scratch, int y0, int y1);
+
+/// Full-frame convenience: prepareFxaa + applyFxaaRows + commitFxaaRows (1 thread).
 void applyFxaaPost(SoftwareFramebuffer& fb, SoftwareAaScratch& scratch,
                    const uint16_t* depth = nullptr, const uint16_t* prim = nullptr);
 
