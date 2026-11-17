@@ -1746,7 +1746,10 @@ int main(int argc, char** argv) {
     // Cortana 2026-10-15 1610 (ENGINE): -1 = auto: measure render time over
     // frames 61..180 uncapped, then cap at 60 if avg render <= 14 ms, else 30.
     // --bench always runs uncapped.
-    const int initialCap = benchSeconds > 0 ? 0 : settings.fpsCap;
+    // R4 (2026-11-17): LL_BENCH_FPS_CAP=N paces a --bench run at N FPS, so the stream budget can be
+    // measured the way it runs in play (30 FPS cap). Unset = uncapped, as before.
+    const int benchCap = [] { const char* e = std::getenv("LL_BENCH_FPS_CAP"); return e ? std::clamp(std::atoi(e), 0, 1000) : 0; }();
+    const int initialCap = benchSeconds > 0 ? benchCap : settings.fpsCap;
     pacer.setCapFps(initialCap > 0 ? initialCap : 0);
     F.appliedFpsCap = initialCap; auto& appliedFpsCap = F.appliedFpsCap;
     // Debug Overlay (Cortana 2026-10-15 1610, ENGINE): the full strip only in
