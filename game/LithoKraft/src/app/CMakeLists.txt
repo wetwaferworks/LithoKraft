@@ -59,6 +59,11 @@ else()
   target_link_options(lithokraft PRIVATE "-Wl,--no-entry" "-Wl,--export=__main_argc_argv"
     "-Wl,--export=lithosys_thread_start" "-Wl,--export-if-defined=__wasm_call_ctors"
     "-Wl,--export-if-defined=__wasm_init_tls"
+    # lkboot thread start (wasm/lkboot/lkthread.mjs): per-thread stack and TLS
+    "-Wl,--export=__stack_pointer"
+    "-Wl,--export-if-defined=__tls_size"
+    "-Wl,--export-if-defined=__tls_align"
+    "-Wl,--export=free"
     "-Wl,--allow-undefined-file=${_lk_web_allowed}")
   # S1 (2026-11-16): an 8 MiB main stack, placed first so an overflow traps at address 0
   # instead of running into static data (wasm-ld's default stack is 64 KiB).

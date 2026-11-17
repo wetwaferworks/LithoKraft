@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><title>lkboot browser check</title>
+<!-- Serve wasm/lkboot with COOP: same-origin and COEP: require-corp, and put next to this
+     file vfs.wasm (tests/lithovfs_check.cpp linked for lkboot) and thread.wasm (thread_check.c).
+     The page prints one line per module and END; each mainDone must be 0. -->
+<pre id="out">running</pre>
+<script type="module">
+// Headless Chromium check: OPFS store worker + engine main in a worker.
+import { makeChannel } from '../lkstore.mjs';
+import { detectMode } from '../lkboot.mjs';
+const out = []; const done = () => { console.log('LKB ' + out.join(' | ') + ' END'); document.getElementById('out').textContent = out.join('\n') + '\nEND'; };
+const timeout = ms => new Promise(r => setTimeout(() => r({ timeout: true }), ms));
+out.push('crossOriginIsolated=' + self.crossOriginIsolated + ' mode=' + detectMode());
+async function run(url, label) {
+  const memory = new WebAssembly.Memory({ initial: 4096, maximum: 9600, shared: true });
+  const channel = makeChannel();
+  const store = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' });
+  store.postMessage({ lkKind: 'store', backend: 'opfs', memory, channel });
+  const main = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' });
+  main.postMessage({ lkKind: 'main', url, memory, channel, cpuCount: 4, pool: 6, volume: new Map([['pack/readme.txt', new TextEncoder().encode('from the pack')]]) });
+  const r = await Promise.race([new Promise(res => { main.onmessage = e => { if ('mainDone' in e.data || 'mainError' in e.data) res(e.data); }; main.onerror = e => res({ mainError: 'worker error ' + e.message }); }), timeout(15000)]);
+  out.push(label + ': ' + JSON.stringify(r).slice(0, 400)); console.log('LKB step ' + out[out.length-1]);
+  store.terminate(); main.terminate();
+}
+(async () => {
+  try {
+    const root = await navigator.storage.getDirectory();
+    for await (const [n] of root.entries()) await root.removeEntry(n, { recursive: true });
+    const m1 = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' }); m1.terminate();
+    // 1. LithoVFS checks (47) over real OPFS
+    await run(new URL('./vfs.wasm', import.meta.url).href, 'lithovfs over OPFS').catch(e => out.push('ERR ' + e));
+    // 2. threads from a worker main: nested workers, join through the tid cell
+    await run(new URL('./thread.wasm', import.meta.url).href, 'threads').catch(e => out.push('ERR ' + e));
+  } catch (e) { out.push('ERR ' + e); }
+  done();
+})();
+</script>
