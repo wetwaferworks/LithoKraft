@@ -64,6 +64,8 @@ else()
     "-Wl,--export-if-defined=__tls_size"
     "-Wl,--export-if-defined=__tls_align"
     "-Wl,--export=free"
+    # lkboot frame loop (wasm/lkboot/lkhost.mjs): lk_frame_loop_set passes a function pointer
+    "-Wl,--export-table"
     "-Wl,--allow-undefined-file=${_lk_web_allowed}")
   # S1 (2026-11-16): an 8 MiB main stack, placed first so an overflow traps at address 0
   # instead of running into static data (wasm-ld's default stack is 64 KiB).
@@ -88,6 +90,9 @@ if(LITHOKRAFT_DEV_BUILD)
   target_compile_definitions(lithokraft PRIVATE LITHOKRAFT_DEV_SCRIPTS_DIR="${LithoKraft_SOURCE_DIR}/scripts")
 endif()
 litholattice_module_options(lithokraft)
+if(LK_WEB)  # the unshared-memory twin for lkboot's single-thread fallback
+  add_subdirectory(web_single)
+endif()
 # 2026-10-24 (JD): playtest builds spawn in the test area on a no-flag launch (own save dir).
 option(LK_PLAYTEST_SPAWN "No-flag launch opens the --test-world area (saves/playtest)" OFF)
 if(LK_PLAYTEST_SPAWN)
