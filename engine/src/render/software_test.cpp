@@ -864,6 +864,34 @@ int testSoftwareRenderer() {
     for (uint32_t px : ref) if (px != ref[0]) ++lit;
     std::printf("Multithreaded chunk pass: 1/2/4/8 threads %s (%zu non-sky px)\n", same ? "bit-identical" : "DIFFER", lit);
     if (!same || lit < 1000) return 1;
+    // JD 2026-11-17: phase-local render bands. The renderer borrows the idle reserved cores
+    // for the render phase only. Every borrowed count must give the same pixels (off and
+    // FXAA), the phase ticket must be closed (even) between frames and advance by exactly
+    // one open/close pair per frame, so the cores are handed back at the boundary.
+    {
+      bool bsame = true, tickOk = true;
+      std::vector<uint32_t> refOff, refFx;
+      for (int borrow : {0, 0, 1, 2, 3, 5}) {
+        cSoftwareRenderer::setBorrowedBandsOverride(borrow);
+        mt.setAaMode("off");
+        const uint64_t t0 = cSoftwareRenderer::renderPhaseTicket();
+        mt.renderFrame(fp);
+        const uint64_t t1 = cSoftwareRenderer::renderPhaseTicket();
+        if ((t0 & 1) || (t1 & 1) || t1 != t0 + 2) { tickOk = false; std::printf("FAIL: render phase ticket %llu -> %llu at borrow %d\n", (unsigned long long)t0, (unsigned long long)t1, borrow); }
+        if (cSoftwareRenderer::borrowedRenderThreads() != unsigned(borrow)) { tickOk = false; std::printf("FAIL: borrowed bands %u, wanted %d\n", cSoftwareRenderer::borrowedRenderThreads(), borrow); }
+        if (borrow == 0 && refOff.empty()) refOff = mt.framebuffer().pixels;
+        else if (mt.framebuffer().pixels != refOff) { bsame = false; std::printf("FAIL: chunk pass differs with %d borrowed band(s)\n", borrow); }
+        mt.setAaMode("fxaa");
+        mt.renderFrame(fp);
+        if (borrow == 0 && refFx.empty()) refFx = mt.framebuffer().pixels;
+        else if (mt.framebuffer().pixels != refFx) { bsame = false; std::printf("FAIL: FXAA frame differs with %d borrowed band(s)\n", borrow); }
+      }
+      mt.setAaMode("off");
+      cSoftwareRenderer::setBorrowedBandsOverride(-1);
+      std::printf("Phase-local render bands: 0/1/2/3/5 borrowed %s (off and FXAA), phase ticket %s\n",
+                  bsame ? "bit-identical" : "DIFFER", tickOk ? "closed between frames" : "WRONG");
+      if (!bsame || !tickOk || refOff == refFx) return 1;
+    }
   }
 
   {  // Cortana 2026-10-15 1335: traces fast path == reference, bit for bit.

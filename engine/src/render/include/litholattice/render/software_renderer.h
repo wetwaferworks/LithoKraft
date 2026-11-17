@@ -275,6 +275,13 @@ class cSoftwareRenderer : public IRenderer {
   static void setRenderScale(float s);
   /// Effective thread count after rounding/clamping.
   static unsigned renderThreads();
+  /// JD 2026-11-17: idle reserved cores the renderer borrows during the render phase only
+  /// (0 when off: explicit --render-threads, LK_RENDER_THREADS=1, LL_SW_BORROW=0, < 3 cores).
+  static unsigned borrowedRenderThreads();
+  /// Selftests only: force n borrowed bands (-1 = the normal rule). Applies at the next run().
+  static void setBorrowedBandsOverride(int n);
+  /// Render-phase ticket: odd while a frame is rendering, even once the cores are handed back.
+  static uint64_t renderPhaseTicket();
   /// Cortana 2026-10-26 (item 5): while held, LL_SW_SHOT does not count frames (the game holds
   /// it until its mesh queue has drained, so pinned shots see the same geometry every run).
   static void setShotHold(bool hold);

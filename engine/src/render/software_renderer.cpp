@@ -325,13 +325,58 @@ unsigned swResolveThreads(unsigned req) {
   // Archie ruling 5 (t3340u): rounding, the auto rule and the WASM cap live in the census.
   return cThreadCensus::instance().renderBands(req);
 }
+// JD 2026-11-17 (phase-local render bands): the permanent three reserve a core each for
+// main, the timing-handshake/control thread and the tick/sim thread. Main is already the
+// render caller; the other two sit idle through most of the render phase (a play tick is a
+// small slice of the frame), so the renderer borrows them for that phase only. Off for an
+// explicit --render-threads, for LK_RENDER_THREADS=1 (JD's four-thread-total opt-in), on
+// WASM, below 3 cores, and with LL_SW_BORROW=0. Never past kMaxRenderBands.
+std::atomic<int> g_swBorrowOverride{-1};  // selftests: force N borrowed bands (-1 = the rule above)
+unsigned swBorrowBands(unsigned bands) {
+  const unsigned room = kSwMaxRenderThreads > bands ? kSwMaxRenderThreads - bands : 0u;
+  if (const int o = g_swBorrowOverride.load(std::memory_order_relaxed); o >= 0) return std::min(unsigned(o), room);
+  if constexpr (kCensusWasm) return 0;
+  if (g_swRequestedThreads.load(std::memory_order_relaxed) != 0) return 0;
+  static const bool envOff = [] {
+    const char* b = std::getenv("LL_SW_BORROW");
+    const char* r = std::getenv("LK_RENDER_THREADS");
+    return (b && b[0] == '0') || (r && r[0] == '1' && r[1] == '\0');
+  }();
+  if (envOff) return 0;
+  const unsigned hw = censusCores();
+  if (hw < 3) return 0;
+  const unsigned lendable = 2u;  // timing-handshake/control + tick/sim
+  return std::min(lendable, room);
+}
 class cSwBandPool {
  public:
   static cSwBandPool& get() { static cSwBandPool p; return p; }
-  unsigned bands() const { return bands_; }
+  // JD 2026-11-17 (phase-local render bands): bands() is the count for the current phase:
+  // the census bands, plus the borrowed reserved cores while a render phase is open.
+  unsigned bands() const { return curBands_.load(std::memory_order_relaxed); }
+  unsigned baseBands() const { return bands_; }
+  unsigned borrowedBands() const { return borrow_; }
+  uint64_t phaseTicket() const { return phase_.load(std::memory_order_relaxed); }
+  // Open / close the render phase. Caller-owned (the render caller: main or the detached
+  // executor), never from a band callback. While open, the borrow workers spawned at start()
+  // take band indices bands_ .. bands_+borrow_-1 in every run(); at close they go back to
+  // idle and stop taking work, so the lent cores are handed back at the phase boundary.
+  // Atomics and a ticket only: no lock, no thread creation, no allocation.
+  void beginRenderPhase() {
+    if (tlInRun_ || phaseDepth_++) return;
+    phaseOpen_ = true;
+    curBands_.store(folded_ ? bands_ : bands_ + borrow_, std::memory_order_relaxed);
+    phase_.fetch_add(1, std::memory_order_acq_rel);  // odd: open
+  }
+  void endRenderPhase() {
+    if (tlInRun_ || !phaseDepth_ || --phaseDepth_) return;
+    phaseOpen_ = false;
+    curBands_.store(bands_, std::memory_order_relaxed);
+    phase_.fetch_add(1, std::memory_order_acq_rel);  // even: closed, cores handed back
+  }
   void run(const std::function<void(unsigned)>& fn) {
     // Nested run() from a band callback: inline (same result, no re-entry).
-    if (tlInRun_) { for (unsigned b = 0; b < std::max(1u, bands_); ++b) fn(b); return; }
+    if (tlInRun_) { for (unsigned b = 0; b < std::max(1u, bands()); ++b) fn(b); return; }
     struct InRun { InRun() { tlInRun_ = true; } ~InRun() { tlInRun_ = false; } } inRun;
     // Frame slot first (serialises sync vs detached), then runGate_ (serialises start/stop).
     if (!tlDetachedBody_) acquireFrameSlot();
@@ -339,15 +384,19 @@ class cSwBandPool {
     runGate_.lock();
     struct RunUnlock { cAtomicGate& g; ~RunUnlock() { g.unlock(); } } runUnlock{runGate_};
     const unsigned want = swResolveThreads(g_swRequestedThreads.load(std::memory_order_relaxed));
-    if (want != bands_ && !tlDetachedBody_) { stopAll(); start(want); }
-    if (bands_ <= 1) { fn(0); return; }
-    if (folded_) { runFolded(fn); return; }
+    if ((want != bands_ || swBorrowBands(want) != borrow_) && !tlDetachedBody_) { stopAll(); start(want); }
+    if (folded_) { if (bands_ <= 1) { fn(0); return; } runFolded(fn); return; }
+    const unsigned active = curBands_.load(std::memory_order_relaxed);
+    if (active <= 1) { fn(0); return; }
     // Publish band work: fn_ before gen_ (release), workers acquire gen then load fn_.
+    // The word carries the run's generation and its active band count together, so a
+    // worker can never pair one run's generation with another run's count. Workers with
+    // index >= active (borrow workers outside a render phase) skip the run untouched.
     workerErr_ = nullptr;
     hasWorkerErr_.store(false, std::memory_order_relaxed);
-    remaining_.store(bands_ - 1, std::memory_order_relaxed);
+    remaining_.store(active - 1, std::memory_order_relaxed);
     fn_ = &fn;
-    gen_.fetch_add(1, std::memory_order_release);  // band workers re-read it (t46u 5b)
+    gen_.store(packGen(genSeq(gen_.load(std::memory_order_relaxed)) + 1, active), std::memory_order_release);  // band workers re-read it (t46u 5b)
     std::exception_ptr mine;
     try { fn(0); } catch (...) { mine = std::current_exception(); }
     for (unsigned v; (v = remaining_.load(std::memory_order_acquire)) != 0;)
@@ -372,7 +421,7 @@ class cSwBandPool {
     acquireFrameSlot();
     runGate_.lock();
     const unsigned want = swResolveThreads(g_swRequestedThreads.load(std::memory_order_relaxed));
-    if (want != bands_) { stopAll(); start(want); }
+    if (want != bands_ || swBorrowBands(want) != borrow_) { stopAll(); start(want); }
     if (!detachedMode_) {
       runGate_.unlock();
       std::exception_ptr err;
@@ -455,7 +504,7 @@ class cSwBandPool {
   }
   void stopAll() {
     stop_.store(true, std::memory_order_release);
-    gen_.fetch_add(1, std::memory_order_release);
+    gen_.store(packGen(genSeq(gen_.load(std::memory_order_relaxed)) + 1, 0), std::memory_order_release);
     detachedPending_.store(true, std::memory_order_release);  // wake executor so it can see stop_
     for (auto& t : threads_) if (t.joinable()) t.join();
     threads_.clear();
@@ -467,6 +516,7 @@ class cSwBandPool {
   }
   void start(unsigned n) {
     bands_ = n;
+    borrow_ = 0;
     {
       const unsigned hw = censusCores();  // t46u: the allocator's cores, not hardware_concurrency()
       const unsigned spawned = detachedMode_ ? n : (n ? n - 1 : 0);
@@ -480,6 +530,7 @@ class cSwBandPool {
     }
     folded_ = n > 1 && foldWanted();
     if (folded_) {
+      curBands_.store(bands_, std::memory_order_relaxed);
       logInfo("software renderer: %u render bands folded into the shared job pool (Gate 1; 0 band threads spawned)", n);
       return;
     }
@@ -487,6 +538,18 @@ class cSwBandPool {
       threads_.emplace_back([this, i, g] { char nm[16]; std::snprintf(nm, sizeof nm, "lk-sw-band-%u", i); ::litholattice::setCurrentThreadName(nm); loop(i, g); });
       records_.add(ThreadClass::Dedicated, ThreadRole::RenderBand, uint16_t(i), "sw-band");
     }
+    // JD 2026-11-17: persistent borrow workers for the idle reserved cores. Spawned here
+    // once (never per frame); they only take band work while a render phase is open.
+    borrow_ = swBorrowBands(bands_);
+    for (unsigned i = bands_; i < bands_ + borrow_; ++i) {
+      threads_.emplace_back([this, i, g] { char nm[16]; std::snprintf(nm, sizeof nm, "lk-sw-borrow-%u", i); ::litholattice::setCurrentThreadName(nm); loop(i, g); });
+      records_.add(ThreadClass::Dedicated, ThreadRole::RenderBand, uint16_t(i), "sw-borrow");
+    }
+    if (borrow_) {
+      std::fprintf(stderr, "software renderer: +%u borrowed band(s) during the render phase (%u in render phase, %u otherwise)\n", borrow_, bands_ + borrow_, bands_);
+      logInfo("software renderer: +%u borrowed band(s) during the render phase (%u in render phase, %u otherwise)", borrow_, bands_ + borrow_, bands_);
+    }
+    curBands_.store(phaseOpen_ ? bands_ + borrow_ : bands_, std::memory_order_relaxed);
   }
   // t46u item 2: one pass over the installed pump. True when it rendered something.
   bool pumpPass() {
@@ -546,6 +609,7 @@ class cSwBandPool {
       }
       if (stop_.load(std::memory_order_acquire)) return;
       seen = g;
+      if (band >= genActive(g)) continue;  // not in this run (borrow worker outside a render phase)
       const std::function<void(unsigned)>* fn = fn_;
       if (!fn) continue;
       tlInRun_ = true;
@@ -556,7 +620,16 @@ class cSwBandPool {
       remaining_.fetch_sub(1, std::memory_order_acq_rel);  // the caller re-reads it (t46u 5b)
     }
   }
+  // gen_ word: [sequence:56 | active bands:8] (kMaxRenderBands = 64 fits).
+  static constexpr uint64_t packGen(uint64_t seq, unsigned active) { return (seq << 8) | uint64_t(active & 0xFFu); }
+  static constexpr uint64_t genSeq(uint64_t w) { return w >> 8; }
+  static constexpr unsigned genActive(uint64_t w) { return unsigned(w & 0xFFu); }
   unsigned bands_ = 1;
+  unsigned borrow_ = 0;              // persistent borrow workers (JD 2026-11-17)
+  std::atomic<unsigned> curBands_{1};  // bands for the current phase (bands_ or bands_ + borrow_)
+  std::atomic<uint64_t> phase_{0};     // render-phase ticket: odd = open, even = closed
+  unsigned phaseDepth_ = 0;          // caller-owned nesting count
+  bool phaseOpen_ = false;           // caller-owned
   bool folded_ = false;
   std::vector<std::thread> threads_;
   cThreadRecordSet records_;
@@ -587,6 +660,9 @@ void cSoftwareRenderer::setShotHold(bool hold) { g_swShotHold.store(hold, std::m
 static std::atomic<bool> g_swShotTaken{false};
 bool cSoftwareRenderer::shotTaken() { return g_swShotTaken.load(std::memory_order_acquire); }
 unsigned cSoftwareRenderer::renderThreads() { return swResolveThreads(g_swRequestedThreads.load()); }
+unsigned cSoftwareRenderer::borrowedRenderThreads() { return cSwBandPool::get().borrowedBands(); }
+void cSoftwareRenderer::setBorrowedBandsOverride(int n) { g_swBorrowOverride.store(n < 0 ? -1 : n, std::memory_order_relaxed); }
+uint64_t cSoftwareRenderer::renderPhaseTicket() { return cSwBandPool::get().phaseTicket(); }
 
 // Design B Stage 2: forward declaration (defined with the store, below) +
 // the (store key, ring kind) map key for drain coalescing.
@@ -3000,6 +3076,11 @@ SwProf g_swProf;
 }  // namespace
 
 void cSoftwareRenderer::renderFrame(const FrameParams& p) {
+  // JD 2026-11-17: the render phase borrows the idle reserved cores and hands them back
+  // when the frame ends (RAII, so an exception still closes the phase).
+  cSwBandPool& phasePool = cSwBandPool::get();
+  phasePool.beginRenderPhase();
+  struct PhaseEnd { cSwBandPool& p; ~PhaseEnd() { p.endRenderPhase(); } } phaseEnd{phasePool};
   // Ginny (Argon) 2026-10-16 Pass 2 A/B proof (Cortana): LL_SW_AB=<n> renders frame n with
   // the LL_SW_AB_A mask (default 0 = pre-Pass-2), then again with the active mask, and logs
   // how many pixels differ. Off (zero cost beyond one branch) unless the env var is set.
@@ -3426,6 +3507,16 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
      unsigned i; std::chrono::steady_clock::time_point t0;
      ~BandTimer() { if (g_swProfOn && i < 64) g_bandMs[i] = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); }
    } bandTimer{bandIdx, tBand0};
+   // JD 2026-11-17: the chunk pass stamps aaId_ with tlFace/tlObject but never sets them, so
+   // a strip drawn by a thread that had just run the flat/sprite path stamped that thread's
+   // leftover face and object, and FXAA's prim gate then depended on which thread drew the
+   // strip. Every strip now starts from the same values a fresh band thread has (face 7 =
+   // unknown, object 0); the caller's values come back afterwards for its own flat path.
+   struct TlStamp {
+     uint8_t f = tlFace, o = tlObject; uint16_t l = tlLayer;
+     TlStamp() { tlFace = 7; tlObject = 0; tlLayer = 0; }
+     ~TlStamp() { tlFace = f; tlObject = o; tlLayer = l; }
+   } tlStamp;
    // Cortana 2026-10-26 (Archie item 6, Candidate D, LL_SW_TILE64=K opt-in): the work list is
    // 64x64 tiles (4 bin strips x 64 px) over a framebuffer height padded up to a multiple of
    // 64; each atomic grab takes K (2-4) consecutive tiles. Each tile draws its 4 strips in turn

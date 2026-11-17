@@ -2587,10 +2587,10 @@ static void lkShutdownTail(FrameCtx& F) {
       const double genAvg = bs ? MsSamples::avg(bs->genMs.run) : 0, genP99 = bs ? MsSamples::pct(bs->genMs.run, 0.99) : 0;
       const double meshAvg = bs ? MsSamples::avg(bs->meshMs.run) : 0, meshP99 = bs ? MsSamples::pct(bs->meshMs.run, 0.99) : 0;
       const double genRate = bs ? double(bs->totalGenerated) / benchSeconds : 0, meshRate = bs ? double(bs->totalMeshed) / benchSeconds : 0;
-      logInfo("bench renderer=%s present=%s path=%s seconds=%.0f frames=%zu rthreads=%u avg=%.3fms p50=%.3fms p99=%.3fms chunks=%zu max=%.3fms sample_start=%.2fs(%s) "
+      logInfo("bench renderer=%s present=%s path=%s seconds=%.0f frames=%zu rthreads=%u+%u avg=%.3fms p50=%.3fms p99=%.3fms chunks=%zu max=%.3fms sample_start=%.2fs(%s) "
               "input=%.3f update=%.3f upload=%.3f render=%.3f present=%.3f ms upload=%.0f B/frame tick=%.3f/%.3fms gen=%.1f cols/s (%.2f/%.2fms) "
               "mesh=%.1f subs/s (%.3f/%.3fms) ram=%.1f->%.1f MB (peak %.1f)",
-              renderer->name(), present.c_str(), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, game.loadedColumnCount(), mx,
+              renderer->name(), present.c_str(), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, cSoftwareRenderer::borrowedRenderThreads() /* JD 2026-11-17: + borrowed in the render phase */, avg, p50, p99, game.loadedColumnCount(), mx,
               F.benchGate.openedAfterS(), F.benchGate.reasonName(), avgOf(br.input),
               avgOf(br.update), avgOf(br.upload), avgOf(br.render), avgOf(br.present), avgOf(br.uploadBytes), avgOf(br.tick), percentile(br.tick, 0.99), genRate,
               genAvg, genP99, meshRate, meshAvg, meshP99, double(br.memStart) / 1048576.0, double(br.memEnd) / 1048576.0,
@@ -2604,7 +2604,7 @@ static void lkShutdownTail(FrameCtx& F) {
       if (!benchJson.empty()) {
         if (std::FILE* f = openForWrite(benchJson.c_str())) {
           std::fprintf(f,
-                       "{\n  \"renderer\": \"%s\", \"present\": \"%s\", \"display\": \"%s\", \"path\": \"%s\", \"seconds\": %.0f, \"frames\": %zu, \"render_threads\": %u,\n"
+                       "{\n  \"renderer\": \"%s\", \"present\": \"%s\", \"display\": \"%s\", \"path\": \"%s\", \"seconds\": %.0f, \"frames\": %zu, \"render_threads\": %u, \"render_threads_borrowed\": %u,\n"
                        "  \"frame_ms\": {\"avg\": %.4f, \"p50\": %.4f, \"p99\": %.4f, \"max\": %.4f}, \"chunks_loaded\": %zu, \"chunks_in_radius\": %zu,\n"
                        "  \"sample_start\": {\"s\": %.3f, \"reason\": \"%s\"},\n"
                        "  \"main_thread_ms\": {\"input\": %.4f, \"update\": %.4f, \"upload\": %.4f, \"render\": %.4f, \"present\": %.4f},\n"
@@ -2612,7 +2612,7 @@ static void lkShutdownTail(FrameCtx& F) {
                        "  \"stream\": {\"columns_per_s\": %.2f, \"gen_ms_avg\": %.4f, \"gen_ms_p99\": %.4f, \"subchunks_per_s\": %.2f, "
                        "\"mesh_ms_avg\": %.4f, \"mesh_ms_p99\": %.4f},\n"
                        "  \"ram_mb\": {\"start\": %.1f, \"end\": %.1f, \"peak\": %.1f},\n  \"soak_drift\": {\"frame_ms\": %.4f, \"ram_mb\": %.1f, \"minutes\": %zu},\n  \"thread_readout\": \"%s\",\n  \"memory_ledger\": %s\n}\n",
-                       renderer->name(), present.c_str(), displayModeName(window->display().mode), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, avg, p50, p99, mx,
+                       renderer->name(), present.c_str(), displayModeName(window->display().mode), benchPath.c_str(), benchSeconds, benchMs.size(), cSoftwareRenderer::renderThreads() /* Cortana 2026-10-15 1450 */, cSoftwareRenderer::borrowedRenderThreads(), avg, p50, p99, mx,
                        game.loadedColumnCount(), game.streamFootprintColumns(), F.benchGate.openedAfterS(), F.benchGate.reasonName(), avgOf(br.input),
                        avgOf(br.update), avgOf(br.upload), avgOf(br.render), avgOf(br.present), avgOf(br.uploadBytes), avgOf(br.tick), percentile(br.tick, 0.99),
                        genRate, genAvg, genP99, meshRate, meshAvg, meshP99, double(br.memStart) / 1048576.0, double(br.memEnd) / 1048576.0,
