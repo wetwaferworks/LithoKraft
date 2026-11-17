@@ -2642,14 +2642,22 @@ void Game::pumpStreaming(float frameDtMs) {
     // R2: the EMA lives on the Game (reset per world load), and the deterministic mode uses
     // a fixed grant so a golden run does not depend on how fast the host renders.
     constexpr int kDetRequestGrant = 4;
-    streamEmaMs_ += (frameDtMs - streamEmaMs_) * 0.1f;
+    // R4 (B5, 2026-11-17): the table above was priced for 60 Hz and read the wall-clock frame,
+    // pacer sleep included, so at the 30 FPS cap it always granted 2. Now the EMA is of the busy
+    // part of the frame, priced against the frame target (cFrameBudget: over by 20 % -> 1, over ->
+    // 2, else 2 + one per 10 % free, up to 10; never below 1). Wall-clock only in play mode.
+    const double busy = cFrameBudget::busyMs(double(frameDtMs), pacerSleptMs_);
+    streamEmaMs_ += (float(busy) - streamEmaMs_) * 0.1f;
     const float ema = streamEmaMs_;
-    const int grant = cfg_.deterministicBudget ? kDetRequestGrant
-                      : ema > 40.0f ? 1 : ema >= 30.0f ? 2 : ema >= 25.0f ? 4 : 6;
+    const int grant = cfg_.deterministicBudget ? kDetRequestGrant : cFrameBudget::requestGrant(double(ema), frameTargetMs_);
     if (grant != streamLastGrant_) {
+      const bool first = streamLastGrant_ < 0;
       streamLastGrant_ = grant;
       if (cfg_.deterministicBudget) logInfo("stream: deterministic budget: %d new columns/frame", grant);
-      else logInfo("stream: frame-aware budget: frame ema %.1f ms -> %d new columns/frame", double(ema), grant);
+      else if (first || grant == 1 || streamPumps_ - streamGrantLogPump_ >= 120) {
+        streamGrantLogPump_ = streamPumps_;
+        logInfo("stream: frame-aware budget: busy ema %.1f ms of a %.1f ms frame -> %d new columns/frame", double(ema), frameTargetMs_, grant);
+      }
     }
     streamer_->setRequestBudget(grant);
   }
@@ -2868,10 +2876,12 @@ void Game::pumpStreaming(float frameDtMs) {
   {  // P5 lazy border ring: re-mesh at most kBorderColsPerPump neighbor columns whose
      // BorderGen moved (coalesced: a column queued by several new neighbors re-meshes once).
     constexpr size_t kBorderColsPerPump = 2;
-    // P6 slack harvesting: spare frame time (vs a 60 Hz budget) buys extra border
-    // columns, priced by the measured cost of a column re-mesh submit.
+    // P6 slack harvesting: spare frame time buys extra border columns, priced by the measured
+    // cost of a column re-mesh submit. R4 (B6): the spare time is the frame target minus the busy
+    // part of the frame (it was 16.7 ms minus the whole frame, so at 30 FPS there was never any).
     // R2: no slack in the deterministic mode (it is priced in wall-clock ms).
-    const int extra = (borderRing_.empty() || cfg_.deterministicBudget) ? 0 : slack_.grant(1000.0 / 60.0, double(frameDtMs));
+    const int extra = (borderRing_.empty() || cfg_.deterministicBudget)
+                          ? 0 : slack_.grant(frameTargetMs_, cFrameBudget::busyMs(double(frameDtMs), pacerSleptMs_));
     p6SlackSlices_ += uint64_t(extra);
     std::vector<uint64_t> border;
     borderRing_.popUpTo(kBorderColsPerPump + size_t(extra), border);
@@ -5559,7 +5569,7 @@ void Game::uploadMeshes() {
   // 2026-10-25 stutter pass: at most 32 sub-chunks or ~1.5 ms of commits per frame, nearest first
   // (was 64, oldest first): a far burst no longer stalls the frame ahead of the ground underfoot.
   constexpr int kUploadBudget = 32;                 // sub-chunks per frame
-  constexpr double kUploadMsBudget = 1.5;           // main-thread commit time per frame
+  const double kUploadMsBudget = cFrameBudget::uploadMsBudget(frameTargetMs_);  // R4: 9 % of the frame target (was 1.5 ms, a 60 Hz price)
   constexpr size_t kUploadBytesBudget = 3u << 20;   // bytes per frame
   constexpr int kUploadFloor = 16;                  // always commit this many (time cap applies past it)
   // P5 render pop N/K: at most N sub-chunks or K bytes per frame (the first always pops).

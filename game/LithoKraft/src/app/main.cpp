@@ -892,6 +892,7 @@ struct FrameCtx {
   bool wasFocused = false;
   litholattice::cFramePacer pacer;
   int appliedFpsCap = 0;
+  double pacerSleptMs = 0;  ///< R4: what the pacer slept at the end of the last frame (the stream budget subtracts it)
   int autoFrames = 0; double autoRenderSum = 0;
   std::vector<double> ovMs;
   size_t ovHead = 0;
@@ -2202,6 +2203,7 @@ static bool lkStepFrame(FrameCtx& F) {
         }
       }
       const auto tUp = Clock::now();
+      game.setFramePacing(pacer.capFps(), F.pacerSleptMs);  // R4 (B5/B6): budgets price against the frame target
       game.update(dt, w, h);
       if (benchSeconds > 0) {
         // --frame-hash: drive camera from present ordinal (deterministic across runs);
@@ -2340,7 +2342,7 @@ static bool lkStepFrame(FrameCtx& F) {
         if (swThreewayOn) sw.releasePresent();  // slot: Presenting -> Shown (re-presentable, recyclable)
       }
       window->swap();
-      pacer.endFrameAndWait();  // render.fps_cap: sleep to the frame deadline (no-op when uncapped)
+      F.pacerSleptMs = std::chrono::duration<double, std::milli>(pacer.endFrameAndWait()).count();  // render.fps_cap: sleep to the frame deadline (no-op when uncapped)
       msPresent = msBetween(tPresent, Clock::now());  // present = blit + swap (swap only on GPU backends)
       msRender = msBetween(tRender, tPresent);
       ++frames;

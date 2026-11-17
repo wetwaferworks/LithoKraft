@@ -63,6 +63,8 @@
 #include "lithokraft/game/wiring_selftest.h"
 #include "lithokraft/game/component_test_selftest.h"  // 2026-11-12 (JD): Component Test world
 #include "lithokraft/game/sprite_host.h"
+#include "litholattice/world/chunk_swarm.h"  // R4: cSlackHarvester
+#include "lithokraft/game/frame_budget.h"  // R4
 #include "lithokraft/game/settings.h"        // A4: render.fps_cap Settings field
 #include "lithokraft/game/settings_cvars.h"  // A4: render.fps_cap cvar row
 #include "litholattice/console/concmd.h"     // A4: cConsoleReg for the cvar flow check
@@ -1419,6 +1421,33 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         bool unique = true;
         for (size_t i = 1; i < a.size(); ++i) if (!(a[i - 1].first < a[i].first)) unique = false;
         check(a == b && unique, "stream rank: a strict total order (no ties), the same from any input order");
+      }
+      {  // R4 (B5/B6, 2026-11-17): stream budgets priced against the frame target, not 60 Hz
+        using lithokraft::cFrameBudget;
+        check(std::abs(cFrameBudget::targetMsFor(30) - 33.333) < 0.01 && std::abs(cFrameBudget::targetMsFor(0) - 33.333) < 0.01 &&
+                  std::abs(cFrameBudget::targetMsFor(60) - 16.667) < 0.01,
+              "frame budget: target 1000/cap; uncapped prices at the 30 FPS play target");
+        check(std::abs(cFrameBudget::busyMs(33.3, 30.0) - 3.3) < 1e-9 && cFrameBudget::busyMs(10.0, 15.0) == 0.0 && cFrameBudget::busyMs(10.0, -1.0) == 10.0,
+              "frame budget: busy = frame minus the pacer's sleep, never negative");
+        const double t30 = cFrameBudget::targetMsFor(30);
+        check(cFrameBudget::requestGrant(3.0, t30) == 10 && cFrameBudget::requestGrant(45.0, t30) == 1 && cFrameBudget::requestGrant(35.0, t30) == 2,
+              "frame budget: a 3 ms frame at 30 FPS gets 10 new columns (was 2), 20 % over gets 1, just over gets 2");
+        bool mono = true, floor1 = true;
+        for (int i = 0, prev = 1 << 20; i <= 600; ++i) {
+          const int g = cFrameBudget::requestGrant(i * 0.1, t30);
+          if (g > prev) mono = false;
+          if (g < 1 || g > cFrameBudget::kMaxGrant) floor1 = false;
+          prev = g;
+        }
+        check(mono && floor1, "frame budget: the grant never rises as the frame gets busier, and stays in [1, 10]");
+        check(cFrameBudget::requestGrant(std::nan(""), t30) == 2 && cFrameBudget::requestGrant(5.0, 0.0) == cFrameBudget::requestGrant(5.0, t30),
+              "frame budget: NaN busy prices as a full frame; a zero target falls back to 30 FPS");
+        check(std::abs(cFrameBudget::uploadMsBudget(cFrameBudget::targetMsFor(60)) - 1.5) < 0.01 &&
+                  std::abs(cFrameBudget::uploadMsBudget(t30) - 3.0) < 0.01,
+              "frame budget: upload commit time is 9 % of the frame (1.5 ms at 60 FPS, 3 ms at 30)");
+        check(litholattice::cSlackHarvester::slicesFor(t30, cFrameBudget::busyMs(33.3, 28.0), 2.0, 0.25, 6) == 6 &&
+                  litholattice::cSlackHarvester::slicesFor(1000.0 / 60.0, 33.3, 2.0, 0.25, 6) == 0,
+              "frame budget: a 30 FPS frame that slept 28 ms has border slack (the old 60 Hz pricing had none)");
       }
     }
     std::filesystem::remove_all(edir);

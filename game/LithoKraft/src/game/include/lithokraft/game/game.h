@@ -15,6 +15,7 @@
 #include "lithokraft/game/engine.h"
 #include "lithokraft/game/prayer.h"  // Cortana 2026-10-15 2255
 #include "lithokraft/game/view_mesh_gate.h"  // Archie Phase 1
+#include "lithokraft/game/frame_budget.h"    // R4
 #include "lithokraft/game/stream_rank.h"     // R3
 #include "lithokraft/game/world_clock.h"  // Cortana 2026-10-16
 #include <array>
@@ -160,6 +161,9 @@ class Game {
   // Frame timing measured by the app loop (fps, avg/max frame ms over the last ~0.5 s); shown on the HUD.
   void setFrameStats(float fps, float avgMs, float maxMs) { fps_ = fps; frameAvgMs_ = avgMs; frameMaxMs_ = maxMs; }
   void setPerfReadout(float p99Ms, float updateMs, float gpuMs) { p99Ms_ = p99Ms; updateMs_ = updateMs; gpuMs_ = gpuMs; }  // F56-4
+  /// R4 (B5/B6): the pacer cap (0 = uncapped, priced at 30 FPS) and what it slept after the last frame.
+  void setFramePacing(int capFps, double lastSleptMs) { frameTargetMs_ = cFrameBudget::targetMsFor(capFps); pacerSleptMs_ = lastSleptMs; }
+  double frameTargetMs() const { return frameTargetMs_; }
   /// --bench: put the camera on a fixed, repeatable path (a slow circle over the spawn, looking
   /// across the world) at time `t` seconds. Same path for every backend and build.
   /// --bench: put the camera on a fixed, repeatable path at time `t` seconds. "orbit": a slow
@@ -832,8 +836,11 @@ class Game {
   litholattice::cSlab<MeshInput> meshSlab_{litholattice::kSlabRadius4Columns};  // radius-4 tier at boot
   litholattice::cSlackHarvester slack_{0.25, 6, 2.0};
   // R2: the frame-aware request grant's state. Members (were function statics), reset per world load.
-  float streamEmaMs_ = 16.7f;
+  float streamEmaMs_ = 16.7f;  ///< R4: EMA of the busy part of the frame (wall time minus the pacer's sleep)
   int streamLastGrant_ = -1;
+  uint64_t streamGrantLogPump_ = 0;  ///< R4: the grant log is rate-limited (10 levels now)
+  double frameTargetMs_ = cFrameBudget::kDefaultTargetMs;  ///< R4: 1000 / cap, or 1000 / 30 uncapped
+  double pacerSleptMs_ = 0;
   uint64_t admitStepFrame_ = 0;  ///< R2 deterministic mode: pump count at the last admission-radius step
   bool swarmPrewarmed_ = false;
   uint64_t p6ColumnJobs_ = 0, p6SlackSlices_ = 0;
