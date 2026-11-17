@@ -703,7 +703,8 @@ class Game {
         [this](int x, int y, int z) { return sim_ && blockRegistry().has(sim_->getBlock(x, y, z), kSolid); },
         [this](int x, int y, int z) {
           return sim_ ? blockRegistry().def(sim_->getBlock(x, y, z)).friction : 0.8f;
-        });
+        },
+        {}, [this](int x, int y, int z) { return sim_ && blockIsLiquid(sim_->getBlock(x, y, z)); });  // P-2: items float
   }};  ///< item drops etc. (game thread)
 
   /// P5 Render Ingress byte weight: vertex payload + a fixed per-mesh overhead.
@@ -916,6 +917,37 @@ class Game {
   /// reaped when their entity dies (updateEntities sweep).
   std::unordered_map<uint64_t, uint32_t> entityPickupDelay_;
   std::unordered_map<uint64_t, ItemStack> entityPayloads_;
+  // Dropped items P-1..P-6 (2026-11-17). Game thread only.
+  /// One world tick of item rules, in entity-id order: magnet, physics (every entity), pickup
+  /// delays, merge, pickup.
+  void stepItemsTick(uint64_t worldTick, double dt, int tps);
+  void pickupItems(uint64_t worldTick, int tps);  ///< P-4 (also runs once per frame while paused)
+  void ensureItemModels();
+  uint32_t itemDelayTicks(bool fromPlayer) const;
+  int itemTps() const;
+  std::filesystem::path droppedItemsPath(const std::string& dimension) const;
+  bool saveDroppedItems(std::string* err);  ///< P-6: <save>/items.<dimension>.lat, items in id order
+  void loadDroppedItems();
+  void spawnItemShowcase();  ///< LL_ITEM_SHOWCASE=1: every modelled item in rows in front of the player
+  itemdrop::cModelIndex itemModels_;
+  bool itemModelsBuilt_ = false;
+  bool itemShowcasePending_ = false;
+  int itemShowcaseWait_ = 0;  ///< frames after load before the showcase spawns (the bench pose settles first)
+  /// P-4 pickup flight: a collected item keeps drawing for kPickupFlightSeconds while it flies
+  /// to the player. Presentation only (not saved, not part of any hash).
+  struct PickupFlight {
+    uint64_t id = 0;
+    uint32_t item = 0, count = 0, ageTicks = 0;
+    double x = 0, y = 0, z = 0;
+    uint64_t startTick = 0;
+  };
+  std::vector<PickupFlight> pickupFlights_;
+  uint64_t itemWorldTick_ = 0;  ///< world tick the item rules last ran at (draw time base)
+  /// P-5 interpolation: each item's position before the last item tick (id order), and when that
+  /// tick ran on the frame clock. Presentation only.
+  struct ItemPrevPos { uint64_t id = 0; double x = 0, y = 0, z = 0; };
+  std::vector<ItemPrevPos> itemPrev_;
+  std::chrono::steady_clock::time_point itemTickAt_{};
   bool showControls_ = true;   // F4: controls panel (ToggleControls)
   bool showHud_ = true;        // F1: hide all HUD (like Minecraft)
   bool showDebug_ = true;      // F3: stats overlay

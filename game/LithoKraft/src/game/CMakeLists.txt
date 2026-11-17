@@ -26,7 +26,7 @@ execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CUR
 if(NOT LK_GIT_COMMIT)
   set(LK_GIT_COMMIT "nogit")
 endif()
-add_library(lithokraft_game STATIC build_version.cpp game.cpp world_save.cpp chunk_streamer.cpp bench_stream.cpp FrameDumpHub.cpp FrameVideoEncoder.cpp FrameHashRecorder.cpp frame_hash_recorder_selftest.cpp L0NeighbourHold.cpp StreamFillTracker.cpp actions.cpp input_selftest.cpp dimensions.cpp wafer_biomes.cpp wafer_pulse.cpp structures.cpp controls_panel.cpp player.cpp resource_manager.cpp sound_director.cpp
+add_library(lithokraft_game STATIC build_version.cpp game.cpp world_save.cpp item_drops.cpp chunk_streamer.cpp bench_stream.cpp FrameDumpHub.cpp FrameVideoEncoder.cpp FrameHashRecorder.cpp frame_hash_recorder_selftest.cpp L0NeighbourHold.cpp StreamFillTracker.cpp actions.cpp input_selftest.cpp dimensions.cpp wafer_biomes.cpp wafer_pulse.cpp structures.cpp controls_panel.cpp player.cpp resource_manager.cpp sound_director.cpp
             game_ui.cpp cWorldCatalog.cpp component_test_selftest.cpp cWorldPicker.cpp game_ui_selftest.cpp script_editor.cpp ui_input_bridge.cpp ui_script_bindings.cpp settings.cpp extensible_facet.cpp
             ui_facade.cpp ui_widgets.cpp ui_textedit.cpp ui_mod.cpp ui_theme.cpp
             settings_cvars.cpp game_commands.cpp world_query.cpp silica_biome.cpp

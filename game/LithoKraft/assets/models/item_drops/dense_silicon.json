@@ -1,0 +1,677 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:dense_silicon",
+  "name": "Dense Silicon",
+  "shape_class": "full_block",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 12,
+  "bounds": {
+    "min": [
+      0.0,
+      0,
+      0.0
+    ],
+    "max": [
+      1.0,
+      1,
+      1.0
+    ]
+  },
+  "notes": [
+    "Full block: 6-quad cube, real face textures."
+  ],
+  "textures_used": {
+    "top": {
+      "key": "wafer_ground_capacitor",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+    },
+    "bottom": {
+      "key": "wafer_ground_capacitor",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+    },
+    "north": {
+      "key": "wafer_ground_capacitor",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+    },
+    "south": {
+      "key": "wafer_ground_capacitor",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+    },
+    "east": {
+      "key": "wafer_ground_capacitor",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+    },
+    "west": {
+      "key": "wafer_ground_capacitor",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+    }
+  },
+  "positions": [
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ]
+  ],
+  "normals": [
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "dense_silicon_top.png",
+      "material": "dense_silicon_top.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "dense_silicon_bottom.png",
+      "material": "dense_silicon_bottom.png",
+      "tris": [
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ]
+      ]
+    },
+    {
+      "name": "dense_silicon_north.png",
+      "material": "dense_silicon_north.png",
+      "tris": [
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "dense_silicon_south.png",
+      "material": "dense_silicon_south.png",
+      "tris": [
+        [
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    },
+    {
+      "name": "dense_silicon_east.png",
+      "material": "dense_silicon_east.png",
+      "tris": [
+        [
+          24,
+          25,
+          26
+        ],
+        [
+          27,
+          28,
+          29
+        ]
+      ]
+    },
+    {
+      "name": "dense_silicon_west.png",
+      "material": "dense_silicon_west.png",
+      "tris": [
+        [
+          30,
+          31,
+          32
+        ],
+        [
+          33,
+          34,
+          35
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "dense_silicon_top.png": "../textures/dense_silicon_top.png",
+    "dense_silicon_bottom.png": "../textures/dense_silicon_bottom.png",
+    "dense_silicon_north.png": "../textures/dense_silicon_north.png",
+    "dense_silicon_south.png": "../textures/dense_silicon_south.png",
+    "dense_silicon_east.png": "../textures/dense_silicon_east.png",
+    "dense_silicon_west.png": "../textures/dense_silicon_west.png"
+  }
+}

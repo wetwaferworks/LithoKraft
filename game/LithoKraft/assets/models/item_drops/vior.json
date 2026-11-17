@@ -1,0 +1,677 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:vior",
+  "name": "Vior",
+  "shape_class": "full_block",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 12,
+  "bounds": {
+    "min": [
+      0.0,
+      0,
+      0.0
+    ],
+    "max": [
+      1.0,
+      1,
+      1.0
+    ]
+  },
+  "notes": [
+    "Full block: 6-quad cube, real face textures."
+  ],
+  "textures_used": {
+    "top": {
+      "key": "vior_run_end",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_end.png"
+    },
+    "bottom": {
+      "key": "vior_run_end",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_end.png"
+    },
+    "east": {
+      "key": "vior_run_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_side.png"
+    },
+    "west": {
+      "key": "vior_run_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_side.png"
+    },
+    "north": {
+      "key": "vior_run_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_side.png"
+    },
+    "south": {
+      "key": "vior_run_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_side.png"
+    }
+  },
+  "positions": [
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ]
+  ],
+  "normals": [
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "vior_top.png",
+      "material": "vior_top.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "vior_bottom.png",
+      "material": "vior_bottom.png",
+      "tris": [
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ]
+      ]
+    },
+    {
+      "name": "vior_north.png",
+      "material": "vior_north.png",
+      "tris": [
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "vior_south.png",
+      "material": "vior_south.png",
+      "tris": [
+        [
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    },
+    {
+      "name": "vior_east.png",
+      "material": "vior_east.png",
+      "tris": [
+        [
+          24,
+          25,
+          26
+        ],
+        [
+          27,
+          28,
+          29
+        ]
+      ]
+    },
+    {
+      "name": "vior_west.png",
+      "material": "vior_west.png",
+      "tris": [
+        [
+          30,
+          31,
+          32
+        ],
+        [
+          33,
+          34,
+          35
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "vior_top.png": "../textures/vior_top.png",
+    "vior_bottom.png": "../textures/vior_bottom.png",
+    "vior_north.png": "../textures/vior_north.png",
+    "vior_south.png": "../textures/vior_south.png",
+    "vior_east.png": "../textures/vior_east.png",
+    "vior_west.png": "../textures/vior_west.png"
+  }
+}

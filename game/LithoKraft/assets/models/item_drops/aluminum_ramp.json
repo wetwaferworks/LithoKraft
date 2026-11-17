@@ -1,0 +1,482 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:aluminum_ramp",
+  "name": "Aluminum Ramp",
+  "shape_class": "special",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 8,
+  "bounds": {
+    "min": [
+      0,
+      0,
+      0
+    ],
+    "max": [
+      1,
+      1.0,
+      1
+    ]
+  },
+  "notes": [
+    "Ramp wedge. Highway is a 1:2 slope (height 8/16 over one block of the pair). Aluminum is a 1:1 slope. Both reuse aluminum_block textures (no dedicated ramp keys in resources.json)."
+  ],
+  "textures_used": {
+    "top": {
+      "key": "aluminum_block",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+    },
+    "bottom": {
+      "key": "aluminum_block",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+    },
+    "north": {
+      "key": "aluminum_block",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+    },
+    "south": {
+      "key": "aluminum_block",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+    },
+    "east": {
+      "key": "aluminum_block",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+    },
+    "west": {
+      "key": "aluminum_block",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+    }
+  },
+  "positions": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      1
+    ],
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      1
+    ],
+    [
+      0,
+      0,
+      1
+    ],
+    [
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      1
+    ],
+    [
+      1,
+      1.0,
+      1
+    ],
+    [
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      1.0,
+      1
+    ],
+    [
+      0,
+      1.0,
+      1
+    ],
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1.0,
+      1
+    ],
+    [
+      1,
+      1.0,
+      1
+    ],
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      1.0,
+      1
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1
+    ],
+    [
+      0,
+      1.0,
+      1
+    ],
+    [
+      1,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      1.0,
+      1
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ]
+  ],
+  "normals": [
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.7071067811865475,
+      -0.7071067811865475
+    ],
+    [
+      0.0,
+      0.7071067811865475,
+      -0.7071067811865475
+    ],
+    [
+      0.0,
+      0.7071067811865475,
+      -0.7071067811865475
+    ],
+    [
+      0.0,
+      0.7071067811865475,
+      -0.7071067811865475
+    ],
+    [
+      0.0,
+      0.7071067811865475,
+      -0.7071067811865475
+    ],
+    [
+      0.0,
+      0.7071067811865475,
+      -0.7071067811865475
+    ],
+    [
+      -1,
+      0,
+      0
+    ],
+    [
+      -1,
+      0,
+      0
+    ],
+    [
+      -1,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "aluminum_ramp_bottom.png",
+      "material": "aluminum_ramp_bottom.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "aluminum_ramp_south.png",
+      "material": "aluminum_ramp_south.png",
+      "tris": [
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ]
+      ]
+    },
+    {
+      "name": "aluminum_ramp_top.png",
+      "material": "aluminum_ramp_top.png",
+      "tris": [
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "aluminum_ramp_west.png",
+      "material": "aluminum_ramp_west.png",
+      "tris": [
+        [
+          18,
+          19,
+          20
+        ]
+      ]
+    },
+    {
+      "name": "aluminum_ramp_east.png",
+      "material": "aluminum_ramp_east.png",
+      "tris": [
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "aluminum_ramp_bottom.png": "../textures/aluminum_ramp_bottom.png",
+    "aluminum_ramp_south.png": "../textures/aluminum_ramp_south.png",
+    "aluminum_ramp_top.png": "../textures/aluminum_ramp_top.png",
+    "aluminum_ramp_west.png": "../textures/aluminum_ramp_west.png",
+    "aluminum_ramp_east.png": "../textures/aluminum_ramp_east.png"
+  }
+}

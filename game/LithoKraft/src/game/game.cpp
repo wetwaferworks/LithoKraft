@@ -50,6 +50,9 @@
 #include "litholattice/procgen/stages.h"  // cStructureFeature (map markers)
 #include "litholattice/render/ground_pulse.h"
 #include "lithokraft/content/item_use.h"
+#include "lithokraft/content/items.h"
+#include "lithokraft/game/item_drops.h"
+#include "litholattice/storage/file_contract.h"
 #include "lithokraft/content/signal_world.h"
 #include "lithokraft/game/tick_signal_posts.h"  // t46u 6b-3b
 #include "lithokraft/content/circuit_scene.h"
@@ -1336,6 +1339,8 @@ std::string Game::teleportCmd(const std::vector<std::string>& args) {
 void Game::loadActive() {
   const auto t0 = Clock::now();
   streamEmaMs_ = 16.7f; streamLastGrant_ = -1; admitStepFrame_ = 0;  // R2: a fresh world starts its budget fresh (was a static)
+  loadDroppedItems();  // P-6: this dimension's saved dropped items (ids kept)
+  if (const char* e = std::getenv("LL_ITEM_SHOWCASE"); e && e[0] == '1') { itemShowcasePending_ = true; itemShowcaseWait_ = 0; }
   holdTicksForIo("load");  // B9: held from the first byte of the load (no sim exists yet; the new one inherits the hold)
   if (cfg_.benchScene != "default") {  // bench scenes: load and tick the whole scene
     cfg_.worldChunks = std::max(cfg_.worldChunks, cfg_.sceneSize / 16 + 12);
@@ -2030,6 +2035,8 @@ bool Game::switchDimension(const std::string& id) {
   if (emissiveProvider_) emissiveProvider_->clear();  // new dimension: rescan
   logInfo("dimension switch: %s -> %s", active_->id.c_str(), next->id.c_str());
   active_->unload();
+  entities_.eraseType(kEntityItem);  // P-6: dropped items belong to their dimension (saved above)
+  entityPayloads_.clear(); entityPickupDelay_.clear(); pickupFlights_.clear(); itemPrev_.clear();
   active_ = next;
   loadActive();
   // Dimension switch must not silently unpause (audit MEDIUM): loadActive()
@@ -2040,6 +2047,10 @@ bool Game::switchDimension(const std::string& id) {
 
 bool Game::saveWorld(const char* reason, bool wait, bool allowAsync) {
   if (!save_ || !sim_ || !active_) return false;
+  {  // P-6 (JD: dropped items are saved as entities). Small file, written on the game thread.
+    std::string ierr;
+    if (!saveDroppedItems(&ierr)) logError("save (%s): dropped items not written: %s", reason, ierr.c_str());
+  }
   cStallTimer stall(wait ? "world save (saveWorld, wait)" : "world save (saveWorld)", lfIoTag());  // LL_STALL_TIMING
   traceIo(std::string("save-begin:") + reason);  // B9 order trace
   // 2026-10-31 (JD, Save World): lock-free path. The tick thread snapshots at a tick boundary,
@@ -3952,7 +3963,8 @@ uint64_t Game::dropStackToWorld(const DropRequest& req) {
   e->vx = double(req.direction.x) * 4.0;
   e->vy = double(req.direction.y) * 4.0 + 1.5;
   e->vz = double(req.direction.z) * 4.0;
-  if (req.fromPlayer) entityPickupDelay_[id] = 256;  // 2 s at 128 TPS
+  // D9: the delay is seconds converted at the live TPS (was a raw 256 ticks).
+  if (const uint32_t d = itemDelayTicks(req.fromPlayer)) entityPickupDelay_[id] = d;
   if (req.stack.hasData()) entityPayloads_[id] = req.stack;
   return id;
 }
@@ -5172,6 +5184,7 @@ void Game::playSounds() {
         en->vx = (rx - 0.5) * 2.0;
         en->vy = 2.5;
         en->vz = (rz - 0.5) * 2.0;
+        if (const uint32_t d = itemDelayTicks(false)) entityPickupDelay_[id] = d;  // natural drop delay
       }
       continue;
     }
@@ -5203,123 +5216,239 @@ void Game::updateEntities() {
     entTicks = ticks;
     dt = double(ticks) / double(std::max(1, sim_->stats().targetTps));
   }
-  // Magnet: items within 4 blocks accelerate toward the player.
-  // (Floating items design 2.5: an item still in its pickup delay is
-  // skipped here too, or the magnet would drag a just-thrown drop
-  // straight back into the pickup radius.)
-  const Vec3& pp = player_.pos;
-  for (litholattice::Entity* e : entities_.querySphere(pp.x, pp.y, pp.z, 4.0, kEntityItem)) {
-    if (entityPickupDelay_.count(e->id)) continue;
-    if (e->onGround) {
-      const double dx = pp.x - e->x, dy = (pp.y + 1.0) - e->y, dz = pp.z - e->z;
-      const double d = std::sqrt(dx * dx + dy * dy + dz * dz);
-      if (d > 0.8 && d < 4.0) {
-        e->onGround = false;
-        const double pull = 14.0 / (d * d + 1.0);
-        e->vx += dx / d * pull * dt;
-        e->vy += dy / d * pull * dt;
-        e->vz += dz / d * pull * dt;
-      }
-    }
-  }
-  entities_.tick(dt);
-  // Projectiles (P2c, ENT-1): one manager tick per elapsed world tick â€”
-  // the locked "projectiles tick with the world" â€” so they freeze with
-  // the world exactly like the entities above (entTicks is 0 while the
-  // sim is paused/frozen) and step at the world's rate, never frame rate.
+  // P-1 (2026-11-17): one fixed step per elapsed world tick, in entity-id order, instead of one
+  // big step per frame (D1). The magnet, the pickup delays, the merge and the pickup run inside
+  // the same per-tick loop, so an item's path, landing and pickup tick do not depend on how the
+  // world ticks group into frames.
+  const int tps = itemTps();
+  const uint64_t wtNow = sim_ ? sim_->stats().worldTick : 0;
+  for (uint64_t k = 0; k < entTicks; ++k) stepItemsTick(wtNow - entTicks + k + 1, 1.0 / double(tps), tps);
+  (void)dt;
+  // Projectiles (P2c, ENT-1): one manager tick per elapsed world tick, as before.
   for (uint64_t i = 0; i < entTicks; ++i) projectiles_.tick();
-  // Pickup delay countdown (floating items design 2.5): the delay
-  // ticks down on world ticks; magnet and pickup both skip entities
-  // whose delay is still running, so a player can never re-grab (or
-  // magnet-drag) the stack they just threw.
-  for (auto it = entityPickupDelay_.begin(); it != entityPickupDelay_.end();) {
-    if (entTicks >= it->second) it = entityPickupDelay_.erase(it);
-    else { it->second -= uint32_t(entTicks); ++it; }
-  }
-  // Reap side state for entities that died (despawn, pickup, cull):
-  // payload and delay entries live exactly as long as their entity.
+  if (entTicks > 0) itemTickAt_ = std::chrono::steady_clock::now();  // P-5: frame-clock time of the last item tick
+  if (entTicks == 0) pickupItems(wtNow, tps);  // paused: collecting a resting item does not move the world
+  if (wtNow >= itemWorldTick_) itemWorldTick_ = wtNow;
+  // Reap side state for entities that died (despawn, pickup, cull).
   for (auto it = entityPayloads_.begin(); it != entityPayloads_.end();)
     if (!entities_.get(it->first)) it = entityPayloads_.erase(it); else ++it;
   for (auto it = entityPickupDelay_.begin(); it != entityPickupDelay_.end();)
     if (!entities_.get(it->first)) it = entityPickupDelay_.erase(it); else ++it;
-  // Forced merging (JD ruling 2026-11-10 08:48 EST, design 2.6 + Part
-  // 3 #8): the entity-count backstop. When item entities exceed the
-  // cap, merge the nearest same-identity pairs (id order, larger
-  // stack absorbs, tie to the lower id, survivor keeps the younger
-  // age... forced merges never DELETE an item: counts are conserved
-  // exactly, and pairs that would overflow the stack cap do not
-  // merge). Runs at most once per 256 world ticks.
-  {
-    static constexpr size_t kItemEntityCap = 1024;
-    static uint64_t lastMergeTick = 0;
-    const uint64_t wtNow = sim_ ? sim_->stats().worldTick : 0;
-    // Cheap gate first: the manager's total size bounds the item
-    // count, so the (allocating) census only runs when a breach is
-    // even possible, and then at most once per 256 world ticks.
-    if (entities_.size() > kItemEntityCap && wtNow >= lastMergeTick + 256) {
-      std::vector<litholattice::Entity*> items;
-      for (litholattice::Entity* e : entities_.querySphere(pp.x, pp.y, pp.z, 1e9, kEntityItem)) items.push_back(e);
-      if (items.size() > kItemEntityCap) {
-        lastMergeTick = wtNow;
-        std::sort(items.begin(), items.end(), [](const litholattice::Entity* a, const litholattice::Entity* b) { return a->id < b->id; });
-        std::vector<char> gone(items.size(), 0);
-        for (size_t i = 0; i < items.size(); ++i) {
-          if (gone[i]) continue;
-          litholattice::Entity* a = items[i];
-          const ItemStack* pa = entityPayload(a->id);
-          size_t bestJ = items.size();
-          double bestD = 1e18;
-          for (size_t j = 0; j < items.size(); ++j) {
-            if (j == i || gone[j]) continue;
-            litholattice::Entity* b = items[j];
-            if (b->data != a->data) continue;
-            const ItemStack* pb = entityPayload(b->id);
-            if ((pa == nullptr) != (pb == nullptr)) continue;
-            if (pa && pb && !pa->sameIdentity(*pb)) continue;
-            if (uint32_t(a->count) + uint32_t(b->count) > uint32_t(stackCapFor(a->data))) continue;
-            const double dx = b->x - a->x, dy = b->y - a->y, dz = b->z - a->z;
-            const double d = dx * dx + dy * dy + dz * dz;
-            if (d < bestD) { bestD = d; bestJ = j; }
-          }
-          if (bestJ < items.size()) {
-            litholattice::Entity* b = items[bestJ];
-            litholattice::Entity* big = a->count >= b->count ? a : b;
-            litholattice::Entity* small = big == a ? b : a;
-            big->count = uint32_t(big->count) + uint32_t(small->count);
-            if (small->age < big->age) big->age = small->age;  // survivor keeps the younger age (more life left)
-            entities_.despawn(small->id);
-            entityPayloads_.erase(small->id);
-            entityPickupDelay_.erase(small->id);
-            gone[small == a ? i : bestJ] = 1;
-          }
+  {  // pickup flights end after kPickupFlightSeconds
+    const uint64_t life = std::max<uint64_t>(1, itemdrop::ticksFor(itemdrop::kPickupFlightSeconds, tps));
+    std::erase_if(pickupFlights_, [&](const PickupFlight& f) { return itemWorldTick_ >= f.startTick + life || itemWorldTick_ < f.startTick; });
+  }
+  if (itemShowcasePending_ && sim_ && active_ && ++itemShowcaseWait_ > 30 && (benchSet_ || itemShowcaseWait_ > 600)) { itemShowcasePending_ = false; spawnItemShowcase(); }
+}
+
+int Game::itemTps() const { return std::max(1, sim_ ? sim_->stats().targetTps : int(cfg_.tps)); }
+
+uint32_t Game::itemDelayTicks(bool fromPlayer) const {
+  return itemdrop::ticksFor(fromPlayer ? itemdrop::kPlayerDropDelaySeconds : itemdrop::kNaturalDropDelaySeconds, itemTps());
+}
+
+void Game::stepItemsTick(uint64_t worldTick, double dt, int tps) {
+  using namespace itemdrop;
+  const Vec3& pp = player_.pos;
+  itemPrev_.clear();  // P-5: where every item was before this tick (id order), for the draw lerp
+  for (const litholattice::Entity* e : entities_.querySphere(pp.x, pp.y, pp.z, 1e12, kEntityItem))
+    itemPrev_.push_back(ItemPrevPos{e->id, e->x, e->y, e->z});
+  // Magnet (JD: items fly to the player): every item past its delay within kMagnetRadius is pulled
+  // toward the player's chest, in the air and in liquid too (was: resting items only, D12).
+  for (litholattice::Entity* e : entities_.querySphere(pp.x, pp.y + 1.0, pp.z, kMagnetRadius, kEntityItem)) {
+    if (entityPickupDelay_.count(e->id)) continue;
+    const double dx = pp.x - e->x, dy = (pp.y + 1.0) - e->y, dz = pp.z - e->z;
+    const double d = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (d < 0.25) continue;
+    e->onGround = false;
+    const double pull = kMagnetPull / (d * d + 1.0);
+    e->vx += dx / d * pull * dt;
+    e->vy += dy / d * pull * dt;
+    e->vz += dz / d * pull * dt;
+  }
+  entities_.tick(dt);  // every entity, id order (items: cItemBehavior)
+  for (auto it = entityPickupDelay_.begin(); it != entityPickupDelay_.end();) {  // order-free countdown
+    if (it->second <= 1) it = entityPickupDelay_.erase(it);
+    else { --it->second; ++it; }
+  }
+  {  // P-3 proximity merge (D3-D6): grid search, id order, radius about one block (JD)
+    std::vector<litholattice::Entity*> items = entities_.querySphere(pp.x, pp.y, pp.z, 1e12, kEntityItem);
+    if (items.size() >= 2) {
+      std::vector<MergeCandidate> cand;
+      cand.reserve(items.size());
+      for (const litholattice::Entity* e : items) {
+        MergeCandidate c;
+        c.id = e->id; c.x = e->x; c.y = e->y; c.z = e->z;
+        c.data = e->data; c.count = e->count; c.cap = uint32_t(stackCapFor(e->data));
+        c.moving = !e->onGround || std::fabs(e->vx) + std::fabs(e->vz) > 0.01;
+        c.payload = entityPayload(e->id) != nullptr;
+        cand.push_back(c);
+      }
+      // Backstop (replaces the old teleporting merge): above the cap, every 40 ticks, everything
+      // merges within two blocks. Never across the map.
+      constexpr size_t kItemEntityCap = 1024;
+      const bool crowded = items.size() > kItemEntityCap && worldTick % kMergeRestEvery == 0;
+      const auto pairs = planMerges(cand, worldTick, crowded ? 2.0 : kMergeRadius,
+                                    [this](uint64_t a, uint64_t b) {
+                                      const ItemStack* pa = entityPayload(a); const ItemStack* pb = entityPayload(b);
+                                      return pa && pb && pa->sameIdentity(*pb);
+                                    }, crowded);
+      for (const MergePair& m : pairs) {
+        litholattice::Entity* s = entities_.get(m.survivor);
+        litholattice::Entity* g = entities_.get(m.absorbed);
+        if (!s || !g) continue;
+        s->count = s->count + g->count;
+        s->age = std::min(s->age, g->age);  // the younger age: more life left
+        const auto gd = entityPickupDelay_.find(g->id);
+        if (gd != entityPickupDelay_.end()) {
+          uint32_t& sd = entityPickupDelay_[s->id];
+          sd = std::max(sd, gd->second);  // the longer pickup delay
         }
+        entities_.despawn(g->id);
+        entityPayloads_.erase(g->id);
+        entityPickupDelay_.erase(g->id);
       }
     }
   }
-  // Pickup: within 1.2 blocks the item goes into the inventory (42 slots, 512/stack).
-  for (litholattice::Entity* e : entities_.querySphere(pp.x, pp.y, pp.z, 1.2, kEntityItem)) {
+  pickupItems(worldTick, tps);
+  itemWorldTick_ = worldTick;
+}
+
+void Game::pickupItems(uint64_t worldTick, int tps) {
+  (void)tps;
+  const Vec3& pp = player_.pos;
+  for (litholattice::Entity* e : entities_.querySphere(pp.x, pp.y + 1.0, pp.z, 4.0, kEntityItem)) {
     if (entityPickupDelay_.count(e->id)) continue;  // still in its pickup delay
+    if (!itemdrop::inPickupReach(pp.x, pp.y, pp.z, e->x, e->y, e->z)) continue;  // D11: enlarged player box
+    uint32_t taken = 0;
     if (const ItemStack* payload = entityPayload(e->id)) {
-      // Data-bearing stack (design 2.9 (a)): identity pickup is
-      // all-or-nothing through placeStack... a partial plain add
-      // would strip the name/certificates, which is exactly the
-      // identity loss JD's fork ruling forbids. If it does not fit
-      // whole, it stays in the world whole.
+      // Data-bearing stack (design 2.9 (a)): all-or-nothing, so the name and certificates are
+      // never stripped by a partial add. If it does not fit whole, it stays in the world whole.
       ItemStack whole = *payload;
       whole.count = uint16_t(e->count);
       if (player_.inventory.placeStack(whole)) {
+        taken = e->count;
         entities_.despawn(e->id);
         entityPayloads_.erase(e->id);
       }
-      continue;
-    }
-    const uint16_t left = player_.inventory.addItem(e->data, uint16_t(e->count));
-    if (left == 0) {
-      entities_.despawn(e->id);  // fully collected
     } else {
-      e->count = left;  // inventory full: stays in the world
+      const uint16_t left = player_.inventory.addItem(e->data, uint16_t(e->count));
+      taken = e->count - left;
+      if (left == 0) entities_.despawn(e->id);  // fully collected
+      else e->count = left;                     // inventory full: the rest stays on the ground
     }
+    if (taken) pickupFlights_.push_back(PickupFlight{e->id, e->data, taken, e->age, e->x, e->y, e->z, worldTick});
   }
+}
+
+void Game::ensureItemModels() {
+  if (itemModelsBuilt_) return;
+  itemModelsBuilt_ = true;
+  itemModels_.build([](const char* sid, uint32_t* item) {
+    if (const auto b = blockRegistry().findById(sid)) { *item = uint32_t(*b); return true; }
+    if (const ItemDef* d = findItemByStringId(sid)) { *item = d->itemId; return true; }
+    return false;
+  });
+  logInfo("items: %zu of %zu drop models matched a block or item", itemModels_.size(), itemdrop::modelCount());
+}
+
+std::filesystem::path Game::droppedItemsPath(const std::string& dimension) const {
+  return save_ ? save_->root() / ("items." + dimension + ".lat") : std::filesystem::path();
+}
+
+bool Game::saveDroppedItems(std::string* err) {
+  if (!save_ || !active_) return true;
+  std::vector<itemdrop::SavedItem> out;
+  const Vec3& pp = player_.pos;
+  for (const litholattice::Entity* e : entities_.querySphere(pp.x, pp.y, pp.z, 1e12, kEntityItem)) {  // id order
+    itemdrop::SavedItem s;
+    s.id = e->id; s.x = e->x; s.y = e->y; s.z = e->z; s.vx = e->vx; s.vy = e->vy; s.vz = e->vz;
+    s.ageTicks = e->age; s.count = e->count; s.onGround = e->onGround;
+    const auto d = entityPickupDelay_.find(e->id);
+    s.delayTicks = d == entityPickupDelay_.end() ? 0 : d->second;
+    if (const ItemDef* def = findItem(e->data)) s.item = std::string(def->stringId);
+    else if (e->data > 0 && e->data < blockRegistry().size()) s.item = blockRegistry().idOf(BlockId(e->data));
+    if (s.item.empty()) continue;  // unknown id: not written
+    if (const ItemStack* p = entityPayload(e->id)) {
+      s.hasData = true; s.name = p->customName; s.certificates = p->certificates;
+    }
+    out.push_back(std::move(s));
+  }
+  const auto path = droppedItemsPath(active_->id);
+  // A world that never had a dropped item keeps exactly the files it had before.
+  if (out.empty() && !std::filesystem::exists(path)) return true;
+  return litholattice::storage::writeFileAtomic(path, itemdrop::encodeItems(std::move(out)), err);
+}
+
+void Game::loadDroppedItems() {
+  if (!save_ || !active_) return;
+  const auto path = droppedItemsPath(active_->id);
+  std::error_code ec;
+  if (!std::filesystem::exists(path, ec)) return;
+  litholattice::storage::Bytes bytes;
+  std::string err;
+  std::vector<itemdrop::SavedItem> items;
+  if (!litholattice::storage::readFileAll(path, &bytes, &err) || !itemdrop::decodeItems(bytes, &items, &err)) {
+    logError("items: %s not loaded: %s (the file is left as it is)", path.string().c_str(), err.c_str());
+    return;
+  }
+  size_t loaded = 0, unknown = 0;
+  for (const itemdrop::SavedItem& s : items) {
+    uint32_t item = 0;
+    if (const ItemDef* d = findItemByStringId(s.item)) item = d->itemId;
+    else if (const auto b = blockRegistry().findById(s.item)) item = uint32_t(*b);
+    else { ++unknown; continue; }
+    litholattice::Entity e;
+    e.id = s.id; e.type = kEntityItem;
+    e.x = s.x; e.y = s.y; e.z = s.z; e.vx = s.vx; e.vy = s.vy; e.vz = s.vz;
+    e.age = s.ageTicks; e.data = item; e.count = s.count; e.onGround = s.onGround;
+    const uint64_t id = entities_.restore(e);
+    if (s.delayTicks) entityPickupDelay_[id] = s.delayTicks;
+    if (s.hasData) {
+      ItemStack st;
+      st.itemId = item; st.count = uint16_t(std::min<uint32_t>(s.count, 0xFFFF));
+      st.customName = s.name; st.certificates = s.certificates;
+      entityPayloads_[id] = st;
+    }
+    ++loaded;
+  }
+  logInfo("items: %zu dropped items loaded for '%s'%s", loaded, active_->id.c_str(),
+          unknown ? " (some ids are no longer registered and were skipped)" : "");
+}
+
+void Game::spawnItemShowcase() {
+  ensureItemModels();
+  const Vec3 at = benchSet_ ? benchCam_ : player_.pos;  // a bench holds the camera at benchCam_ (the body catches up later)
+  const Vec3 fwd = player_.forward();
+  double fx = fwd.x, fz = fwd.z;
+  const double fl = std::sqrt(fx * fx + fz * fz);
+  if (fl < 1e-6) { fx = 1; fz = 0; } else { fx /= fl; fz /= fl; }
+  const double rx = -fz, rz = fx;  // right of the view
+  size_t n = 0;
+  int groundLo = INT32_MAX, groundHi = INT32_MIN;
+  for (size_t i = 0; i < itemdrop::modelCount(); ++i) {
+    const auto& row = itemdrop::modelRow(i);
+    uint32_t item = 0;
+    if (const auto b = blockRegistry().findById(row.id)) item = uint32_t(*b);
+    else if (const ItemDef* d = findItemByStringId(row.id)) item = d->itemId;
+    else continue;
+    const int col = int(n % 9), rowN = int(n / 9);
+    const double ahead = 3.0 + rowN * 0.9, side = (col - 4) * 0.9;
+    const double x = at.x + fx * ahead + rx * side, z = at.z + fz * ahead + rz * side;
+    // On the ground (or the water) under the spot, so the rows sit in view of a raised camera.
+    int gy = int(std::floor(at.y)) + 1;
+    for (int y = gy, lo = gy - 320; y > lo; --y) {
+      const auto b = sim_->getBlock(int(std::floor(x)), y - 1, int(std::floor(z)));
+      if (blockRegistry().has(b, kSolid) || blockIsLiquid(b)) { gy = y; break; }
+    }
+    groundLo = std::min(groundLo, gy); groundHi = std::max(groundHi, gy);
+    const uint64_t id = entities_.spawn(kEntityItem, x, double(gy) + 0.5, z);
+    if (litholattice::Entity* e = entities_.get(id)) { e->data = item; e->count = 1 + uint32_t(n % 4) * 7; }
+    entityPickupDelay_[id] = 0xFFFFFFF0u;  // showcase items stay put (no magnet, no pickup)
+    ++n;
+  }
+  logInfo("items: showcase spawned %zu dropped items in rows of 9, from %.1f,%.1f,%.1f facing yaw %.3f, ground y %d..%d", n,
+          at.x, at.y, at.z, player_.yaw, groundLo, groundHi);
 }
 
 // Design B Stage 2: hold an upload the renderer's ring refused (ring full)
@@ -5991,7 +6120,7 @@ void Game::uploadEntities() {
   // Optimization (audit App.A/game-2): skip the 64-block querySphere scan and
   // the billboard build when there is nothing to draw. The (empty) upload
   // below still runs so a cleared scene never keeps stale billboards.
-  if (entities_.size() == 0) { renderer_.uploadEntityMesh(verts); return; }
+  if (entities_.size() == 0 && pickupFlights_.empty()) { renderer_.uploadEntityMesh(verts); return; }
   // GAME-H1 (2026-10-15): every renderer decodes PackedVertex xyz as 1/16
   // block relative to a mesh origin (the chunk encoding). Entities were
   // written in whole blocks, absolute, so they drew at 1/16 of their
@@ -6007,27 +6136,52 @@ void Game::uploadEntities() {
     const float q = std::round((v - o) * 16.f);
     return uint16_t(q < 0.f ? 0.f : q > 65535.f ? 65535.f : q);
   };
-  // Billboard basis from the camera yaw (items face the player).
+  // Billboard basis from the camera yaw (the Deceitor bodies below face the player).
   const float cy = std::cos(player_.yaw), sy = std::sin(player_.yaw);
   const float rx = cy, rz = -sy;  // camera right in XZ
-  const float s = 0.15f;  // half-size (0.3 block item)
-  for (litholattice::Entity* e : entities_.querySphere(player_.pos.x, player_.pos.y, player_.pos.z, 64.0, kEntityItem)) {
-    const float cx = float(e->x), cyy = float(e->y), cz = float(e->z);
-    // Two triangles (6 verts) forming a camera-facing quad.
-    const float corners[4][2] = {{-1,-1}, {1,-1}, {1,1}, {-1,1}};
-    PackedVertex q[4];
-    for (int i = 0; i < 4; ++i) {
-      const float ox = corners[i][0] * s, oy = corners[i][1] * s;
-      q[i] = {};
-      q[i].x = enc(cx + rx * ox, eox);  // GAME-H1: 1/16 block from the batch origin
-      q[i].y = enc(cyy + oy, eoy);
-      q[i].z = enc(cz + rz * ox, eoz);
-      q[i].mode = kShadeTex;
-      // TODO: set q[i].layer from the block's texture
+  // P-5 (2026-11-17): dropped items draw as the CloudAtlas low-poly models (D8), posed as a pure
+  // function of (entity id, age in world ticks, count, position): a hover, a bob and a spin, with
+  // a per-item phase hashed from the id and 1-4 copies for bigger stacks. The vertices are built
+  // here once, so GL, Vulkan and the software renderer all draw the same triangles.
+  {
+    ensureItemModels();
+    const auto mats = resources_.materials();
+    const int tps = itemTps();
+    auto layersFor = [&](uint32_t item, uint16_t out[6]) {
+      for (int s = 0; s < 6; ++s) out[s] = 0;
+      if (!mats || item == 0 || item >= kFirstItemId || item >= blockRegistry().size()) return;  // non-block items: layer 0 for now
+      for (int s = 0; s < 6; ++s) out[s] = uint16_t(mats->face(BlockId(item), FaceSlot(s), false).layer);
+    };
+    itemdrop::DropPose poses[4];
+    uint16_t layers[6];
+    // Interpolated between the last two item ticks (a render-only weight; 1 in bench/golden runs,
+    // so those draw exactly the tick state).
+    const double alpha = itemdrop::tickAlpha(
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - itemTickAt_).count(), tps, cfg_.deterministicBudget);
+    for (litholattice::Entity* e : entities_.querySphere(player_.pos.x, player_.pos.y, player_.pos.z, 64.0, kEntityItem)) {
+      const itemdrop::ItemDropModel* m = itemModels_.find(e->data);
+      layersFor(e->data, layers);
+      double x = e->x, y = e->y, z = e->z, age = double(e->age);
+      const auto pv = std::lower_bound(itemPrev_.begin(), itemPrev_.end(), e->id,
+                                       [](const ItemPrevPos& p, uint64_t id) { return p.id < id; });
+      if (pv != itemPrev_.end() && pv->id == e->id && alpha < 1.0) {
+        x = pv->x + (e->x - pv->x) * alpha; y = pv->y + (e->y - pv->y) * alpha; z = pv->z + (e->z - pv->z) * alpha;
+        age = age - 1.0 + alpha;
+      }
+      const int n = itemdrop::posesFor(e->id, age, tps, e->count, x, y, z, poses);
+      for (int c = 0; c < n; ++c) itemdrop::appendModel(m ? *m : itemdrop::fallbackCube(), layers, poses[c], eox, eoy, eoz, verts);
     }
-    // Triangles: 0,1,2 and 0,2,3
-    verts.push_back(q[0]); verts.push_back(q[1]); verts.push_back(q[2]);
-    verts.push_back(q[0]); verts.push_back(q[2]); verts.push_back(q[3]);
+    // Pickup flight: the collected item eases from where it lay to the player's chest and shrinks.
+    const double life = double(std::max<uint32_t>(1, itemdrop::ticksFor(itemdrop::kPickupFlightSeconds, tps)));
+    for (const PickupFlight& f : pickupFlights_) {
+      const double k = std::clamp(double(itemWorldTick_ - f.startTick) / life, 0.0, 1.0), ease = k * k * (3.0 - 2.0 * k);
+      const double x = f.x + (player_.pos.x - f.x) * ease, y = f.y + (player_.pos.y + 0.9 - f.y) * ease, z = f.z + (player_.pos.z - f.z) * ease;
+      const itemdrop::ItemDropModel* m = itemModels_.find(f.item);
+      layersFor(f.item, layers);
+      itemdrop::posesFor(f.id, f.ageTicks + uint32_t(itemWorldTick_ - f.startTick), tps, 1, x, y, z, poses);
+      poses[0].scale *= float(1.0 - 0.5 * ease);
+      itemdrop::appendModel(m ? *m : itemdrop::fallbackCube(), layers, poses[0], eox, eoy, eoz, verts);
+    }
   }
   // Deceitor bodies: upright bipeds (1.8 blocks) from stacked billboards
   // through this same entity-mesh path â€” the placeholder presentation

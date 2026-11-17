@@ -1,0 +1,4207 @@
+{
+  "title": "LithoKraft low-poly dropped items",
+  "date": "2026-11-17",
+  "drop_scale": 0.3,
+  "counts": {
+    "full_block": 54,
+    "special": 20,
+    "component_slab": 14,
+    "half_slab": 3,
+    "foliage": 16
+  },
+  "items": [
+    {
+      "id": "lithokraft:repeator",
+      "short": "repeator",
+      "name": "Repeator",
+      "shape_class": "component_slab",
+      "engine_shape": "Custom",
+      "stem": "repeator",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "repeator_top_d16_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/repeator/repeator_top_d16_base.png"
+        },
+        "bottom": {
+          "key": "repeator_side_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/repeator/repeator_side_base.png"
+        },
+        "east": {
+          "key": "repeator_side_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/repeator/repeator_side_base.png"
+        },
+        "west": {
+          "key": "repeator_side_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/repeator/repeator_side_base.png"
+        },
+        "north": {
+          "key": "repeator_front_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/repeator/repeator_front_base.png"
+        },
+        "south": {
+          "key": "repeator_back_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/repeator/repeator_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:fusor",
+      "short": "fusor",
+      "name": "Breakor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "breakor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.4375 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "breakor_top_closed_base",
+          "source": "/workspace/components-v2/breakor-well-fix-2026-11-16/option-A/pack_128/breakor_top_closed_base.png"
+        },
+        "bottom": {
+          "key": "breakor_side_closed_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/breakor/breakor_side_closed_base.png"
+        },
+        "east": {
+          "key": "breakor_side_closed_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/breakor/breakor_side_closed_base.png"
+        },
+        "west": {
+          "key": "breakor_side_closed_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/breakor/breakor_side_closed_base.png"
+        },
+        "north": {
+          "key": "breakor_front_closed_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/breakor/breakor_front_closed_base.png"
+        },
+        "south": {
+          "key": "breakor_back_closed_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/breakor/breakor_back_closed_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:fusor_sum",
+      "short": "fusor_sum",
+      "name": "Fusor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "fusor_sum",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2500 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "fusor_sum_top_base",
+          "source": "/workspace/components-v2/texture-review-2026-11-17/fixes/fusor_sum/pack_128/fusor_sum_top_base.png"
+        },
+        "bottom": {
+          "key": "fusor_sum_side_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fusor_sum/fusor_sum_side_base.png"
+        },
+        "east": {
+          "key": "fusor_sum_side_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fusor_sum/fusor_sum_side_base.png"
+        },
+        "west": {
+          "key": "fusor_sum_side_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fusor_sum/fusor_sum_side_base.png"
+        },
+        "north": {
+          "key": "fusor_sum_front_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fusor_sum/fusor_sum_front_base.png"
+        },
+        "south": {
+          "key": "fusor_sum_back_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fusor_sum/fusor_sum_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:dividor",
+      "short": "dividor",
+      "name": "Dividor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "dividor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "dividor_top_base",
+          "source": "/workspace/components-v2/dividor/pack_128/textures/blocks/dividor/dividor_top_base.png"
+        },
+        "bottom": {
+          "key": "dividor_side_base",
+          "source": "/workspace/components-v2/dividor/pack_128/textures/blocks/dividor/dividor_side_base.png"
+        },
+        "east": {
+          "key": "dividor_side_base",
+          "source": "/workspace/components-v2/dividor/pack_128/textures/blocks/dividor/dividor_side_base.png"
+        },
+        "west": {
+          "key": "dividor_side_base",
+          "source": "/workspace/components-v2/dividor/pack_128/textures/blocks/dividor/dividor_side_base.png"
+        },
+        "north": {
+          "key": "dividor_front_base",
+          "source": "/workspace/components-v2/dividor/pack_128/textures/blocks/dividor/dividor_front_base.png"
+        },
+        "south": {
+          "key": "dividor_back_base",
+          "source": "/workspace/components-v2/dividor/pack_128/textures/blocks/dividor/dividor_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:memor",
+      "short": "memor",
+      "name": "Memor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "memor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "memor_top_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_top_idle_base.png"
+        },
+        "bottom": {
+          "key": "memor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_side_idle_base.png"
+        },
+        "east": {
+          "key": "memor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_side_idle_base.png"
+        },
+        "west": {
+          "key": "memor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_side_idle_base.png"
+        },
+        "north": {
+          "key": "memor_front_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_front_idle_base.png"
+        },
+        "south": {
+          "key": "memor_back_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_back_idle_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:thresholdor",
+      "short": "thresholdor",
+      "name": "Thresholdor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "thresholdor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "thresholdor_top_compare_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/thresholdor/thresholdor_top_compare_base.png"
+        },
+        "bottom": {
+          "key": "thresholdor_side_compare_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/thresholdor/thresholdor_side_compare_base.png"
+        },
+        "east": {
+          "key": "thresholdor_side_compare_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/thresholdor/thresholdor_side_compare_base.png"
+        },
+        "west": {
+          "key": "thresholdor_side_compare_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/thresholdor/thresholdor_side_compare_base.png"
+        },
+        "north": {
+          "key": "thresholdor_front_compare_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/thresholdor/thresholdor_front_compare_base.png"
+        },
+        "south": {
+          "key": "thresholdor_back_compare_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/thresholdor/thresholdor_back_compare_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:multiplexor",
+      "short": "multiplexor",
+      "name": "Multiplexor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "multiplexor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "multiplexor_top_sel_red_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/multiplexor/multiplexor_top_sel_red_base.png"
+        },
+        "bottom": {
+          "key": "multiplexor_side_sel_red_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/multiplexor/multiplexor_side_sel_red_base.png"
+        },
+        "east": {
+          "key": "multiplexor_side_sel_red_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/multiplexor/multiplexor_side_sel_red_base.png"
+        },
+        "west": {
+          "key": "multiplexor_side_sel_red_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/multiplexor/multiplexor_side_sel_red_base.png"
+        },
+        "north": {
+          "key": "multiplexor_front_sel_red_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/multiplexor/multiplexor_front_sel_red_base.png"
+        },
+        "south": {
+          "key": "multiplexor_back_sel_red_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/multiplexor/multiplexor_back_sel_red_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:routor",
+      "short": "routor",
+      "name": "Routor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "routor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2500 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "routor_mode1_top_base",
+          "source": "/workspace/components-v2/routor/pack_128/textures/blocks/routor/routor_mode1_top_base.png"
+        },
+        "bottom": {
+          "key": "routor_mode1_side_base",
+          "source": "/workspace/components-v2/routor/pack_128/textures/blocks/routor/routor_mode1_side_base.png"
+        },
+        "east": {
+          "key": "routor_mode1_side_base",
+          "source": "/workspace/components-v2/routor/pack_128/textures/blocks/routor/routor_mode1_side_base.png"
+        },
+        "west": {
+          "key": "routor_mode1_side_base",
+          "source": "/workspace/components-v2/routor/pack_128/textures/blocks/routor/routor_mode1_side_base.png"
+        },
+        "north": {
+          "key": "routor_mode1_front_base",
+          "source": "/workspace/components-v2/routor/pack_128/textures/blocks/routor/routor_mode1_front_base.png"
+        },
+        "south": {
+          "key": "routor_mode1_back_base",
+          "source": "/workspace/components-v2/routor/pack_128/textures/blocks/routor/routor_mode1_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:pulsor",
+      "short": "pulsor",
+      "name": "Pulsor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "pulsor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "pulsor_top_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/pulsor/pulsor_top_idle_base.png"
+        },
+        "bottom": {
+          "key": "pulsor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/pulsor/pulsor_side_idle_base.png"
+        },
+        "east": {
+          "key": "pulsor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/pulsor/pulsor_side_idle_base.png"
+        },
+        "west": {
+          "key": "pulsor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/pulsor/pulsor_side_idle_base.png"
+        },
+        "north": {
+          "key": "pulsor_front_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/pulsor/pulsor_front_idle_base.png"
+        },
+        "south": {
+          "key": "pulsor_back_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/pulsor/pulsor_back_idle_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:fast_latch",
+      "short": "fast_latch",
+      "name": "Latchor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "fast_latch",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2500 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "latchor_top_off_base",
+          "source": "/workspace/components-v2/texture-review-2026-11-17/fixes/latchor/pack_128/latchor_top_off_base.png"
+        },
+        "bottom": {
+          "key": "fast_latch_side_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_side_off_base.png"
+        },
+        "east": {
+          "key": "fast_latch_side_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_side_off_base.png"
+        },
+        "west": {
+          "key": "fast_latch_side_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_side_off_base.png"
+        },
+        "north": {
+          "key": "fast_latch_front_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_front_off_base.png"
+        },
+        "south": {
+          "key": "fast_latch_back_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_back_off_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:randor",
+      "short": "randor",
+      "name": "Randor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "randor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "randor_top_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/randor/randor_top_idle_base.png"
+        },
+        "bottom": {
+          "key": "randor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/randor/randor_side_idle_base.png"
+        },
+        "east": {
+          "key": "randor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/randor/randor_side_idle_base.png"
+        },
+        "west": {
+          "key": "randor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/randor/randor_side_idle_base.png"
+        },
+        "north": {
+          "key": "randor_front_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/randor/randor_front_idle_base.png"
+        },
+        "south": {
+          "key": "randor_back_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/randor/randor_back_idle_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:catchor",
+      "short": "catchor",
+      "name": "Catchor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "catchor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "catchor_top_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/catchor/catchor_top_idle_base.png"
+        },
+        "bottom": {
+          "key": "catchor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/catchor/catchor_side_idle_base.png"
+        },
+        "east": {
+          "key": "catchor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/catchor/catchor_side_idle_base.png"
+        },
+        "west": {
+          "key": "catchor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/catchor/catchor_side_idle_base.png"
+        },
+        "north": {
+          "key": "catchor_front_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/catchor/catchor_front_idle_base.png"
+        },
+        "south": {
+          "key": "catchor_back_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/catchor/catchor_back_idle_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:keyboard",
+      "short": "keyboard",
+      "name": "Keyboard",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "keyboard",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2500 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "keyboard_top_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_top_idle_base.png"
+        },
+        "bottom": {
+          "key": "keyboard_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_side_idle_base.png"
+        },
+        "east": {
+          "key": "keyboard_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_side_idle_base.png"
+        },
+        "west": {
+          "key": "keyboard_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_side_idle_base.png"
+        },
+        "north": {
+          "key": "keyboard_front_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_front_idle_base.png"
+        },
+        "south": {
+          "key": "keyboard_back_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_back_idle_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:switch",
+      "short": "switch",
+      "name": "Switch",
+      "shape_class": "special",
+      "engine_shape": "Cube",
+      "stem": "switch",
+      "tris": 24,
+      "status": "ready",
+      "notes": [
+        "Switch: component plate plus a simple upright lever box."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "switch_top_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/switch/switch_top_off_base.png"
+        },
+        "bottom": {
+          "key": "switch_side_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/switch/switch_side_off_base.png"
+        },
+        "east": {
+          "key": "switch_side_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/switch/switch_side_off_base.png"
+        },
+        "west": {
+          "key": "switch_side_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/switch/switch_side_off_base.png"
+        },
+        "north": {
+          "key": "switch_front_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/switch/switch_front_off_base.png"
+        },
+        "south": {
+          "key": "switch_back_off_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/switch/switch_back_off_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:button",
+      "short": "button",
+      "name": "Button",
+      "shape_class": "special",
+      "engine_shape": "Cube",
+      "stem": "button",
+      "tris": 24,
+      "status": "ready",
+      "notes": [
+        "Button: component plate plus a raised cap."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "button_top_up_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/button/button_top_up_base.png"
+        },
+        "bottom": {
+          "key": "button_side_up_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/button/button_side_up_base.png"
+        },
+        "east": {
+          "key": "button_side_up_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/button/button_side_up_base.png"
+        },
+        "west": {
+          "key": "button_side_up_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/button/button_side_up_base.png"
+        },
+        "north": {
+          "key": "button_front_up_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/button/button_front_up_base.png"
+        },
+        "south": {
+          "key": "button_back_up_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/button/button_back_up_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:dialor",
+      "short": "dialor",
+      "name": "Dialor",
+      "shape_class": "special",
+      "engine_shape": "Cube",
+      "stem": "dialor",
+      "tris": 36,
+      "status": "ready",
+      "notes": [
+        "Dialor: component plate plus an 8-sided dial disc. Top is the approved v32 still with the widened well."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "dialor_top_v32_base",
+          "source": "/workspace/components-v2/texture-review-2026-11-17/fixes/dialor/pack_128/dialor_top_v32_base.png"
+        },
+        "bottom": {
+          "key": "dialor_side_base",
+          "source": "/workspace/components-v2/dialor/pack_128/textures/blocks/dialor/dialor_C_side_base.png"
+        },
+        "east": {
+          "key": "dialor_side_base",
+          "source": "/workspace/components-v2/dialor/pack_128/textures/blocks/dialor/dialor_C_side_base.png"
+        },
+        "west": {
+          "key": "dialor_side_base",
+          "source": "/workspace/components-v2/dialor/pack_128/textures/blocks/dialor/dialor_C_side_base.png"
+        },
+        "north": {
+          "key": "dialor_front_base",
+          "source": "/workspace/components-v2/dialor/pack_128/textures/blocks/dialor/dialor_C_front_base.png"
+        },
+        "south": {
+          "key": "dialor_back_base",
+          "source": "/workspace/components-v2/dialor/pack_128/textures/blocks/dialor/dialor_C_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:bitor",
+      "short": "bitor",
+      "name": "Bitor",
+      "shape_class": "component_slab",
+      "engine_shape": "Cube",
+      "stem": "bitor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Component plate: height 0.2812 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "bitor_top_and_base",
+          "source": "/workspace/components-v2/bitor/pack_128/textures/blocks/bitor/bitor_B_top_and_base.png"
+        },
+        "bottom": {
+          "key": "bitor_bottom_base",
+          "source": "/workspace/components-v2/bitor/pack_128/textures/blocks/bitor/bitor_B_bottom_base.png"
+        },
+        "east": {
+          "key": "bitor_east_base",
+          "source": "/workspace/components-v2/bitor/pack_128/textures/blocks/bitor/bitor_B_east_base.png"
+        },
+        "west": {
+          "key": "bitor_east_base",
+          "source": "/workspace/components-v2/bitor/pack_128/textures/blocks/bitor/bitor_B_east_base.png"
+        },
+        "north": {
+          "key": "bitor_front_base",
+          "source": "/workspace/components-v2/bitor/pack_128/textures/blocks/bitor/bitor_B_front_base.png"
+        },
+        "south": {
+          "key": "bitor_back_base",
+          "source": "/workspace/components-v2/bitor/pack_128/textures/blocks/bitor/bitor_B_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:watchor",
+      "short": "watchor",
+      "name": "Watchor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "watchor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "watchor_top_base",
+          "source": "/workspace/components-v2/watchor/pack_128/textures/blocks/watchor/watchor_B_top_base.png"
+        },
+        "bottom": {
+          "key": "watchor_bottom_base",
+          "source": "/workspace/components-v2/watchor/pack_128/textures/blocks/watchor/watchor_B_bottom_base.png"
+        },
+        "east": {
+          "key": "watchor_east_base",
+          "source": "/workspace/components-v2/watchor/pack_128/textures/blocks/watchor/watchor_B_east_base.png"
+        },
+        "west": {
+          "key": "watchor_east_base",
+          "source": "/workspace/components-v2/watchor/pack_128/textures/blocks/watchor/watchor_B_east_base.png"
+        },
+        "north": {
+          "key": "watchor_front_base",
+          "source": "/workspace/components-v2/watchor/pack_128/textures/blocks/watchor/watchor_B_front_base.png"
+        },
+        "south": {
+          "key": "watchor_back_base",
+          "source": "/workspace/components-v2/watchor/pack_128/textures/blocks/watchor/watchor_B_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:pushor",
+      "short": "pushor",
+      "name": "Pushor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "pushor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "pushor_top_base",
+          "source": "/workspace/components-v2/pushor/pack_128/textures/blocks/pushor/pushor_B_top_base.png"
+        },
+        "bottom": {
+          "key": "pushor_bottom_base",
+          "source": "/workspace/components-v2/pushor/pack_128/textures/blocks/pushor/pushor_B_bottom_base.png"
+        },
+        "east": {
+          "key": "pushor_east_base",
+          "source": "/workspace/components-v2/pushor/pack_128/textures/blocks/pushor/pushor_B_east_base.png"
+        },
+        "west": {
+          "key": "pushor_east_base",
+          "source": "/workspace/components-v2/pushor/pack_128/textures/blocks/pushor/pushor_B_east_base.png"
+        },
+        "north": {
+          "key": "pushor_front_base",
+          "source": "/workspace/components-v2/pushor/pack_128/textures/blocks/pushor/pushor_B_front_base.png"
+        },
+        "south": {
+          "key": "pushor_back_base",
+          "source": "/workspace/components-v2/pushor/pack_128/textures/blocks/pushor/pushor_B_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:swivelor",
+      "short": "swivelor",
+      "name": "Swivelor",
+      "shape_class": "special",
+      "engine_shape": "Cube",
+      "stem": "swivelor",
+      "tris": 44,
+      "status": "ready",
+      "notes": [
+        "Swivelor: full cube plus an 8-sided gear belt (the ring silhouette)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "swivelor_top_d00_base",
+          "source": "/workspace/components-v2/swivelor/pack_128/textures/blocks/swivelor/swivelor_B_top_d00_base.png"
+        },
+        "bottom": {
+          "key": "swivelor_bottom_base",
+          "source": "/workspace/components-v2/swivelor/pack_128/textures/blocks/swivelor/swivelor_B_bottom_base.png"
+        },
+        "east": {
+          "key": "swivelor_east_base",
+          "source": "/workspace/components-v2/swivelor/pack_128/textures/blocks/swivelor/swivelor_B_east_base.png"
+        },
+        "west": {
+          "key": "swivelor_east_base",
+          "source": "/workspace/components-v2/swivelor/pack_128/textures/blocks/swivelor/swivelor_B_east_base.png"
+        },
+        "north": {
+          "key": "swivelor_front_base",
+          "source": "/workspace/components-v2/swivelor/pack_128/textures/blocks/swivelor/swivelor_B_front_base.png"
+        },
+        "south": {
+          "key": "swivelor_back_base",
+          "source": "/workspace/components-v2/swivelor/pack_128/textures/blocks/swivelor/swivelor_B_back_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:red_trace",
+      "short": "red_trace",
+      "name": "Red Trace",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "red_trace",
+      "tris": 36,
+      "status": "proposal",
+      "notes": [
+        "PROPOSAL: 1/16 chip with the straight-wire texture and a raised centre node. Trace is non-volumetric in the world."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "red_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/red_trace.png"
+        },
+        "bottom": {
+          "key": "red_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/red_trace.png"
+        },
+        "north": {
+          "key": "red_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/red_trace.png"
+        },
+        "south": {
+          "key": "red_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/red_trace.png"
+        },
+        "east": {
+          "key": "red_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/red_trace.png"
+        },
+        "west": {
+          "key": "red_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/red_trace.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:blue_trace",
+      "short": "blue_trace",
+      "name": "Blue Trace",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "blue_trace",
+      "tris": 36,
+      "status": "proposal",
+      "notes": [
+        "PROPOSAL: 1/16 chip with the straight-wire texture and a raised centre node. Trace is non-volumetric in the world."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "blue_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/blue_trace.png"
+        },
+        "bottom": {
+          "key": "blue_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/blue_trace.png"
+        },
+        "north": {
+          "key": "blue_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/blue_trace.png"
+        },
+        "south": {
+          "key": "blue_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/blue_trace.png"
+        },
+        "east": {
+          "key": "blue_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/blue_trace.png"
+        },
+        "west": {
+          "key": "blue_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/blue_trace.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:red_via",
+      "short": "red_via",
+      "name": "Red Via",
+      "shape_class": "special",
+      "engine_shape": "Cube",
+      "stem": "red_via",
+      "tris": 64,
+      "status": "ready",
+      "notes": [
+        "Via B lattice cage (straight single). Elbows are auto-geometry and have no drop."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "via_top_single (red s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/red/via_top_single_s64.png"
+        },
+        "bottom": {
+          "key": "via_bottom_single (red s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/red/via_bottom_single_s64.png"
+        },
+        "north": {
+          "key": "via_side_single (red s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/red/via_side_single_s64.png"
+        },
+        "south": {
+          "key": "via_side_single (red s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/red/via_side_single_s64.png"
+        },
+        "east": {
+          "key": "via_side_single (red s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/red/via_side_single_s64.png"
+        },
+        "west": {
+          "key": "via_side_single (red s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/red/via_side_single_s64.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:blue_via",
+      "short": "blue_via",
+      "name": "Blue Via",
+      "shape_class": "special",
+      "engine_shape": "Cube",
+      "stem": "blue_via",
+      "tris": 64,
+      "status": "ready",
+      "notes": [
+        "Via B lattice cage (straight single). Elbows are auto-geometry and have no drop."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "via_top_single (blue s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/blue/via_top_single_s64.png"
+        },
+        "bottom": {
+          "key": "via_bottom_single (blue s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/blue/via_bottom_single_s64.png"
+        },
+        "north": {
+          "key": "via_side_single (blue s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/blue/via_side_single_s64.png"
+        },
+        "south": {
+          "key": "via_side_single (blue s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/blue/via_side_single_s64.png"
+        },
+        "east": {
+          "key": "via_side_single (blue s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/blue/via_side_single_s64.png"
+        },
+        "west": {
+          "key": "via_side_single (blue s64)",
+          "source": "/workspace/components-v2/via/pack_128/preview_tinted/blue/via_side_single_s64.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:vior",
+      "short": "vior",
+      "name": "Vior",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "vior",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "vior_run_end",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_end.png"
+        },
+        "bottom": {
+          "key": "vior_run_end",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_end.png"
+        },
+        "east": {
+          "key": "vior_run_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_side.png"
+        },
+        "west": {
+          "key": "vior_run_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_side.png"
+        },
+        "north": {
+          "key": "vior_run_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_side.png"
+        },
+        "south": {
+          "key": "vior_run_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/vior_run_side.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:red_torch",
+      "short": "red_torch",
+      "name": "Red LED",
+      "shape_class": "special",
+      "engine_shape": "Cross",
+      "stem": "red_torch",
+      "tris": 36,
+      "status": "ready",
+      "notes": [
+        "LED: shaft box + gem cap, using the official led_shaft / led_gem / led_chip textures."
+      ],
+      "textures_used": {
+        "bottom": {
+          "key": "led_chip",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_chip.png"
+        },
+        "top": {
+          "key": "led_gem_red_off",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_gem_red_off.png"
+        },
+        "east": {
+          "key": "led_shaft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_shaft.png"
+        },
+        "west": {
+          "key": "led_shaft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_shaft.png"
+        },
+        "north": {
+          "key": "led_shaft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_shaft.png"
+        },
+        "south": {
+          "key": "led_shaft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_shaft.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:blue_torch",
+      "short": "blue_torch",
+      "name": "Blue LED",
+      "shape_class": "special",
+      "engine_shape": "Cross",
+      "stem": "blue_torch",
+      "tris": 36,
+      "status": "ready",
+      "notes": [
+        "LED: shaft box + gem cap, using the official led_shaft / led_gem / led_chip textures."
+      ],
+      "textures_used": {
+        "bottom": {
+          "key": "led_chip",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_chip.png"
+        },
+        "top": {
+          "key": "led_gem_blue_off",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_gem_blue_off.png"
+        },
+        "east": {
+          "key": "led_shaft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_shaft.png"
+        },
+        "west": {
+          "key": "led_shaft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_shaft.png"
+        },
+        "north": {
+          "key": "led_shaft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_shaft.png"
+        },
+        "south": {
+          "key": "led_shaft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/led_shaft.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:lamp",
+      "short": "lamp",
+      "name": "Lamp",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "lamp",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "lamp_on",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lamp_on.png"
+        },
+        "bottom": {
+          "key": "lamp_on",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lamp_on.png"
+        },
+        "north": {
+          "key": "lamp_on",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lamp_on.png"
+        },
+        "south": {
+          "key": "lamp_on",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lamp_on.png"
+        },
+        "east": {
+          "key": "lamp_on",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lamp_on.png"
+        },
+        "west": {
+          "key": "lamp_on",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lamp_on.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:color_lamp_16",
+      "short": "color_lamp_16",
+      "name": "lamp16",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "color_lamp_16",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "color_lamp_16",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_16.png"
+        },
+        "bottom": {
+          "key": "color_lamp_16",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_16.png"
+        },
+        "north": {
+          "key": "color_lamp_16",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_16.png"
+        },
+        "south": {
+          "key": "color_lamp_16",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_16.png"
+        },
+        "east": {
+          "key": "color_lamp_16",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_16.png"
+        },
+        "west": {
+          "key": "color_lamp_16",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_16.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:color_lamp_32",
+      "short": "color_lamp_32",
+      "name": "lamp32",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "color_lamp_32",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "color_lamp_32",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_32.png"
+        },
+        "bottom": {
+          "key": "color_lamp_32",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_32.png"
+        },
+        "north": {
+          "key": "color_lamp_32",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_32.png"
+        },
+        "south": {
+          "key": "color_lamp_32",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_32.png"
+        },
+        "east": {
+          "key": "color_lamp_32",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_32.png"
+        },
+        "west": {
+          "key": "color_lamp_32",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_32.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:color_lamp_64",
+      "short": "color_lamp_64",
+      "name": "lamp64",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "color_lamp_64",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "color_lamp_64",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_64.png"
+        },
+        "bottom": {
+          "key": "color_lamp_64",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_64.png"
+        },
+        "north": {
+          "key": "color_lamp_64",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_64.png"
+        },
+        "south": {
+          "key": "color_lamp_64",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_64.png"
+        },
+        "east": {
+          "key": "color_lamp_64",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_64.png"
+        },
+        "west": {
+          "key": "color_lamp_64",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/color_lamp_64.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:silicon",
+      "short": "silicon",
+      "name": "Wafer Silicon",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "silicon",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "silicon",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon.png"
+        },
+        "bottom": {
+          "key": "silicon",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon.png"
+        },
+        "north": {
+          "key": "silicon",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon.png"
+        },
+        "south": {
+          "key": "silicon",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon.png"
+        },
+        "east": {
+          "key": "silicon",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon.png"
+        },
+        "west": {
+          "key": "silicon",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:silicon_slab",
+      "short": "silicon_slab",
+      "name": "Silicon Slab",
+      "shape_class": "half_slab",
+      "engine_shape": "Slab",
+      "stem": "silicon_slab",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Half slab: height 8/16, side UVs cropped to the authored bottom half."
+      ],
+      "textures_used": {
+        "bottom": {
+          "key": "silicon_slab_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon_slab_top.png"
+        },
+        "top": {
+          "key": "silicon_slab_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon_slab_top.png"
+        },
+        "east": {
+          "key": "silicon_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon_slab_side.png"
+        },
+        "west": {
+          "key": "silicon_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon_slab_side.png"
+        },
+        "north": {
+          "key": "silicon_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon_slab_side.png"
+        },
+        "south": {
+          "key": "silicon_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silicon_slab_side.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:stone",
+      "short": "stone",
+      "name": "Stone",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "stone",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "stone",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone.png"
+        },
+        "bottom": {
+          "key": "stone",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone.png"
+        },
+        "north": {
+          "key": "stone",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone.png"
+        },
+        "south": {
+          "key": "stone",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone.png"
+        },
+        "east": {
+          "key": "stone",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone.png"
+        },
+        "west": {
+          "key": "stone",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:stone_slab",
+      "short": "stone_slab",
+      "name": "Stone Slab",
+      "shape_class": "half_slab",
+      "engine_shape": "Slab",
+      "stem": "stone_slab",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Half slab: height 8/16, side UVs cropped to the authored bottom half."
+      ],
+      "textures_used": {
+        "bottom": {
+          "key": "stone_slab_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone_slab_top.png"
+        },
+        "top": {
+          "key": "stone_slab_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone_slab_top.png"
+        },
+        "east": {
+          "key": "stone_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone_slab_side.png"
+        },
+        "west": {
+          "key": "stone_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone_slab_side.png"
+        },
+        "north": {
+          "key": "stone_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone_slab_side.png"
+        },
+        "south": {
+          "key": "stone_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/stone_slab_side.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:dirt",
+      "short": "dirt",
+      "name": "Dirt",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "dirt",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "dirt",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt.png"
+        },
+        "bottom": {
+          "key": "dirt",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt.png"
+        },
+        "north": {
+          "key": "dirt",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt.png"
+        },
+        "south": {
+          "key": "dirt",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt.png"
+        },
+        "east": {
+          "key": "dirt",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt.png"
+        },
+        "west": {
+          "key": "dirt",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:dirt_slab",
+      "short": "dirt_slab",
+      "name": "Dirt Slab",
+      "shape_class": "half_slab",
+      "engine_shape": "Slab",
+      "stem": "dirt_slab",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Half slab: height 8/16, side UVs cropped to the authored bottom half."
+      ],
+      "textures_used": {
+        "bottom": {
+          "key": "dirt_slab_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt_slab_top.png"
+        },
+        "top": {
+          "key": "dirt_slab_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt_slab_top.png"
+        },
+        "east": {
+          "key": "dirt_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt_slab_side.png"
+        },
+        "west": {
+          "key": "dirt_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt_slab_side.png"
+        },
+        "north": {
+          "key": "dirt_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt_slab_side.png"
+        },
+        "south": {
+          "key": "dirt_slab_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt_slab_side.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:grass",
+      "short": "grass",
+      "name": "Grass",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "grass",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "bottom": {
+          "key": "dirt",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt.png"
+        },
+        "top": {
+          "key": "grass_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_top.png"
+        },
+        "east": {
+          "key": "grass_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_side.png"
+        },
+        "west": {
+          "key": "grass_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_side.png"
+        },
+        "north": {
+          "key": "grass_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_side.png"
+        },
+        "south": {
+          "key": "grass_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_side.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:glass",
+      "short": "glass",
+      "name": "Glass",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "glass",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/glass.png"
+        },
+        "bottom": {
+          "key": "glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/glass.png"
+        },
+        "north": {
+          "key": "glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/glass.png"
+        },
+        "south": {
+          "key": "glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/glass.png"
+        },
+        "east": {
+          "key": "glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/glass.png"
+        },
+        "west": {
+          "key": "glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/glass.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:frosted_glass",
+      "short": "frosted_glass",
+      "name": "Frosted Glass",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "frosted_glass",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "frosted_glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/frosted_glass.png"
+        },
+        "bottom": {
+          "key": "frosted_glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/frosted_glass.png"
+        },
+        "north": {
+          "key": "frosted_glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/frosted_glass.png"
+        },
+        "south": {
+          "key": "frosted_glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/frosted_glass.png"
+        },
+        "east": {
+          "key": "frosted_glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/frosted_glass.png"
+        },
+        "west": {
+          "key": "frosted_glass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/frosted_glass.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:ceramic",
+      "short": "ceramic",
+      "name": "Ceramic",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "ceramic",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "ceramic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/ceramic.png"
+        },
+        "bottom": {
+          "key": "ceramic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/ceramic.png"
+        },
+        "north": {
+          "key": "ceramic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/ceramic.png"
+        },
+        "south": {
+          "key": "ceramic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/ceramic.png"
+        },
+        "east": {
+          "key": "ceramic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/ceramic.png"
+        },
+        "west": {
+          "key": "ceramic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/ceramic.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:copper_block",
+      "short": "copper_block",
+      "name": "Copper Block",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "copper_block",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "copper_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/copper_block.png"
+        },
+        "bottom": {
+          "key": "copper_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/copper_block.png"
+        },
+        "north": {
+          "key": "copper_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/copper_block.png"
+        },
+        "south": {
+          "key": "copper_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/copper_block.png"
+        },
+        "east": {
+          "key": "copper_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/copper_block.png"
+        },
+        "west": {
+          "key": "copper_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/copper_block.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:aluminum_block",
+      "short": "aluminum_block",
+      "name": "Aluminum Block",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "aluminum_block",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "bottom": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "north": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "south": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "east": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "west": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:gravity_block",
+      "short": "gravity_block",
+      "name": "Gravity Block",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "gravity_block",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "gravity_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/gravity_block.png"
+        },
+        "bottom": {
+          "key": "gravity_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/gravity_block.png"
+        },
+        "north": {
+          "key": "gravity_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/gravity_block.png"
+        },
+        "south": {
+          "key": "gravity_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/gravity_block.png"
+        },
+        "east": {
+          "key": "gravity_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/gravity_block.png"
+        },
+        "west": {
+          "key": "gravity_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/gravity_block.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:substrate",
+      "short": "substrate",
+      "name": "Substrate",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "substrate",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "substrate",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/substrate.png"
+        },
+        "bottom": {
+          "key": "substrate",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/substrate.png"
+        },
+        "north": {
+          "key": "substrate",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/substrate.png"
+        },
+        "south": {
+          "key": "substrate",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/substrate.png"
+        },
+        "east": {
+          "key": "substrate",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/substrate.png"
+        },
+        "west": {
+          "key": "substrate",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/substrate.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:insulatnor",
+      "short": "insulatnor",
+      "name": "Insulatnor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "insulatnor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "insulatnor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatnor.png"
+        },
+        "bottom": {
+          "key": "insulatnor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatnor.png"
+        },
+        "north": {
+          "key": "insulatnor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatnor.png"
+        },
+        "south": {
+          "key": "insulatnor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatnor.png"
+        },
+        "east": {
+          "key": "insulatnor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatnor.png"
+        },
+        "west": {
+          "key": "insulatnor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatnor.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:insulator",
+      "short": "insulator",
+      "name": "Insulator",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "insulator",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "insulator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulator.png"
+        },
+        "bottom": {
+          "key": "insulator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulator.png"
+        },
+        "north": {
+          "key": "insulator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulator.png"
+        },
+        "south": {
+          "key": "insulator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulator.png"
+        },
+        "east": {
+          "key": "insulator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulator.png"
+        },
+        "west": {
+          "key": "insulator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulator.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:insulatxor",
+      "short": "insulatxor",
+      "name": "Insulatxor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "insulatxor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "insulatxor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatxor.png"
+        },
+        "bottom": {
+          "key": "insulatxor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatxor.png"
+        },
+        "north": {
+          "key": "insulatxor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatxor.png"
+        },
+        "south": {
+          "key": "insulatxor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatxor.png"
+        },
+        "east": {
+          "key": "insulatxor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatxor.png"
+        },
+        "west": {
+          "key": "insulatxor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/insulatxor.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:structure_block",
+      "short": "structure_block",
+      "name": "Structure Block",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "structure_block",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "structure_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/structure_block.png"
+        },
+        "bottom": {
+          "key": "structure_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/structure_block.png"
+        },
+        "north": {
+          "key": "structure_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/structure_block.png"
+        },
+        "south": {
+          "key": "structure_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/structure_block.png"
+        },
+        "east": {
+          "key": "structure_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/structure_block.png"
+        },
+        "west": {
+          "key": "structure_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/structure_block.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:lithographor",
+      "short": "lithographor",
+      "name": "Lithographor",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "lithographor",
+      "tris": 24,
+      "status": "ready",
+      "notes": [
+        "Lithographor: body box + lens column (simplified from the custom machine mesh)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "lithographor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lithographor_top.png"
+        },
+        "bottom": {
+          "key": "lithographor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lithographor_side.png"
+        },
+        "east": {
+          "key": "lithographor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lithographor_side.png"
+        },
+        "west": {
+          "key": "lithographor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lithographor_side.png"
+        },
+        "north": {
+          "key": "lithographor_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lithographor_front.png"
+        },
+        "south": {
+          "key": "lithographor_back",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/lithographor_back.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:etchor",
+      "short": "etchor",
+      "name": "Etchor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "etchor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "etchor_top_blue_in",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/etchor_top_blue_in.png"
+        },
+        "bottom": {
+          "key": "etchor_bottom_red_in",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/etchor_bottom_red_in.png"
+        },
+        "east": {
+          "key": "etchor_side_laser_port",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/etchor_side_laser_port.png"
+        },
+        "west": {
+          "key": "etchor_side_laser_port",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/etchor_side_laser_port.png"
+        },
+        "north": {
+          "key": "etchor_front_chip_out",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/etchor_front_chip_out.png"
+        },
+        "south": {
+          "key": "etchor_back_wafer_in",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/etchor_back_wafer_in.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:certificate_table",
+      "short": "certificate_table",
+      "name": "Certificate Table",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "certificate_table",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "certificate_table_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_top.png"
+        },
+        "east": {
+          "key": "certificate_table_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_side.png"
+        },
+        "west": {
+          "key": "certificate_table_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_side.png"
+        },
+        "north": {
+          "key": "certificate_table_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_side.png"
+        },
+        "south": {
+          "key": "certificate_table_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_side.png"
+        },
+        "bottom": {
+          "key": "certificate_table_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_top.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:emitor",
+      "short": "emitor",
+      "name": "Emitor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "emitor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "emitor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/emitor_top.png"
+        },
+        "bottom": {
+          "key": "emitor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/emitor_top.png"
+        },
+        "east": {
+          "key": "emitor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/emitor_side.png"
+        },
+        "west": {
+          "key": "emitor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/emitor_side.png"
+        },
+        "north": {
+          "key": "emitor_aperture",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/emitor_aperture.png"
+        },
+        "south": {
+          "key": "emitor_back_trace_in",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/emitor_back_trace_in.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:laysor",
+      "short": "laysor",
+      "name": "Laysor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "laysor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "laysor_crystal_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/laysor_crystal_top.png"
+        },
+        "bottom": {
+          "key": "laysor_crystal_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/laysor_crystal_top.png"
+        },
+        "east": {
+          "key": "laysor_crystal_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/laysor_crystal_side.png"
+        },
+        "west": {
+          "key": "laysor_crystal_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/laysor_crystal_side.png"
+        },
+        "north": {
+          "key": "laysor_crystal_end",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/laysor_crystal_end.png"
+        },
+        "south": {
+          "key": "laysor_crystal_end",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/laysor_crystal_end.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:selector",
+      "short": "selector",
+      "name": "Selector",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "selector",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "selector_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/selector_top.png"
+        },
+        "bottom": {
+          "key": "selector_bottom_out",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/selector_bottom_out.png"
+        },
+        "east": {
+          "key": "selector_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/selector_side.png"
+        },
+        "west": {
+          "key": "selector_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/selector_side.png"
+        },
+        "north": {
+          "key": "selector_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/selector_side.png"
+        },
+        "south": {
+          "key": "selector_side_bus",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/selector_side_bus.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:connector",
+      "short": "connector",
+      "name": "Connector",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "connector",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "connector_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/connector_top.png"
+        },
+        "bottom": {
+          "key": "connector_bottom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/connector_bottom.png"
+        },
+        "east": {
+          "key": "connector_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/connector_side.png"
+        },
+        "west": {
+          "key": "connector_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/connector_side.png"
+        },
+        "north": {
+          "key": "connector_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/connector_side.png"
+        },
+        "south": {
+          "key": "connector_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/connector_side.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:input_buffer",
+      "short": "input_buffer",
+      "name": "Input Buffer",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "input_buffer",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "buffer_top_in",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/buffer_top_in.png"
+        },
+        "east": {
+          "key": "buffer_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/buffer_side.png"
+        },
+        "west": {
+          "key": "buffer_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/buffer_side.png"
+        },
+        "north": {
+          "key": "buffer_front_out",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/buffer_front_out.png"
+        },
+        "south": {
+          "key": "buffer_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/buffer_side.png"
+        },
+        "bottom": {
+          "key": "buffer_top_in",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/buffer_top_in.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:fabor",
+      "short": "fabor",
+      "name": "Fabor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "fabor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "fabor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/fabor_top.png"
+        },
+        "east": {
+          "key": "fabor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/fabor_side.png"
+        },
+        "west": {
+          "key": "fabor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/fabor_side.png"
+        },
+        "north": {
+          "key": "fabor_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/fabor_front.png"
+        },
+        "south": {
+          "key": "fabor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/fabor_side.png"
+        },
+        "bottom": {
+          "key": "fabor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/fabor_top.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:autofabor",
+      "short": "autofabor",
+      "name": "AutoFabor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "autofabor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "autofabor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/autofabor_top.png"
+        },
+        "east": {
+          "key": "autofabor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/autofabor_side.png"
+        },
+        "west": {
+          "key": "autofabor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/autofabor_side.png"
+        },
+        "north": {
+          "key": "autofabor_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/autofabor_front.png"
+        },
+        "south": {
+          "key": "autofabor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/autofabor_side.png"
+        },
+        "bottom": {
+          "key": "autofabor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/autofabor_top.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:chipor",
+      "short": "chipor",
+      "name": "Chipor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "chipor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "chipor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_top.png"
+        },
+        "bottom": {
+          "key": "chipor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_side.png"
+        },
+        "east": {
+          "key": "chipor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_side.png"
+        },
+        "west": {
+          "key": "chipor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_side.png"
+        },
+        "north": {
+          "key": "chipor_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_front.png"
+        },
+        "south": {
+          "key": "chipor_back",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_back.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:chipor_viewport",
+      "short": "chipor_viewport",
+      "name": "Chipor Viewport",
+      "shape_class": "full_block",
+      "engine_shape": "Custom",
+      "stem": "chipor_viewport",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "chipor_viewport_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_viewport_top.png"
+        },
+        "bottom": {
+          "key": "chipor_viewport_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_viewport_side.png"
+        },
+        "east": {
+          "key": "chipor_viewport_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_viewport_side.png"
+        },
+        "west": {
+          "key": "chipor_viewport_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_viewport_side.png"
+        },
+        "north": {
+          "key": "chipor_viewport_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_viewport_front.png"
+        },
+        "south": {
+          "key": "chipor_viewport_back",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/chipor_viewport_back.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:signal_transmittor",
+      "short": "signal_transmittor",
+      "name": "Signal Transmittor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "signal_transmittor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "signal_transmittor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_transmittor_top.png"
+        },
+        "bottom": {
+          "key": "signal_transmittor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_transmittor_side.png"
+        },
+        "east": {
+          "key": "signal_transmittor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_transmittor_side.png"
+        },
+        "west": {
+          "key": "signal_transmittor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_transmittor_side.png"
+        },
+        "north": {
+          "key": "signal_transmittor_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_transmittor_front.png"
+        },
+        "south": {
+          "key": "signal_transmittor_back",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_transmittor_back.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:signal_receivor",
+      "short": "signal_receivor",
+      "name": "Signal Receivor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "signal_receivor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "signal_receivor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_receivor_top.png"
+        },
+        "bottom": {
+          "key": "signal_receivor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_receivor_side.png"
+        },
+        "east": {
+          "key": "signal_receivor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_receivor_side.png"
+        },
+        "west": {
+          "key": "signal_receivor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_receivor_side.png"
+        },
+        "north": {
+          "key": "signal_receivor_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_receivor_front.png"
+        },
+        "south": {
+          "key": "signal_receivor_back",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/signal_receivor_back.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:dish",
+      "short": "dish",
+      "name": "Dish",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "dish",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "dish_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dish_top.png"
+        },
+        "bottom": {
+          "key": "dish_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dish_side.png"
+        },
+        "east": {
+          "key": "dish_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dish_side.png"
+        },
+        "west": {
+          "key": "dish_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dish_side.png"
+        },
+        "north": {
+          "key": "dish_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dish_front.png"
+        },
+        "south": {
+          "key": "dish_back",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dish_back.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:overclockor",
+      "short": "overclockor",
+      "name": "Overclockor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "overclockor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "overclockor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/overclockor_top.png"
+        },
+        "bottom": {
+          "key": "overclockor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/overclockor_side.png"
+        },
+        "east": {
+          "key": "overclockor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/overclockor_side.png"
+        },
+        "west": {
+          "key": "overclockor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/overclockor_side.png"
+        },
+        "north": {
+          "key": "overclockor_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/overclockor_front.png"
+        },
+        "south": {
+          "key": "overclockor_back",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/overclockor_back.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:portor",
+      "short": "portor",
+      "name": "Portor",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "portor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "portor_top",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_top.png"
+        },
+        "bottom": {
+          "key": "portor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_side.png"
+        },
+        "east": {
+          "key": "portor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_side.png"
+        },
+        "west": {
+          "key": "portor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_side.png"
+        },
+        "north": {
+          "key": "portor_front",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_front.png"
+        },
+        "south": {
+          "key": "portor_back",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_back.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:trace_trunk",
+      "short": "trace_trunk",
+      "name": "Trace Trunk",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "trace_bark",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "trace_bark",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bark.png"
+        },
+        "bottom": {
+          "key": "trace_bark",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bark.png"
+        },
+        "north": {
+          "key": "trace_bark",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bark.png"
+        },
+        "south": {
+          "key": "trace_bark",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bark.png"
+        },
+        "east": {
+          "key": "trace_bark",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bark.png"
+        },
+        "west": {
+          "key": "trace_bark",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bark.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:trace_branch",
+      "short": "trace_branch",
+      "name": "Trace Branch",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "trace_canopy",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "trace_canopy",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_canopy.png"
+        },
+        "bottom": {
+          "key": "trace_canopy",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_canopy.png"
+        },
+        "north": {
+          "key": "trace_canopy",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_canopy.png"
+        },
+        "south": {
+          "key": "trace_canopy",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_canopy.png"
+        },
+        "east": {
+          "key": "trace_canopy",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_canopy.png"
+        },
+        "west": {
+          "key": "trace_canopy",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_canopy.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:trace_tip_red",
+      "short": "trace_tip_red",
+      "name": "Red Trace Bulb",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "trace_tip_red",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "red_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/red_trace_bulb_ghost.png"
+        },
+        "bottom": {
+          "key": "red_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/red_trace_bulb_ghost.png"
+        },
+        "north": {
+          "key": "red_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/red_trace_bulb_ghost.png"
+        },
+        "south": {
+          "key": "red_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/red_trace_bulb_ghost.png"
+        },
+        "east": {
+          "key": "red_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/red_trace_bulb_ghost.png"
+        },
+        "west": {
+          "key": "red_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/red_trace_bulb_ghost.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:trace_tip_blue",
+      "short": "trace_tip_blue",
+      "name": "Blue Trace Bulb",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "trace_tip",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "blue_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/blue_trace_bulb_ghost.png"
+        },
+        "bottom": {
+          "key": "blue_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/blue_trace_bulb_ghost.png"
+        },
+        "north": {
+          "key": "blue_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/blue_trace_bulb_ghost.png"
+        },
+        "south": {
+          "key": "blue_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/blue_trace_bulb_ghost.png"
+        },
+        "east": {
+          "key": "blue_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/blue_trace_bulb_ghost.png"
+        },
+        "west": {
+          "key": "blue_trace_bulb_ghost",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/trace_bulb/blue_trace_bulb_ghost.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:capacitor_can",
+      "short": "capacitor_can",
+      "name": "Capacitor Can",
+      "shape_class": "special",
+      "engine_shape": "Cube",
+      "stem": "capacitor_side",
+      "tris": 32,
+      "status": "ready",
+      "notes": [
+        "Capacitor can: 8-sided cylinder."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "capacitor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/capacitor_side.png"
+        },
+        "bottom": {
+          "key": "capacitor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/capacitor_side.png"
+        },
+        "north": {
+          "key": "capacitor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/capacitor_side.png"
+        },
+        "south": {
+          "key": "capacitor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/capacitor_side.png"
+        },
+        "east": {
+          "key": "capacitor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/capacitor_side.png"
+        },
+        "west": {
+          "key": "capacitor_side",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/capacitor_side.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:resonator_crystal",
+      "short": "resonator_crystal",
+      "name": "Resonator Crystal",
+      "shape_class": "special",
+      "engine_shape": "Cube",
+      "stem": "quartz_spire",
+      "tris": 24,
+      "status": "ready",
+      "notes": [
+        "Resonator crystal: 6-sided prism with a pointed cap."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "quartz_spire",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/quartz_spire.png"
+        },
+        "bottom": {
+          "key": "quartz_spire",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/quartz_spire.png"
+        },
+        "north": {
+          "key": "quartz_spire",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/quartz_spire.png"
+        },
+        "south": {
+          "key": "quartz_spire",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/quartz_spire.png"
+        },
+        "east": {
+          "key": "quartz_spire",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/quartz_spire.png"
+        },
+        "west": {
+          "key": "quartz_spire",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/quartz_spire.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:dead_silicon",
+      "short": "dead_silicon",
+      "name": "Dead Silicon",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "wafer_ground_dead",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "bottom": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "north": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "south": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "east": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "west": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:fossil_trace",
+      "short": "fossil_trace",
+      "name": "Fossil Trace",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "wafer_ground_trace",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "wafer_ground_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_trace.png"
+        },
+        "bottom": {
+          "key": "wafer_ground_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_trace.png"
+        },
+        "north": {
+          "key": "wafer_ground_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_trace.png"
+        },
+        "south": {
+          "key": "wafer_ground_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_trace.png"
+        },
+        "east": {
+          "key": "wafer_ground_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_trace.png"
+        },
+        "west": {
+          "key": "wafer_ground_trace",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_trace.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:broken_via",
+      "short": "broken_via",
+      "name": "Broken Via",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "wafer_ground_dead",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "bottom": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "north": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "south": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "east": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        },
+        "west": {
+          "key": "wafer_ground_dead",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dead.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:scribe_silicon",
+      "short": "scribe_silicon",
+      "name": "Scribe Silicon",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "wafer_ground_dicing",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "wafer_ground_dicing",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dicing.png"
+        },
+        "bottom": {
+          "key": "wafer_ground_dicing",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dicing.png"
+        },
+        "north": {
+          "key": "wafer_ground_dicing",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dicing.png"
+        },
+        "south": {
+          "key": "wafer_ground_dicing",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dicing.png"
+        },
+        "east": {
+          "key": "wafer_ground_dicing",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dicing.png"
+        },
+        "west": {
+          "key": "wafer_ground_dicing",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_dicing.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:dense_silicon",
+      "short": "dense_silicon",
+      "name": "Dense Silicon",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "wafer_ground_capacitor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "wafer_ground_capacitor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+        },
+        "bottom": {
+          "key": "wafer_ground_capacitor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+        },
+        "north": {
+          "key": "wafer_ground_capacitor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+        },
+        "south": {
+          "key": "wafer_ground_capacitor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+        },
+        "east": {
+          "key": "wafer_ground_capacitor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+        },
+        "west": {
+          "key": "wafer_ground_capacitor",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_capacitor.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:flecked_silicon",
+      "short": "flecked_silicon",
+      "name": "Flecked Silicon",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "wafer_ground_resonator",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "wafer_ground_resonator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_resonator.png"
+        },
+        "bottom": {
+          "key": "wafer_ground_resonator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_resonator.png"
+        },
+        "north": {
+          "key": "wafer_ground_resonator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_resonator.png"
+        },
+        "south": {
+          "key": "wafer_ground_resonator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_resonator.png"
+        },
+        "east": {
+          "key": "wafer_ground_resonator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_resonator.png"
+        },
+        "west": {
+          "key": "wafer_ground_resonator",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/wafer_ground_resonator.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:dead_memory_cell",
+      "short": "dead_memory_cell",
+      "name": "Dead Memory Cell",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "memor",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "memor_top_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_top_idle_base.png"
+        },
+        "bottom": {
+          "key": "memor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_side_idle_base.png"
+        },
+        "east": {
+          "key": "memor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_side_idle_base.png"
+        },
+        "west": {
+          "key": "memor_side_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_side_idle_base.png"
+        },
+        "north": {
+          "key": "memor_front_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_front_idle_base.png"
+        },
+        "south": {
+          "key": "memor_back_idle_base",
+          "source": "/workspace/components-v2/pack_128/textures/blocks/memor/memor_back_idle_base.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:tilled_silicon",
+      "short": "tilled_silicon",
+      "name": "Tilled Silicon",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "silica_tilled",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "silica_tilled",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_tilled.png"
+        },
+        "bottom": {
+          "key": "silica_tilled",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_tilled.png"
+        },
+        "north": {
+          "key": "silica_tilled",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_tilled.png"
+        },
+        "south": {
+          "key": "silica_tilled",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_tilled.png"
+        },
+        "east": {
+          "key": "silica_tilled",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_tilled.png"
+        },
+        "west": {
+          "key": "silica_tilled",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_tilled.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:aluminum_ramp",
+      "short": "aluminum_ramp",
+      "name": "Aluminum Ramp",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "aluminum_block",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Ramp wedge. Highway is a 1:2 slope (height 8/16 over one block of the pair). Aluminum is a 1:1 slope. Both reuse aluminum_block textures (no dedicated ramp keys in resources.json)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "bottom": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "north": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "south": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "east": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "west": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:highway_ramp",
+      "short": "highway_ramp",
+      "name": "Highway Ramp",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "aluminum_block",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Ramp wedge. Highway is a 1:2 slope (height 8/16 over one block of the pair). Aluminum is a 1:1 slope. Both reuse aluminum_block textures (no dedicated ramp keys in resources.json)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "bottom": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "north": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "south": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "east": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        },
+        "west": {
+          "key": "aluminum_block",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/aluminum_block.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:virtual_post",
+      "short": "virtual_post",
+      "name": "Virtual Post",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "virtual_post",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Standing post: slim 4/16 column, 1.25 blocks tall (the world post is 2 tall; shortened for the drop)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "east": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "west": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "north": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "south": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "bottom": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:organic_post",
+      "short": "organic_post",
+      "name": "Organic Post",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "organic_post",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Standing post: slim 4/16 column, 1.25 blocks tall (the world post is 2 tall; shortened for the drop)."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "east": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "west": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "north": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "south": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "bottom": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:virtual_wall_post",
+      "short": "virtual_wall_post",
+      "name": "Virtual Wall Post",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "virtual_wall_post",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Wall post: a thin 1 x 1 x 4/16 panel."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "east": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "west": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "north": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "south": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        },
+        "bottom": {
+          "key": "post_wood_virtual",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_virtual.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:organic_wall_post",
+      "short": "organic_wall_post",
+      "name": "Organic Wall Post",
+      "shape_class": "special",
+      "engine_shape": "Custom",
+      "stem": "organic_wall_post",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Wall post: a thin 1 x 1 x 4/16 panel."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "east": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "west": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "north": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "south": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        },
+        "bottom": {
+          "key": "post_wood_organic",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/post_wood_organic.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:crystal_leaves_a",
+      "short": "crystal_leaves_a",
+      "name": "Crystal Leaves",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "crystal_leaves_a",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "crystal_leaves_a",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_a.png"
+        },
+        "bottom": {
+          "key": "crystal_leaves_a",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_a.png"
+        },
+        "north": {
+          "key": "crystal_leaves_a",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_a.png"
+        },
+        "south": {
+          "key": "crystal_leaves_a",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_a.png"
+        },
+        "east": {
+          "key": "crystal_leaves_a",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_a.png"
+        },
+        "west": {
+          "key": "crystal_leaves_a",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_a.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:crystal_leaves_b",
+      "short": "crystal_leaves_b",
+      "name": "Crystal Leaves (Sparse)",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "crystal_leaves_b",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "crystal_leaves_b",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_b.png"
+        },
+        "bottom": {
+          "key": "crystal_leaves_b",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_b.png"
+        },
+        "north": {
+          "key": "crystal_leaves_b",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_b.png"
+        },
+        "south": {
+          "key": "crystal_leaves_b",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_b.png"
+        },
+        "east": {
+          "key": "crystal_leaves_b",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_b.png"
+        },
+        "west": {
+          "key": "crystal_leaves_b",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_b.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:crystal_leaves_reddom",
+      "short": "crystal_leaves_reddom",
+      "name": "Red Crystal Leaves",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "crystal_leaves_reddom",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "crystal_leaves_reddom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_reddom.png"
+        },
+        "bottom": {
+          "key": "crystal_leaves_reddom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_reddom.png"
+        },
+        "north": {
+          "key": "crystal_leaves_reddom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_reddom.png"
+        },
+        "south": {
+          "key": "crystal_leaves_reddom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_reddom.png"
+        },
+        "east": {
+          "key": "crystal_leaves_reddom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_reddom.png"
+        },
+        "west": {
+          "key": "crystal_leaves_reddom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_reddom.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:crystal_leaves_bluedom",
+      "short": "crystal_leaves_bluedom",
+      "name": "Blue Crystal Leaves",
+      "shape_class": "full_block",
+      "engine_shape": "Cube",
+      "stem": "crystal_leaves_bluedom",
+      "tris": 12,
+      "status": "ready",
+      "notes": [
+        "Full block: 6-quad cube, real face textures."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "crystal_leaves_bluedom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_bluedom.png"
+        },
+        "bottom": {
+          "key": "crystal_leaves_bluedom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_bluedom.png"
+        },
+        "north": {
+          "key": "crystal_leaves_bluedom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_bluedom.png"
+        },
+        "south": {
+          "key": "crystal_leaves_bluedom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_bluedom.png"
+        },
+        "east": {
+          "key": "crystal_leaves_bluedom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_bluedom.png"
+        },
+        "west": {
+          "key": "crystal_leaves_bluedom",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/crystal_leaves/crystal_leaves_bluedom.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:silica_grass",
+      "short": "silica_grass",
+      "name": "Silica Grass",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "silica_grass",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "silica_grass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_grass.png"
+        },
+        "bottom": {
+          "key": "silica_grass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_grass.png"
+        },
+        "north": {
+          "key": "silica_grass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_grass.png"
+        },
+        "south": {
+          "key": "silica_grass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_grass.png"
+        },
+        "east": {
+          "key": "silica_grass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_grass.png"
+        },
+        "west": {
+          "key": "silica_grass",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/silica_grass.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:procgen_grass_tuft",
+      "short": "procgen_grass_tuft",
+      "name": "Grass Tuft",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "procgen_grass_tuft",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "procgen_grass_tuft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_grass_tuft.png"
+        },
+        "bottom": {
+          "key": "procgen_grass_tuft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_grass_tuft.png"
+        },
+        "north": {
+          "key": "procgen_grass_tuft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_grass_tuft.png"
+        },
+        "south": {
+          "key": "procgen_grass_tuft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_grass_tuft.png"
+        },
+        "east": {
+          "key": "procgen_grass_tuft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_grass_tuft.png"
+        },
+        "west": {
+          "key": "procgen_grass_tuft",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_grass_tuft.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:procgen_fern",
+      "short": "procgen_fern",
+      "name": "Fern",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "procgen_fern",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "procgen_fern",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_fern.png"
+        },
+        "bottom": {
+          "key": "procgen_fern",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_fern.png"
+        },
+        "north": {
+          "key": "procgen_fern",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_fern.png"
+        },
+        "south": {
+          "key": "procgen_fern",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_fern.png"
+        },
+        "east": {
+          "key": "procgen_fern",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_fern.png"
+        },
+        "west": {
+          "key": "procgen_fern",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_fern.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:procgen_dry_scrub",
+      "short": "procgen_dry_scrub",
+      "name": "Dry Scrub",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "procgen_dry_scrub",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "procgen_dry_scrub",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+        },
+        "bottom": {
+          "key": "procgen_dry_scrub",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+        },
+        "north": {
+          "key": "procgen_dry_scrub",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+        },
+        "south": {
+          "key": "procgen_dry_scrub",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+        },
+        "east": {
+          "key": "procgen_dry_scrub",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+        },
+        "west": {
+          "key": "procgen_dry_scrub",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:procgen_formula_flower",
+      "short": "procgen_formula_flower",
+      "name": "Formula Flower",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "procgen_formula_flower",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "procgen_formula_flower",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_flower.png"
+        },
+        "bottom": {
+          "key": "procgen_formula_flower",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_flower.png"
+        },
+        "north": {
+          "key": "procgen_formula_flower",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_flower.png"
+        },
+        "south": {
+          "key": "procgen_formula_flower",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_flower.png"
+        },
+        "east": {
+          "key": "procgen_formula_flower",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_flower.png"
+        },
+        "west": {
+          "key": "procgen_formula_flower",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_flower.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:procgen_formula_star",
+      "short": "procgen_formula_star",
+      "name": "Formula Star",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "procgen_formula_star",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "procgen_formula_star",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_star.png"
+        },
+        "bottom": {
+          "key": "procgen_formula_star",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_star.png"
+        },
+        "north": {
+          "key": "procgen_formula_star",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_star.png"
+        },
+        "south": {
+          "key": "procgen_formula_star",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_star.png"
+        },
+        "east": {
+          "key": "procgen_formula_star",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_star.png"
+        },
+        "west": {
+          "key": "procgen_formula_star",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_star.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:procgen_formula_leaf",
+      "short": "procgen_formula_leaf",
+      "name": "Formula Leaf",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "procgen_formula_leaf",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "procgen_formula_leaf",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_leaf.png"
+        },
+        "bottom": {
+          "key": "procgen_formula_leaf",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_leaf.png"
+        },
+        "north": {
+          "key": "procgen_formula_leaf",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_leaf.png"
+        },
+        "south": {
+          "key": "procgen_formula_leaf",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_leaf.png"
+        },
+        "east": {
+          "key": "procgen_formula_leaf",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_leaf.png"
+        },
+        "west": {
+          "key": "procgen_formula_leaf",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_leaf.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:procgen_formula_blob",
+      "short": "procgen_formula_blob",
+      "name": "Formula Blob",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "procgen_formula_blob",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "procgen_formula_blob",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_blob.png"
+        },
+        "bottom": {
+          "key": "procgen_formula_blob",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_blob.png"
+        },
+        "north": {
+          "key": "procgen_formula_blob",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_blob.png"
+        },
+        "south": {
+          "key": "procgen_formula_blob",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_blob.png"
+        },
+        "east": {
+          "key": "procgen_formula_blob",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_blob.png"
+        },
+        "west": {
+          "key": "procgen_formula_blob",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_formula_blob.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:formula_shrub_311",
+      "short": "formula_shrub_311",
+      "name": "Formula Shrub 311",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "formula_shrub_311",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "formula_shrub_311",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_311.png"
+        },
+        "bottom": {
+          "key": "formula_shrub_311",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_311.png"
+        },
+        "north": {
+          "key": "formula_shrub_311",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_311.png"
+        },
+        "south": {
+          "key": "formula_shrub_311",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_311.png"
+        },
+        "east": {
+          "key": "formula_shrub_311",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_311.png"
+        },
+        "west": {
+          "key": "formula_shrub_311",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_311.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:formula_shrub_314",
+      "short": "formula_shrub_314",
+      "name": "Formula Shrub 314",
+      "shape_class": "foliage",
+      "engine_shape": "Cross",
+      "stem": "formula_shrub_314",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "formula_shrub_314",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_314.png"
+        },
+        "bottom": {
+          "key": "formula_shrub_314",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_314.png"
+        },
+        "north": {
+          "key": "formula_shrub_314",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_314.png"
+        },
+        "south": {
+          "key": "formula_shrub_314",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_314.png"
+        },
+        "east": {
+          "key": "formula_shrub_314",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_314.png"
+        },
+        "west": {
+          "key": "formula_shrub_314",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/formula_shrub_314.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:foliage_cattail",
+      "short": "foliage_cattail",
+      "name": "Cattails",
+      "shape_class": "foliage",
+      "engine_shape": "Custom",
+      "stem": "foliage_cattail",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "foliage_m33",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m33.png"
+        },
+        "bottom": {
+          "key": "foliage_m33",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m33.png"
+        },
+        "north": {
+          "key": "foliage_m33",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m33.png"
+        },
+        "south": {
+          "key": "foliage_m33",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m33.png"
+        },
+        "east": {
+          "key": "foliage_m33",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m33.png"
+        },
+        "west": {
+          "key": "foliage_m33",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m33.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:foliage_bush",
+      "short": "foliage_bush",
+      "name": "Berry Bush",
+      "shape_class": "foliage",
+      "engine_shape": "Custom",
+      "stem": "foliage_bush",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "bottom": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "north": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "south": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "east": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "west": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:foliage_fern",
+      "short": "foliage_fern",
+      "name": "Fern Clump",
+      "shape_class": "foliage",
+      "engine_shape": "Custom",
+      "stem": "foliage_fern",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "foliage_m35",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m35.png"
+        },
+        "bottom": {
+          "key": "foliage_m35",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m35.png"
+        },
+        "north": {
+          "key": "foliage_m35",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m35.png"
+        },
+        "south": {
+          "key": "foliage_m35",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m35.png"
+        },
+        "east": {
+          "key": "foliage_m35",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m35.png"
+        },
+        "west": {
+          "key": "foliage_m35",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m35.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:foliage_reeds",
+      "short": "foliage_reeds",
+      "name": "Reed Tuft",
+      "shape_class": "foliage",
+      "engine_shape": "Custom",
+      "stem": "foliage_reeds",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "foliage_m36",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m36.png"
+        },
+        "bottom": {
+          "key": "foliage_m36",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m36.png"
+        },
+        "north": {
+          "key": "foliage_m36",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m36.png"
+        },
+        "south": {
+          "key": "foliage_m36",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m36.png"
+        },
+        "east": {
+          "key": "foliage_m36",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m36.png"
+        },
+        "west": {
+          "key": "foliage_m36",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m36.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:foliage_crystal_shrub",
+      "short": "foliage_crystal_shrub",
+      "name": "Crystal Shrub",
+      "shape_class": "foliage",
+      "engine_shape": "Custom",
+      "stem": "foliage_crystal_shrub",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "foliage_m37",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m37.png"
+        },
+        "bottom": {
+          "key": "foliage_m37",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m37.png"
+        },
+        "north": {
+          "key": "foliage_m37",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m37.png"
+        },
+        "south": {
+          "key": "foliage_m37",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m37.png"
+        },
+        "east": {
+          "key": "foliage_m37",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m37.png"
+        },
+        "west": {
+          "key": "foliage_m37",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m37.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:foliage_moss",
+      "short": "foliage_moss",
+      "name": "Routing Moss",
+      "shape_class": "foliage",
+      "engine_shape": "Custom",
+      "stem": "foliage_moss",
+      "tris": 8,
+      "status": "ready",
+      "notes": [
+        "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "bottom": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "north": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "south": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "east": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        },
+        "west": {
+          "key": "foliage_m34",
+          "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/foliage_m34.png"
+        }
+      }
+    },
+    {
+      "id": "lithokraft:resin",
+      "short": "resin",
+      "name": "Resin",
+      "shape_class": "special",
+      "engine_shape": "Item",
+      "stem": "resin",
+      "tris": 40,
+      "status": "ready",
+      "notes": [
+        "Resin pot (look B). Item only; engine string id lithokraft:resin is still proposed / OPEN.",
+        "No resin block was designed."
+      ],
+      "textures_used": {
+        "top": {
+          "key": "resin_item_B_top.png",
+          "source": "/workspace/components-v2/resin/pack_128/textures/items/resin/model_faces/resin_item_B_top.png"
+        },
+        "bottom": {
+          "key": "resin_item_B_bottom.png",
+          "source": "/workspace/components-v2/resin/pack_128/textures/items/resin/model_faces/resin_item_B_bottom.png"
+        },
+        "north": {
+          "key": "resin_item_B_front.png",
+          "source": "/workspace/components-v2/resin/pack_128/textures/items/resin/model_faces/resin_item_B_front.png"
+        },
+        "south": {
+          "key": "resin_item_B_back.png",
+          "source": "/workspace/components-v2/resin/pack_128/textures/items/resin/model_faces/resin_item_B_back.png"
+        },
+        "east": {
+          "key": "resin_item_B_east.png",
+          "source": "/workspace/components-v2/resin/pack_128/textures/items/resin/model_faces/resin_item_B_east.png"
+        },
+        "west": {
+          "key": "resin_item_B_west.png",
+          "source": "/workspace/components-v2/resin/pack_128/textures/items/resin/model_faces/resin_item_B_west.png"
+        }
+      }
+    }
+  ],
+  "judgment_calls": [
+    "Official `Shape::Slab` blocks (silicon, stone, dirt) are half-slabs at 8/16. Trace logic plates are **not** forced to 8/16: JD said we can reuse the geometry, and the placed components are 3/16 plates (some with a taller housing). Height is at least 3/16 and grows to the opaque band of the side texture so that art is not cropped. If JD wants every plate drawn as an 8/16 half-slab, that is a one-line change.",
+    "Watchor and Pushor stay full cubes (12 tris). The eye and honeycomb are in the approved concept-B face textures, which already read at drop scale.",
+    "Swivelor is a cube plus an 8-sided equatorial gear belt so the ring silhouette still reads.",
+    "Dialor is a component plate plus an 8-sided dial disc. The top is the approved v32 still with tonight's widened well.",
+    "Via drops use the Via B lattice cage (straight single, tinted s64 so red and blue read). Side vias have no unique drop. Elbows have no drop.",
+    "Red / Blue Trace are a **proposal**: a 1/16 chip with the KEEP-OLD straight-wire texture and a raised centre node, because the world wire is non-volumetric.",
+    "Resin is the approved look-B pot. The engine string id `lithokraft:resin` is still proposed / OPEN. No resin block was designed.",
+    "Switch and Button keep the component plate and add a simple lever box or raised cap.",
+    "LEDs (torches) use a shaft + gem + chip, with the official `led_*` textures, on state.",
+    "Ramps are a single wedge. Highway uses height 8/16 (one half of the paired 1:2 slope). Both reuse `aluminum_block` textures; resources.json has no dedicated ramp keys.",
+    "Standing posts are a slim 4/16 column, shortened to 1.25 tall so they still read at 0.30 scale (the world post is 2 tall). Wall posts are a thin panel.",
+    "Lithographor is a body box plus a lens column, simplified from the custom machine mesh.",
+    "Capacitor Can is an 8-sided cylinder; Resonator Crystal is a 6-sided prism with a pointed cap.",
+    "Foliage and Cross plants (except the LEDs) are two crossed planes.",
+    "Readout tops use tonight's approved well fixes: Breakor option A (closed, ghost 88), Latchor off, Dialor v32, Fusor adder with the baked ghost 88. Other readout plates use their current idle / representative still (Repeator d16, Bitor AND, Memor idle, and so on).",
+    "`lithokraft:redirector` is a live alias of `lithokraft:multiplexor`. The approved standalone Redirector is `lithokraft:routor`. No unique redirector id was invented.",
+    "Concept-B / concept-C filenames are preferred when they exist in the approved component packs (`components-v2/<name>/pack_128`)."
+  ]
+}

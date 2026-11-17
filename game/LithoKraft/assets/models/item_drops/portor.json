@@ -1,0 +1,677 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:portor",
+  "name": "Portor",
+  "shape_class": "full_block",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 12,
+  "bounds": {
+    "min": [
+      0.0,
+      0,
+      0.0
+    ],
+    "max": [
+      1.0,
+      1,
+      1.0
+    ]
+  },
+  "notes": [
+    "Full block: 6-quad cube, real face textures."
+  ],
+  "textures_used": {
+    "top": {
+      "key": "portor_top",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_top.png"
+    },
+    "bottom": {
+      "key": "portor_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_side.png"
+    },
+    "east": {
+      "key": "portor_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_side.png"
+    },
+    "west": {
+      "key": "portor_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_side.png"
+    },
+    "north": {
+      "key": "portor_front",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_front.png"
+    },
+    "south": {
+      "key": "portor_back",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/portor_back.png"
+    }
+  },
+  "positions": [
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ]
+  ],
+  "normals": [
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "portor_top.png",
+      "material": "portor_top.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "portor_bottom.png",
+      "material": "portor_bottom.png",
+      "tris": [
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ]
+      ]
+    },
+    {
+      "name": "portor_north.png",
+      "material": "portor_north.png",
+      "tris": [
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "portor_south.png",
+      "material": "portor_south.png",
+      "tris": [
+        [
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    },
+    {
+      "name": "portor_east.png",
+      "material": "portor_east.png",
+      "tris": [
+        [
+          24,
+          25,
+          26
+        ],
+        [
+          27,
+          28,
+          29
+        ]
+      ]
+    },
+    {
+      "name": "portor_west.png",
+      "material": "portor_west.png",
+      "tris": [
+        [
+          30,
+          31,
+          32
+        ],
+        [
+          33,
+          34,
+          35
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "portor_top.png": "../textures/portor_top.png",
+    "portor_bottom.png": "../textures/portor_bottom.png",
+    "portor_north.png": "../textures/portor_north.png",
+    "portor_south.png": "../textures/portor_south.png",
+    "portor_east.png": "../textures/portor_east.png",
+    "portor_west.png": "../textures/portor_west.png"
+  }
+}

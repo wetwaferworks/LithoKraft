@@ -1,0 +1,454 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:procgen_dry_scrub",
+  "name": "Dry Scrub",
+  "shape_class": "foliage",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 8,
+  "bounds": {
+    "min": [
+      0.05,
+      0.0,
+      0.05
+    ],
+    "max": [
+      0.95,
+      1.0,
+      0.95
+    ]
+  },
+  "notes": [
+    "Foliage: two crossed planes (4 quads, two-sided), using the plant texture."
+  ],
+  "textures_used": {
+    "top": {
+      "key": "procgen_dry_scrub",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+    },
+    "bottom": {
+      "key": "procgen_dry_scrub",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+    },
+    "north": {
+      "key": "procgen_dry_scrub",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+    },
+    "south": {
+      "key": "procgen_dry_scrub",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+    },
+    "east": {
+      "key": "procgen_dry_scrub",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+    },
+    "west": {
+      "key": "procgen_dry_scrub",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/procgen_dry_scrub.png"
+    }
+  },
+  "positions": [
+    [
+      0.05,
+      0.0,
+      0.5
+    ],
+    [
+      0.95,
+      0.0,
+      0.5
+    ],
+    [
+      0.95,
+      1.0,
+      0.5
+    ],
+    [
+      0.05,
+      0.0,
+      0.5
+    ],
+    [
+      0.95,
+      1.0,
+      0.5
+    ],
+    [
+      0.05,
+      1.0,
+      0.5
+    ],
+    [
+      0.95,
+      0.0,
+      0.5
+    ],
+    [
+      0.05,
+      0.0,
+      0.5
+    ],
+    [
+      0.05,
+      1.0,
+      0.5
+    ],
+    [
+      0.95,
+      0.0,
+      0.5
+    ],
+    [
+      0.05,
+      1.0,
+      0.5
+    ],
+    [
+      0.95,
+      1.0,
+      0.5
+    ],
+    [
+      0.5,
+      0.0,
+      0.95
+    ],
+    [
+      0.5,
+      0.0,
+      0.05
+    ],
+    [
+      0.5,
+      1.0,
+      0.05
+    ],
+    [
+      0.5,
+      0.0,
+      0.95
+    ],
+    [
+      0.5,
+      1.0,
+      0.05
+    ],
+    [
+      0.5,
+      1.0,
+      0.95
+    ],
+    [
+      0.5,
+      0.0,
+      0.05
+    ],
+    [
+      0.5,
+      0.0,
+      0.95
+    ],
+    [
+      0.5,
+      1.0,
+      0.95
+    ],
+    [
+      0.5,
+      0.0,
+      0.05
+    ],
+    [
+      0.5,
+      1.0,
+      0.95
+    ],
+    [
+      0.5,
+      1.0,
+      0.05
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ]
+  ],
+  "normals": [
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "procgen_dry_scrub_north.png",
+      "material": "procgen_dry_scrub_north.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ],
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ],
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ],
+        [
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "procgen_dry_scrub_north.png": "../textures/procgen_dry_scrub_north.png"
+  }
+}

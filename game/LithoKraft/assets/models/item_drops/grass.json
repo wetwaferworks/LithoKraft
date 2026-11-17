@@ -1,0 +1,677 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:grass",
+  "name": "Grass",
+  "shape_class": "full_block",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 12,
+  "bounds": {
+    "min": [
+      0.0,
+      0,
+      0.0
+    ],
+    "max": [
+      1.0,
+      1,
+      1.0
+    ]
+  },
+  "notes": [
+    "Full block: 6-quad cube, real face textures."
+  ],
+  "textures_used": {
+    "bottom": {
+      "key": "dirt",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/dirt.png"
+    },
+    "top": {
+      "key": "grass_top",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_top.png"
+    },
+    "east": {
+      "key": "grass_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_side.png"
+    },
+    "west": {
+      "key": "grass_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_side.png"
+    },
+    "north": {
+      "key": "grass_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_side.png"
+    },
+    "south": {
+      "key": "grass_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/grass_side.png"
+    }
+  },
+  "positions": [
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ]
+  ],
+  "normals": [
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "grass_top.png",
+      "material": "grass_top.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "grass_bottom.png",
+      "material": "grass_bottom.png",
+      "tris": [
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ]
+      ]
+    },
+    {
+      "name": "grass_north.png",
+      "material": "grass_north.png",
+      "tris": [
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "grass_south.png",
+      "material": "grass_south.png",
+      "tris": [
+        [
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    },
+    {
+      "name": "grass_east.png",
+      "material": "grass_east.png",
+      "tris": [
+        [
+          24,
+          25,
+          26
+        ],
+        [
+          27,
+          28,
+          29
+        ]
+      ]
+    },
+    {
+      "name": "grass_west.png",
+      "material": "grass_west.png",
+      "tris": [
+        [
+          30,
+          31,
+          32
+        ],
+        [
+          33,
+          34,
+          35
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "grass_top.png": "../textures/grass_top.png",
+    "grass_bottom.png": "../textures/grass_bottom.png",
+    "grass_north.png": "../textures/grass_north.png",
+    "grass_south.png": "../textures/grass_south.png",
+    "grass_east.png": "../textures/grass_east.png",
+    "grass_west.png": "../textures/grass_west.png"
+  }
+}

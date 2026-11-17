@@ -1,0 +1,677 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:certificate_table",
+  "name": "Certificate Table",
+  "shape_class": "full_block",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 12,
+  "bounds": {
+    "min": [
+      0.0,
+      0,
+      0.0
+    ],
+    "max": [
+      1.0,
+      1,
+      1.0
+    ]
+  },
+  "notes": [
+    "Full block: 6-quad cube, real face textures."
+  ],
+  "textures_used": {
+    "top": {
+      "key": "certificate_table_top",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_top.png"
+    },
+    "east": {
+      "key": "certificate_table_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_side.png"
+    },
+    "west": {
+      "key": "certificate_table_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_side.png"
+    },
+    "north": {
+      "key": "certificate_table_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_side.png"
+    },
+    "south": {
+      "key": "certificate_table_side",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_side.png"
+    },
+    "bottom": {
+      "key": "certificate_table_top",
+      "source": "/workspace/lk/src/game/LithoKraft/assets/packs/pack_128/textures/blocks/certificate_table_top.png"
+    }
+  },
+  "positions": [
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      1,
+      0.0
+    ],
+    [
+      1.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      1,
+      1.0
+    ],
+    [
+      0.0,
+      1,
+      0.0
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.0
+    ],
+    [
+      0,
+      0.0
+    ]
+  ],
+  "normals": [
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "certificate_table_top.png",
+      "material": "certificate_table_top.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "certificate_table_bottom.png",
+      "material": "certificate_table_bottom.png",
+      "tris": [
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ]
+      ]
+    },
+    {
+      "name": "certificate_table_north.png",
+      "material": "certificate_table_north.png",
+      "tris": [
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "certificate_table_south.png",
+      "material": "certificate_table_south.png",
+      "tris": [
+        [
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    },
+    {
+      "name": "certificate_table_east.png",
+      "material": "certificate_table_east.png",
+      "tris": [
+        [
+          24,
+          25,
+          26
+        ],
+        [
+          27,
+          28,
+          29
+        ]
+      ]
+    },
+    {
+      "name": "certificate_table_west.png",
+      "material": "certificate_table_west.png",
+      "tris": [
+        [
+          30,
+          31,
+          32
+        ],
+        [
+          33,
+          34,
+          35
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "certificate_table_top.png": "../textures/certificate_table_top.png",
+    "certificate_table_bottom.png": "../textures/certificate_table_bottom.png",
+    "certificate_table_north.png": "../textures/certificate_table_north.png",
+    "certificate_table_south.png": "../textures/certificate_table_south.png",
+    "certificate_table_east.png": "../textures/certificate_table_east.png",
+    "certificate_table_west.png": "../textures/certificate_table_west.png"
+  }
+}

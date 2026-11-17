@@ -1,0 +1,677 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:fast_latch",
+  "name": "Latchor",
+  "shape_class": "component_slab",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 12,
+  "bounds": {
+    "min": [
+      0.0,
+      0,
+      0.0
+    ],
+    "max": [
+      1.0,
+      0.25,
+      1.0
+    ]
+  },
+  "notes": [
+    "Component plate: height 0.2500 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+  ],
+  "textures_used": {
+    "top": {
+      "key": "latchor_top_off_base",
+      "source": "/workspace/components-v2/texture-review-2026-11-17/fixes/latchor/pack_128/latchor_top_off_base.png"
+    },
+    "bottom": {
+      "key": "fast_latch_side_off_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_side_off_base.png"
+    },
+    "east": {
+      "key": "fast_latch_side_off_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_side_off_base.png"
+    },
+    "west": {
+      "key": "fast_latch_side_off_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_side_off_base.png"
+    },
+    "north": {
+      "key": "fast_latch_front_off_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_front_off_base.png"
+    },
+    "south": {
+      "key": "fast_latch_back_off_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/fast_latch/fast_latch_back_off_base.png"
+    }
+  },
+  "positions": [
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      0.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0.25,
+      0.0
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      0,
+      0.75
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      0.75
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      0.75
+    ]
+  ],
+  "normals": [
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "fast_latch_top.png",
+      "material": "fast_latch_top.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "fast_latch_bottom.png",
+      "material": "fast_latch_bottom.png",
+      "tris": [
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ]
+      ]
+    },
+    {
+      "name": "fast_latch_north.png",
+      "material": "fast_latch_north.png",
+      "tris": [
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "fast_latch_south.png",
+      "material": "fast_latch_south.png",
+      "tris": [
+        [
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    },
+    {
+      "name": "fast_latch_east.png",
+      "material": "fast_latch_east.png",
+      "tris": [
+        [
+          24,
+          25,
+          26
+        ],
+        [
+          27,
+          28,
+          29
+        ]
+      ]
+    },
+    {
+      "name": "fast_latch_west.png",
+      "material": "fast_latch_west.png",
+      "tris": [
+        [
+          30,
+          31,
+          32
+        ],
+        [
+          33,
+          34,
+          35
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "fast_latch_top.png": "../textures/fast_latch_top.png",
+    "fast_latch_bottom.png": "../textures/fast_latch_bottom.png",
+    "fast_latch_north.png": "../textures/fast_latch_north.png",
+    "fast_latch_south.png": "../textures/fast_latch_south.png",
+    "fast_latch_east.png": "../textures/fast_latch_east.png",
+    "fast_latch_west.png": "../textures/fast_latch_west.png"
+  }
+}

@@ -80,6 +80,8 @@
 #include "litholattice/core/gate_lock.h"
 #include "litholattice/sim/sim_thread.h"
 #include "lithokraft/content/item_use.h"
+#include "lithokraft/game/entities.h"
+#include "lithokraft/game/item_drops.h"
 #include "litholattice/projectile/projectile.h"
 #include "litholattice/world/dimension.h"
 
@@ -1420,6 +1422,109 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
       }
     }
     std::filesystem::remove_all(edir);
+  }
+  {  // Dropped items (P-1..P-6, 2026-11-17): merge, pickup reach, the floating pose, the save record, physics
+    using namespace lithokraft::itemdrop;
+    const SameIdentityFn same = [](uint64_t, uint64_t) { return true; };
+    {
+      std::vector<MergeCandidate> c(4);
+      c[0] = {1, 0.0, 64.0, 0.0, 7, 5, 64, false, false};
+      c[1] = {2, 0.6, 64.0, 0.0, 7, 10, 64, false, false};
+      c[2] = {3, 3.0, 64.0, 0.0, 7, 10, 64, false, false};  // too far
+      c[3] = {4, 0.3, 64.0, 0.3, 8, 10, 64, false, false};  // different item
+      const auto p = planMerges(c, 0, kMergeRadius, same, true);
+      check(p.size() == 1 && p[0] == MergePair{2, 1}, "item drops: stacks within a block merge into the bigger one; far or different items don't");
+      c[0].count = 60;
+      const auto q = planMerges(c, 0, kMergeRadius, same, true);
+      check(q.empty(), "item drops: a merge never goes over the stack cap");
+    }
+    check(inPickupReach(0, 64, 0, 1.2, 64, 0) && !inPickupReach(0, 64, 0, 2.0, 64, 0) &&
+              inPickupReach(0, 64, 0, 0, 66.2, 0) && !inPickupReach(0, 64, 0, 0, 66.5, 0),
+          "item drops: pickup reach is one block sideways and half a block up and down");
+    {
+      double worst = 0;
+      for (int i = -1000; i <= 3000; ++i) {
+        const double t = i / 1000.0;
+        worst = std::max(worst, std::abs(double(sinTurns(float(t))) - std::sin(t * 6.283185307179586)));
+      }
+      check(worst < 1e-4 && sinTurns(0.25f) > 0.99999f && std::abs(sinTurns(0.5f)) < 1e-6f, "item drops: sinTurns tracks sin within 1e-4");
+    }
+    {
+      DropPose a[4], b[4], c[4];
+      const int na = posesFor(77, 1234, 32, 30, 10.5, 64.0, -3.5, a);
+      const int nb = posesFor(77, 1234, 32, 30, 10.5, 64.0, -3.5, b);
+      posesFor(78, 1234, 32, 30, 10.5, 64.0, -3.5, c);
+      bool eq = na == 4 && nb == 4;
+      for (int i = 0; i < 4 && eq; ++i)
+        eq = a[i].x == b[i].x && a[i].y == b[i].y && a[i].z == b[i].z && a[i].yawTurns == b[i].yawTurns;
+      check(eq && c[0].yawTurns != a[0].yawTurns && a[0].y >= 64.0f + kHover - 1e-4f && a[0].y <= 64.0f + kHover + kBobAmplitude + 1e-4f,
+            "item drops: the pose is a pure function of id and age (4 copies for 30, hovering and bobbing in range)");
+    }
+    {
+      std::vector<SavedItem> in(2);
+      in[0].id = 9; in[0].x = 1.25; in[0].y = 70; in[0].z = -4.5; in[0].vy = -2; in[0].ageTicks = 100; in[0].count = 3; in[0].item = "lithokraft:stone";
+      in[1].id = 4; in[1].x = 2; in[1].y = 65; in[1].z = 8; in[1].onGround = true; in[1].count = 1; in[1].delayTicks = 64; in[1].item = "lithokraft:fragment";
+      in[1].hasData = true; in[1].name = "Shard"; in[1].certificates = {"cert-a", "cert-b"};
+      const auto bytes = encodeItems(in);
+      std::vector<SavedItem> out;
+      std::string err;
+      const bool ok = decodeItems(bytes, &out, &err);
+      check(ok && out.size() == 2 && out[0].id == 4 && out[1].id == 9 && out[1].x == 1.25 && out[1].vy == -2 && out[1].ageTicks == 100 &&
+                out[0].onGround && out[0].delayTicks == 64 && out[0].name == "Shard" && out[0].certificates.size() == 2 &&
+                out[1].item == "lithokraft:stone",
+            "item drops: the save record round-trips, items in id order");
+      auto bad = bytes;
+      bad[bad.size() - 1] ^= 0x5a;
+      check(!decodeItems(bad, &out, &err), "item drops: a damaged save record is refused");
+    }
+    {
+      bool sorted = modelCount() == 107;
+      for (size_t i = 1; i < modelCount() && sorted; ++i) sorted = std::string(modelRow(i - 1).id) < std::string(modelRow(i).id);
+      check(sorted, "item drops: 107 CloudAtlas models, sorted by id");
+    }
+    {
+      lithokraft::cItemBehavior b([](int, int y, int) { return y < 60; }, [](int, int, int) { return 0.6f; },
+                                  [](int, int y, int) { return y >= 60 && y <= 63; });  // water 60..63, surface at 64
+      litholattice::Entity e;
+      e.x = 0.5; e.y = 61.0; e.z = 0.5;
+      for (int i = 0; i < 32 * 10; ++i) { b.onTick(e, 1.0 / 32); ++e.age; }
+      check(!e.dead && !e.onGround && e.y > 63.0 && e.y < 64.5, "item drops: items float up to the water surface");
+      litholattice::Entity d;
+      d.x = 0.5; d.y = 60.0; d.z = 0.5; d.onGround = true;
+      d.age = ticksFor(kLifeSeconds, 32) - 1;
+      b.onTick(d, 1.0 / 32);
+      const bool alive = !d.dead;
+      d.age += 1;
+      b.onTick(d, 1.0 / 32);
+      check(alive && d.dead, "item drops: an item despawns after exactly 8 minutes of ticks");
+    }
+    {  // P-1 golden: a thrown item lands on the same spot, bit for bit, however the world ticks
+       // group into frames (1, 2 or 4 ticks per frame: about 30, 15 and 8 fps at 32 TPS).
+      auto run = [](int perFrame) {
+        lithokraft::cItemBehavior b([](int, int y, int) { return y < 64; }, [](int, int, int) { return 0.6f; });
+        litholattice::Entity e;
+        e.x = 0.5; e.y = 66.0; e.z = 0.5; e.vx = 3.0; e.vy = 2.5; e.vz = -1.25;
+        for (int frame = 0; frame * perFrame < 32 * 4; ++frame)
+          for (int k = 0; k < perFrame; ++k) { b.onTick(e, 1.0 / 32); ++e.age; }
+        return e;
+      };
+      const auto a = run(1), b2 = run(2), c4 = run(4);
+      check(a.onGround && a.y >= 64.0 && a.y < 64.01 && a.x == b2.x && a.x == c4.x && a.z == b2.z && a.z == c4.z && a.y == b2.y && a.y == c4.y &&
+                a.vx == c4.vx,
+            "item drops: a thrown item lands on the same spot at any frame rate (fixed tick step)");
+    }
+    {  // P-5: the draw lerp weight
+      check(tickAlpha(0.0, 32, true) == 1.0 && tickAlpha(1.0 / 64, 32, false) == 0.5 && tickAlpha(5.0, 32, false) == 1.0 &&
+                tickAlpha(-1.0, 32, false) == 0.0,
+            "item drops: the draw lerp is 1 in deterministic runs, a fraction of a tick otherwise, clamped");
+      DropPose p0[4], p1[4], ph[4];
+      posesFor(77, 40.0, 32, 1, 0, 64, 0, p0);
+      posesFor(77, 41.0, 32, 1, 0, 64, 0, p1);
+      posesFor(77, 40.5, 32, 1, 0, 64, 0, ph);
+      const float lo = std::min(p0[0].y, p1[0].y), hi = std::max(p0[0].y, p1[0].y);
+      check(ph[0].y >= lo - 1e-4f && ph[0].y <= hi + 1e-4f && ph[0].yawTurns != p0[0].yawTurns,
+            "item drops: a half-tick pose sits between the two tick poses");
+    }
   }
   {  // A3 (brief B1/B1a no-decision subset, 2026-10-13): the per-item use
      // registry dispatches defined handlers and fails closed for the rest.

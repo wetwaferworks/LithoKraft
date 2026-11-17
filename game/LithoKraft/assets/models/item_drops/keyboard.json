@@ -1,0 +1,677 @@
+{
+  "format": "lithokraft-item-drop-mesh-v1",
+  "id": "lithokraft:keyboard",
+  "name": "Keyboard",
+  "shape_class": "component_slab",
+  "status": "ready",
+  "units": "block",
+  "drop_scale": 0.3,
+  "suggested_bob": {
+    "amplitude_blocks": 0.1,
+    "period_s": 2.0
+  },
+  "suggested_spin": {
+    "yaw_deg_per_s": 40.0
+  },
+  "suggested_hover": {
+    "height_blocks": 0.08
+  },
+  "tris": 12,
+  "bounds": {
+    "min": [
+      0.0,
+      0,
+      0.0
+    ],
+    "max": [
+      1.0,
+      0.25,
+      1.0
+    ]
+  },
+  "notes": [
+    "Component plate: height 0.2500 block (min 3/16, grown to the side-texture band so the art is not cropped)."
+  ],
+  "textures_used": {
+    "top": {
+      "key": "keyboard_top_idle_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_top_idle_base.png"
+    },
+    "bottom": {
+      "key": "keyboard_side_idle_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_side_idle_base.png"
+    },
+    "east": {
+      "key": "keyboard_side_idle_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_side_idle_base.png"
+    },
+    "west": {
+      "key": "keyboard_side_idle_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_side_idle_base.png"
+    },
+    "north": {
+      "key": "keyboard_front_idle_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_front_idle_base.png"
+    },
+    "south": {
+      "key": "keyboard_back_idle_base",
+      "source": "/workspace/components-v2/pack_128/textures/blocks/keyboard/keyboard_back_idle_base.png"
+    }
+  },
+  "positions": [
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      0.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0,
+      0.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      1.0,
+      0,
+      1.0
+    ],
+    [
+      1.0,
+      0.25,
+      0.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0,
+      1.0
+    ],
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0,
+      0.0
+    ],
+    [
+      0.0,
+      0.25,
+      1.0
+    ],
+    [
+      0.0,
+      0.25,
+      0.0
+    ]
+  ],
+  "uvs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      0,
+      0.75
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      0,
+      0.75
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      1.0
+    ],
+    [
+      1,
+      0.75
+    ],
+    [
+      0,
+      0.75
+    ]
+  ],
+  "normals": [
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      -1.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "faces": [
+    {
+      "name": "keyboard_top.png",
+      "material": "keyboard_top.png",
+      "tris": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "keyboard_bottom.png",
+      "material": "keyboard_bottom.png",
+      "tris": [
+        [
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11
+        ]
+      ]
+    },
+    {
+      "name": "keyboard_north.png",
+      "material": "keyboard_north.png",
+      "tris": [
+        [
+          12,
+          13,
+          14
+        ],
+        [
+          15,
+          16,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "keyboard_south.png",
+      "material": "keyboard_south.png",
+      "tris": [
+        [
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23
+        ]
+      ]
+    },
+    {
+      "name": "keyboard_east.png",
+      "material": "keyboard_east.png",
+      "tris": [
+        [
+          24,
+          25,
+          26
+        ],
+        [
+          27,
+          28,
+          29
+        ]
+      ]
+    },
+    {
+      "name": "keyboard_west.png",
+      "material": "keyboard_west.png",
+      "tris": [
+        [
+          30,
+          31,
+          32
+        ],
+        [
+          33,
+          34,
+          35
+        ]
+      ]
+    }
+  ],
+  "materials": {
+    "keyboard_top.png": "../textures/keyboard_top.png",
+    "keyboard_bottom.png": "../textures/keyboard_bottom.png",
+    "keyboard_north.png": "../textures/keyboard_north.png",
+    "keyboard_south.png": "../textures/keyboard_south.png",
+    "keyboard_east.png": "../textures/keyboard_east.png",
+    "keyboard_west.png": "../textures/keyboard_west.png"
+  }
+}
