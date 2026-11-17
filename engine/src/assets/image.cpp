@@ -6,7 +6,9 @@
 #include <cmath>
 #include <fstream>
 #include <iterator>
-#if !defined(__wasm__)
+#if defined(__wasm__)
+#include "litholattice/assets/lk_png.h"  // in-house decoder (web build; no outside libraries)
+#else
 #include "stb_image.h"
 #include "vendor/nanosvg.h"
 #include "vendor/nanosvgrast.h"
@@ -20,12 +22,16 @@ Image::Image(int width, int height, std::vector<uint8_t> rgba) : w_(width), h_(h
 
 std::optional<Image> Image::decode(std::span<const uint8_t> bytes, std::string* err) {
 #if defined(__wasm__)
-  // WEB-ONLY FAIL-SAFE STUB (S1, 2026-11-16): no stb_image in the web build (JD 12:41 ET: in-house
-  // PNG decoder, its own safety-critical stage). Rejects every input; callers already handle a
-  // decode failure (missing-texture path). Replace with the in-house decoder; do not grow this.
-  (void)bytes;
-  if (err) *err = "image decode not available on web yet (in-house PNG decoder stage pending)";
-  return std::nullopt;
+  // Web build: the in-house PNG decoder (lk_png.h: bounded, CRC/Adler-checked, fail-closed;
+  // fuzzed by engine/src/assets/fuzz/lk_png_check.cpp). Same caps as the native path: 64 MiB
+  // input, 8192 px per side. A rejected file takes the callers' missing-texture path.
+  lkpng::Image png;
+  const char* why = nullptr;
+  if (!lkpng::decode(bytes.data(), bytes.size(), png, &why)) {
+    if (err) *err = why ? why : "decode failed";
+    return std::nullopt;
+  }
+  return Image(int(png.w), int(png.h), std::move(png.rgba));
 #else
   if (bytes.empty() || bytes.size() > size_t(64) << 20) {  // stb takes an int length; textures are far below 64 MB
     if (err) *err = bytes.empty() ? "empty file" : "file too large";
