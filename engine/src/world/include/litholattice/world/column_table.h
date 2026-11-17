@@ -93,14 +93,17 @@ class ColumnTable {
   /// JD 2026-11-17: the current owner hands the table over (no lock: one atomic store with
   /// release). The next owner-only call claims it from any thread without tripping the
   /// second-thread warning. ChunkMap calls it when the tick thread starts (main -> sim) and
-  /// after it is joined (sim -> main). A call from a second thread with no handover in
-  /// between still warns.
+  /// after it is joined (sim -> main). Owner-only publish/pin/drop/takeStale also hand the
+  /// table back on their outermost return, so a between-ticks hold visit cannot leave main
+  /// as a sticky owner for the next tick.
   void handOver();
   bool lockFree() const { return true; }
 
  private:
-  void lfEnter();  // owner-thread entry on the lock-free path: tripwire + drain stale marks
+  bool lfEnter();  // claim owner (CAS from empty) + drain stale marks; false if another thread holds it
+  void lfLeave();  // nested; the outermost leave is a handOver
   bool lf_ = true;  // Archie PlayI: always lock-free
+  int lfDepth_ = 0;  // owner-thread only: nest depth of lfEnter/lfLeave
   cLfKeyTable lfStale_{size_t(1) << 15};
   cLfHandoff<std::pair<uint64_t, uint64_t>> lfSpill_;
   std::atomic<size_t> lfCount_{0};

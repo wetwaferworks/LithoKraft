@@ -1026,22 +1026,18 @@ void cSimThread::run() {
     const auto tFlush = Clock::now();
     if (!dirtySubs_.empty() && (flushNow || (tFlush - lastFlush >= kRemeshInterval && (worldTickN_ - lastFlushTick >= kRenderDiv || tFlush - lastFlush >= kRenderMaxWait)))) {
       const int64_t tpF = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only)
-      // PlayJ fix 7: with CoW columns, publish+pin read pinned snapshots - release blockMutex_
-      // before pin/submit so streaming holdBetweenTicks is not stalled for remesh duration.
-      // Without CoW, pin still reads live columns; keep the gate (SIM-H1 2026-10-15 reverted unlock).
-      const bool unlockForFlush = cowColumnsEnabled() && postLock.owns_lock();
-      if (unlockForFlush) {
-        locktiming::setBlockHolder(locktiming::kHolderNone);
-        postLock.unlock();
-      }
+      // JD 2026-11-17: PlayJ fix 7 used to drop blockMutex_ around flushDirty when CoW
+      // was on so streaming tryHoldBetweenTicks was not stalled for remesh. Main then
+      // succeeded the hold and called owner-only ColumnTable publish/pin/drop while
+      // the tick thread was still in takeStale/publish/pin — a real overlap of
+      // entries_/stale_/lfOwner_ (and of live Column lookups). The mutex stays held
+      // for the flush; that is the phase boundary. ColumnTable also hands back
+      // ownership at the end of each owner-only call so a legal between-ticks visit
+      // cannot leave a sticky lfOwner_ for the next tick. Streaming hitch (worst / p99)
+      // is measured before and after this change.
       flushDirty(editsApplied);  // Cortana 2026-11-06: player edits bypass view cull
       if (tpF) ::litholattice::tickprof::ticks().noteFlush(::litholattice::tickprof::nowNs() - tpF);
       lastFlush = tFlush; lastFlushTick = worldTickN_;
-      if (unlockForFlush && !postLock.owns_lock()) {
-        postLock = ::litholattice::cGateLock<cBlockGate>(blockMutex_);
-        adoptBoundary();  // t46u 6b-2b/6b-3: and again after the unlocked flush
-        locktiming::setBlockHolder(locktiming::kHolderSimPost);
-      }
     }
     publishEvents();
 
