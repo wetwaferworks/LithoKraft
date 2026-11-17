@@ -926,20 +926,6 @@ void cLithoKraftAppearance::meshCustom(const CustomBlock& cell, MeshWriter& out)
       const int lo[3] = {q.lo[0], q.lo[1], q.lo[2]}, hi[3] = {q.hi[0], q.hi[1], q.hi[2]};
       FaceLook fl{};
       if (q.material == foliage::mat::kGlow) fl.mode = kShadeEmissive;  // Tron pass: glow lines self-lit
-      fl.mode = uint8_t(fl.mode | kShadeLodNear);  // Cortana 2026-10-16: detail = near LOD only
-      out.face(cell, q.face, lo, hi, *fm, fl);
-    }
-    // Cortana 2026-10-16 [GAME] (JD): far LOD cross-hatch, tagged far-only. Renderers draw
-    // one set per sub-chunk by its distance (renderer.h kShadeLodNear / kShadeLodFar).
-    for (const foliage::Quad& q0 : foliage::crossMesh(kind).quads) {
-      if (q0.material < foliage::kFirstMaterial || q0.material > foliage::kLastMaterial) continue;
-      const FaceMaterial* fm = mats[q0.material - foliage::kFirstMaterial];
-      if (!fm) continue;
-      const foliage::Quad q = foliage::rotated(q0, turns);
-      const int lo[3] = {q.lo[0], q.lo[1], q.lo[2]}, hi[3] = {q.hi[0], q.hi[1], q.hi[2]};
-      FaceLook fl{};
-      if (q.material == foliage::mat::kGlow) fl.mode = kShadeEmissive;
-      fl.mode = uint8_t(fl.mode | kShadeLodFar);
       out.face(cell, q.face, lo, hi, *fm, fl);
     }
     return;

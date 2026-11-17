@@ -4268,17 +4268,13 @@ void testRender() {
     check(sq(u) == sq(scene) && u.canonical != nullptr, "mesher (unified): golden scene decodes to the legacy quads and publishes a canonical mesh");
     // Render pipeline M8: the uploader reference decode (L0) is the published stream exactly.
     std::vector<PackedVertex> dv;
-    bool same = u.canonical && decodeCanonicalMesh(*u.canonical, 0, dv) && dv.size() == u.verts.size();
+    bool same = u.canonical && decodeCanonicalMesh(*u.canonical, dv) && dv.size() == u.verts.size();
     for (size_t i = 0; same && i < dv.size(); ++i) {
       PackedVertex a = dv[i], b = u.verts[i];
       a.slot = b.slot = 0;
       same = std::memcmp(&a, &b, sizeof a) == 0;
     }
-    check(same, "mesher (M8): decodeCanonicalMesh(L0) reproduces ChunkMesh::verts in order");
-    check(selectCanonLod(3, -1, 12, 24) == 0 && selectCanonLod(12, 0, 12, 24) == 0 && selectCanonLod(13, 0, 12, 24) == 0 &&
-              selectCanonLod(14, 0, 12, 24) == 1 && selectCanonLod(11, 1, 12, 24) == 1 && selectCanonLod(9, 1, 12, 24) == 0 &&
-              selectCanonLod(40, 0, 12, 24) == 2 && selectCanonLod(23, 2, 12, 24) == 2 && selectCanonLod(21, 2, 12, 24) == 1,
-          "mesher (M8): LOD ring selection with +-1.5 chunk hysteresis");
+    check(same, "mesher (M8): decodeCanonicalMesh reproduces ChunkMesh::verts in order");
     {  // M9 (ruling 6): open-addressing ColumnTable map agrees with std::unordered_map under churn.
       OaTable<uint64_t> oa;
       std::unordered_map<uint64_t, uint64_t> ref;
@@ -4302,7 +4298,7 @@ void testRender() {
       fp.viewProj.m[12] = -1.f; fp.viewProj.m[13] = -1.f; fp.viewProj.m[14] = 0.f; fp.viewProj.m[15] = 1.f;
       fp.camPos = {8.f, 8.f, 8.f};
       fp.crosshair = false;
-      auto shot = [&](bool canonOn, int* lodOut) {
+      auto shot = [&](bool canonOn, int* stateOut) {
         cSoftwareRenderer::setCanonIngest(canonOn);
         cSoftwareRenderer sr;
         sr.resize(96, 96);
@@ -4310,18 +4306,18 @@ void testRender() {
         sr.setModelDither(false);
         sr.uploadChunkMesh(u);
         sr.renderFrame(fp);
-        if (lodOut) *lodOut = sr.canonLodOf(0, 0, 0);
+        if (stateOut) *stateOut = sr.canonDecodedOf(0, 0, 0);
         return sr.framebuffer().pixels;
       };
-      int lodLegacy = 0, lodCanon = -1;
-      const std::vector<uint32_t> a = shot(false, &lodLegacy), b = shot(true, &lodCanon);
+      int stLegacy = 0, stCanon = -1;
+      const std::vector<uint32_t> a = shot(false, &stLegacy), b = shot(true, &stCanon);
       cSoftwareRenderer::setCanonIngest(false);
       size_t lit = 0;
       for (uint32_t px : a) lit += px != a[0];
       size_t ndiff = 0;
       for (size_t i = 0; i < a.size() && i < b.size(); ++i) ndiff += a[i] != b[i];
-      std::printf("  M8 sw: lodLegacy %d lodCanon %d lit %zu diff %zu (%zu/%zu px)\n", lodLegacy, lodCanon, lit, ndiff, a.size(), b.size());
-      check(lodLegacy == -1 && lodCanon == 0 && a == b && lit > 0,
+      std::printf("  M8 sw: stLegacy %d stCanon %d lit %zu diff %zu (%zu/%zu px)\n", stLegacy, stCanon, lit, ndiff, a.size(), b.size());
+      check(stLegacy == -1 && stCanon == 1 && a == b && lit > 0,
             "software (M8): LL_SW_CANON ingest of the canonical mesh is pixel-identical to the legacy stream");
       {  // Fix (e), Archie Q5: an LRU-capped decode cache evicts out-of-view decodes, re-decodes in view, same pixels.
         cSoftwareRenderer::setCanonIngest(true);
@@ -4336,18 +4332,18 @@ void testRender() {
         sr.uploadChunkMesh(far);
         sr.renderFrame(fp);
         const std::vector<uint32_t> c1 = sr.framebuffer().pixels;
-        const bool farEvicted = sr.canonLodOf(100, 0, 0) == -1 && sr.canonLodOf(0, 0, 0) == 0;
+        const bool farEvicted = sr.canonDecodedOf(100, 0, 0) == 0 && sr.canonDecodedOf(0, 0, 0) == 1;
         FrameParams away = fp;
         away.viewProj.m[12] = 50.f;  // nothing in view: (0,0,0) goes cold and is evicted
         sr.renderFrame(away);
-        const bool nearEvicted = sr.canonLodOf(0, 0, 0) == -1;
+        const bool nearEvicted = sr.canonDecodedOf(0, 0, 0) == 0;
         sr.renderFrame(fp);
         const std::vector<uint32_t> c2 = sr.framebuffer().pixels;
         const auto& dc = sr.decodeCacheForTest();
         std::printf("  fix e sw cache: evictions %llu redecodes %llu resident %zu B\n", (unsigned long long)dc.evictions(),
                     (unsigned long long)dc.redecodes(), dc.residentBytes());
         cSoftwareRenderer::setCanonIngest(false);
-        check(farEvicted && nearEvicted && c1 == a && c2 == a && dc.evictions() >= 2 && dc.redecodes() >= 1 && sr.canonLodOf(0, 0, 0) == 0,
+        check(farEvicted && nearEvicted && c1 == a && c2 == a && dc.evictions() >= 2 && dc.redecodes() >= 1 && sr.canonDecodedOf(0, 0, 0) == 1,
               "software (fix e): capped canonical decode cache evicts cold chunks and re-decodes in view, pixel-identical");
       }
     }

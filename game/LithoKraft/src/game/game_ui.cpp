@@ -1035,11 +1035,6 @@ void cGameUi::openSettings(const GameSettings& cur) {
     ui::cNumberField& nf = rr.add<ui::cNumberField>(0, 64, cur.streamRadius);
     nf.setId("set-stream-radius");
     nf.on("change", [changed, state](ui::cWidget& w) { state->streamRadius = static_cast<ui::cNumberField&>(w).value(); changed(); });
-    // Archie Phase 1 (JD 2026-11-04): far-LOD detail slider (software renderer; live, never beyond the view).
-    ui::cStackPanel& lr = row(pg, "Far LOD detail (0 off, 1 high, 2 balanced, 3 fast)");
-    ui::cSlider& ls = lr.add<ui::cSlider>(0.f, 3.f, float(cur.lodDetail), 1.f);
-    ls.setId("set-lod");
-    ls.on("change", [changed, state](ui::cWidget& w) { state->lodDetail = int(static_cast<ui::cSlider&>(w).value() + 0.5f); changed(); });
     // JD Vulkan push (Cortana 2026-10-16): one toggle per Vulkan effect (live; GL33 / software keep their look).
     pg.add<ui::cLabel>("Vulkan effects (live; OpenGL / software unchanged)");
     struct FxBox { const char* name; const char* id; int bit; };
@@ -1054,8 +1049,6 @@ void cGameUi::openSettings(const GameSettings& cur) {
       const int bit = fb.bit;
       box(fb.name, fb.id, (cur.vkFx & bit) != 0, [bit](GameSettings& s, bool v) { s.vkFx = v ? (s.vkFx | bit) : (s.vkFx & ~bit); });
     }
-    // 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): far LOD (2x for chunks 33-48, 4x beyond; render-only).
-    box("Far LOD (chunks 33-64)", "set-vk-far-lod", cur.vkFarLod, [](GameSettings& s, bool v) { s.vkFarLod = v; });
     // F56-4 (Proposed by JD, Built by Cortana): F3-style perf readout, off by default (live).
     box("Performance readout (FPS, frame / update / GPU ms)", "set-perf-readout", cur.fpsCounter, [](GameSettings& s, bool v) { s.fpsCounter = v; });
   }

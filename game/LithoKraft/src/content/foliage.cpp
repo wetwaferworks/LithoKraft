@@ -339,63 +339,6 @@ const Mesh& mesh(Kind k) {
   return all[size_t(k)];
 }
 
-// Cortana 2026-10-16 [GAME] (JD): the far LOD of a kind - a cross-hatch of two crossed planes
-// through the cell centre (x = 8 and z = 8, both facings), each carrying the model's silhouette
-// projected onto it (front-most micro-cell's material per 1/16 texel), greedy-merged into
-// rectangles. Render-only, derived from the shared detail mesh; no world data involved.
-Mesh crossFromMesh(const Mesh& detail, int heightBlocks) {
-  Mesh out;
-  const int H = 16 * std::max(1, heightBlocks);
-  for (int plane = 0; plane < 2; ++plane) {  // 0: XY silhouette at z = 8; 1: ZY silhouette at x = 8
-    const int u = plane == 0 ? 0 : 2, d = plane == 0 ? 2 : 0;  // in-plane horizontal axis, depth axis
-    std::vector<uint8_t> mat(size_t(16 * H), 0);
-    std::vector<int> depth(size_t(16 * H), -1);
-    for (const Quad& q : detail.quads) {
-      for (int y = std::max(0, int(q.lo[1])); y < std::min(H, int(q.hi[1])); ++y)
-        for (int a = std::max(0, int(q.lo[u])); a < std::min(16, int(q.hi[u])); ++a) {
-          const size_t i = size_t(y * 16 + a);
-          if (q.hi[d] > depth[i]) { depth[i] = q.hi[d]; mat[i] = q.material; }
-        }
-    }
-    std::vector<uint8_t> used(mat.size(), 0);
-    for (int y = 0; y < H; ++y)
-      for (int a = 0; a < 16; ++a) {
-        const size_t i0 = size_t(y * 16 + a);
-        if (!mat[i0] || used[i0]) continue;
-        const uint8_t m = mat[i0];
-        int w = 1;
-        while (a + w < 16 && mat[size_t(y * 16 + a + w)] == m && !used[size_t(y * 16 + a + w)]) ++w;
-        int h = 1;
-        for (;; ++h) {
-          if (y + h >= H) break;
-          bool row = true;
-          for (int k = 0; k < w && row; ++k) row = mat[size_t((y + h) * 16 + a + k)] == m && !used[size_t((y + h) * 16 + a + k)];
-          if (!row) break;
-        }
-        for (int yy = y; yy < y + h; ++yy)
-          for (int k = 0; k < w; ++k) used[size_t(yy * 16 + a + k)] = 1;
-        Quad q{};
-        q.lo[1] = int16_t(y); q.hi[1] = int16_t(y + h);
-        q.lo[u] = int16_t(a); q.hi[u] = int16_t(a + w);
-        q.lo[d] = q.hi[d] = 8;
-        q.material = m;
-        const uint8_t faces[2][2] = {{4, 5}, {0, 1}};
-        for (uint8_t f : faces[plane]) { q.face = f; out.quads.push_back(q); }
-      }
-  }
-  out.rawQuads = out.quads.size();
-  return out;
-}
-
-const Mesh& crossMesh(Kind k) {
-  static const std::array<Mesh, kKindCount> all = [] {
-    std::array<Mesh, kKindCount> a;
-    for (int i = 0; i < kKindCount; ++i) a[size_t(i)] = crossFromMesh(mesh(Kind(i)), kindHeight(Kind(i)));
-    return a;
-  }();
-  return all[size_t(k)];
-}
-
 std::vector<model::Model> buildRepeatorModel(int activeIndex) { return repeatorModel(activeIndex); }
 
 namespace {

@@ -58,12 +58,6 @@ struct Mesh {
 };
 /// The shared mesh for kind k (built on first use from the assets or the generator).
 const Mesh& mesh(Kind k);
-/// Cortana 2026-10-16 [GAME] (JD): far LOD (beyond kLodDistanceBlocks) - the cross-hatch variant
-/// of kind k: two crossed zero-thickness planes (x = 8, z = 8; both facings) carrying the model's
-/// silhouette. Shared, built once from mesh(k). Render-only: never touches world data.
-const Mesh& crossMesh(Kind k);
-Mesh crossFromMesh(const Mesh& detail, int heightBlocks);
-inline constexpr float kLodDistanceBlocks = 32.f;
 /// Asset path of block i of kind k under `dir`.
 std::string assetPath(const std::string& dir, Kind k, int i);
 /// Mesh a model stack into shared quads. lodLevel 4 = 16^3 (foliage); level-5 component

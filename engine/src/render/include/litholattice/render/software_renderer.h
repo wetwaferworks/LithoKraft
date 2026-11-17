@@ -336,21 +336,15 @@ class cSoftwareRenderer : public IRenderer {
 
  private:
   // Render pipeline M8 (software uploader): LL_SW_CANON=1 ingests ChunkMesh::canonical
-  // (span decode via decodeCanonicalMesh) with draw-side LOD/skirt selection; default off =
-  // the legacy PackedVertex stream. canonSrc_ keeps each canonical mesh + its current lod so
-  // a camera ring crossing re-decodes at the new lod (store-owned: drain/renderFrame only).
-  // M10: skirtMask = the draw-side skirt directions decoded (canonSkirtMask); pend = the
-  // lod being selected this pass (neighbour masks read it).
+  // (span decode via decodeCanonicalMesh); default off = the legacy PackedVertex stream.
+  // canonStore_ keeps each canonical mesh so an evicted decode can be rebuilt in view
+  // (store-owned: drain/renderFrame only). Full geometry only (LOD removed 2026-11-17).
   using SwCanonSrc = cSwCanonStore::Entry;  // refactor step 3b: the store is an IMeshUploader
-  uint8_t canonSkirtMaskFor(int cx, int sy, int cz, int lod) const;
-  bool redecodeCanon(SwCanonSrc& src, int lod);
-  void refreshCanonNeighbours(int cx, int sy, int cz);
+  bool redecodeCanon(SwCanonSrc& src);
   cSwCanonStore canonStore_;  ///< step 3b: was std::map<int64_t, SwCanonSrc> canonSrc_
-  int canonCamCx_ = 1 << 30, canonCamCz_ = 1 << 30;
   bool canonInner_ = false;  ///< storing a decoded stream (keeps canonSrc_)
-  void reselectCanonLods(const Vec3& cam);
   // Fix (e), Archie Q5: LRU cap on the expanded decode of canonical chunks (meshes_ entries
-  // made by redecodeCanon). Evicted chunks keep canonSrc_ (lod = -1) and re-decode in view.
+  // made by redecodeCanon). Evicted chunks keep their store entry (not decoded) and re-decode in view.
   cSwDecodeCache decodeCache_;
   uint64_t decodeFrame_ = 0;
   std::vector<int64_t> decodeEvictScratch_;
@@ -361,12 +355,8 @@ class cSoftwareRenderer : public IRenderer {
   cSwDecodeCache& decodeCacheForTest() { return decodeCache_; }
   static bool canonIngestEnabled();
   static void setCanonIngest(bool on);  ///< overrides LL_SW_CANON (tests)
-  /// Test hook: the lod the canonical path currently draws for a stored chunk (-1 = legacy).
-  int canonLodOf(int cx, int sy, int cz) const;
-  /// Test hook (M10): the draw-side skirt direction mask of a stored canonical chunk.
-  int canonSkirtMaskOf(int cx, int sy, int cz) const;
-  /// Test hook: move the LOD reference point without a frame (renderFrame does this).
-  void setCanonCamera(const Vec3& cam) { reselectCanonLods(cam); }
+  /// Test hook: canonical decode state of a chunk: 1 decoded, 0 stored but evicted, -1 not stored (legacy).
+  int canonDecodedOf(int cx, int sy, int cz) const;
  private:
   SoftwareFramebuffer fb_;
   std::vector<int> meshRowY0_, meshRowY1_;  ///< RND-H3: per drawn mesh screen row span
@@ -412,9 +402,6 @@ class cSoftwareRenderer : public IRenderer {
   std::vector<float> frameEmit_;     ///< this frame's nearest emitters (6 floats each)        ///< Cortana 2026-10-16: render.mipmaps (distance LOD, BUG-0005)
   float shimmerTime_ = 0.f;  ///< render clock (s) for the shimmer wave
   std::unique_ptr<SoftwareAaScratch> aaScratch_;  ///< lazily built post-pass scratch
-  std::vector<uint32_t> layerAvg_;  ///< 2026-10-25: per texture layer average colour (far-LOD flat shading)
-  const uint32_t* layerAvgSrc_ = nullptr; uint32_t layerAvgN_ = 0;
-  void refreshLayerAvg();
   std::vector<uint32_t> swScaleX_;                ///< pass sw3: upscale column map
   SoftwareFramebuffer aaOut_;                     ///< SSAA resolve target (renderFrame)
   SoftwareAaScratch& ensureAaScratch();
@@ -480,16 +467,7 @@ class cSoftwareRenderer : public IRenderer {
     float pulseP1[4] = {0.f, 0.f, 0.f, 0.f};
     float traceP0[4] = {0.f, 0.f, 0.f, 0.f};
     float traceP1[4] = {0.f, 0.f, 0.f, 0.f};
-    uint8_t lodScale = 1;   // 2026-10-25: ChunkMesh::lodScale (>= 4: flat shade + height cull)
     bool hasBlend = false;  // Cortana 2026-10-15 1755: has kShadeAlphaBlend quads (second, blended pass)
-    // Cortana 2026-10-16 (JD foliage LOD) / Elfie 2026-10-17 (Argon counsel pt 1, phase A):
-    // ONE stored set, reordered at upload: untagged quads first (original relative order),
-    // then kShadeLodNear quads with tag bits masked — as a set, exactly the old near set.
-    // kShadeLodFar quads are never drawn on the software path (both old sets dropped them)
-    // and are not stored. Beyond kLodSwitchBlocks the renderer draws only the prefix
-    // [0, untaggedCount) quads — exactly the old far set (JD: software may skip far foliage).
-    bool hasLod = false;
-    size_t untaggedCount = 0;  // quads in the far-mode prefix of `verts`
     /// Cortana 2026-10-16 (render.emissive_light): this mesh's light emitters, world space,
     /// 6 floats each (x, y, z, r, g, b). Built at upload from emissive / powered-Trace quads.
     std::vector<float> emit;
@@ -497,9 +475,7 @@ class cSoftwareRenderer : public IRenderer {
     /// (+X,-X,+Y,-Y,+Z,-Z: the geometric normal of the quad's own winding, axis-aligned
     /// planar quads only) or 6 (never culled). planeLim[b] = the bucket's limiting plane in
     /// mesh-local blocks (min for + buckets, max for - buckets). Built once over the stored
-    /// vector (Elfie 2026-10-17): exact for the near set; in far mode the limits span the
-    /// untagged prefix plus the (undrawn) near quads, which only widens them — the bucket
-    /// test stays conservative and the draw prefix remains the authority on what is drawn.
+    /// vector (Elfie 2026-10-17), exact for the drawn set.
     std::vector<uint8_t> quadFace;
     float planeLim[6] = {0, 0, 0, 0, 0, 0};
   };
@@ -511,7 +487,6 @@ class cSoftwareRenderer : public IRenderer {
   /// discipline drawOrder_/frameEmit_ already rely on.
   std::vector<std::pair<float, size_t>> emitCandScratch_;  ///< renderFrame emitter candidates
   std::vector<const float*> emitSrcScratch_;               ///< renderFrame emitter sources
-  std::vector<PackedVertex> uploadOrderedScratch_;         ///< uploadChunkMesh LOD reorder set
   std::map<int64_t, PbrChunkMesh> pbrMeshes_;  ///< BinaryQuad uploads, same keying
   uint64_t storeGen_ = 0;  ///< mesh-store seal generation: bumped by every store mutation
 

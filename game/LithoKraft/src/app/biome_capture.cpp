@@ -215,11 +215,6 @@ int main(int argc, char** argv) {
           if (!in) continue;
           litholattice::ChunkMesh m = litholattice::meshSubChunk(*in, lctx);
           if (m.verts.empty()) continue;
-          {  // Cortana 2026-10-16: close-up capture = near LOD (foliage detail, no cross-hatch)
-            std::vector<litholattice::PackedVertex> nearVerts;
-            litholattice::selectLod(m.verts, /*far=*/false, nearVerts);
-            m.verts.swap(nearVerts);
-          }
           LM e{{}, {}, float(dx * 16), float(sy * 16), float(dz * 16)};
           for (size_t q = 0; q + 3 < m.verts.size(); q += 4)
             (m.verts[q].mode == litholattice::kShadeAlphaBlend ? e.bl : e.op)

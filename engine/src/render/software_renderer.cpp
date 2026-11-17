@@ -9,7 +9,7 @@
 #include "litholattice/core/thread_name.h"
 #include "litholattice/core/idle_backoff.h"  // t46u item 5b
 #include "litholattice/core/atomic_gate.h"
-#include "litholattice/render/sw_lod_rings.h"  // PlayB: the shared far-LOD ladder
+#include "litholattice/render/view_radius.h"  // draw-side view bound
 #include "litholattice/render/mesher.h"
 #include "litholattice/render/unified_mesher.h"
 #include "litholattice/core/thread_census.h"  // Thread Handshake P2
@@ -237,7 +237,6 @@ static thread_local uint8_t tlQuadValue = 0;
 // Cortana 2026-10-15 1755 [ENGINE]: blended chunk pass filter for renderMesh's per-pixel
 // path: -1 every quad, 0 opaque quads only, 1 kShadeAlphaBlend quads only.
 static thread_local int8_t tlBlendPass = -1;
-static thread_local bool tlFlatLod = false;  // 2026-10-25: this mesh is >= 4x far LOD (flat shade)
 // Cortana 2026-10-15 1345: sign verified on real walk frames (no holes vs cull-off).
 static constexpr float g_backSign = 1.0f;
 // Ginny (Argon) 2026-10-16 Pass 2 feature bits (Cortana). LL_SW_P2=<mask> overrides the
@@ -253,18 +252,10 @@ static std::atomic<unsigned> g_p2{[] {
 }()};
 static inline bool swP2(unsigned bit) { return (g_p2.load(std::memory_order_relaxed) & bit) != 0; }
 static const bool g_swProfOn = std::getenv("LL_SW_PROF") != nullptr;
-// 2026-10-25 (Archie): far-LOD (>= 4x) meshes flat-shade with the layer's average colour
-// (LL_SW_FLAT_LOD=0 off) and drop quads under LL_SW_LOD4_MINH px tall (default 1.5; 0 = off).
-static const bool g_swFlatLod = [] { const char* e = std::getenv("LL_SW_FLAT_LOD"); return !(e && *e == '0'); }();
-// Strike 2 (Elfie bench, 2026-10-26, Archie battle plan): extend the flat-LOD path to
-// 2x meshes (the largest tri ring). Opt-in LL_SW_FLAT_LOD2=1 until the picture and the
-// counts are judged; the >= 4x path above stays as shipped.
 // Cortana 2026-10-26 (Archie item 6, Candidate D): LL_SW_TILE64=K (1-4) = 64x64 tiles, K per grab; 0/unset = strips.
 static std::atomic<int> g_swTile64{[] { const char* e = std::getenv("LL_SW_TILE64"); return e ? std::clamp(std::atoi(e), 0, 4) : 0; }()};
 static const bool g_swNearBinOld = std::getenv("LL_SW_NEARBIN_OLD") != nullptr;  // Cortana 2026-10-26: A/B the near-plane quad binning
 static const float g_swMipBias = [] { const char* e = std::getenv("LL_SW_MIP_BIAS"); return e ? float(std::atof(e)) : 0.0f; }();  // Cortana 2026-10-26: distant moire A/B (mip levels added to the per-triangle pick)
-static const bool g_swFlatLod2 = [] { const char* e = std::getenv("LL_SW_FLAT_LOD2"); return e && *e == '1'; }();
-static const float g_swLod4MinH = [] { const char* e = std::getenv("LL_SW_LOD4_MINH"); return e ? float(std::atof(e)) : 1.5f; }();
 // 2026-10-26 (Archie triage, HUD fill): the HUD is drawn in parallel row chunks. Each chunk walks
 // the whole primitive list in order, clipped to its rows, so every pixel sees the same blend
 // sequence as the serial walk (bit-identical output). Stats count on the unclipped primitive,
@@ -295,8 +286,6 @@ struct SwTlCounters { uint64_t pxScan = 0, pxCov = 0, pxShade = 0, tris = 0, hiz
 static thread_local SwTlCounters tlC;
 static double g_bandMs[64] = {};
 static double g_thrMinAcc = 0, g_thrMaxAcc = 0;
-static std::atomic<uint64_t> g_ringTris[4]{};  // 2026-10-25 (Archie step 6): binned tris per far-LOD ring (LL_SW_PROF)
-static int g_ringEdge[3] = {32, 64, 96};  // = game LL_SW_LOD_RINGS default; PlayB: refreshed from cSwLodRings::shared() (clamped to view) (JD's 32-chunk full-fidelity core, 2026-10-28)
 static std::atomic<uint64_t> g_fcCulled{0}, g_fcQuads{0};  // Pass 2 step 3 (LL_SW_PROF): quads culled by face bucket / total  // Cortana 2026-10-15 1715: rows skipped by Hi-Z (LL_SW_PROF)
 
 namespace {
@@ -1815,23 +1804,6 @@ void cSoftwareRenderer::renderMesh(const PackedVertex* verts, size_t vertCount,
         if (cx0 > cx1 || cy0 > cy1) { ++tlQuadCentreCulled; continue; }
       }
     }
-    if (tlFlatLod) {
-      const uint8_t md = verts[i].mode;
-      if ((md == kShadeTex || md == kShadeGroundPulse || md == kShadeCutout || md == kShadeLeaf) && tlBlendPass <= 0) {
-        // 2026-10-25 (Archie): >= 4x far LOD: average layer colour x face light x mean AO; no UV
-        // setup, no texture fetch. Same light model as basicFragmentShader (0.35 + 0.65 N.L).
-        static constexpr float kFaceLight[6] = {0.35f + 0.65f * 0.44f, 0.35f, 0.35f + 0.65f * 0.88f, 0.35f, 0.35f + 0.65f * 0.26f, 0.35f};
-        const uint32_t layer = verts[i].layerIndex();
-        const uint32_t avg = layer < layerAvg_.size() ? layerAvg_[layer] : 0xFF808080u;
-        float ao = 1.f;
-        if (g_swAo) ao = 0.25f * (kSwAoLut[(verts[i].faceAo >> 3) & 3] + kSwAoLut[(verts[i + 1].faceAo >> 3) & 3] + kSwAoLut[(verts[i + 2].faceAo >> 3) & 3] + kSwAoLut[(verts[i + 3].faceAo >> 3) & 3]);
-        const float l = kFaceLight[std::min(5, verts[i].faceAo & 7)] * ao;
-        const uint32_t col = 0xFF000000u | (uint32_t(float((avg >> 16) & 0xFF) * l) << 16) | (uint32_t(float((avg >> 8) & 0xFF) * l) << 8) | uint32_t(float(avg & 0xFF) * l);
-        rasterizeTriangle(&screen[i*4], &screen[(i+1)*4], &screen[(i+2)*4], col);
-        rasterizeTriangle(&screen[i*4], &screen[(i+2)*4], &screen[(i+3)*4], col);
-        continue;
-      }
-    }
     for (int k = 0; k < 4; ++k) varyingsFromPackedVertex(verts[i + k], sv[k]);
     // Ground pulse/traces tag: only kShadeGroundPulse quads of a mesh whose
     // baked params renderFrame supplied (direct renderMesh callers leave
@@ -1876,27 +1848,6 @@ void cSoftwareRenderer::renderEntityVerts(const float* viewProj) {
     if (!triVisible(i)) continue;
     const uint32_t color = faceColor(verts[i].faceAo & 0x7, verts[i].value, verts[i].mode);
     rasterizeTriangle(&screen[i*4], &screen[(i+1)*4], &screen[(i+2)*4], color);
-  }
-}
-
-void cSoftwareRenderer::refreshLayerAvg() {
-  // 2026-10-25 (Archie): average colour per layer of the base texture array (opaque texels only),
-  // recomputed when the pack changes (data pointer / layer count).
-  const uint32_t* d = textures_.data();
-  const uint32_t n = textures_.layers();
-  if (d == layerAvgSrc_ && n == layerAvgN_) return;
-  layerAvgSrc_ = d; layerAvgN_ = n;
-  layerAvg_.assign(n, 0xFF808080u);
-  if (!d) return;
-  const size_t area = size_t(textures_.tileSize()) * size_t(textures_.tileSize());
-  for (uint32_t l = 0; l < n; ++l) {
-    uint64_t r = 0, g = 0, b = 0, c = 0;
-    for (size_t k = 0; k < area; ++k) {
-      const uint32_t t = d[size_t(l) * area + k];
-      if ((t >> 24) < 128) continue;
-      r += (t >> 16) & 0xFF; g += (t >> 8) & 0xFF; b += t & 0xFF; ++c;
-    }
-    if (c) layerAvg_[l] = 0xFF000000u | uint32_t(r / c) << 16 | uint32_t(g / c) << 8 | uint32_t(b / c);
   }
 }
 
@@ -2077,35 +2028,16 @@ bool cSoftwareRenderer::canonIngestEnabled() {
   const int o = g_swCanonOverride.load(std::memory_order_relaxed);
   return o < 0 ? v : o == 1;
 }
-int cSoftwareRenderer::canonLodOf(int cx, int sy, int cz) const {
+int cSoftwareRenderer::canonDecodedOf(int cx, int sy, int cz) const {
   auto it = canonStore_.entries().find(swMeshKey(cx, sy, cz));
-  return it == canonStore_.entries().end() ? -1 : it->second.lod;
+  return it == canonStore_.entries().end() ? -1 : it->second.decoded ? 1 : 0;
 }
-static int swCanonDist(int cx, int cz, int camCx, int camCz) {
-  return std::max(std::abs(cx - camCx), std::abs(cz - camCz));
-}
-int cSoftwareRenderer::canonSkirtMaskOf(int cx, int sy, int cz) const {
-  auto it = canonStore_.entries().find(swMeshKey(cx, sy, cz));
-  return it == canonStore_.entries().end() ? -1 : int(it->second.skirtMask);
-}
-// M10 (Archie ruling 2): skirts only toward neighbours drawn at another LOD.
-uint8_t cSoftwareRenderer::canonSkirtMaskFor(int cx, int sy, int cz, int lod) const {
-  static const int kD[6][3] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-  int nbr[6];
-  for (int f = 0; f < 6; ++f) {
-    const int64_t k = swMeshKey(cx + kD[f][0], sy + kD[f][1], cz + kD[f][2]);
-    auto it = canonStore_.entries().find(k);
-    nbr[f] = it != canonStore_.entries().end() ? it->second.pend : meshes_.count(k) ? -1 : -2;
-  }
-  return canonSkirtMask(lod, nbr);
-}
-bool cSoftwareRenderer::redecodeCanon(SwCanonSrc& src, int lod) {
-  const uint8_t mask = canonSkirtMaskFor(src.meta.cx, src.meta.sy, src.meta.cz, lod);
-  if (lod == src.lod && mask == src.skirtMask) return true;
+bool cSoftwareRenderer::redecodeCanon(SwCanonSrc& src) {
+  if (src.decoded) return true;
   ChunkMesh dm = src.meta;  // verts empty in the stored meta
   dm.canonical.reset();
-  if (!decodeCanonicalMesh(*src.meta.canonical, lod, dm.verts, mask) || dm.verts.empty()) return false;
-  src.lod = lod; src.pend = lod; src.skirtMask = mask;
+  if (!decodeCanonicalMesh(*src.meta.canonical, dm.verts) || dm.verts.empty()) return false;
+  src.decoded = true;
   canonInner_ = true;
   uploadChunkMesh(dm);
   canonInner_ = false;  // legacy store path (canonical reset: no recursion into this branch)
@@ -2115,18 +2047,15 @@ bool cSoftwareRenderer::redecodeCanon(SwCanonSrc& src, int lod) {
     decodeCache_.onDecoded(key, it->second.quads.size() * sizeof(StoredQuad) + it->second.verts.size() * sizeof(PackedVertex), decodeFrame_);
   return true;
 }
-// Fix (e): an evicted canonical chunk (lod -1) that is in view decodes again at its pending lod.
+// Fix (e): an evicted canonical chunk that is in view decodes again.
 void cSoftwareRenderer::redecodeEvictedInView(const FrameParams& p) {
-  const int view = cSwLodRings::shared().view();  // Archie Phase 1: never redecode beyond the view
   const int ccx = int(std::floor(p.camPos.x / 16.f)), ccz = int(std::floor(p.camPos.z / 16.f));
   for (auto& [key, src] : canonStore_.entries()) {
-    if (src.lod >= 0) continue;
-    if (view > 0 && view < (1 << 20) &&
-        std::max(std::abs(src.meta.cx - ccx), std::abs(src.meta.cz - ccz)) > view) continue;
+    if (src.decoded) continue;
+    if (cViewRadius::beyond(std::max(std::abs(src.meta.cx - ccx), std::abs(src.meta.cz - ccz)))) continue;  // never beyond the view
     const Vec3 mn{src.meta.cx * 16.f, src.meta.sy * 16.f, src.meta.cz * 16.f};
     if (cullProto_.decide(p.viewProj, mn, mn + Vec3{16, 16, 16}, p.camPos, frustumMarginDeg_) != CullDecision::Full) continue;
-    const int want = src.pend >= 0 ? src.pend : 0;
-    if (redecodeCanon(src, want)) decodeCache_.countRedecode();
+    if (redecodeCanon(src)) decodeCache_.countRedecode();
   }
 }
 // Fix (e): drop the least-recently-drawn decodes over the cap (never one drawn this frame).
@@ -2137,53 +2066,23 @@ void cSoftwareRenderer::evictColdDecodes() {
     if (it == canonStore_.entries().end()) { decodeCache_.onErased(key); continue; }
     ++storeGen_;
     meshes_.erase(key);
-    it->second.lod = -1;
+    it->second.decoded = false;
     decodeCache_.onErased(key);
     decodeCache_.countEviction();
   }
-}
-void cSoftwareRenderer::refreshCanonNeighbours(int cx, int sy, int cz) {
-  static const int kD[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};  // same column = same lod: no Y seam
-  for (const auto& d : kD) {
-    auto it = canonStore_.entries().find(swMeshKey(cx + d[0], sy, cz + d[1]));
-    if (it != canonStore_.entries().end() && it->second.lod >= 0) redecodeCanon(it->second, it->second.lod);
-  }
-}
-void cSoftwareRenderer::reselectCanonLods(const Vec3& cam) {
-  const int ccx = int(std::floor(cam.x / 16.f)), ccz = int(std::floor(cam.z / 16.f));
-  if (ccx == canonCamCx_ && ccz == canonCamCz_) return;
-  canonCamCx_ = ccx; canonCamCz_ = ccz;
-  if (canonStore_.entries().empty()) return;
-  int r1 = 0, r2 = 0;
-  canonLodRings(r1, r2);
-  const int view = cSwLodRings::shared().view();  // Archie Phase 1: rings already clamped; skip beyond view
-  // Two passes (M10): pick every lod first so the skirt masks see the new neighbours.
-  for (auto& [key, src] : canonStore_.entries()) {
-    const int d = swCanonDist(src.meta.cx, src.meta.cz, ccx, ccz);
-    if (view > 0 && view < (1 << 20) && d > view) { src.pend = -1; continue; }  // beyond view: leave decoded until tombstone
-    src.pend = selectCanonLod(d, src.lod, r1, r2);
-  }
-  for (auto& [key, src] : canonStore_.entries())
-    if (src.pend >= 0 && src.lod >= 0 && !redecodeCanon(src, src.pend)) src.pend = src.lod;  // keep current lod (evicted: decode when in view)
 }
 
 void cSoftwareRenderer::uploadChunkMesh(const ChunkMesh& mesh) {
   const int64_t key = swMeshKey(mesh.cx, mesh.sy, mesh.cz);
   if (canonIngestEnabled() && !canonInner_) {
     if (!canonStore_.prepare(mesh)) {  // step 3b: no decodable canonical payload
-      if (canonStore_.entries().erase(key) || mesh.verts.empty()) refreshCanonNeighbours(mesh.cx, mesh.sy, mesh.cz);
+      canonStore_.entries().erase(key);
     } else {
-      int r1 = 0, r2 = 0;
-      canonLodRings(r1, r2);
-      const int want = canonCamCx_ == (1 << 30) ? 0 : selectCanonLod(swCanonDist(mesh.cx, mesh.cz, canonCamCx_, canonCamCz_), -1, r1, r2);
       MeshPlacement placed;
-      canonStore_.commit(placed);  // stores the staged entry at key (fresh: lod -1, skirtMask 0xFF)
+      canonStore_.commit(placed);  // stores the staged entry at key (fresh: not decoded)
       SwCanonSrc& st = canonStore_.entries()[key];
-      st.lod = -1; st.pend = want;
-      if (redecodeCanon(st, want) || (st.pend = 0, redecodeCanon(st, 0))) {
-        refreshCanonNeighbours(mesh.cx, mesh.sy, mesh.cz);  // M10: their seams may have changed
-        return;
-      }
+      st.decoded = false;
+      if (redecodeCanon(st)) return;
       canonStore_.entries().erase(key);  // nothing decodable: fall through to the legacy stream
     }
   }
@@ -2218,44 +2117,8 @@ void cSoftwareRenderer::uploadChunkMesh(const ChunkMesh& mesh) {
       s.emit.insert(s.emit.end(), e, e + 6);
     }
   }
-  // Cortana 2026-10-16: LOD-tagged quads (foliage) split into a near set (detail) and a far set.
-  // The far set keeps only untagged quads: far foliage is skipped on the software path.
-  // Elfie 2026-10-17 (Argon counsel pt 1, phase A): the two sets are no longer both stored.
-  // One vector, reordered: untagged quads first (original relative order â€” the exact old far
-  // set), then kShadeLodNear quads with tag bits masked (with the prefix, the exact old near
-  // set selectLod produced). kShadeLodFar quads were dropped by BOTH old sets on this path,
-  // so they are not stored. Far mode draws the prefix [0, untaggedCount) quads only.
-  s.hasLod = hasLodTags(mesh.verts);
-  // Elfie 2026-10-18 phase B: the phase-A ordered set is built in a local,
-  // then packed into StoredQuad form (legacy store kept if packing declines).
-  // CREW TILE (shake 2026-10-18): the no-LOD common path used to copy the
-  // whole mesh into `ordered` just to read it back below. Readers now work
-  // on mesh.verts directly; only the LOD path builds a reordered set, in a
-  // reused member scratch. Contents seen by every consumer are unchanged.
-  const std::vector<PackedVertex>* orderedPtr = &mesh.verts;
-  if (s.hasLod) {
-    std::vector<PackedVertex>& ordered = uploadOrderedScratch_;
-    ordered.clear();
-    ordered.reserve(mesh.verts.size());
-    size_t untagged = 0;
-    for (size_t q = 0; q + 3 < mesh.verts.size(); q += 4)
-      if (!(mesh.verts[q].mode & (kShadeLodNear | kShadeLodFar))) {
-        ordered.insert(ordered.end(), mesh.verts.begin() + q, mesh.verts.begin() + q + 4);
-        ++untagged;
-      }
-    for (size_t q = 0; q + 3 < mesh.verts.size(); q += 4)
-      if (mesh.verts[q].mode & kShadeLodNear)
-        for (size_t k = 0; k < 4; ++k) {
-          PackedVertex v = mesh.verts[q + k];
-          v.mode = uint8_t(v.mode & kShadeModeMask);
-          ordered.push_back(v);
-        }
-    s.untaggedCount = untagged;
-    orderedPtr = &ordered;
-  } else {
-    s.untaggedCount = mesh.verts.size() / 4;
-  }
-  const std::vector<PackedVertex>& ordered = *orderedPtr;
+  // Full geometry at every distance (LOD removed 2026-11-17): the stored set is mesh.verts.
+  const std::vector<PackedVertex>& ordered = mesh.verts;
   swFaceBuckets(ordered, s.quadFace, s.planeLim);  // Pass 2 step 3 (one set now)
   s.hasBlend = false;  // Cortana 2026-10-15 1755: route to the blended pass
   for (size_t q = 0; q < ordered.size(); q += 4)
@@ -2265,13 +2128,8 @@ void cSoftwareRenderer::uploadChunkMesh(const ChunkMesh& mesh) {
     s.verts.shrink_to_fit();  // release the legacy buffer: memory is the point
   } else {
     s.quads.clear();
-    // CREW TILE: `ordered` is mesh.verts (no-LOD) or the member scratch
-    // (LOD) now -- copy in the first case, move in the second, exactly the
-    // values the old local held either way.
-    if (s.hasLod) s.verts = std::move(uploadOrderedScratch_);
-    else s.verts = mesh.verts;
+    s.verts = mesh.verts;
   }
-  s.lodScale = mesh.lodScale;
   for (int i = 0; i < 4; ++i) {
     s.pulseP0[i] = mesh.pulseP0[i];
     s.pulseP1[i] = mesh.pulseP1[i];
@@ -3086,14 +2944,6 @@ struct SwProf {
     std::fprintf(stderr, "swprof thread-summed ms/frame: renderMesh=%.1f calls=%llu\n", g_meshUs.exchange(0) / 1000.0 / frames, (unsigned long long)(g_meshCalls.exchange(0) / frames));
     std::fprintf(stderr, "swprof quad centrecull=%llu /frame\n", (unsigned long long)(g_quadCentreCulled.exchange(0) / frames));
     std::fprintf(stderr, "swprof centrecull tris=%llu emitmemo vertex hits=%llu /frame\n", (unsigned long long)(g_centreCulled.exchange(0)/frames), (unsigned long long)(g_emitMemoHits.exchange(0)/frames));  // Cortana 2026-10-25 box
-    {
-      static const bool once = [] { if (const char* r = std::getenv("LL_SW_LOD_RINGS")) std::sscanf(r, "%d,%d,%d", &g_ringEdge[0], &g_ringEdge[1], &g_ringEdge[2]); return true; }();
-      for (int i = 0; i < 3; ++i) g_ringEdge[i] = litholattice::cSwLodRings::shared().edge(i);  // PlayB: same edges the game meshes with
-      (void)once;
-      const uint64_t r0 = g_ringTris[0].exchange(0) / frames, r1 = g_ringTris[1].exchange(0) / frames, r2 = g_ringTris[2].exchange(0) / frames, r3 = g_ringTris[3].exchange(0) / frames;
-      std::fprintf(stderr, "swprof ring tris (binned): near<=%d=%llu mid<=%d=%llu mid2<=%d(2x)=%llu far>%d(4x)=%llu /frame\n", g_ringEdge[0], (unsigned long long)r0,
-                   g_ringEdge[1], (unsigned long long)r1, g_ringEdge[2], (unsigned long long)r2, g_ringEdge[2], (unsigned long long)r3);
-    }
     std::fprintf(stderr, "swprof facecull quads culled=%llu of %llu /frame\n", (unsigned long long)(g_fcCulled.exchange(0)/frames), (unsigned long long)(g_fcQuads.exchange(0)/frames));  // Pass 2 step 3
     std::fprintf(stderr, "swprof ms/frame: clear+cull=%.2f transform+bin=%.2f strips=%.2f pbr+ent+sprites=%.2f post+hud=%.2f\n",
                  acc[0]/frames, acc[1]/frames, acc[2]/frames, acc[3]/frames, acc[4]/frames);
@@ -3110,7 +2960,6 @@ SwProf g_swProf;
 }  // namespace
 
 void cSoftwareRenderer::renderFrame(const FrameParams& p) {
-  if (canonIngestEnabled()) reselectCanonLods(p.camPos);  // M8 draw-side LOD (store-owned here)
   // Ginny (Argon) 2026-10-16 Pass 2 A/B proof (Cortana): LL_SW_AB=<n> renders frame n with
   // the LL_SW_AB_A mask (default 0 = pre-Pass-2), then again with the active mask, and logs
   // how many pixels differ. Off (zero cost beyond one branch) unless the env var is set.
@@ -3233,12 +3082,10 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
     for (size_t i = 0; i < keep; ++i) frameEmit_.insert(frameEmit_.end(), src[cand[i].second], src[cand[i].second] + 6);
   }
   drawOrder_.clear();
-  const int viewCull = cSwLodRings::shared().view();  // Archie Phase 1 follow-up: draw-side view bound
   const int eyeCx = int(std::floor(p.camPos.x / 16.f)), eyeCz = int(std::floor(p.camPos.z / 16.f));
   for (auto& [key, m] : meshes_) {
     (void)key;
-    if (viewCull > 0 && viewCull < (1 << 20) &&
-        std::max(std::abs(m.cx - eyeCx), std::abs(m.cz - eyeCz)) > viewCull) continue;
+    if (cViewRadius::beyond(std::max(std::abs(m.cx - eyeCx), std::abs(m.cz - eyeCz)))) continue;  // draw-side view bound
     const Vec3 mn{m.cx * 16.f, m.sy * 16.f, m.cz * 16.f};
     if (cullProto_.decide(p.viewProj, mn, mn + Vec3{16, 16, 16}, p.camPos,
                           frustumMarginDeg_) != CullDecision::Full)
@@ -3248,16 +3095,6 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
     if (canonCache) decodeCache_.touch(key, decodeFrame_);  // fix (e)
   }
   if (canonCache) evictColdDecodes();  // fix (e): only non-drawn entries; drawOrder_ pointers stay valid
-  // Elfie 2026-10-17: LOD is now a draw range, not a swap (the mesh pointer sort
-  // below makes per-index state fragile, so the range is derived where used).
-  // Beyond the switch distance only the untagged prefix is active.
-  auto drawVertsOf = [&p](const StoredMesh& m) -> size_t {
-    if (m.hasLod) {  // Cortana 2026-10-16: per-sub-chunk LOD by horizontal centre distance
-      const float lx = m.cx * 16.f + 8.f - p.camPos.x, lz = m.cz * 16.f + 8.f - p.camPos.z;
-      if (lx * lx + lz * lz > kLodSwitchBlocks * kLodSwitchBlocks) return m.untaggedCount * 4;
-    }
-    return m.storedVerts();
-  };
   std::stable_sort(drawOrder_.begin(), drawOrder_.end(),
                    [](const auto& a, const auto& b) { return a.first < b.first; });
   // RND-H3 banding (2026-10-15): each band thread walks the same
@@ -3359,7 +3196,7 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
         if (di >= drawOrder_.size()) break;
         if (p2par) meshRowSpan(di);
         const StoredMesh& m = *drawOrder_[di].second;
-        const size_t drawVerts = drawVertsOf(m);  // Elfie 2026-10-17: far LOD = untagged prefix
+        const size_t drawVerts = m.storedVerts();
         const Vec3 mn{m.cx * 16.f, m.sy * 16.f, m.cz * 16.f};
         const Mat4 mvp = mul(p.viewProj, swTranslation(mn.x, mn.y, mn.z));
         float* dst = frameScreen_.data() + meshScreenOff_[di];
@@ -3415,7 +3252,6 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
           auto& bins = meshBins_[di];
           off.assign(size_t(nStripsF) + 1, 0u);
           const bool cullBin = swP2(kP2CentreCull);
-          const float minH = (perPixel_ && m.lodScale >= 4) ? g_swLod4MinH : 0.f;
           auto range = [&](size_t q, int& s0, int& s1) {
             const float* s = dst + q * 16;
             float y0, y1;
@@ -3454,7 +3290,6 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
             y0 = std::min(std::min(s[1], s[5]), std::min(s[9], s[13]));
             y1 = std::max(std::max(s[1], s[5]), std::max(s[9], s[13]));
             if (!(y1 >= -1.f) || !(y0 <= float(fb_.height) + 1.f)) { s0 = 1; s1 = 0; return; }
-            if (minH > 0.f && y1 - y0 < minH) { s0 = 1; s1 = 0; return; }  // 2026-10-25: thin 4x-LOD faces
             if (cullBin) {  // 2026-10-25 (Archie step 4): no pixel centre in the quad bbox -> never binned
               constexpr float kEps = 1e-3f;  // same conservative test as the per-strip quad cull
               const float x0 = std::min(std::min(s[0], s[4]), std::min(s[8], s[12]));
@@ -3474,12 +3309,6 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
           auto& fill = p2par ? tlFill : binFill_[band];
           fill.assign(off.begin(), off.end() - 1);
           for (size_t q = 0; q < nqd; ++q) { if (qface && !((vis >> qface[q]) & 1u)) continue; int s0, s1; range(q, s0, s1); for (int s = s0; s <= s1; ++s) bins[fill[size_t(s)]++] = uint32_t(q); }
-          if (g_swProfOn && std::isfinite(eye[0]) && std::isfinite(eye[2])) {  // tris per ring: Chebyshev chunk distance from the eye's chunk
-            uint64_t nb = 0;
-            for (size_t q = 0; q < nqd; ++q) { if (qface && !((vis >> qface[q]) & 1u)) continue; int s0, s1; range(q, s0, s1); if (s0 <= s1) ++nb; }
-            const int d = std::max(std::abs(m.cx - int(std::floor(eye[0] / 16.0))), std::abs(m.cz - int(std::floor(eye[2] / 16.0))));
-            g_ringTris[d > g_ringEdge[2] ? 3 : d > g_ringEdge[1] ? 2 : d > g_ringEdge[0] ? 1 : 0].fetch_add(nb * 2, std::memory_order_relaxed);
-          }
         }
       }
     });
@@ -3496,7 +3325,6 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
   // left finishing one alone. Strips own disjoint rows, so pixels do not depend on the order.
   // A strip far heavier than a thread's fair share (the horizon rows) is split into 64-px-
   // multiple x tiles (Hi-Z tiles never straddle two), each its own work item.
-  if (perPixel_ && g_swFlatLod) refreshLayerAvg();
   stripWork_.clear();
   const int tileK = g_swTile64.load(std::memory_order_relaxed);
   int nTiles = 0;
@@ -3618,8 +3446,7 @@ void cSoftwareRenderer::renderFrame(const FrameParams& p) {
     tlBlendPass = (perPixel_ && m.hasBlend) ? int8_t(pass) : int8_t(-1);
     const auto tm0 = g_swProfOn ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     if (g_swProfOn) ++tlMeshCalls;
-    tlFlatLod = perPixel_ && g_swFlatLod && (m.lodScale >= 4 || (g_swFlatLod2 && m.lodScale >= 2));
-    renderMesh(frameVerts_.data() + meshVertOff_[di], drawVertsOf(m), mvp.m);  // Elfie 2026-10-17: far LOD prefix bound; 2026-10-18 phase B: frame scratch
+    renderMesh(frameVerts_.data() + meshVertOff_[di], m.storedVerts(), mvp.m);  // 2026-10-18 phase B: frame scratch
     if (g_swProfOn) tlMeshMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tm0).count();
     tlBlendPass = -1;
     tlCullBack = false;

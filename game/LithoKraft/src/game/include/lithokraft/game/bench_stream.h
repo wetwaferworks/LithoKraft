@@ -54,22 +54,13 @@ class cBenchStreamer {
   // 0.0.1.53 [C53-2] (Proposed by JD, Built by Cortana): workers snapshot + mesh + (with mapped GPU memory)
   // write the vertices; `prep.ready` = already in GPU memory, main thread only publishes.
   // `skipped` = the column was dropped before the job ran. `verts` = vertex count.
-  struct MeshOut { ChunkMesh mesh; double ms; PreparedChunkMesh prep{}; size_t verts = 0; bool skipped = false; int lod = 0; uint32_t gen = 0; };
-  // 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): render-only far LOD. Level 0 = full mesh (ring <= 32),
-  // 1 = 2x2x2 downsampled (33-48), 2 = 4x4x4 (49+). Hysteresis: a column only goes coarser
-  // 2 chunks past the edge, finer as soon as it crosses it. `gen` drops stale results.
-  struct ColLod { int lod = 0; uint32_t gen = 0; };
-  std::unordered_map<uint64_t, ColLod> lod_;
-  uint32_t lodGen_ = 0;
-  bool farLod_ = true;
-  int lodEnv_ = -1;  ///< LL_VK_FAR_LOD=0/1 (wins over the setting)
+  struct MeshOut { ChunkMesh mesh; double ms; PreparedChunkMesh prep{}; size_t verts = 0; bool skipped = false; uint32_t gen = 0; };
+  /// Per-column generation token, bumped when the column's meshes are (re)submitted; `gen`
+  /// drops stale results (LOD levels removed 2026-11-17).
+  std::unordered_map<uint64_t, uint32_t> colGen_;
+  uint32_t genSeq_ = 0;
   uint64_t frame_ = 0;
-  void submitMesh(int cx, int sy, int cz, int lod, uint32_t gen, const std::shared_ptr<const BlockMaterials>& materials);
- public:
-  /// [C54-1] Graphics "Far LOD" setting (live); LL_VK_FAR_LOD overrides.
-  void setFarLod(bool on) { farLod_ = on; }
-  bool farLodActive() const { return lodEnv_ >= 0 ? lodEnv_ != 0 : farLod_; }
-  uint64_t lodRemeshed = 0;
+  void submitMesh(int cx, int sy, int cz, uint32_t gen, const std::shared_ptr<const BlockMaterials>& materials);
  private:
   bool inFixedWorld(int cx, int cz) const { return cx >= 0 && cz >= 0 && cx < world_ && cz < world_; }
   IRenderer& renderer_;
@@ -84,7 +75,7 @@ class cBenchStreamer {
   std::unordered_set<uint64_t> requested_;                      // generating or loaded
   std::unordered_map<uint64_t, std::vector<int>> meshedSubs_;
   struct ColStat { int cx = 0, cz = 0; size_t verts = 0; int draws = 0; std::vector<uint32_t> sv; };  // [C54-1] sv = per-sub verts
-  std::unordered_map<uint64_t, ColStat> colStats_;  // per-ring LOD data (JD 2026-10-16)
+  std::unordered_map<uint64_t, ColStat> colStats_;  // per-ring cost data (JD 2026-10-16)
   int lastPcx_ = 0, lastPcz_ = 0;   // column -> sub-chunks with a mesh
   std::shared_ptr<cHandoffQueue<GenOut>> genDone_ = std::make_shared<cHandoffQueue<GenOut>>();
   std::shared_ptr<cHandoffQueue<MeshOut>> meshDone_ = std::make_shared<cHandoffQueue<MeshOut>>();

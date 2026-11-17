@@ -170,23 +170,6 @@ int runContentSelfTest() {
                   raw ? 100.0 * double(raw - merged) / double(raw) : 0.0);
       check(fewer, "foliage meshes: coplanar merge never adds quads");
       check(rot, "foliage variants: quarter turns stay in the cell and 4 turns are the identity");
-      {  // Cortana 2026-10-16: far-LOD cross-hatch variant for every kind.
-        bool crossOk = true;
-        size_t det = 0, cross = 0;
-        for (int k = 0; k < fo::kKindCount; ++k) {
-          const fo::Mesh& c = fo::crossMesh(fo::Kind(k));
-          const fo::Mesh& m = fo::mesh(fo::Kind(k));
-          det += m.quads.size(); cross += c.quads.size();
-          crossOk = crossOk && !c.quads.empty() && c.quads.size() < m.quads.size() && &c == &fo::crossMesh(fo::Kind(k));
-          const int top = 16 * fo::kindHeight(fo::Kind(k));
-          for (const fo::Quad& q : c.quads)
-            crossOk = crossOk && q.lo[1] >= 0 && q.hi[1] <= top && q.hi[1] > q.lo[1] &&
-                      ((q.lo[2] == 8 && q.hi[2] == 8 && q.hi[0] > q.lo[0] && (q.face == 4 || q.face == 5)) ||
-                       (q.lo[0] == 8 && q.hi[0] == 8 && q.hi[2] > q.lo[2] && (q.face == 0 || q.face == 1)));
-        }
-        std::printf("  foliage LOD: %zu detail quads -> %zu cross-hatch quads (all kinds)\n", det, cross);
-        check(crossOk, "foliage LOD: every kind has a cross-hatch variant (two centre planes, fewer quads than the detail mesh)");
-      }
 #ifdef LITHOKRAFT_MODELS_DIR
       // Cortana 2026-10-15 2100 (review M2): shipped .lthm assets must equal the generator.
       bool assetsOk = true;

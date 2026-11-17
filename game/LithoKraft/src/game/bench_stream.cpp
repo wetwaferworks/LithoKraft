@@ -15,86 +15,6 @@ namespace lithokraft {
 // 0.0.1.53 [C53-1] (Proposed by JD, Built by Cortana): phase timing of cBenchStreamer::update (logged with ringstats).
 namespace { double g_ph[5]{}; int g_phFrames = 0; }
 
-// 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): far LOD helpers.
-namespace {
-// 0.0.1.54 [A54-3d] (Proposed by Argon (Archie), Chief Optimization Officer and Chief Optimization Operand, the Bitmaster and the Bitmasker; Built by Cortana): level 0 = full mesh with the foliage kShadeLodNear quads
-// (column within 2 chunks: chunk.vert may draw them, it switches at 32 blocks from the sub-chunk
-// centre); level 1 = full mesh WITHOUT near quads (3..32 chunks: centre >= 40 blocks away, so
-// chunk.vert never draws them); 2 = 2x2x2 (33..48); 3 = 4x4x4 (49+).
-constexpr int kLodEdge[3] = {2, 32, 48}, kLodHyst[3] = {1, 2, 2};
-int lodBase(int d) { return d <= kLodEdge[0] ? 0 : d <= kLodEdge[1] ? 1 : d <= kLodEdge[2] ? 2 : 3; }
-int lodWithHysteresis(int d, int cur) {
-  const int base = lodBase(d);
-  if (base > cur && cur < 3 && d <= kLodEdge[cur] + kLodHyst[cur]) return cur;  // not far enough past the edge yet
-  return base;
-}
-bool stripNearOn() { static const bool on = [] { const char* e = std::getenv("LL_VK_STRIP_NEAR"); return !(e && e[0] == '0'); }(); return on; }
-// Downsampled snapshot: coarse cell (a,b,c) of size f sits at interior cell (a,b,c); the mesher
-// meshes the (16/f)^3 corner and the result is scaled by f. Representative block: a Custom/shell
-// block (Trace, bulbs: keeps the glow readable at distance) if present, else the most frequent
-// non-air block, when >= 1/4 of the cell is non-air. Negative-side padding is solid only if the
-// whole fine pad patch is opaque (conservative: never a hole); the positive side stays air, so
-// boundary faces are always emitted (hidden by the neighbour, never a hole).
-std::shared_ptr<MeshInput> lodInput(const MeshInput& in, int f) {
-  auto out = std::make_shared<MeshInput>(in);
-  std::fill(std::begin(out->id), std::end(out->id), kAir);
-  std::fill(std::begin(out->st), std::end(out->st), CellState{});
-  std::fill(std::begin(out->mat), std::end(out->mat), uint8_t(0));
-  const cBlockReg& reg = blockRegistry();
-  const int n = kChunkSize / f;
-  for (int b = 0; b < n; ++b)
-    for (int c = 0; c < n; ++c)
-      for (int a = 0; a < n; ++a) {
-        BlockId ids[64]; int cnt[64]; int k = 0, nonAir = 0, feat = -1, featY = -1;
-        int src[64];
-        for (int dy = 0; dy < f; ++dy)
-          for (int dz = 0; dz < f; ++dz)
-            for (int dx = 0; dx < f; ++dx) {
-              const int i = meshPadIndex(a * f + dx + 1, b * f + dy + 1, c * f + dz + 1);
-              const BlockId id = in.id[i];
-              if (id == kAir) continue;
-              ++nonAir;
-              const auto& def = reg.def(id);
-              if ((def.shape == Shape::Custom || (def.flags & kShell)) && dy >= featY) { feat = i; featY = dy; }
-              int j = 0;
-              while (j < k && ids[j] != id) ++j;
-              if (j == k) { ids[k] = id; cnt[k] = 0; src[k] = i; ++k; }
-              ++cnt[j];
-            }
-        int pick = -1;
-        if (feat >= 0) pick = feat;
-        else if (nonAir * 4 >= f * f * f) {
-          int best = 0;
-          for (int j = 1; j < k; ++j) if (cnt[j] > cnt[best]) best = j;
-          pick = src[best];
-        }
-        if (pick < 0) continue;
-        const int o = meshPadIndex(a + 1, b + 1, c + 1);
-        out->id[o] = in.id[pick]; out->st[o] = in.st[pick]; out->mat[o] = in.mat[pick];
-      }
-  // negative-side padding (x = -1, y = -1, z = -1 faces of the coarse grid)
-  for (int axis = 0; axis < 3; ++axis)
-    for (int p = 0; p < n; ++p)
-      for (int q = 0; q < n; ++q) {
-        int first = -1; bool all = true;
-        for (int dp = 0; dp < f && all; ++dp)
-          for (int dq = 0; dq < f && all; ++dq) {
-            const int u = p * f + dp + 1, v = q * f + dq + 1;
-            const int i = axis == 0 ? meshPadIndex(0, u, v) : axis == 1 ? meshPadIndex(u, 0, v) : meshPadIndex(u, v, 0);
-            if (!reg.has(in.id[i], kOpaque)) all = false;
-            else if (first < 0) first = i;
-          }
-        if (!all || first < 0) continue;
-        const int o = axis == 0 ? meshPadIndex(0, p + 1, q + 1) : axis == 1 ? meshPadIndex(p + 1, 0, q + 1) : meshPadIndex(p + 1, q + 1, 0);
-        out->id[o] = in.id[first]; out->st[o] = in.st[first]; out->mat[o] = in.mat[first];
-      }
-  return out;
-}
-}  // namespace
-
-// 2026-10-25 (box, triangle diet): shared with the live software-path far LOD (game.cpp).
-std::shared_ptr<MeshInput> farLodMeshInput(const MeshInput& in, int f) { return lodInput(in, f); }
-
 double MsSamples::avg(const std::vector<double>& v) {
   double s = 0; for (double x : v) s += x;
   return v.empty() ? 0.0 : s / double(v.size());
@@ -128,7 +48,7 @@ cBenchStreamer::~cBenchStreamer() {
 }
 
 cBenchStreamer::Second cBenchStreamer::takeSecond() {
-  // JD 2026-10-16: per-ring cost (Chebyshev chunk distance from the camera) for the LOD decision.
+  // JD 2026-10-16: per-ring cost (Chebyshev chunk distance from the camera).
   {
     constexpr int kEdge[4] = {-1, 16, 32, 64};
     size_t verts[4] = {}, cols[4] = {}; long long draws[4] = {};
@@ -158,11 +78,11 @@ cBenchStreamer::Second cBenchStreamer::takeSecond() {
   return s;
 }
 
-// 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): one mesh job (snapshot under the shared lock, optional
-// LOD downsample + scale, worker-direct GPU write).
-void cBenchStreamer::submitMesh(int cx, int sy, int cz, int lod, uint32_t gen, const std::shared_ptr<const BlockMaterials>& materials) {
+// 0.0.1.54 [C54-1] (Proposed by JD, Built by Cortana): one mesh job (snapshot under the shared lock,
+// full mesh, worker-direct GPU write). `gen` is the column's generation token (stale results drop).
+void cBenchStreamer::submitMesh(int cx, int sy, int cz, uint32_t gen, const std::shared_ptr<const BlockMaterials>& materials) {
   ++*inFlight_;
-  pool_.submit([map = &map_, mu = mapMu_, below = below_, rend = &renderer_, materials, out = meshDone_, n = inFlight_, cx, sy, cz, lod, gen] {
+  pool_.submit([map = &map_, mu = mapMu_, below = below_, rend = &renderer_, materials, out = meshDone_, n = inFlight_, cx, sy, cz, gen] {
     const auto t0 = Clock::now();
     std::shared_ptr<MeshInput> in;
     {
@@ -170,22 +90,11 @@ void cBenchStreamer::submitMesh(int cx, int sy, int cz, int lod, uint32_t gen, c
       if (map->column(cx, cz)) in = snapshotForMeshing(*map, blockRegistry(), cx, sy, cz, 0, 0, below);
     }
     MeshOut o;
-    o.lod = lod; o.gen = gen;
+    o.gen = gen;
     if (!in) {
       o.mesh.cx = cx; o.mesh.sy = sy; o.mesh.cz = cz; o.skipped = true;
     } else {
-      const int f = lod <= 1 ? 1 : lod == 2 ? 2 : 4;
-      if (f > 1) in = lodInput(*in, f);
       o.mesh = meshSubChunk(*in, MeshContext{blockRegistry(), *materials, &blockAppearance()});
-      if (f > 1)
-        for (PackedVertex& v : o.mesh.verts) { v.x = uint16_t(v.x * f); v.y = uint16_t(v.y * f); v.z = uint16_t(v.z * f); }
-      if (lod >= 1 && stripNearOn()) {  // [A54-3d] near-LOD quads are never drawn this far out
-        auto& vs = o.mesh.verts;
-        size_t w = 0;
-        for (size_t q = 0; q + 3 < vs.size(); q += 4)
-          if (!(vs[q].mode & kShadeLodNear)) { if (w != q) for (int k = 0; k < 4; ++k) vs[w + size_t(k)] = vs[q + size_t(k)]; w += 4; }
-        vs.resize(w);
-      }
       o.verts = o.mesh.verts.size();
       if (rend->prepareChunkMeshAsync(o.mesh, o.prep)) std::vector<PackedVertex>().swap(o.mesh.verts);
     }
@@ -206,7 +115,6 @@ size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const Bloc
       if (!renderer_.enqueueChunkMesh(std::move(t))) keep.push_back(std::move(t));
     tombstoneRetry_.swap(keep);
   }
-  if (lodEnv_ == -1) { const char* e = std::getenv("LL_VK_FAR_LOD"); lodEnv_ = e ? (e[0] != '0' ? 1 : 0) : -2; }  // [C54-1]
   ++frame_;
   const int pcx = int(std::floor(x / 16.f)), pcz = int(std::floor(z / 16.f));
   lastPcx_ = pcx; lastPcz_ = pcz;
@@ -245,29 +153,9 @@ size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const Bloc
     const ChunkColumn* col = map_.column(cx, cz);
     for (int sy = 0; sy < kSubChunks; ++sy) {
       if (!col->subs[size_t(sy)]) continue;
-      // [C54-1] LOD level at submit time (fresh columns: no hysteresis yet)
-      const int d = std::max(std::abs(cx - pcx), std::abs(cz - pcz));
-      ColLod& cl = lod_[ChunkKey::make(cx, cz)];
-      if (sy == 0 || cl.gen == 0) { cl.lod = (farLodActive() ? lodBase(d) : 0); cl.gen = ++lodGen_; }
-      submitMesh(cx, sy, cz, cl.lod, cl.gen, materials);
-    }
-  }
-  // [C54-1b] LOD transitions (every 2nd frame, at most 48 columns per scan): remesh the
-  // column's sub-chunks at the new level; the old mesh stays drawn until the new one lands.
-  if ((frame_ & 1) == 0) {
-    const bool on = farLodActive();
-    int budget = 48;
-    for (auto& [key, cl] : lod_) {
-      if (budget <= 0) break;
-      const auto cit = map_.columns().find(key);
-      if (cit == map_.columns().end()) continue;
-      const ChunkColumn* col = cit->second.get();
-      const int d = std::max(std::abs(col->cx - pcx), std::abs(col->cz - pcz));
-      const int want = on ? lodWithHysteresis(d, cl.lod) : 0;
-      if (want == cl.lod) continue;
-      cl.lod = want; cl.gen = ++lodGen_; --budget; ++lodRemeshed;
-      for (int sy = 0; sy < kSubChunks; ++sy)
-        if (col->subs[size_t(sy)]) submitMesh(col->cx, sy, col->cz, cl.lod, cl.gen, materials);
+      uint32_t& cg = colGen_[ChunkKey::make(cx, cz)];  // generation token at submit
+      if (sy == 0 || cg == 0) cg = ++genSeq_;
+      submitMesh(cx, sy, cz, cg, materials);
     }
   }
   lap(1);  // [C53-1]
@@ -294,8 +182,8 @@ size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const Bloc
     if (m.skipped) continue;
     meshMs.add(m.ms); ++sec_.meshed; ++totalMeshed;
     const uint64_t key = ChunkKey::make(m.mesh.cx, m.mesh.cz);
-    const auto lit = lod_.find(key);  // [C54-1] stale LOD level -> drop
-    if (!map_.column(m.mesh.cx, m.mesh.cz) || lit == lod_.end() || lit->second.gen != m.gen) {
+    const auto lit = colGen_.find(key);  // [C54-1] stale generation -> drop
+    if (!map_.column(m.mesh.cx, m.mesh.cz) || lit == colGen_.end() || lit->second != m.gen) {
       if (m.prep.ready) renderer_.discardChunkMesh(m.prep);
       continue;
     }
@@ -315,7 +203,7 @@ size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const Bloc
     }
     bytes += b;
     { auto& subs = meshedSubs_[key]; if (std::find(subs.begin(), subs.end(), m.mesh.sy) == subs.end()) subs.push_back(m.mesh.sy); }
-    {  // [C54-1] per-sub accounting (a LOD remesh replaces, never adds)
+    {  // [C54-1] per-sub accounting (a remesh replaces, never adds)
       ColStat& cs = colStats_[key]; cs.cx = m.mesh.cx; cs.cz = m.mesh.cz;
       if (cs.sv.empty()) cs.sv.assign(size_t(kSubChunks), 0u);
       const uint32_t old = cs.sv[size_t(m.mesh.sy)];
@@ -342,7 +230,7 @@ size_t cBenchStreamer::update(float x, float z, const std::shared_ptr<const Bloc
     }
     meshedSubs_.erase(key);
     colStats_.erase(key);
-    lod_.erase(key);  // [C54-1]
+    colGen_.erase(key);  // [C54-1]
     requested_.erase(key);
     {
       litholattice::cGateGuard lock(*mapMu_);  // [C53-2]

@@ -51,7 +51,6 @@ GameSettings GameSettings::load(const std::string& path, const GameSettings& def
   if (!json.getBool("simDistanceV4", false) && s.tickRadius == 16) s.tickRadius = 8;
   s.streaming = json.getBool("streaming", s.streaming);
   s.streamRadius = clampInt(int(json.getNum("streamRadius", s.streamRadius)), 0, 64);
-  s.lodDetail = clampInt(int(json.getNum("lodDetail", s.lodDetail)), 0, 3);  // Archie Phase 1
   s.euv = json.getBool("euv", s.euv);
   s.mesher = clampInt(int(json.getNum("mesher", s.mesher)), 0, kSettingsMesherCount - 1);
   s.pbrTier = clampInt(int(json.getNum("pbrTier", s.pbrTier)), 0, 3);
@@ -67,7 +66,6 @@ GameSettings GameSettings::load(const std::string& path, const GameSettings& def
   s.vkFx = clampInt(int(json.getNum("vkFx", s.vkFx)), 0, 127);  // JD Vulkan push
   s.vkBloomStrength = std::clamp(float(json.getNum("vkBloomStrength", s.vkBloomStrength)), 0.f, 4.f);
   s.vkHeartbeatGlow = std::clamp(float(json.getNum("vkHeartbeatGlow", s.vkHeartbeatGlow)), 0.f, 4.f);  // [C53-3]
-  s.vkFarLod = json.getBool("vkFarLod", s.vkFarLod);  // [C54-1]
   s.roundSimArea = json.getBool("roundSimArea", s.roundSimArea);  // F56-7
   s.diamondSimArea = json.getBool("diamondSimArea", s.diamondSimArea);  // diamond (JD 2026-10-23)
   s.diamondStreamArea = json.getBool("diamondStreamArea", s.diamondStreamArea);  // diamond (JD 2026-10-23)
@@ -95,7 +93,6 @@ bool GameSettings::save(const std::string& path) const {
   json.add("simDistanceV4", litholattice::Json::boolean(true));  // F56-10
   json.add("streaming", litholattice::Json::boolean(streaming));
   json.add("streamRadius", litholattice::Json::number(streamRadius));
-  json.add("lodDetail", litholattice::Json::number(lodDetail));  // Archie Phase 1
   json.add("euv", litholattice::Json::boolean(euv));
   json.add("mesher", litholattice::Json::number(mesher));
   json.add("pbrTier", litholattice::Json::number(pbrTier));
@@ -111,7 +108,6 @@ bool GameSettings::save(const std::string& path) const {
   json.add("vkFx", litholattice::Json::number(vkFx));  // JD Vulkan push
   json.add("vkBloomStrength", litholattice::Json::number(vkBloomStrength));
   json.add("vkHeartbeatGlow", litholattice::Json::number(vkHeartbeatGlow));  // [C53-3]
-  json.add("vkFarLod", litholattice::Json::boolean(vkFarLod));  // [C54-1]
   json.add("roundSimArea", litholattice::Json::boolean(roundSimArea));  // F56-7
   json.add("diamondSimArea", litholattice::Json::boolean(diamondSimArea));  // diamond (JD 2026-10-23)
   json.add("diamondStreamArea", litholattice::Json::boolean(diamondStreamArea));  // diamond (JD 2026-10-23)

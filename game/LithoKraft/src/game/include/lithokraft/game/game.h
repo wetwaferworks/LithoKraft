@@ -3,7 +3,7 @@
 // registry, the active dimension's sim thread, the mesh pipeline, creative placement,
 // hotbar and debug commands.
 #pragma once
-#include "litholattice/render/sw_lod_rings.h"  // PlayB: far-LOD rings clamped to view
+#include "litholattice/render/view_radius.h"  // draw-side view bound
 #include "lithokraft/content/circuit_scene.h"
 #include <atomic>
 #include <chrono>  // Cortana 2026-10-15 2215
@@ -540,9 +540,6 @@ class Game {
   /// finished ones into the active dimension (sim stopped for the insert).
   void pumpStreaming(float frameDtMs);
   void pumpViewGate();  ///< Archie Phase 1: retire columns leaving the view, mesh columns entering it
-  void pumpSwLod();  ///< software far-LOD ring re-mesh (2026-10-25)
-  int swLodLevel(int d) const;
-  int swLodFor(int cx, int cz) const;
   /// Column eviction (A2 / B-M1): drops resident columns beyond the stream
   /// radius + hysteresis, bounded per call, in its own sim-stopped window
   /// at the end of pumpStreaming(). Dirty or signal-bearing columns are
@@ -724,23 +721,9 @@ class Game {
   std::deque<int64_t> pbrPendingOrder_;                             // sub-chunks waiting, oldest first
   std::unordered_map<int64_t, litholattice::PbrChunkMesh> pbrPendingMesh_;  // newest per sub-chunk
   std::unordered_map<int64_t, uint64_t> pbrMeshSeq_;  // latest uploaded PBR seq per sub-chunk
-  bool swLodOn_ = false;
-  // JD ruling, 2026-10-28: the full-fidelity core is 32 chunks in
-  // every direction (Chebyshev, per swLodFor); LOD steps begin only
-  // beyond it, so any view distance <= 32 sees no LOD at all (at
-  // view 48: 32 full, steps in the outer ring only). The old
-  // {2, 4, 6} rings stepped detail down almost at the player's feet
-  // and broke immersion (his word: jarring). Rings 2/3 keep the old
-  // structure scaled x16 ({32, 64, 96}); JD named the 32, the rest
-  // is the same ladder stretched... retune here if he calls it.
-  int swLodRing_[3] = {32, 64, 96};  // LL_SW_LOD_RINGS=a,b,c overrides (designed edges)
-  // PlayB (JD 2026-11-04): effective edges clamped to the view radius (cSwLodRings::shared()).
-  litholattice::cSwLodRings& swLodRings_ = litholattice::cSwLodRings::shared();
-  std::atomic<int> swLodPcx_{0}, swLodPcz_{0};
-  std::unordered_map<uint64_t, int> swLodMeshed_;  // Archie Phase 3a: game thread only (was swLodMu_)
   cViewMeshGate viewGate_;          ///< Archie Phase 1: nothing beyond the view radius meshes
   bool viewGateBacklog_ = false;    ///< entering columns left over from a bounded sweep
-  uint64_t viewGateRetired_ = 0, viewGateEntered_ = 0;  ///< Phase 1 counters (log)  // column key -> LOD level meshed
+  uint64_t viewGateRetired_ = 0, viewGateEntered_ = 0;  ///< Phase 1 counters (log)
   bool useBinaryMesher_ = false;  // mesher option, boot-applied from settings_.mesher
   // Design B Stage 2: ring spill. When the renderer's lock-free upload ring
   // is momentarily full, an upload the ring refused waits here â€” in order,

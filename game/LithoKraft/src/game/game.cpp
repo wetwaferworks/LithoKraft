@@ -177,7 +177,6 @@ plink::Snap locoSnap() { return g_plink.snap.load(); }
 }  // namespace
 }  // namespace lithokraft
 namespace lithokraft {
-std::shared_ptr<MeshInput> farLodMeshInput(const MeshInput& in, int f);  // bench_stream.cpp
 bool asyncChunkUploadOn();  // Cortana 2026-10-25 upload pass (defined above Game::uploadMeshes)
 
 // render.ambient_mode (JD 2026-10-11): 0 = Fraction (cheap default), 1 = NormalizedSun.
@@ -831,14 +830,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
   if (cfg.materials) emissiveProvider_ = std::make_unique<litholattice::cChunkEmissiveProvider>(cfg.materials);
   // Called on the main thread at load and on the sim thread afterwards; each job keeps the
   // materials it started with, so a hot reload never pulls them out from under a worker.
-  swLodOn_ = renderer_.prefersGreedyMeshes() && !(std::getenv("LL_SW_LOD") && std::atoi(std::getenv("LL_SW_LOD")) == 0);
-  if (const char* r = std::getenv("LL_SW_LOD_RINGS")) std::sscanf(r, "%d,%d,%d", &swLodRing_[0], &swLodRing_[1], &swLodRing_[2]);
-  // PlayB (JD 2026-11-04, Elfie far-LOD brief): the ladder is hard-bounded to the view radius.
-  // view <= ring 0: no LOD at all (no checks, no LOD meshing); else rings span ring 0 .. view.
-  swLodRings_.setDetail(settings_.lodDetail);  // Archie Phase 1: the settings slider
-  const bool lodLive = swLodRings_.configure(swLodRing_, effectiveStreamRadius(cfg_));
-  if (swLodOn_) logInfo("software far LOD: rings %d/%d/%d chunks, view %d -> %s (effective %d/%d/%d; LL_SW_LOD=0 off)", swLodRing_[0], swLodRing_[1], swLodRing_[2],
-                        swLodRings_.view(), lodLive ? "live" : "off (view inside the full-fidelity core)", swLodRings_.edge(0), swLodRings_.edge(1), swLodRings_.edge(2));
+  litholattice::cViewRadius::set(effectiveStreamRadius(cfg_));  // draw-side view bound (software renderer)
   submitMesh_ = [this](std::shared_ptr<MeshInput> in) {
     if (!viewGate_.inView(in->cx, in->cz)) {
       // A culled member still completes its publish batch. Dropping it silently stranded
@@ -2223,14 +2215,6 @@ inline double pumpMsSince(std::chrono::steady_clock::time_point t0) {
   return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 }
 }
-int Game::swLodLevel(int d) const {
-  return swLodRings_.level(d);  // PlayB: clamped to the view radius; 0 when LOD is not live
-}
-int Game::swLodFor(int cx, int cz) const {
-  const int px = swLodPcx_.load(std::memory_order_relaxed), pz = swLodPcz_.load(std::memory_order_relaxed);
-  return swLodLevel(std::max(std::abs(cx - px), std::abs(cz - pz)));
-}
-
 // Archie Phase 1 (JD 2026-11-04): bound meshing to the view. A centre / radius change retires
 // every meshed column now beyond the view (tombstones -> the renderer drops its meshes) and meshes
 // the deferred columns now inside it (bounded per frame, under the between-ticks sim hold).
@@ -2255,7 +2239,6 @@ void Game::pumpViewGate() {
     const bool in = viewGate_.inView(cx, cz), held = viewGate_.deferred(cx, cz);
     if (!in && !held) {  // left the view: its meshes go (tombstones), it re-meshes on return
       retireColumnMeshes(cx, cz, /*force=*/true);
-      swLodMeshed_.erase(ChunkKey::make(cx, cz));
       viewGate_.defer(cx, cz);
       ++viewGateRetired_;
     } else if (in && held) {
@@ -2271,43 +2254,6 @@ void Game::pumpViewGate() {
   if (++logEvery % 120 == 1)
     logInfo("view gate: centre %d,%d radius %d | held %zu, retired %llu, entered %llu", pcx, pcz, viewGate_.radius(),
             viewGate_.deferredCount(), (unsigned long long)viewGateRetired_, (unsigned long long)viewGateEntered_);
-}
-
-// 2026-10-25 (box, triangle diet): re-mesh columns whose far-LOD ring changed (1-chunk hysteresis),
-// a bounded batch per frame, under the same between-ticks sim hold the streaming insert uses.
-void Game::pumpSwLod() {
-  if (!swLodOn_ || !sim_ || !active_) return;
-  // PlayB: a view-radius change re-clamps the rings; the loop below then reclassifies every column.
-  if (const int v = effectiveStreamRadius(cfg_); v != swLodRings_.view()) swLodRings_.setView(v);
-  if (!swLodRings_.live() && swLodMeshed_.empty()) return;  // LOD off: nothing still meshed at a LOD level
-  const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
-  swLodPcx_.store(pcx, std::memory_order_relaxed); swLodPcz_.store(pcz, std::memory_order_relaxed);
-  std::vector<std::pair<int, int>> todo;
-  {
-    for (auto it = swLodMeshed_.begin(); it != swLodMeshed_.end();) {
-      const uint64_t key = it->first; const int have = it->second;
-      const int cx = int(int32_t(uint32_t(key >> 32))), cz = int(int32_t(uint32_t(key)));
-      if (!viewGate_.inView(cx, cz)) { it = swLodMeshed_.erase(it); continue; }  // Archie Phase 1: retired, not re-LODed
-      ++it;
-      const int d = std::max(std::abs(cx - pcx), std::abs(cz - pcz));
-      const int want = swLodLevel(d);
-      if (want == have) continue;
-      if (want < have ? swLodLevel(d + 1) == have : swLodLevel(d - 1) == have) continue;  // hysteresis
-      todo.emplace_back(cx, cz);
-      if (todo.size() >= 24) break;
-    }
-  }
-  if (todo.empty()) return;
-  ::litholattice::cGateLock<litholattice::cBlockGate> simHold;
-  static int lodSkips = 0;  // game thread only
-  bool lodBusy = false;
-  if (!frameHold(*sim_, simHold, lodSkips, lodBusy, /*allowBlock=*/false)) return;
-  for (auto [cx, cz] : todo) {
-    const ChunkColumn* c = active_->chunks.column(cx, cz);
-    if (!c) { swLodMeshed_.erase(ChunkKey::make(cx, cz)); continue; }
-    if (!swLodRings_.live()) swLodMeshed_.erase(ChunkKey::make(cx, cz));  // PlayB: back to full detail, no longer tracked
-    submitMeshColumn(cx, cz);  // P6 locality (records the new ring)
-  }
 }
 
 // ---- Thread Handshake P5: chunk handshake bookkeeping (game thread) ----
@@ -2440,24 +2386,8 @@ void Game::meshOne(const std::shared_ptr<MeshInput>& in, const std::shared_ptr<c
   ctx.traceParams = [this](int cx, int cz, float t0[4], float t1[4]) {
     if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->traceParams(cx, cz, t0, t1);
   };
-  // 2026-10-25 (box, triangle diet; software path only, Vulkan untouched): far sub-chunks mesh
-  // from a 2x/4x downsampled snapshot (bench-stream lodInput) and drop near-detail quads.
-  const bool lodLive = swLodOn_ && swLodRings_.live();  // PlayB: no LOD checks when view <= ring 0
-  const int lod = lodLive ? swLodFor(in->cx, in->cz) : 0;
-  const int lf = lod == 0 ? 1 : lod == 1 ? 1 : lod == 2 ? 2 : 4;
-  const std::shared_ptr<MeshInput> src = lf > 1 ? farLodMeshInput(*in, lf) : in;
-  ChunkMesh cm = meshSubChunk(*src, ctx);
+  ChunkMesh cm = meshSubChunk(*in, ctx);  // full geometry at every distance (LOD removed 2026-11-17)
   const uint64_t hc2 = hc ? litholattice::cHitchCapture::nowNs() : 0;
-  cm.lodScale = uint8_t(lf);  // software renderer: >= 4x flat shade / thin-face cull
-  if (lf > 1)
-    for (PackedVertex& v : cm.verts) { v.x = uint16_t(v.x * lf); v.y = uint16_t(v.y * lf); v.z = uint16_t(v.z * lf); }
-  if (lod >= 1) {
-    auto& vs = cm.verts;
-    size_t w = 0;
-    for (size_t q = 0; q + 3 < vs.size(); q += 4)
-      if (!(vs[q].mode & kShadeLodNear)) { if (w != q) for (int k = 0; k < 4; ++k) vs[w + size_t(k)] = vs[q + size_t(k)]; w += 4; }
-    vs.resize(w);
-  }
   // Cortana 2026-10-25 (box, upload pass; JD-approved): pack + copy into GPU memory here on the
   // worker (backends with a direct-upload arena: Vulkan ReBAR/host, or a worker-staged device-only
   // block); the main thread then only publishes the handle. Off unless LL_ASYNC_CHUNK_UPLOAD=1.
@@ -2465,7 +2395,7 @@ void Game::meshOne(const std::shared_ptr<MeshInput>& in, const std::shared_ptr<c
     auto h = std::make_shared<PreparedChunkMeshHandle>();
     if (renderer_.prepareChunkMeshAsync(cm, h->mesh)) { h->owner = &renderer_; cm.prepared = std::move(h); }
   }
-  if (hc) {  // gather = slab build, mesh = mesher (incl. binary path), vertex = LOD scale/cull + async pack/copy
+  if (hc) {  // gather = slab build, mesh = mesher (incl. binary path), vertex = async pack/copy
     const uint64_t hc3 = litholattice::cHitchCapture::nowNs();
     litholattice::cHitchCapture::add(litholattice::cHitchCapture::kGather, hc1 - hc0);
     litholattice::cHitchCapture::add(litholattice::cHitchCapture::kMesh, hc2 - hc1);
@@ -2491,7 +2421,6 @@ void Game::submitMeshColumn(int cx, int cz) {
   const ChunkColumn* c = active_->chunks.column(cx, cz);
   if (!c || c->edgeShell) return;  // Q12: a demoted column keeps its meshes
   if (!viewGate_.inView(cx, cz)) { viewGate_.defer(cx, cz); return; }  // Archie Phase 1: meshes when it enters the view
-  if (swLodOn_ && swLodRings_.live()) swLodMeshed_[ChunkKey::make(cx, cz)] = swLodFor(cx, cz);  // Phase 3a: game thread records the ring
   std::vector<std::shared_ptr<MeshInput>> batch;
   batch.reserve(kSubChunks);
   const auto tPub = std::chrono::steady_clock::now();
@@ -2551,7 +2480,6 @@ void Game::startFirstMesh(int cx, int cz) {
 void Game::submitMeshAt(int cx, int sy, int cz) {
   if (const ChunkColumn* dc = active_->chunks.column(cx, cz); dc && dc->edgeShell) return;  // Q12
   if (!viewGate_.inView(cx, cz)) { viewGate_.defer(cx, cz); return; }  // Archie Phase 1
-  if (swLodOn_ && swLodRings_.live()) swLodMeshed_[ChunkKey::make(cx, cz)] = swLodFor(cx, cz);  // Phase 3a
   if (meshBackpressured()) {  // t3366u: paused + Render Ingress at cap -> defer the key, never drop
     const int64_t k = packPos(cx, sy, cz);
     if (deferredMeshKeys_.insert(k).second) { deferredMeshOrder_.push_back(k); ++meshDeferredTotal_; }
@@ -3084,7 +3012,6 @@ void Game::evictFarColumns() {
     postColumnSignalDrop(*sim_, signal, cx, cz);  // drop sim indexes (ghost-component guard), tick side (6b-3b)
     retireColumnMeshes(cx, cz);        // meshes die with their column
     viewGate_.forget(cx, cz);          // Archie Phase 1
-    swLodMeshed_.erase(key);           // Phase 3a
     // P5 deferred free: unlink now, free the voxel data two pumps later outside the hold.
     deferredFree_.retire(active_->chunks.extract(cx, cz), streamPumps_ + 2);
     borderRing_.forget(key);
@@ -3107,17 +3034,16 @@ void Game::evictFarColumns() {
 // R = max(LL_FAR_DEMOTE_RADIUS (9), tickRadius + 3) free their sub-chunks and keep a 1-cell edge
 // shell (neighbour mesh aprons stay exact); their meshes stay up. At d <= R - 2 the column is
 // re-requested (disk if saved, else worldgen) and the fresh one replaces the shell in place.
-// Known limit (JD 12:14): light stops at the ring. LL_FAR_LOD=1 also builds the Voxy-#1 LOD.
+// Known limit (JD 12:14): light stops at the ring.
 void Game::demoteFarColumns() {
   static const bool on = [] { const char* e = std::getenv("LL_FAR_DEMOTE"); return !(e && e[0] == '0'); }();  // default on (JD 2026-10-31); =0 kill switch
   if (!on || !streamer_ || !sim_ || !active_ || !litholattice::cowColumnsEnabled()) return;
-  static const bool withLod = [] { const char* e = std::getenv("LL_FAR_LOD"); return !(e && e[0] == '0'); }();  // default on (JD 2026-10-31); =0 kill switch
   static const int envR = [] { const char* e = std::getenv("LL_FAR_DEMOTE_RADIUS"); const int v = e ? std::atoi(e) : 9; return v > 0 ? v : 9; }();
   const int R = std::max(envR, cfg_.tickRadius + 3);
   static bool told = false;  // game thread only
   if (!told) {
     told = true;
-    logInfo("far-demote: on (radius %d, lod %s); known limit: light stops at the 1-cell edge shell of demoted columns", R, withLod ? "on" : "off");
+    logInfo("far-demote: on (radius %d); known limit: light stops at the 1-cell edge shell of demoted columns", R);
   }
   constexpr size_t kDemoteBudgetPerPump = 8;
   const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
@@ -3165,7 +3091,7 @@ void Game::demoteFarColumns() {
     const int cx = int(int32_t(key >> 32)), cz = int(int32_t(key & 0xffffffffu));
     const ChunkColumn* c = active_->chunks.column(cx, cz);
     if (!c || !eligible(key, *c) || signalBearing.count(key)) continue;  // 6b-4a: tick-side answer
-    std::unique_ptr<ChunkColumn> body = active_->chunks.demote(cx, cz, withLod);
+    std::unique_ptr<ChunkColumn> body = active_->chunks.demote(cx, cz);
     if (!body) continue;
     deferredFree_.retire(std::move(body), streamPumps_ + 2);  // P5: freed outside the hold
     borderRing_.forget(key);
@@ -3769,12 +3695,6 @@ void Game::onSettingsChanged(const GameSettings& s) {
     cfg_.handshakePhases = s.handshakePhases;
     logInfo("settings: timing handshake -> %s, %d phases/cycle (applies on world load)",
             s.timingHandshake ? "on" : "off", s.handshakePhases);
-  }
-  if (s.lodDetail != old.lodDetail) {  // Archie Phase 1: far-LOD slider; re-mesh at the new ladder
-    swLodRings_.setDetail(s.lodDetail);
-    swLodRings_.setView(effectiveStreamRadius(cfg_));
-    if (sim_) sim_->requestRemeshAll();
-    logInfo("settings: render.lod_detail -> %d (edges %d/%d/%d)", s.lodDetail, swLodRings_.edge(0), swLodRings_.edge(1), swLodRings_.edge(2));
   }
   if (s.bulbShellSolid != old.bulbShellSolid) {  // 1551 (JD): re-mesh with the new bulb shell
     litholattice::setShellSolid(s.bulbShellSolid);
@@ -5128,7 +5048,7 @@ void Game::update(float dt, int width, int height) {
   sim_->setRay({eyePos.x, eyePos.y, eyePos.z, f.x, f.y, f.z});
   g_split.lap(3);  // [C53-1]
   pumpViewGate();  // Archie Phase 1
-  pumpSwLod();
+  litholattice::cViewRadius::set(effectiveStreamRadius(cfg_));  // draw-side view bound follows live radius changes
   pumpStreaming(dt * 1000.0f);  // generate/load columns around the player; insert finished ones
   g_split.lap(4);
   if (playing && !clickUsed) handleWorldActions();
@@ -5158,7 +5078,6 @@ void Game::update(float dt, int width, int height) {
   uploadMeshes();
   pumpWaferReveal(dt);  // Thread Handshake P7
   g_split.lap(6);  // [C53-1] (includes the PBR/emissive lines just above)
-  if (stream_) stream_->setFarLod(settings_.vkFarLod);  // [C54-1]
   // Phase 4 (JD-approved 6:30): follow the bench camera; player_.pos was just reset from the locomotion body.
   if (stream_) uploadBytes_ += stream_->update(benchSet_ ? benchCam_.x : player_.pos.x, benchSet_ ? benchCam_.z : player_.pos.z, resources_.materials());
   g_split.lap(7);

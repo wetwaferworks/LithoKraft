@@ -182,13 +182,13 @@ class ChunkMap {
     if (cow_) cow_->noteStale(x >> 4, y >> 4, z >> 4);  // Archie review H7: snapshot carries cellText
     return true;
   }
-  /// Q12 far demote: replaces the column's sub-chunks with its 1-cell edge shell (plus the
-  /// Voxy-#1 far LOD when withLod) and hands the freed body back for deferred free. Null when
+  /// Q12 far demote: replaces the column's sub-chunks with its 1-cell edge shell and hands
+  /// the freed body back for deferred free. Null when
   /// not resident or already demoted. Owner thread only; the caller owns eligibility.
-  std::unique_ptr<ChunkColumn> demote(int cx, int cz, bool withLod) {
+  std::unique_ptr<ChunkColumn> demote(int cx, int cz) {
     ChunkColumn* c = column(cx, cz);
     if (!c || c->edgeShell) return nullptr;
-    c->edgeShell = cColumnEdgeShell::build(*c, registry_, withLod);
+    c->edgeShell = cColumnEdgeShell::build(*c);
     auto body = std::make_unique<ChunkColumn>();
     body->cx = cx;
     body->cz = cz;
