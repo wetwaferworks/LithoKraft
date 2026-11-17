@@ -94,7 +94,7 @@ bool cChunkStreamer::requestable(uint64_t key, std::chrono::steady_clock::time_p
   return true;
 }
 
-void cChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
+void cChunkStreamer::pumpRequests(std::vector<std::pair<cStreamRank::Key, uint64_t>> want) {
   // B-L7: collect job failures first — un-request those keys and arm their
   // retry backoff, so a transient fault heals on a later update instead of
   // leaving a permanent hole for the session.
@@ -114,9 +114,9 @@ void cChunkStreamer::pumpRequests(std::vector<std::pair<int, uint64_t>> want) {
   // Nearest-first: when something crosses into ungenerated territory the
   // ground underfoot streams in before the horizon does.
   constexpr int kMaxInFlight = 32;  // leave pool capacity for meshing
-  std::sort(want.begin(), want.end());  // (priority, key): nearest first, key tiebreak (fix 3b)
-  for (const auto& [dist2, key] : want) {
-    (void)dist2;
+  std::sort(want.begin(), want.end());  // R3: cStreamRank (in front, then nearest), key tie-break
+  for (const auto& [rank, key] : want) {
+    (void)rank;
     if (inFlight_->load(std::memory_order_relaxed) >= kMaxInFlight) break;
     // Frame-aware budget (2026-10-28, see setRequestBudget): the
     // cycle's new-request grant is spent; later wants wait a frame.
@@ -218,13 +218,14 @@ void cChunkStreamer::update(int playerCx, int playerCz) {
     return;
   }
   const auto now = std::chrono::steady_clock::now();
-  std::vector<std::pair<int, uint64_t>> want;  // (distance^2 in chunks, key)
+  const cStreamRank rank = rankAround(playerCx, playerCz);
+  std::vector<std::pair<cStreamRank::Key, uint64_t>> want;  // (rank, key)
   for (int dz = -radius_; dz <= radius_; ++dz)
     for (int dx = -radius_; dx <= radius_; ++dx) {
       if (diamond_ && std::abs(dx) + std::abs(dz) > radius_) continue;  // diamond footprint (JD 2026-10-23)
       if ((diamond_ ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz))) > admitR_) continue;  // pool-pressure admission
       const uint64_t key = litholattice::ChunkKey::make(playerCx + dx, playerCz + dz);
-      if (requestable(key, now)) want.emplace_back(streamRequestPriority(dx, dz, diamond_), key);  // fix 3b: diamond-nearest first
+      if (requestable(key, now)) want.emplace_back(rank.column(playerCx + dx, playerCz + dz), key);  // R3 (fix 3b's footprint metric, view-weighted)
     }
   pumpRequests(std::move(want));
 }
@@ -234,13 +235,14 @@ void cChunkStreamer::updateAround(int cx, int cz, int radiusChunks) {
   if (!centreInRange(cx, cz)) return;  // B-L2: same refusal as update() (logged there / at setup)
   const int r = std::clamp(radiusChunks, 0, radius_);
   const auto now = std::chrono::steady_clock::now();
-  std::vector<std::pair<int, uint64_t>> want;
+  const cStreamRank rank = rankAround(cx, cz);
+  std::vector<std::pair<cStreamRank::Key, uint64_t>> want;
   for (int dz = -r; dz <= r; ++dz)
     for (int dx = -r; dx <= r; ++dx) {
       if (diamond_ && std::abs(dx) + std::abs(dz) > r) continue;  // diamond footprint (JD 2026-10-23)
       if ((diamond_ ? std::abs(dx) + std::abs(dz) : std::max(std::abs(dx), std::abs(dz))) > admitR_) continue;  // pool-pressure admission
       const uint64_t key = litholattice::ChunkKey::make(cx + dx, cz + dz);
-      if (requestable(key, now)) want.emplace_back(streamRequestPriority(dx, dz, diamond_), key);  // fix 3b: diamond-nearest first
+      if (requestable(key, now)) want.emplace_back(rank.column(cx + dx, cz + dz), key);  // R3
     }
   pumpRequests(std::move(want));
 }
@@ -250,7 +252,7 @@ void cChunkStreamer::requestColumn(int cx, int cz) {
   if (!centreInRange(cx, cz)) return;  // B-L2: same refusal as update()
   const uint64_t key = litholattice::ChunkKey::make(cx, cz);
   if (!requestable(key, std::chrono::steady_clock::now())) return;
-  pumpRequests({{0, key}});
+  pumpRequests({{cStreamRank::Key{}, key}});
 }
 
 void cChunkStreamer::forgetColumn(int cx, int cz) {
@@ -302,7 +304,16 @@ std::vector<StreamedColumn> cChunkStreamer::takeReadyPromote(size_t budget, int 
       }
     }
   }
+  // R3 (B7): promote in rank order around the centre, not in the order the workers finished.
   const size_t n = std::min(budget, staged_.size());
+  if (n > 0 && n < staged_.size()) {
+    const cStreamRank rank = rankAround(centerCx, centerCz);
+    auto keyOf = [&](const StreamedColumn& sc) {
+      if (!sc.column) return cStreamRank::Key{UINT32_MAX, UINT32_MAX, UINT64_MAX, INT32_MAX};
+      return rank.column(sc.column->cx, sc.column->cz);
+    };
+    std::stable_sort(staged_.begin(), staged_.end(), [&](const StreamedColumn& a, const StreamedColumn& b) { return keyOf(a) < keyOf(b); });
+  }
   for (size_t i = 0; i < n; ++i) out.push_back(std::move(staged_[i]));
   staged_.erase(staged_.begin(), staged_.begin() + std::ptrdiff_t(n));
   if (bypassed) *bypassed = nb;

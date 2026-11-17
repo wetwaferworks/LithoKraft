@@ -896,8 +896,12 @@ class cGL33Renderer final : public IRenderer {
       const Vec3 mn{g.cx * 16.f, g.sy * 16.f, g.cz * 16.f};
       if (decideOnce(k, mn) == CullDecision::Full) classicOrder.push_back(&g);
     }
+    // R3 (B9): nearest first with a (cx, sy, cz) tie-break, so equal distances never fall back
+    // to hash-map order (VK breaks ties the same way).
     std::sort(classicOrder.begin(), classicOrder.end(), [&](const Gpu* a, const Gpu* b) {
-      return chunkDist2(a->cx, a->sy, a->cz) < chunkDist2(b->cx, b->sy, b->cz);
+      const auto da = chunkDist2(a->cx, a->sy, a->cz), db = chunkDist2(b->cx, b->sy, b->cz);
+      if (da != db) return da < db;
+      return std::tie(a->cx, a->sy, a->cz) < std::tie(b->cx, b->sy, b->cz);
     });
     for (const Gpu* gp : classicOrder) {
       const Gpu& g = *gp;
@@ -954,8 +958,10 @@ class cGL33Renderer final : public IRenderer {
         const Vec3 mn{g.cx * 16.f, g.sy * 16.f, g.cz * 16.f};
         if (decideOnce(k, mn) == CullDecision::Full) pbrOrder.push_back(&g);
       }
-      std::sort(pbrOrder.begin(), pbrOrder.end(), [&](const PbrGpu* a, const PbrGpu* b) {
-        return chunkDist2(a->cx, a->sy, a->cz) < chunkDist2(b->cx, b->sy, b->cz);
+      std::sort(pbrOrder.begin(), pbrOrder.end(), [&](const PbrGpu* a, const PbrGpu* b) {  // R3 (B9): key tie-break
+        const auto da = chunkDist2(a->cx, a->sy, a->cz), db = chunkDist2(b->cx, b->sy, b->cz);
+        if (da != db) return da < db;
+        return std::tie(a->cx, a->sy, a->cz) < std::tie(b->cx, b->sy, b->cz);
       });
       for (const PbrGpu* gp : pbrOrder) {
         const PbrGpu& g = *gp;

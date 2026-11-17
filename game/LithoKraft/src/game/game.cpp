@@ -1698,7 +1698,8 @@ void Game::loadActive() {
     const int meshR = cfg_.streaming ? std::clamp(effectiveStreamRadius(cfg_), 6, 12) : 9999;
     const int tickR = cfg_.tickRadius;
     int meshQueued = 0, meshDeferred = 0, simActive = 0, stagedFar = 0;
-    std::vector<std::pair<int, uint64_t>> order;
+    std::vector<std::pair<cStreamRank::Key, uint64_t>> order;  // R3: same rank as streaming, from the spawn view
+    const cStreamRank loadRank(scx, scz, cStreamRank::sectorOf(sp.yaw), cfg_.diamondStreamArea);
     order.reserve(size_t(2 * meshR + 1) * size_t(2 * meshR + 1));
     for (const auto& [k, col] : active_->chunks.columns()) {
       for (int sy = 0; sy < kSubChunks; ++sy)
@@ -1709,7 +1710,7 @@ void Game::loadActive() {
         col->state.setStage(litholattice::ChunkStage::Active);
         ++simActive;
         if (d <= meshR && prebakeKeys.count(k)) {
-          order.emplace_back(streamRequestPriority(col->cx - scx, col->cz - scz, cfg_.diamondStreamArea), k);
+          order.emplace_back(loadRank.column(col->cx, col->cz), k);
         } else {
           for (int sy = 0; sy < kSubChunks; ++sy) {
             if (!col->subs[sy]) continue;
@@ -2022,7 +2023,7 @@ bool Game::switchDimension(const std::string& id) {
   ringSpillDroppedOnSwitch_ += ringSpill_.size();
   ringSpill_.clear();
   if (!renderer_.enqueueClearChunkMeshes()) spillRingUpload(2, {}, {});
-  pendingOrder_.clear(); pendingMesh_.clear(); meshSeq_.clear(); uploadSortedAt_ = INT64_MIN; uploadSortedSize_ = 0;  // in-flight jobs are dropped by the epoch check
+  pendingOrder_.clear(); pendingMesh_.clear(); meshSeq_.clear(); uploadSortedAt_ = INT64_MIN; uploadSortedSize_ = 0; uploadSortedSector_ = cStreamRank::kNoDirection;  // in-flight jobs are dropped by the epoch check
   deferredMeshOrder_.clear(); deferredMeshKeys_.clear();  // t3366u deferred keys belong to the old dimension
   mcpSenses_.clearMeshes();  // vision cache follows the GL renderer's clearChunkMeshes() above
   pbrPendingOrder_.clear(); pbrPendingMesh_.clear(); pbrMeshSeq_.clear();  // same for the PBR queue
@@ -2219,6 +2220,11 @@ inline double pumpMsSince(std::chrono::steady_clock::time_point t0) {
 // Archie Phase 1 (JD 2026-11-04): bound meshing to the view. A centre / radius change retires
 // every meshed column now beyond the view (tombstones -> the renderer drops its meshes) and meshes
 // the deferred columns now inside it (bounded per frame, under the between-ticks sim hold).
+cStreamRank Game::playerRank() const {
+  const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
+  return cStreamRank(pcx, pcz, cStreamRank::sectorOf(player_.yaw), cfg_.diamondStreamArea);
+}
+
 void Game::pumpViewGate() {
   if (!sim_ || !active_ || !viewGate_.enabled()) return;
   const int pcx = int(std::floor(player_.pos.x / 16)), pcz = int(std::floor(player_.pos.z / 16));
@@ -2232,8 +2238,8 @@ void Game::pumpViewGate() {
   // Every resident column is checked (a few hundred keys): meshes may also come from the sim
   // thread's remesh path, so the gate keeps only the set of columns it holds back.
   constexpr size_t kEnterPerPump = 12;
-  size_t n = 0;
   viewGateBacklog_ = false;
+  std::vector<std::pair<cStreamRank::Key, const ChunkColumn*>> entering;  // R3 (B7): ranked, not map order
   for (const auto& [key, col] : active_->chunks.columns()) {
     if (!col) continue;
     const int cx = col->cx, cz = col->cz;
@@ -2244,8 +2250,17 @@ void Game::pumpViewGate() {
       ++viewGateRetired_;
     } else if (in && held) {
       if (col->edgeShell) continue;  // Q12: promotes first (demoteFarColumns), then meshes
-      if (n >= kEnterPerPump) { viewGateBacklog_ = true; continue; }
-      ++n; ++viewGateEntered_;
+      entering.emplace_back(cStreamRank::Key{}, col.get());
+    }
+  }
+  if (!entering.empty()) {
+    const cStreamRank rank = playerRank();
+    for (auto& e : entering) e.first = rank.column(e.second->cx, e.second->cz);
+    std::sort(entering.begin(), entering.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    if (entering.size() > kEnterPerPump) { viewGateBacklog_ = true; entering.resize(kEnterPerPump); }
+    for (const auto& e : entering) {
+      const int cx = e.second->cx, cz = e.second->cz;
+      ++viewGateEntered_;
       viewGate_.undefer(cx, cz);
       for (int sy = 0; sy < kSubChunks; ++sy) { meshSeq_.erase(packPos(cx, sy, cz)); pbrMeshSeq_.erase(packPos(cx, sy, cz)); }
       startFirstMesh(cx, cz);
@@ -2650,6 +2665,7 @@ void Game::pumpStreaming(float frameDtMs) {
     streamer_->setRequestBudgetFloor(edgeNear ? 4 : -1);
   }
   { const auto tStm = std::chrono::steady_clock::now();
+    streamer_->setViewSector(cStreamRank::sectorOf(player_.yaw));  // R3: requests and promotion rank in front first
     streamer_->update(pcx, pcz);
     msStream += pumpMsSince(tStm);
   }
@@ -2830,6 +2846,11 @@ void Game::pumpStreaming(float frameDtMs) {
     l0Hold_.setMaxTicks(cL0NeighbourHold::maxTicksFor(sim_->stats().targetTps));  // 2 s of ticks at the live rate
     l0Hold_.collectReady(cChunkMapPresence(active_->chunks), sim_->stats().worldTick, ready);  // (under the between-ticks hold)
     const auto tL0 = std::chrono::steady_clock::now();
+    {  // R3 (B7): first meshes in rank order
+      const cStreamRank rank = playerRank();
+      auto rk = [&](uint64_t k) { return rank.column(int(int32_t(k >> 32)), int(int32_t(k & 0xffffffffu))); };
+      std::sort(ready.begin(), ready.end(), [&](uint64_t a, uint64_t b) { return rk(a) < rk(b); });
+    }
     for (uint64_t key : ready) { startFirstMesh(int(int32_t(key >> 32)), int(int32_t(key & 0xffffffffu))); ++nFirst; }
     msFirst += pumpMsSince(tL0);
   }
@@ -5420,10 +5441,14 @@ void Game::uploadMeshes() {
   {  // nearest-first: re-sort only when the player changes chunk or the queue grew past the last sort
     const int pcx = int(std::floor(player_.pos.x / 16)), pcy = int(std::floor(player_.pos.y / 16)), pcz = int(std::floor(player_.pos.z / 16));
     const int64_t here = packPos(pcx, std::clamp(pcy, 0, kSubChunks - 1), pcz);
-    if (pendingOrder_.size() > size_t(kUploadBudget) && (here != uploadSortedAt_ || pendingOrder_.size() > uploadSortedSize_ + size_t(kUploadBudget))) {
-      auto dist = [&](int64_t k) { int x, y, z; unpackPos(k, x, y, z); return (x - pcx) * (x - pcx) + (y - pcy) * (y - pcy) + (z - pcz) * (z - pcz); };
-      std::stable_sort(pendingOrder_.begin(), pendingOrder_.end(), [&](int64_t a, int64_t b) { return dist(a) < dist(b); });
+    const cStreamRank rank = playerRank();  // R3 (B7): same rank as admission, key tie-break
+    if (pendingOrder_.size() > size_t(kUploadBudget) &&
+        (here != uploadSortedAt_ || rank.sector() != uploadSortedSector_ || pendingOrder_.size() > uploadSortedSize_ + size_t(kUploadBudget))) {
+      const int csy = std::clamp(pcy, 0, kSubChunks - 1);
+      auto rk = [&](int64_t k) { int x, y, z; unpackPos(k, x, y, z); return rank.section(x, y, z, csy); };
+      std::sort(pendingOrder_.begin(), pendingOrder_.end(), [&](int64_t a, int64_t b) { return rk(a) < rk(b); });
       uploadSortedAt_ = here;
+      uploadSortedSector_ = rank.sector();
     }
     uploadSortedSize_ = pendingOrder_.size();
   }

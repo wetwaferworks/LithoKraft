@@ -15,6 +15,7 @@
 #include "lithokraft/game/engine.h"
 #include "lithokraft/game/prayer.h"  // Cortana 2026-10-15 2255
 #include "lithokraft/game/view_mesh_gate.h"  // Archie Phase 1
+#include "lithokraft/game/stream_rank.h"     // R3
 #include "lithokraft/game/world_clock.h"  // Cortana 2026-10-16
 #include <array>
 #include <deque>
@@ -718,6 +719,9 @@ class Game {
   std::unordered_map<int64_t, uint64_t> meshSeq_;  // latest uploaded seq per sub-chunk
   int64_t uploadSortedAt_ = INT64_MIN;  // player-chunk key at the last nearest-first sort of pendingOrder_
   size_t uploadSortedSize_ = 0;         // pendingOrder_ size at that sort (reset with the queue on world switch)
+  int uploadSortedSector_ = cStreamRank::kNoDirection;  // R3: view sector at that sort
+  /// R3 (B7): the rank around the player's column and view sector (game thread).
+  cStreamRank playerRank() const;
   // PBR (BinaryQuad) path queues (phase 2, Worker 3): only used when the mesher option
   // selects BinaryQuad. The classic path above keeps serving every non-cube shape even
   // then (the binary mesher's scope is opaque cubes), so both queues drain each frame.

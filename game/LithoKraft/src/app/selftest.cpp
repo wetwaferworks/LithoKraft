@@ -1392,6 +1392,32 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
         std::sort(again.begin(), again.end());
         check(again == order, "stream order: ties break by chunk key (deterministic, input-order independent)");
       }
+      {  // R3 (B7, 2026-11-17): one rank for requests, promotion, view-gate entry, first mesh and upload
+        const cStreamRank r(0, 0, cStreamRank::sectorOf(0.f), true);  // looking +x
+        check(r.column(5, 0) < r.column(-5, 0), "stream rank: a column in front ranks before one equally far behind");
+        check(r.column(9, 0) < r.column(-5, 0) && r.column(-4, 0) < r.column(9, 0),
+              "stream rank: behind counts as twice as far (front 9 before behind 5, behind 4 before front 9)");
+        check(r.column(7, 0) < r.column(0, 5) && r.column(0, 5) < r.column(-4, 0), "stream rank: front, then side, then behind");
+        check(r.column(-1, 0) < r.column(2, 0), "stream rank: the ring around the player comes first, in any direction");
+        check(cStreamRank::sectorOf(-1.5708f) == 12 && cStreamRank(0, 0, 12, true).column(0, -5) < cStreamRank(0, 0, 12, true).column(0, 5),
+              "stream rank: yaw -pi/2 faces -z (cPlayer::lookDir convention)");
+        check(cStreamRank::sectorOf(6.2831853f) == 0 && cStreamRank::sectorOf(-0.1f) == 0 && cStreamRank::sectorOf(0.3f) == 1,
+              "stream rank: yaw quantizes to 16 sectors, wrapping");
+        check(r.section(1, 4, 0, 4) < r.section(0, 15, 0, 4), "stream rank: uploads put the ground of a near column before the sky above you");
+        const cStreamRank nodir(0, 0, cStreamRank::kNoDirection, true);
+        check(nodir.column(5, 0).primary == nodir.column(0, 5).primary && nodir.column(-5, 0).primary == nodir.column(5, 0).primary,
+              "stream rank: without a direction only distance and the key decide");
+        std::vector<std::pair<cStreamRank::Key, uint64_t>> a, b;
+        for (int dz = -8; dz <= 8; ++dz)
+          for (int dx = -8; dx <= 8; ++dx)
+            if (std::abs(dx) + std::abs(dz) <= 8) a.emplace_back(r.column(dx, dz), ChunkKey::make(dx, dz));
+        b.assign(a.rbegin(), a.rend());
+        std::sort(a.begin(), a.end());
+        std::sort(b.begin(), b.end());
+        bool unique = true;
+        for (size_t i = 1; i < a.size(); ++i) if (!(a[i - 1].first < a[i].first)) unique = false;
+        check(a == b && unique, "stream rank: a strict total order (no ties), the same from any input order");
+      }
     }
     std::filesystem::remove_all(edir);
   }

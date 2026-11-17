@@ -35,6 +35,7 @@
 #include "litholattice/world/chunk_map.h"
 #include "litholattice/world/chunk_ingress.h"
 #include "litholattice/world/column_generator.h"
+#include "lithokraft/game/stream_rank.h"
 
 namespace lithokraft {
 
@@ -68,6 +69,11 @@ class cChunkStreamer {
 
   /// Diamond (Manhattan) footprint for the wanted set + eviction (JD 2026-10-23).
   void setDiamond(bool d) { diamond_ = d; }
+  /// R3 (B7): the player's view sector (cStreamRank::sectorOf), set by the Game before update().
+  /// Requests and staged promotion rank in-front columns first. kNoDirection = distance only.
+  void setViewSector(int s) { viewSector_ = s; }
+  int viewSector() const { return viewSector_; }
+  cStreamRank rankAround(int cx, int cz) const { return cStreamRank(cx, cz, viewSector_, diamond_); }
   /// 2026-10-25 stutter pass: requests farther than this (same metric as the footprint) are not
   /// admitted; resident columns are untouched. The game lowers it while the mesh pool is > 90% full.
   void setAdmitRadius(int r) { admitR_ = r; }
@@ -124,7 +130,8 @@ class cChunkStreamer {
   /// Ingress into staging, then hands out every staged column inside the
   /// ring-center bypass (spawnSpiralBypass: Chebyshev 1 around (centerCx,
   /// centerCz), only while `spiralActive`) regardless of budget, plus up to
-  /// `budget` others in staging order. `*bypassed` gets the bypass count
+  /// `budget` others in cStreamRank order around the centre (R3; was staging order, which
+  /// is worker-completion order). `*bypassed` gets the bypass count
   /// (those do not spend the budget).
   std::vector<StreamedColumn> takeReadyPromote(size_t budget, int centerCx, int centerCz, bool spiralActive, size_t* bypassed);
   bool hasReady() const { return !staged_.empty() || readyCount_->load(std::memory_order_relaxed) > 0; }
@@ -143,8 +150,8 @@ class cChunkStreamer {
   /// Shared request pump behind update()/updateAround()/requestColumn():
   /// drains failures (arming retry backoff), then submits generation /
   /// load jobs for the wanted columns nearest-first until the in-flight
-  /// cap. `want` is (distance^2, key) pairs, already dedup-filtered.
-  void pumpRequests(std::vector<std::pair<int, uint64_t>> want);
+  /// cap. `want` is (rank, key) pairs, already dedup-filtered (R3: cStreamRank, in front first).
+  void pumpRequests(std::vector<std::pair<cStreamRank::Key, uint64_t>> want);
   /// True when `key` may be requested right now (not already requested,
   /// not inside a retry backoff window at `now`).
   bool requestable(uint64_t key, std::chrono::steady_clock::time_point now);
@@ -166,6 +173,7 @@ class cChunkStreamer {
   int requestFloor_ = -1;     ///< S4 emergency floor (see setRequestBudgetFloor); -1 = no floor
   int admittedThisCycle_ = 0; ///< admissions since the last update() opened a cycle
   bool diamond_ = false;  ///< diamond (Manhattan) stream footprint (JD 2026-10-23)
+  int viewSector_ = cStreamRank::kNoDirection;  ///< R3: see setViewSector
   size_t initialCount_ = 0;
   std::unordered_set<uint64_t> requested_;  // loaded or in flight (failures are erased by update(), B-L7)
   std::unordered_map<uint64_t, Retry> retries_;  // failed keys: attempt count + backoff deadline (main thread)
