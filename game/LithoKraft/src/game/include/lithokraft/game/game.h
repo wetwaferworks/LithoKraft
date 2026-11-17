@@ -95,6 +95,10 @@ struct GameConfig {
   bool diamondStreamArea = true;  ///< diamond (Manhattan) stream/residency footprint (JD 2026-10-23). DEFAULT since fix run 3
   int vkFxOverride = -1;  // 0.0.1.51: --vkfx for this run only (never saved); -1 = settings
   int streamRadius = 32;  // JD 2026-10-16: render / procgen stream distance (chunks, max 64)
+  /// R2 (2026-11-17): streaming budgets by count and bytes only, never the wall clock, so a bench
+  /// or golden run admits, meshes and uploads the same columns on any host load.
+  /// --det-budget or LL_DET_BUDGET=1. Play mode keeps the frame-aware budgets.
+  bool deterministicBudget = false;
   bool streaming = true;  // false: no player-centred streaming (fixed pre-baked world only)
   bool euv = true;
   bool timingHandshake = true;   // SimConfig::timingHandshake at world load (standard; default ON since 2026-10-14)
@@ -803,13 +807,29 @@ class Game {
   /// backpressure) and mesh them all in ONE pool job, on one worker, in order.
   void submitMeshColumn(int cx, int cz);
   void startFirstMesh(int cx, int cz);  ///< fix (b): first L0 mesh of a promoted column
-  /// The mesh job body (any pool worker).
-  void meshOne(const std::shared_ptr<MeshInput>& in, const std::shared_ptr<const BlockMaterials>& mats, bool binary);
+  /// R2 (B3): everything a mesh job reads besides its MeshInput, captured by value when the job is
+  /// submitted. The worker never looks at live game state (active_, the renderer) while it runs, so
+  /// a dimension switch or a settings change can't reach into a job that is already queued.
+  struct MeshJobParams {
+    std::shared_ptr<const BlockMaterials> mats;
+    class WaferPulseCache* pulse = nullptr;       // set only while the Wafer is the active dimension
+    bool greedy = false;                           // renderer_.prefersGreedyMeshes() at submit
+    bool binary = false;                           // BinaryQuad mesher option
+  };
+  /// Owner-thread side: the parameters for a job submitted now (game thread, or the sim thread
+  /// while it owns the map; both only run while active_ is stable).
+  MeshJobParams meshJobParams() const;
+  /// The mesh job body (any pool worker). Reads only `in` and `p`.
+  void meshOne(const std::shared_ptr<MeshInput>& in, const MeshJobParams& p);
   /// Title-screen pre-warm: wake every pool worker once (first-touch stacks and allocator
   /// arenas), grow the snapshot slab to the radius-8 tier, request the radius-8 ring.
   void prewarmSwarm();
   litholattice::cSlab<MeshInput> meshSlab_{litholattice::kSlabRadius4Columns};  // radius-4 tier at boot
   litholattice::cSlackHarvester slack_{0.25, 6, 2.0};
+  // R2: the frame-aware request grant's state. Members (were function statics), reset per world load.
+  float streamEmaMs_ = 16.7f;
+  int streamLastGrant_ = -1;
+  uint64_t admitStepFrame_ = 0;  ///< R2 deterministic mode: pump count at the last admission-radius step
   bool swarmPrewarmed_ = false;
   uint64_t p6ColumnJobs_ = 0, p6SlackSlices_ = 0;
   // Thread Handshake P7: the wafer reveal (render-only). Started on world load, paced by

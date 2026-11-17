@@ -845,7 +845,7 @@ Game::Game(const GameConfig& cfg, IRenderer& renderer, cJobPool& pool, cResource
     }
     ++meshInFlight_;  // P8 quiescence
     litholattice::workTrace("submit", in->cx, in->sy, in->cz, in->seq);  // duplicate-work trace (LL_WORK_TRACE)
-    submitMeshJob(pool_, [this, in, mats = resources_.materials(), binary = useBinaryMesher_] { meshOne(in, mats, binary); });
+    submitMeshJob(pool_, [this, in, p = meshJobParams()] { meshOne(in, p); });
   };
   std::optional<PlayerMeta> savedPlayer;
   if (!cfg_.saveDir.empty()) {
@@ -1335,6 +1335,7 @@ std::string Game::teleportCmd(const std::vector<std::string>& args) {
 
 void Game::loadActive() {
   const auto t0 = Clock::now();
+  streamEmaMs_ = 16.7f; streamLastGrant_ = -1; admitStepFrame_ = 0;  // R2: a fresh world starts its budget fresh (was a static)
   holdTicksForIo("load");  // B9: held from the first byte of the load (no sim exists yet; the new one inherits the hold)
   if (cfg_.benchScene != "default") {  // bench scenes: load and tick the whole scene
     cfg_.worldChunks = std::max(cfg_.worldChunks, cfg_.sceneSize / 16 + 12);
@@ -2341,7 +2342,18 @@ void Game::pumpWaferReveal(float dt) {
 }
 
 // ---- Thread Handshake P6: swarm and locality ----
-void Game::meshOne(const std::shared_ptr<MeshInput>& in, const std::shared_ptr<const BlockMaterials>& mats, bool binary) {
+Game::MeshJobParams Game::meshJobParams() const {
+  MeshJobParams p;
+  p.mats = resources_.materials();
+  p.pulse = (active_ && active_->id == "wafer") ? pulseCache_.get() : nullptr;
+  p.greedy = renderer_.prefersGreedyMeshes();
+  p.binary = useBinaryMesher_;
+  return p;
+}
+
+void Game::meshOne(const std::shared_ptr<MeshInput>& in, const MeshJobParams& p) {
+  const bool binary = p.binary;
+  const BlockMaterials* mats = p.mats.get();
   litholattice::workTrace("mesh", in->cx, in->sy, in->cz, in->seq);  // duplicate-work trace (LL_WORK_TRACE)
   const bool hc = litholattice::cHitchCapture::enabled();  // LL_HITCH_CAPTURE (default off)
   const uint64_t hc0 = hc ? litholattice::cHitchCapture::nowNs() : 0;
@@ -2376,15 +2388,16 @@ void Game::meshOne(const std::shared_ptr<MeshInput>& in, const std::shared_ptr<c
   // worldgen-static, so this costs nothing per frame). Only the Wafer
   // pulses; other dimensions leave the mesh params zeroed.
   litholattice::MeshContext ctx{blockRegistry(), *mats, &blockAppearance()};
-  ctx.greedy = renderer_.prefersGreedyMeshes();  // Cortana 2026-10-15 1705: greedy meshing [GAME] (software backend only)
-  ctx.pulseParams = [this](int cx, int cz, float p0[4], float p1[4]) {
-    if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->params(cx, cz, p0, p1);
+  ctx.greedy = p.greedy;  // Cortana 2026-10-15 1705: greedy meshing [GAME] (software backend only); R2: captured at submit
+  WaferPulseCache* pulse = p.pulse;
+  ctx.pulseParams = [pulse](int cx, int cz, float p0[4], float p1[4]) {
+    if (pulse) pulse->params(cx, cz, p0, p1);
   };
   // Wafer ground traces (JD 2026-10-11; landed 2026-10-13, P1-RENDER H1):
   // same biome weight vector as the pulse, blended by the same cache;
   // the mesher bakes the result into ChunkMesh::traceP0/traceP1.
-  ctx.traceParams = [this](int cx, int cz, float t0[4], float t1[4]) {
-    if (active_ && active_->id == "wafer" && pulseCache_) pulseCache_->traceParams(cx, cz, t0, t1);
+  ctx.traceParams = [pulse](int cx, int cz, float t0[4], float t1[4]) {
+    if (pulse) pulse->traceParams(cx, cz, t0, t1);
   };
   ChunkMesh cm = meshSubChunk(*in, ctx);  // full geometry at every distance (LOD removed 2026-11-17)
   const uint64_t hc2 = hc ? litholattice::cHitchCapture::nowNs() : 0;
@@ -2439,8 +2452,8 @@ void Game::submitMeshColumn(int cx, int cz) {
   ++p6ColumnJobs_;
   meshInFlight_ += int(batch.size());  // P8 quiescence
   if (meshHashOn_) meshLedger_.noteMeshedBorder(ChunkKey::make(cx, cz), litholattice::ChunkStateWord::borderGen(c->state.load()));
-  submitMeshJob(pool_, [this, batch = std::move(batch), mats = resources_.materials(), binary = useBinaryMesher_] {
-    for (const auto& in : batch) meshOne(in, mats, binary);
+  submitMeshJob(pool_, [this, batch = std::move(batch), p = meshJobParams()] {
+    for (const auto& in : batch) meshOne(in, p);
   });
 }
 
@@ -2487,7 +2500,7 @@ void Game::submitMeshAt(int cx, int sy, int cz) {
   }
   auto in = snapshotSlab(cx, sy, cz);
   ++meshInFlight_;  // P8 quiescence
-  submitMeshJob(pool_, [this, in, mats = resources_.materials(), binary = useBinaryMesher_] { meshOne(in, mats, binary); });
+  submitMeshJob(pool_, [this, in, p = meshJobParams()] { meshOne(in, p); });
 }
 
 bool Game::streamSettled() const { return streamUnsettledReason() == nullptr; }
@@ -2583,8 +2596,9 @@ void Game::pumpStreaming(float frameDtMs) {
     const float fill = renderer_.meshPoolFill();
     int ar = std::min(streamer_->admitRadius(), full);
     if (fill < 0.f) ar = full;
-    else if (msBetween(lastAdmit, Clock::now()) >= 250.0) {
-      lastAdmit = Clock::now();
+    else if (cfg_.deterministicBudget ? streamPumps_ - admitStepFrame_ >= 15 : msBetween(lastAdmit, Clock::now()) >= 250.0) {
+      lastAdmit = Clock::now();  // R2: the deterministic mode steps every 15 pumps (~250 ms at 60 Hz) instead
+      admitStepFrame_ = streamPumps_;
       const int was = ar;
       if (fill > 0.90f) ar = std::max(std::min(8, full), ar - 1);
       else if (fill < 0.85f) ar = std::min(full, ar + 1);
@@ -2599,13 +2613,17 @@ void Game::pumpStreaming(float frameDtMs) {
      // stops fighting the frame it is filling for. EMA of the frame
      // time; Archie's grant table: starving (>40 ms) 1, cruising
      // (30..40) 2, settling (25..30) 4, headroom (<25) 6 per frame.
-    static float emaMs = 16.7f;
-    emaMs += (frameDtMs - emaMs) * 0.1f;
-    const int grant = emaMs > 40.0f ? 1 : emaMs >= 30.0f ? 2 : emaMs >= 25.0f ? 4 : 6;
-    static int lastGrant = -1;
-    if (grant != lastGrant) {
-      lastGrant = grant;
-      logInfo("stream: frame-aware budget: frame ema %.1f ms -> %d new columns/frame", double(emaMs), grant);
+    // R2: the EMA lives on the Game (reset per world load), and the deterministic mode uses
+    // a fixed grant so a golden run does not depend on how fast the host renders.
+    constexpr int kDetRequestGrant = 4;
+    streamEmaMs_ += (frameDtMs - streamEmaMs_) * 0.1f;
+    const float ema = streamEmaMs_;
+    const int grant = cfg_.deterministicBudget ? kDetRequestGrant
+                      : ema > 40.0f ? 1 : ema >= 30.0f ? 2 : ema >= 25.0f ? 4 : 6;
+    if (grant != streamLastGrant_) {
+      streamLastGrant_ = grant;
+      if (cfg_.deterministicBudget) logInfo("stream: deterministic budget: %d new columns/frame", grant);
+      else logInfo("stream: frame-aware budget: frame ema %.1f ms -> %d new columns/frame", double(ema), grant);
     }
     streamer_->setRequestBudget(grant);
   }
@@ -2820,7 +2838,8 @@ void Game::pumpStreaming(float frameDtMs) {
     constexpr size_t kBorderColsPerPump = 2;
     // P6 slack harvesting: spare frame time (vs a 60 Hz budget) buys extra border
     // columns, priced by the measured cost of a column re-mesh submit.
-    const int extra = borderRing_.empty() ? 0 : slack_.grant(1000.0 / 60.0, double(frameDtMs));
+    // R2: no slack in the deterministic mode (it is priced in wall-clock ms).
+    const int extra = (borderRing_.empty() || cfg_.deterministicBudget) ? 0 : slack_.grant(1000.0 / 60.0, double(frameDtMs));
     p6SlackSlices_ += uint64_t(extra);
     std::vector<uint64_t> border;
     borderRing_.popUpTo(kBorderColsPerPump + size_t(extra), border);
@@ -5410,8 +5429,12 @@ void Game::uploadMeshes() {
   }
   if (r2prof) lastMeshDrainMs_ = msBetween(r2t0, Clock::now());  // GUI lag round 2: drain phase ends here
   const auto tUploads = Clock::now();  // the cap measures commits, not the sort
+  // R2: the ms cap is play-mode only; the deterministic mode stops on the count and byte caps.
+  auto timeCapped = [&] {
+    return !cfg_.deterministicBudget && uploads >= kUploadFloor && msBetween(tUploads, Clock::now()) > kUploadMsBudget;
+  };
   for (; !pendingOrder_.empty() && uploads < pop.maxItems;) {
-    if (uploads >= kUploadFloor && msBetween(tUploads, Clock::now()) > kUploadMsBudget) { g_uploadsCapped += pendingOrder_.size(); break; }
+    if (timeCapped()) { g_uploadsCapped += pendingOrder_.size(); break; }
     const int64_t k = pendingOrder_.front();
     auto node = pendingMesh_.find(k);
     if (node == pendingMesh_.end()) { pendingOrder_.pop_front(); continue; }
@@ -5436,7 +5459,7 @@ void Game::uploadMeshes() {
       else if (m.epoch != it->second.epoch || m.seq > it->second.seq) it->second = std::move(m);
     } }
   for (; !pbrPendingOrder_.empty() && uploads < pop.maxItems;) {
-    if (uploads >= kUploadFloor && msBetween(tUploads, Clock::now()) > kUploadMsBudget) break;
+    if (timeCapped()) break;
     const int64_t k = pbrPendingOrder_.front();
     auto node = pbrPendingMesh_.find(k);
     if (node == pbrPendingMesh_.end()) { pbrPendingOrder_.pop_front(); continue; }

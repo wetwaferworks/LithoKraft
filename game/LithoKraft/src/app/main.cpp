@@ -1049,6 +1049,7 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--radius")) { cfg.tickRadius = int(num(0, 512)); radiusGiven = true; }
     else if (!std::strcmp(argv[i], "--vkfx")) { vkFxArg = int(num(0, 127)); }  // JD Vulkan push: effect bits for this run
     else if (!std::strcmp(argv[i], "--stream-radius")) { cfg.streamRadius = int(num(1, 64)); streamGiven = true; }  // JD 2026-10-16
+    else if (!std::strcmp(argv[i], "--det-budget")) cfg.deterministicBudget = true;  // R2: count/bytes-only streaming budgets
     else if (!std::strcmp(argv[i], "--sim-area") && i + 1 < argc) {
       const std::string a = argv[++i];
       bool ok = true;  // Fix run 3: case-insensitive; unknown -> WARN + diamond (never square)
@@ -1260,7 +1261,7 @@ int main(int argc, char** argv) {
     else {
       std::printf("usage: LithoKraft [--version] [--selftest] [--dim wafer|organic] [--size chunks] "
                   "[--tps 32|64|128|256|512] [--tps-unlock (debug: --tps up to 8192, powers of 2)] [--no-euv] [--radius chunks] [--render-threads 1|2|4|8|16|32|64] [--sw-scale 0.5|0.75|1.0] [--seconds s] [--vsync] [--display windowed|maximized|borderless|fullscreen] [--monitor N] [--resolution WxH] [--refresh Hz] [--log file] "
-                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--showcase wafer] [--frame-dump dir] [--frame-hash dir] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--flat-lab] [--bolt-lab] [--component-test] [--pchie-maze file] [--spawn name] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--stream-bench [file.json]] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--no-verify] [--mcp-stdio] "
+                  "[--pack pack_64|pack_32] [--resource-pack dir]... [--scripts source|exe|dir] [--mute] [--renderer software|gl33|vulkan] [--bench seconds] [--bench-path orbit|stream|flyover|walk|still] [--showcase wafer] [--frame-dump dir] [--frame-hash dir] [--bench-scene default|circuits|display|framebuffer|redirector|wall-pixel|pattern-wall|sawtooth|wire-torture|litho|litho-wired|testworld] [--test-world [--rom-screen 32|64]] [--test-world-examples] [--flat-lab] [--bolt-lab] [--component-test] [--pchie-maze file] [--spawn name] [--capture] [--scene-size n] [--scene-rows 1-64 (wall-pixel <= 16, sawtooth)] [--pattern checkers|circles (pattern-wall)] [--screen-orient flat|vertical] [--perf-headless [json]] [--soak minutes] [--bench-json file] [--stream-bench [file.json]] [--det-budget] [--ui-shot file.png [--ui-view hud|menu|settings|pause|inventory]] [--present fifo|mailbox|immediate] [--save-dir dir] [--no-save] [--verify-mesh] [--no-verify] [--mcp-stdio] "
                   "[--vk-validation] [--vk-arena host|device|rebar] [--gl-arena on|off] [--handshake-workers n] [--stub-models] [--seed n] [--cities on|off] [--noise-preview graph.json [--preview-out f.png] "
                   "[--preview-output name] [--preview-size px] [--preview-scale blocks/px] [--preview-y y]]\n");
       return 0;
@@ -1348,6 +1349,7 @@ int main(int argc, char** argv) {
   // JD 2026-10-16: render / stream distance (auto: Vulkan 64, software and GL 3.3 32; hard cap 64).
   if (!streamGiven) cfg.streamRadius = settings.streamRadius > 0 ? settings.streamRadius : 16;  // PlayN (JD ruling 11-05): 16 chunks on software / GL / Vulkan
   cfg.streamRadius = std::clamp(cfg.streamRadius, 1, 64);
+  if (const char* e = std::getenv("LL_DET_BUDGET"); e && *e == '1') cfg.deterministicBudget = true;  // R2
   cfg.streaming = streamingArg >= 0 ? streamingArg == 1 : settings.streaming;
   vsync = vsync || settings.vsync;
   // Cortana 2026-10-15 1610 (ENGINE): tear-free software presentation. The
