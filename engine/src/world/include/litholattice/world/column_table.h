@@ -98,6 +98,10 @@ class ColumnTable {
   /// as a sticky owner for the next tick.
   void handOver();
   bool lockFree() const { return true; }
+  /// Test hook: claim or release ownership without a publish/takeStale, so a test can
+  /// hold a live owner across a concurrent call and check that it does not steal.
+  bool testEnterOwner() { return lfEnter(); }
+  void testLeaveOwner() { lfLeave(); }
 
  private:
   bool lfEnter();  // claim owner (CAS from empty) + drain stale marks; false if another thread holds it

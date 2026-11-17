@@ -149,13 +149,14 @@ void ColumnTable::handOver() {
 
 bool ColumnTable::lfEnter() {
   const std::thread::id me = std::this_thread::get_id();
-  if (lfDepth_ > 0) {
+  // lfDepth_ is owner-thread only. A foreign thread must not use it as a nest
+  // shortcut — that would walk into entries_/stale_ while the owner is still in
+  // the section (the overlap the tests hold with testEnterOwner).
+  const std::thread::id o = lfOwner_.load(std::memory_order_acquire);
+  if (o == me) {
     ++lfDepth_;
-  } else {
-    std::thread::id o = lfOwner_.load(std::memory_order_acquire);
-    if (o == me) {
-      lfDepth_ = 1;
-    } else if (o != std::thread::id()) {
+    if (lfDepth_ < 1) lfDepth_ = 1;
+  } else if (o != std::thread::id()) {
       // Another thread is in an owner-only section. Do not steal (that was the race).
       // The LL_LF_COWTABLE stderr line is gone: a leftover owner after a legal hold
       // visit is fixed by lfLeave/handOver, and PlayJ's unlocked flush no longer overlaps.
@@ -169,7 +170,6 @@ bool ColumnTable::lfEnter() {
         return false;
       }
       lfDepth_ = 1;
-    }
   }
   lfStale_.takeAll([&](uint64_t k, uint64_t m) { stale_[k] |= m; });
   std::vector<std::pair<uint64_t, uint64_t>> sp;
