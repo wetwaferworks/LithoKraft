@@ -1,9 +1,11 @@
 // __cxa_atexit is lock-free now (CAS push). 4 threads register 250 entries each at
 // the same time; then __cxa_finalize(nullptr) must run all 1000 exactly once, and
 // each thread's entries newest first. Entries for another DSO handle are deferred
-// and must survive a finalize of this one. rc 0 = pass.
+// and must survive a finalize of this one. A plain atexit(void(void)) handler
+// must run with its own type. rc 0 = pass.
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "lithoweave.h"
 extern "C" int __cxa_atexit(void (*)(void*), void*, void*);
 extern "C" void __cxa_finalize(void*);
@@ -19,6 +21,10 @@ static void on_exit_fn(void* p) {
   last_seen[t] = i;
 }
 static void on_other(void*) { other_ran += 1; }
+// A plain atexit handler is void(void): it must be called with that type
+// (a void(void*) call through the registry traps on wasm).
+static int plain_ran = 0;
+static void on_plain(void) { plain_ran += 1; }
 static void* worker(void* a) {
   int t = (int)(uintptr_t)a;
   for (int i = 0; i < N; ++i) __cxa_atexit(on_exit_fn, (void*)(((uintptr_t)t << 16) | (uintptr_t)i), &dso_a);
@@ -26,6 +32,7 @@ static void* worker(void* a) {
 }
 int main() {
   __cxa_atexit(on_other, nullptr, &dso_b);
+  if (atexit(on_plain) != 0) return 6;
   lw_thread_t th[T];
   for (int t = 0; t < T; ++t) {
     last_seen[t] = N;
@@ -42,5 +49,8 @@ int main() {
   if (other_ran != 0) return 4;
   __cxa_finalize(&dso_b);
   if (other_ran != 1) return 5;
+  __cxa_finalize(nullptr);  // the atexit() entry (dso NULL)
+  printf("atexit: plain handler ran %d\n", plain_ran);
+  if (plain_ran != 1) return 7;
   return 0;
 }

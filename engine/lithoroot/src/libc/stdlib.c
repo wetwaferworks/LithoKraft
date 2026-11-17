@@ -411,11 +411,16 @@ int rand(void) {
 
 /* ---- exit family -------------------------------------------------------- */
 
+/* atexit handlers are void(void); the registry calls void(void*). Calling
+ * one through the other's type traps on wasm (call_indirect checks the
+ * signature), so the handler rides in the argument and a void(void*)
+ * trampoline calls it with its real type. */
+static void atexit_trampoline(void* fn) { ((void (*)(void))fn)(); }
+
 int atexit(void (*func)(void)) {
-  /* One registry for C and C++ (LithoAbi's), as in musl: the
-   * handler adapts to the registry's (void (*)(void*), arg) shape
-   * with a NULL argument. */
-  return __cxa_atexit((void (*)(void*))func, NULL, NULL);
+  /* One registry for C and C++ (LithoAbi's), as in musl. */
+  if (!func) return -1;
+  return __cxa_atexit(atexit_trampoline, (void*)func, NULL);
 }
 
 #define QUICK_EXIT_MAX 32
