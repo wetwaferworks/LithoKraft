@@ -37,6 +37,29 @@ else()
   # names), while --export=malloc is surgical (142 imports, malloc
   # exported).
   target_link_options(lithokraft PRIVATE "-Wl,--export=malloc")
+  # wasm-ld reads the allow list line by line and keeps a trailing CR, so the two checked-in lists
+  # (CRLF on a Windows checkout) are joined into one LF file in the build tree at configure time.
+  set(_lk_web_allowed "${CMAKE_CURRENT_BINARY_DIR}/web-link-allowed.txt")
+  file(STRINGS "${LithoLattice_SOURCE_DIR}/lithoroot/toolchain/lithosys-allowed.txt" _lk_allow_sys)
+  file(STRINGS "${LithoLattice_SOURCE_DIR}/lithoroot/toolchain/web-link-pending.txt" _lk_allow_pending REGEX "^[^#]")
+  list(TRANSFORM _lk_allow_sys STRIP)
+  list(TRANSFORM _lk_allow_pending STRIP)
+  list(JOIN _lk_allow_sys "\n" _lk_a1)
+  list(JOIN _lk_allow_pending "\n" _lk_a2)
+  file(WRITE "${_lk_web_allowed}" "${_lk_a1}\n${_lk_a2}\n")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${LithoLattice_SOURCE_DIR}/lithoroot/toolchain/lithosys-allowed.txt"
+    "${LithoLattice_SOURCE_DIR}/lithoroot/toolchain/web-link-pending.txt")
+  # Link wiring (2026-11-16): the host calls __wasm_call_ctors, then __main_argc_argv (clang's
+  # wasm name for main(argc, argv)); there is no _start. lithosys_thread_start is the weave's
+  # thread entry, __wasm_init_tls the per-thread TLS set-up. Undefined symbols: only the 14 frozen
+  # lithosys calls (lithosys-allowed.txt) and the named list of stages still pending
+  # (web-link-pending.txt) may become imports; lk_* imports are annotated in their headers. Any
+  # other undefined symbol is a link error.
+  target_link_options(lithokraft PRIVATE "-Wl,--no-entry" "-Wl,--export=__main_argc_argv"
+    "-Wl,--export=lithosys_thread_start" "-Wl,--export-if-defined=__wasm_call_ctors"
+    "-Wl,--export-if-defined=__wasm_init_tls"
+    "-Wl,--allow-undefined-file=${_lk_web_allowed}")
   # S1 (2026-11-16): an 8 MiB main stack, placed first so an overflow traps at address 0
   # instead of running into static data (wasm-ld's default stack is 64 KiB).
   target_link_options(lithokraft PRIVATE "-Wl,-z,stack-size=8388608" "-Wl,--stack-first")

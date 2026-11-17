@@ -1,0 +1,31 @@
+# web-link-pending.txt ... undefined symbols the LK_WEB link still lets through, by stage.
+#
+# The web link (game/LithoKraft/src/app/CMakeLists.txt) allows exactly the 14 frozen lithosys
+# calls (lithosys-allowed.txt) plus the names below; lk_* imports are annotated in their headers.
+# Any other undefined symbol is a link error. Each name here is a stage NOT DONE: the module would
+# import it from "env", which no host provides, so instantiation fails until the stage lands and
+# deletes its lines. This file must end up empty. Lines starting with # are comments.
+#
+# S7 file layer (std::filesystem subset, __lk_list_dir, POSIX fd calls), over lk_store / OPFS:
+_ZNSt10filesystem6statusERKNS_4pathERSt10error_code
+_ZNSt10filesystem14symlink_statusERKNS_4pathERSt10error_code
+_ZNSt10filesystem18create_directoriesERKNS_4pathERSt10error_code
+_ZNSt10filesystem14create_symlinkERKNS_4pathES2_RSt10error_code
+_ZNSt10filesystem9copy_fileERKNS_4pathES2_NS_12copy_optionsERSt10error_code
+_ZNSt10filesystem9file_sizeERKNS_4pathERSt10error_code
+_ZNSt10filesystem15last_write_timeERKNS_4pathERSt10error_code
+_ZNSt10filesystem6removeERKNS_4pathERSt10error_code
+_ZNSt10filesystem10remove_allERKNS_4pathERSt10error_code
+_ZNSt10filesystem6renameERKNS_4pathES2_RSt10error_code
+_ZNSt10filesystem11resize_fileERKNS_4pathEyRSt10error_code
+_ZNSt10filesystem19temp_directory_pathERSt10error_code
+_ZNSt10filesystem16weakly_canonicalERKNS_4pathERSt10error_code
+_ZNSt10filesystem9canonicalERKNS_4pathERSt10error_code
+_ZNSt10filesystem12current_pathERSt10error_code
+_ZNSt10filesystem13__lk_list_dirERKNS_4pathERSt6vectorISsSaISsEERSt10error_code
+fileno
+fsync
+ftruncate
+isatty
+# Audio (sfx, sound_components, sound_director, voice): LithoLibC math has no public exp2 yet.
+exp2

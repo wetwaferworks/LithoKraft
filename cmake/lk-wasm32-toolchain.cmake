@@ -92,6 +92,11 @@ set(LK_WASM_LINK_FLAGS
   "-Wl,--import-memory -Wl,--shared-memory -Wl,--initial-memory=268435456 -Wl,--max-memory=629145600")
 set(CMAKE_EXE_LINKER_FLAGS_INIT "${LK_WASM_LINK_FLAGS}")
 
+# Link wiring (2026-11-16): LithoRoot is the only runtime. -nostdlib stops the clang driver from
+# adding crt1.o, -lc, -lc++/-lc++abi and libclang_rt.builtins; the engine's lithoroot/ target
+# (lithoroot_runtime) supplies crt1, LithoLibC, LithoAbi and the compiler builtins it needs.
+set(CMAKE_EXE_LINKER_FLAGS_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT} -nostdlib")
+
 # The module's entry exports beyond _start/main are declared at the
 # consuming target (the engine exports its lk_* entry points and
 # lithosys_thread_start); the toolchain file does not guess them.

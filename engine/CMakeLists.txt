@@ -63,6 +63,15 @@ FetchContent_Declare(glfw
 FetchContent_MakeAvailable(glfw)
 endif()
 
+# LK_WEB (link wiring, 2026-11-16): LithoRoot is the whole runtime of the web module. Its crt1,
+# LithoLibC and C++ runtime are built here and linked into every target defined after this
+# point; the toolchain's -nostdlib keeps clang from adding any libc, libc++ or compiler-rt of
+# its own. Native builds never enter lithoroot/.
+if(LK_WEB)
+  add_subdirectory(lithoroot)
+  link_libraries(lithoroot_runtime)
+endif()
+
 # AngelScript 2.38.0, official SDK zip from angelcode.com, pinned by SHA256.
 # LK_WEB: AngelScript is the ONE sanctioned third-party library in the web build (JD 2026-11-16
 # 12:41 ET, "grant an exception"); everything else third-party stays off LK_WEB.
