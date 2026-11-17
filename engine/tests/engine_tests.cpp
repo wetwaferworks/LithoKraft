@@ -4290,6 +4290,25 @@ void testRender() {
       ok = ok && oa.size() == ref.size() && oa.maxProbe() < 64;
       check(ok, "column table (M9): open-addressing map matches unordered_map under insert/erase churn");
     }
+    {  // JD 2026-11-17: LL_LF_COWTABLE owner handover. main -> tick thread -> main with handOver()
+       // is not a second-thread call; a call from another thread with no handover still is.
+      ColumnTable t;
+      const uint64_t f0 = cowStats().lfForeignOwner, h0 = cowStats().lfHandovers;
+      (void)t.takeStale();                          // main claims it
+      t.handOver();                                 // main -> "tick" (ChunkMap::tickSideStarting)
+      std::thread tick([&] { (void)t.takeStale(); t.noteStale(1, 2, 3); (void)t.takeStale(); });
+      tick.join();
+      t.handOver();                                 // joined: back to main (ChunkMap::tickSideStopped)
+      (void)t.takeStale();
+      const uint64_t f1 = cowStats().lfForeignOwner;
+      check(f1 == f0 && cowStats().lfHandovers == h0 + 2,
+            "column table (LL_LF_COWTABLE): handed over main -> tick -> main without a second-thread warning");
+      std::printf("  (one LL_LF_COWTABLE owner-only warning may follow: the tripwire check)\n");
+      std::thread rogue([&] { (void)t.takeStale(); });  // no handover: must still count
+      rogue.join();
+      check(cowStats().lfForeignOwner == f1 + 1, "column table (LL_LF_COWTABLE): a call from a second thread without a handover still trips");
+      t.handOver();
+    }
     {  // M8 software uploader: canonical ingest renders the same framebuffer as the legacy stream.
       FrameParams fp;
       fp.width = 96; fp.height = 96;

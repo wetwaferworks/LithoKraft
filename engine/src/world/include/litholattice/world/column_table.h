@@ -67,6 +67,7 @@ struct CowStats {
   uint64_t verifyChecked = 0, verifyMismatches = 0, retainedBytes = 0, gathers = 0;
   uint64_t staleNoted = 0, staleFlushed = 0, stalePinned = 0, maxProbe = 0;
   uint64_t lfForeignOwner = 0;  ///< LL_LF_COWTABLE: owner-only calls seen from a second thread
+  uint64_t lfHandovers = 0;     ///< explicit owner handovers (ChunkMap tickSideStarting / tickSideStopped)
 };
 
 class ColumnTable {
@@ -89,6 +90,12 @@ class ColumnTable {
   /// owner thread only (the thread that may mutate the map: sim thread, or main before the sim
   /// starts) and drain the stale marks first. columns() reads an atomic. Set before first use.
   void setLockFree(bool) { lf_ = true; }  // Archie PlayI: LF-only; mutex path removed
+  /// JD 2026-11-17: the current owner hands the table over (no lock: one atomic store with
+  /// release). The next owner-only call claims it from any thread without tripping the
+  /// second-thread warning. ChunkMap calls it when the tick thread starts (main -> sim) and
+  /// after it is joined (sim -> main). A call from a second thread with no handover in
+  /// between still warns.
+  void handOver();
   bool lockFree() const { return true; }
 
  private:

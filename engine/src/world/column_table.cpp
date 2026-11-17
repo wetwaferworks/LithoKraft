@@ -13,6 +13,7 @@ namespace litholattice {
 namespace {
 std::atomic<int> g_cow{-1};
 std::atomic<uint64_t> g_lfForeign{0};  // 2026-11-01 LL_LF_COWTABLE
+std::atomic<uint64_t> g_lfHandovers{0};  // JD 2026-11-17: explicit owner handovers (sim start / stop)
 std::atomic<uint64_t> g_staleNoted{0}, g_staleFlushed{0}, g_stalePinned{0}, g_maxProbe{0};
 std::atomic<uint64_t> g_pins{0}, g_subs{0}, g_full{0}, g_evict{0}, g_vChecked{0}, g_vMismatch{0}, g_bytes{0}, g_gathers{0};
 size_t budgetBytes() {
@@ -51,7 +52,7 @@ CowStats cowStats() {
   s.pins = g_pins.load(); s.subsPublished = g_subs.load(); s.columnsFullPublished = g_full.load();
   s.evictedColumns = g_evict.load(); s.verifyChecked = g_vChecked.load(); s.verifyMismatches = g_vMismatch.load();
   s.retainedBytes = g_bytes.load(); s.gathers = g_gathers.load();
-  s.lfForeignOwner = g_lfForeign.load(); s.staleNoted = g_staleNoted.load(); s.staleFlushed = g_staleFlushed.load(); s.stalePinned = g_stalePinned.load(); s.maxProbe = g_maxProbe.load();
+  s.lfForeignOwner = g_lfForeign.load(); s.lfHandovers = g_lfHandovers.load(); s.staleNoted = g_staleNoted.load(); s.staleFlushed = g_staleFlushed.load(); s.stalePinned = g_stalePinned.load(); s.maxProbe = g_maxProbe.load();
   return s;
 }
 void noteCowVerify(bool match) {
@@ -138,9 +139,16 @@ void ColumnTable::enforceBudgetLocked() {
   g_bytes.store(bytes_, std::memory_order_relaxed);
 }
 
+void ColumnTable::handOver() {
+  // JD 2026-11-17: the old owner lets go. Release pairs with the acquire in lfEnter, so the
+  // next owner sees everything this one wrote to entries_ / stale_ / the counters.
+  lfOwner_.store(std::thread::id(), std::memory_order_release);
+  g_lfHandovers.fetch_add(1, std::memory_order_relaxed);
+}
+
 void ColumnTable::lfEnter() {
   const std::thread::id me = std::this_thread::get_id();
-  std::thread::id o = lfOwner_.load(std::memory_order_relaxed);
+  std::thread::id o = lfOwner_.load(std::memory_order_acquire);
   if (o != me) {
     if (o != std::thread::id() && g_lfForeign.fetch_add(1, std::memory_order_relaxed) == 0)
       std::fprintf(stderr, "column table (LL_LF_COWTABLE): owner-only call from a second thread (owner handed over?)\n");

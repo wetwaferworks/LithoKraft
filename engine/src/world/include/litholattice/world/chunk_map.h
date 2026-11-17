@@ -84,11 +84,13 @@ class ChunkMap {
     tickDir_ = nullptr;
     dir_->setConsumerLive(false);
     dir_->reclaimAllStopped();
+    if (cow_) cow_->handOver();  // JD 2026-11-17: the joined tick thread's CoW table ownership comes back
   }
   /// Structure owner, before the tick thread starts: publish and mark the tick side live.
   void tickSideStarting() {
     publishDirectory();
     dir_->setConsumerLive(true);
+    if (cow_) cow_->handOver();  // JD 2026-11-17: main -> tick thread; it claims the CoW table on first use
   }
   /// True when everything the owner removed before its last publish is unreachable from the tick side
   /// (deferred frees of extracted / demoted columns wait for this).
