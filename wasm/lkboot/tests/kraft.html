@@ -3,7 +3,8 @@
      built module next to this file as LithoKraft.wasm. The engine runs in a worker and
      draws into this canvas through an OffscreenCanvas. -->
 <style>html,body{margin:0;background:#000}canvas{width:960px;height:540px;display:block}</style>
-<canvas id="canvas" width="960" height="540"></canvas>
+<div id="wrap" style="position:relative;width:960px;height:540px"><canvas id="canvas" width="960" height="540"></canvas></div>
+<script src="../touch.js"></script>
 <script type="module">
 import { makeChannel } from '../lkstore.mjs';
 import { lkPageAttach } from '../lkpage.mjs';

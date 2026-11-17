@@ -100,3 +100,8 @@ set(CMAKE_EXE_LINKER_FLAGS_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT} -nostdlib")
 # The module's entry exports beyond _start/main are declared at the
 # consuming target (the engine exports its lk_* entry points and
 # lithosys_thread_start); the toolchain file does not guess them.
+
+# The game's .lthm models are read at run time from LITHOKRAFT_MODELS_DIR. Natively that
+# is the source tree; on web it has to be the volume path the asset pack mounts, or
+# the world generators fail with "unknown model 'starfish'" and the world loads empty.
+set(LITHOKRAFT_MODELS_DIR_PATH "/LithoKraft/assets/models" CACHE STRING "run-time .lthm directory (web volume path)")

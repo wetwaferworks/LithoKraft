@@ -71,7 +71,7 @@ export async function runKraft(d, post) {
       startWorker, onConsole, providers, argv: d.argv, isUnwind: e => isUnwindTrap(e, host) });
   } catch (e) { post({ kraft: { fatal: String(e && e.stack || e), errors, log: log.slice(-40) } }); return; }
   const report = extra => post({ kraft: { unwound: r.unwound, code: r.code, frames: host.state.frames, draws: gl.stats.draws,
-    glCalls: gl.stats.calls, glErrors: gl.stats.glErrors, gaps: gl.stats.gaps, contexts: gl.stats.contexts, title: host.state.title, events: host.state.events, ringWrites: host.state.ringWrites, queued: host.state.queue.length, ringOn: host.state.ringOn, ringHdr: host.state.ringOn ? Array.from(new Int32Array(d.memory.buffer, host.state.ringBase, 4)) : null, threadsLeft: pool.length,
+    glCalls: gl.stats.calls, glErrors: gl.stats.glErrors, gaps: gl.stats.gaps, contexts: gl.stats.contexts, title: host.state.title, events: host.state.events, ringWrites: host.state.ringWrites, queued: host.state.queue.length, ringOn: host.state.ringOn, ringHdr: host.state.ringOn ? Array.from(new Int32Array(d.memory.buffer, host.state.ringBase, 4)) : null, threadsLeft: pool.length, memMiB: Math.round(d.memory.buffer.byteLength / 1048576),
     ms: Math.round(performance.now() - t0), errors: errors.slice(0, 20), errorCount: errors.length, log: log.slice(-25), ilog, ...extra } });
   if (!r.unwound) { report({ exited: true }); return; }
   const raf = self.requestAnimationFrame ? self.requestAnimationFrame.bind(self) : f => setTimeout(f, 16);
