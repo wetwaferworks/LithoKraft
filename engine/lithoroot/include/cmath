@@ -44,6 +44,8 @@ using ::copysign;
 using ::fmin;
 using ::fmax;
 using ::pow;
+using ::exp2;
+using ::exp2f;
 using ::atan2;
 using ::hypot;
 using ::lround;

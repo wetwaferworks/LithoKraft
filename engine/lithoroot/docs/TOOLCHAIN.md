@@ -523,7 +523,7 @@ operator new/delete), and `engine/CMakeLists.txt` links them into every web targ
 passes `-nostdlib`, so clang adds no crt1.o, no -lc/-lc++ and no compiler-rt.
 
 - **Compiler builtins:** in-house (`src/rt/int128.c`), only what the link asks for: `__multi3`
-  today. No compiler-rt subset exists in the tree, so none is used. Check: `tests/rt_int128_check.c`.
+  today (exp2/exp2f live in LithoLibC math as pow(2, x), for clang's pow(2, x) rewrite). No compiler-rt subset exists in the tree, so none is used. Check: `tests/rt_int128_check.c`.
 - **crt1:** `src/crt/crt1.c` runs as the first constructor inside `__wasm_call_ctors`: default
   heap over `__heap_base`..end of memory (growth through `lithosys_memory_grow`, 16 MiB minimum
   step), main thread attach, errno arming. Status word `__lithoroot_crt_status` is exported
@@ -534,7 +534,7 @@ passes `-nostdlib`, so clang adds no crt1.o, no -lc/-lc++ and no compiler-rt.
   `malloc`, `lithosys_thread_start`, `__lithoroot_crt_status`.
 - **Undefined symbols:** the link allows only the 14 frozen lithosys calls
   (`toolchain/lithosys-allowed.txt`) and the named pending stages (`toolchain/web-link-pending.txt`,
-  S7 file layer and exp2); lk_* imports are annotated. Anything else fails the link.
+  the S7 file layer); lk_* imports are annotated. Anything else fails the link.
 - **new/delete:** the twenty replaceable forms are weak and forward to the base forms as the
   standard's default definitions do; `std::set_new_handler`/`get_new_handler` live in LithoAbi
   (`std_exceptions.cc`), lock-free. Check: `tests/new_handler_check.cpp`.

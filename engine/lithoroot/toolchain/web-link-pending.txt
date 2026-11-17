@@ -27,5 +27,3 @@ fileno
 fsync
 ftruncate
 isatty
-# Audio (sfx, sound_components, sound_director, voice): LithoLibC math has no public exp2 yet.
-exp2
