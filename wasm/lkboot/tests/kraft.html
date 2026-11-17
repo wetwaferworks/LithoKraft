@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><title>LithoKraft (lkboot)</title>
+<!-- Smoke page: serve wasm/lkboot with COOP same-origin + COEP require-corp and put the
+     built module next to this file as LithoKraft.wasm. The engine runs in a worker and
+     draws into this canvas through an OffscreenCanvas. -->
+<style>html,body{margin:0;background:#000}canvas{width:960px;height:540px;display:block}</style>
+<canvas id="canvas" width="960" height="540"></canvas>
+<script type="module">
+import { makeChannel } from '../lkstore.mjs';
+import { lkPageAttach } from '../lkpage.mjs';
+const memory = new WebAssembly.Memory({ initial: 4096, maximum: 9600, shared: true });
+const channel = makeChannel();
+const store = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' });
+store.postMessage({ lkKind: 'store', backend: new URLSearchParams(location.search).get('store') || 'opfs', memory, channel });
+const main = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' });
+const page = lkPageAttach(document.getElementById('canvas'), main);
+window.__kraft = null;
+main.onmessage = e => { if (e.data.kraft) { window.__kraft = e.data.kraft; console.log('KRAFT ' + JSON.stringify(e.data.kraft).slice(0, 3000)); } else page.onMessage(e.data); };
+main.onerror = e => console.log('KRAFT worker error ' + e.message);
+main.postMessage({ lkKind: 'kraft', url: new URL('./LithoKraft.wasm', import.meta.url).href, memory, channel, cpuCount: 4, pool: 12,
+  canvas: page.offscreen, search: location.search, argv: ['LithoKraft'] }, [page.offscreen]);
+</script>

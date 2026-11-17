@@ -44,6 +44,44 @@ export async function runMain(d, post) {
   } catch (e) { post({ mainError: String(e && e.message || e), log }); }
 }
 
+// LithoKraft in a worker with an OffscreenCanvas: boot, then drive the frame
+// loop that main() registered. Posts { kraft: stats } about once a second.
+export async function runKraft(d, post) {
+  const { lkBoot } = await import('./lkboot.mjs');
+  const { makeGL } = await import('./lkgl.mjs');
+  const { makeHost, isUnwindTrap } = await import('./lkhost.mjs');
+  const errors = [], log = [];
+  const onConsole = (s, e) => { (e ? errors : log).push(s); if (log.length > 400) log.shift(); };
+  const module = new WebAssembly.Module(await (await fetch(d.url)).arrayBuffer());
+  let gl, host;
+  const providers = ctx => {
+    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s) });
+    host = makeHost(ctx, { canvas: d.canvas, search: d.search, post: m => post(m) });
+    return { ...gl.imports, ...host.imports };
+  };
+  self.addEventListener('message', e => { if (e.data && e.data.lkInput) host && host.onPageMessage(e.data); });
+  await prewarm(d.pool ?? 0);
+  const t0 = performance.now();
+  let r;
+  try {
+    r = await lkBoot({ module, mode: 'threaded', memory: d.memory, channel: d.channel, mainCanBlock: true, cpuCount: d.cpuCount,
+      startWorker, onConsole, providers, argv: d.argv, isUnwind: e => isUnwindTrap(e, host) });
+  } catch (e) { post({ kraft: { fatal: String(e && e.stack || e), errors, log: log.slice(-40) } }); return; }
+  const report = extra => post({ kraft: { unwound: r.unwound, code: r.code, frames: host.state.frames, draws: gl.stats.draws,
+    glCalls: gl.stats.calls, glErrors: gl.stats.glErrors, gaps: gl.stats.gaps, contexts: gl.stats.contexts, title: host.state.title,
+    ms: Math.round(performance.now() - t0), errors: errors.slice(0, 20), errorCount: errors.length, log: log.slice(-25), ...extra } });
+  if (!r.unwound) { report({ exited: true }); return; }
+  const raf = self.requestAnimationFrame ? self.requestAnimationFrame.bind(self) : f => setTimeout(f, 16);
+  let last = 0;
+  const tick = () => {
+    try { if (!host.frame()) { report({ loopCancelled: true }); return; } }
+    catch (e) { errors.push('frame threw: ' + (e && e.stack || e)); report({ frameThrew: true }); return; }
+    const now = performance.now(); if (now - last > 1000) { last = now; report({}); }
+    raf(tick);
+  };
+  raf(tick);
+}
+
 export async function runStore(d) {
   const backend = d.backend === 'opfs' ? new OpfsBackend(await navigator.storage.getDirectory(), d.memory) : new MemoryBackend(d.memory);
   const srv = new StoreServer(backend, d.channel);
@@ -93,5 +131,5 @@ if (nodeWT) {
     if (d.lkKind === 'ping') post({ lkReady: true }); else if (d.lkKind === 'thread') runThread(d, post); else runStore(d);
   }
 } else if (typeof WorkerGlobalScope !== 'undefined') {
-  self.onmessage = e => { const d = e.data; const post = m => self.postMessage(m); if (d.lkKind === 'ping') post({ lkReady: true }); else if (d.lkKind === 'thread') runThread(d, post); else if (d.lkKind === 'main') runMain(d, post); else runStore(d); };
+  self.onmessage = e => { const d = e.data; const post = m => self.postMessage(m); if (d.lkKind === 'ping') post({ lkReady: true }); else if (d.lkKind === 'thread') runThread(d, post); else if (d.lkKind === 'main') runMain(d, post); else if (d.lkKind === 'kraft') runKraft(d, post); else if (d.lkKind === 'store') runStore(d); };
 }

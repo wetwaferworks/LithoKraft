@@ -175,11 +175,13 @@ export async function lkBoot(opts) {
   const t = { canBlock: opts.mainCanBlock ?? false, onConsole: log, onBudget: opts.onBudget };
   t.store = storeImports(sh, t.canBlock, opts.singleStore ?? new MemoryBackend(memory));
   const env = makeImports(sh, t);
-  Object.assign(env, opts.providers ? opts.providers({ memory }) : {});
+  const pctx = { memory, exports: null };
+  Object.assign(env, opts.providers ? opts.providers(pctx) : {});
   const missing = WebAssembly.Module.imports(module).filter(i => i.kind === 'function' && !(i.name in env)).map(i => i.name);
   for (const n of missing) env[n] = () => { throw new LkBootError('host does not provide ' + n); };
   const inst = new WebAssembly.Instance(module, { env });
   const ex = inst.exports;
+  pctx.exports = ex;
   if (mode === 'threaded') {
     const need = ['__stack_pointer', '__tls_size', '__tls_align', '__wasm_init_tls', 'lithosys_thread_start', 'malloc', 'free'];
     const lack = need.filter(n => !(n in ex));
@@ -194,8 +196,12 @@ export async function lkBoot(opts) {
     if (ex.__main_argc_argv) { const argv = opts.argv ?? ['LithoKraft']; code = ex.__main_argc_argv(argv.length, allocArgv(ex, memory, argv)); }
     else if (ex.__main_void) code = ex.__main_void();
     else throw new LkBootError('module has no __main_argc_argv');
-  } catch (e) { if (e instanceof LkExit) code = e.code; else throw e; }
-  return { code, mode, memory, exports: ex, missing, missingImports: missing };
+  } catch (e) {
+    if (e instanceof LkExit) code = e.code;
+    else if ((e && e.name === 'LkUnwind') || (opts.isUnwind && opts.isUnwind(e))) code = undefined; // main handed over to the frame loop
+    else throw e;
+  }
+  return { code, unwound: code === undefined, mode, memory, exports: ex, missing, missingImports: missing };
 }
 
 // Spawn: runs on the spawning thread (its TLS is live, so malloc is
