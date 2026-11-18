@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <system_error>
 #include <thread>
 #include <vector>
 
@@ -481,26 +482,39 @@ Force16Arm driveForce16(int ticks, int mode /* -1 = no render thread */, const s
   st.setPaused(true);
   st.start();
 
+  // Single-thread WASM: start() falls back to a cooperative sim (pumpCooperative() runs the due
+  // passes on this thread) and no render thread can spawn, so the render side then runs inline
+  // between steps, still the sole stats() reader and still reading the published front only.
+  const bool coop = st.cooperative();
   std::atomic<bool> stopRender{false};
+  FrameGate gate(renderShiftModeFromInt(mode < 0 ? 0 : mode));
+  uint64_t sink = 0;
+  auto renderOnce = [&] {
+    const uint64_t completed = st.stats().worldTick;  // published at the phase boundary (sole stats reader)
+    res.lastCompleted = completed;
+    if (gate.admit(completed)) {
+      if (!gate.isFrameTick(gate.lastShownTick())) ++res.badFrameTicks;
+      for (int dx = -2; dx <= 2; ++dx)
+        for (int dz = -2; dz <= 2; ++dz) { sink += st.getBlock(wx + dx, wy, wz + dz); ++res.reads; }  // published front only
+      ++res.frames;
+    }
+  };
   std::thread render;
+  bool inlineRender = false;
   if (mode >= 0) {
-    render = std::thread([&] {
-      FrameGate gate(renderShiftModeFromInt(mode));
-      uint64_t sink = 0;
-      while (!stopRender.load(std::memory_order_acquire)) {
-        const uint64_t completed = st.stats().worldTick;  // published at the phase boundary (sole stats reader)
-        res.lastCompleted = completed;
-        if (gate.admit(completed)) {
-          if (!gate.isFrameTick(gate.lastShownTick())) ++res.badFrameTicks;
-          for (int dx = -2; dx <= 2; ++dx)
-            for (int dz = -2; dz <= 2; ++dz) { sink += st.getBlock(wx + dx, wy, wz + dz); ++res.reads; }  // published front only
-          ++res.frames;
-        }
-        std::this_thread::yield();
-      }
-      if (sink == 0xFFFFFFFFFFFFFFFFull) std::printf(" ");  // keep the reads
-    });
+    try {
+      render = std::thread([&] {
+        while (!stopRender.load(std::memory_order_acquire)) { renderOnce(); std::this_thread::yield(); }
+      });
+    } catch (const std::system_error&) {
+      inlineRender = true;
+    }
   }
+  auto idle = [&] {  // one wait step: run the cooperative sim and the inline render side when threads are absent
+    if (coop) st.pumpCooperative();
+    if (inlineRender) renderOnce();
+    std::this_thread::yield();
+  };
 
   bool ok = true;
   uint64_t stepped = 0;
@@ -513,22 +527,26 @@ Force16Arm driveForce16(int ticks, int mode /* -1 = no render thread */, const s
     const uint64_t target = stepped + chunk;
     while (st.ticksStepped() < target) {
       if (std::chrono::steady_clock::now() > deadline) { ok = false; break; }
-      std::this_thread::yield();
+      idle();
     }
     stepped = target;
   }
   if (mode < 0) {  // no render thread: this thread is the stats reader; wait for the last pass's publish
     const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    while ((res.lastCompleted = st.stats().worldTick) < uint64_t(ticks) && std::chrono::steady_clock::now() < until)
+    while ((res.lastCompleted = st.stats().worldTick) < uint64_t(ticks) && std::chrono::steady_clock::now() < until) {
+      if (coop) st.pumpCooperative();
       std::this_thread::yield();
+    }
   }
   if (mode >= 0) {
     // Let the render side see the final published count, then stop it before the sim stops.
     const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(200);
-    while (std::chrono::steady_clock::now() < until) std::this_thread::yield();
+    while (std::chrono::steady_clock::now() < until) idle();
     stopRender.store(true, std::memory_order_release);
-    render.join();
+    if (render.joinable()) render.join();
   }
+  if (sink == 0xFFFFFFFFFFFFFFFFull) std::printf(" ");  // keep the reads
+  if (coop || inlineRender) std::printf("  (force16: %s%s)\n", coop ? "cooperative sim" : "threaded sim", inlineRender ? ", render side inline" : "");
   res.steppedAll = ok && st.ticksStepped() == uint64_t(ticks) && res.lastCompleted == uint64_t(ticks);
   res.stoppedCleanly = st.stop();
   res.hash = hashControlWorld(w, sig.signal(), uint64_t(ticks));
