@@ -67,7 +67,7 @@ export function makeHost(ctx, o) {
     lk_input_set_capture_wanted(on) { S.captureWanted = on; post({ lkPage: 'capture', on }); },
     lk_input_install() { post({ lkPage: 'input' }); },
     lk_input_ring_publish(base, cap, words) {
-      if (!(ctx.memory.buffer instanceof SharedArrayBuffer)) return 0; // single mode: the queue carries input
+      if (typeof SharedArrayBuffer === 'undefined' || !(ctx.memory.buffer instanceof SharedArrayBuffer)) return 0; // single mode: the queue carries input (don't touch the SAB ctor when it is missing)
       S.ringBase = base; S.ringCap = cap; S.ringWords = words; S.ringOn = true; return 1;
     },
     lk_input_drain_queue(bufPtr, cap) {
