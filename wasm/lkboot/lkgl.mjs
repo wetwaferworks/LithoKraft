@@ -28,6 +28,16 @@ export function makeGL(ctx, canvas, opts = {}) {
   const contexts = new Map(); let nextHandle = 1;
   let gl = null;
   let unpackAlign = 4, packAlign = 4, unpackBuf = false, packBuf = false;
+  // Software present frame boundary (2026-11-18). While main() runs without returning to the event
+  // loop (the web bench's direct frame loop), the OffscreenCanvas never commits a frame, and the GPU
+  // process (ANGLE/SwiftShader) kept every lkio_present texture upload alive: about 1 GB/s at the
+  // software bench's frame rate, until the browser ran out of memory and the run stalled (single and
+  // threaded alike; glFlush/glFinish do not release it). 'auto' (default) ends the frame with
+  // transferToImageBitmap() after each present only while opts.inMain() says main() is still running;
+  // the unwound rAF loop commits normally and is untouched. Test pages: ?swsync=auto|bitmap|flush|finish|none.
+  const presentSync = opts.presentSync || 'auto';
+  const inMain = typeof opts.inMain === 'function' ? opts.inMain : () => false;
+  const frameBoundary = () => { if (canvas && typeof canvas.transferToImageBitmap === 'function') { try { const b = canvas.transferToImageBitmap(); if (b && b.close) b.close(); stats.boundaries = (stats.boundaries | 0) + 1; } catch (e) { stats.boundaryErr = String(e && e.message || e); } } };
   const buf = () => ctx.memory.buffer;
   const u8 = () => new Uint8Array(buf()), i32 = () => new Int32Array(buf()), u32 = () => new Uint32Array(buf()), f32 = () => new Float32Array(buf());
   const dec = new TextDecoder();
@@ -197,6 +207,8 @@ export function makeGL(ctx, canvas, opts = {}) {
     const l = gl.getUniformLocation(p, cstr(namePtr)); if (l) gl.uniform1i(l, 0);
     gl.bindVertexArray(v); gl.drawArrays(0x0004, 0, 3); stats.draws++;
     gl.bindVertexArray(null); gl.useProgram(null); gl.bindTexture(0x0DE1, null);
+    if (presentSync === 'bitmap' || (presentSync === 'auto' && inMain())) frameBoundary();
+    else if (presentSync === 'flush') gl.flush(); else if (presentSync === 'finish') gl.finish();
     return 0;
   }
   // Mega-draw (gl33_renderer.cpp): one instanced draw per record, re-pointing

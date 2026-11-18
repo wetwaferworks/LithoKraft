@@ -22,5 +22,5 @@ main.onmessage = e => { if (e.data.kraftLog) { if (window.__klog.length < 6000) 
 main.onerror = e => console.log('KRAFT worker error ' + e.message);
 await storeReady;
 main.postMessage({ lkKind: 'kraft', url: new URL('./LithoKraft.wasm', import.meta.url).href, memory, channel, cpuCount: 4, pool: Number(Q.get('pool') || 12),
-  liveLog: Q.has('livelog'), glSlowMs: Number(Q.get('glslow') || 0), glSync: Q.has('glsync'), glBig: Number(Q.get('glbig') || 0), mega: Q.has('mega'), canvas: page.offscreen, search: location.search, argv: ['LithoKraft', ...(Q.get('args') ?? '').split(' ').filter(Boolean)] }, [page.offscreen]);
+  liveLog: Q.has('livelog'), glSlowMs: Number(Q.get('glslow') || 0), glSync: Q.has('glsync'), glBig: Number(Q.get('glbig') || 0), mega: Q.has('mega'), presentSync: Q.get('swsync') || undefined, canvas: page.offscreen, search: location.search, argv: ['LithoKraft', ...(Q.get('args') ?? '').split(' ').filter(Boolean)] }, [page.offscreen]);
 </script>

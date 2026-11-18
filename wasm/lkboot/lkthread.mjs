@@ -69,9 +69,9 @@ export async function runKraft(d, post) {
   globalThis.__lkThreadLog = m => { if (m.error) errors.push('thread: ' + m.error); else if (m.console) onConsole(m.console, m.err); };
   const onConsole = (s, e) => { (e ? errors : log).push(s); if (log.length > 400) log.shift(); if (/input|screen|world|menu|hash-at-tick|threads: sim|job pool:|job system:/i.test(s) && ilog.length < 240) ilog.push(s); if (d.liveLog) post({ kraftLog: (e ? 'E ' : '') + s }); }; // liveLog: test pages see lines while main() blocks (bench)
   const module = new WebAssembly.Module(await (await fetch(d.url)).arrayBuffer());
-  let gl, host;
+  let gl, host, inMain = true; // inMain: main() has not returned yet (bench direct frame loop); lkgl frame boundary
   const providers = ctx => {
-    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s), slowMs: d.glSlowMs || 0, glSync: !!d.glSync, bigDraw: d.glBig || 0, mega: !!d.mega, onSlow: (n, ms, a) => onConsole('lkgl slow: ' + n + ' ' + ms.toFixed(1) + ' ms args=' + a.slice(0, 8).join(','), true) });
+    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s), slowMs: d.glSlowMs || 0, glSync: !!d.glSync, bigDraw: d.glBig || 0, mega: !!d.mega, presentSync: d.presentSync, inMain: () => inMain, onSlow: (n, ms, a) => onConsole('lkgl slow: ' + n + ' ' + ms.toFixed(1) + ' ms args=' + a.slice(0, 8).join(','), true) });
     host = makeHost(ctx, { canvas: d.canvas, search: d.search, post: m => post(m) });
     return { ...gl.imports, ...host.imports };
   };
@@ -83,8 +83,8 @@ export async function runKraft(d, post) {
     r = await lkBoot({ module, mode: 'threaded', memory: d.memory, channel: d.channel, mainCanBlock: true, cpuCount: d.cpuCount,
       startWorker, onConsole, providers, argv: d.argv, isUnwind: e => isUnwindTrap(e, host) });
   } catch (e) { post({ kraft: { fatal: String(e && e.stack || e), errors, log: log.slice(-40) } }); return; }
-  const ft = makeFt();
-  const report = extra => post({ kraft: { mode: 'threaded', unwound: r.unwound, code: r.code, frames: host.state.frames, draws: gl.stats.draws,
+  inMain = false;  const ft = makeFt();
+  const report = extra => post({ kraft: { mode: 'threaded', unwound: r.unwound, code: r.code, frames: host.state.frames, draws: gl.stats.draws, boundaries: gl.stats.boundaries | 0, boundaryErr: gl.stats.boundaryErr,
     glCalls: gl.stats.calls, glErrors: gl.stats.glErrors, gaps: gl.stats.gaps, contexts: gl.stats.contexts, title: host.state.title, events: host.state.events, ringWrites: host.state.ringWrites, queued: host.state.queue.length, ringOn: host.state.ringOn, ringHdr: host.state.ringOn ? Array.from(new Int32Array(d.memory.buffer, host.state.ringBase, 4)) : null, threadsLeft: pool.length, memMiB: Math.round(d.memory.buffer.byteLength / 1048576),
     ms: Math.round(performance.now() - t0), errors: errors.slice(0, 20), errorCount: errors.length, log: (extra && (extra.exited || extra.loopCancelled || extra.frameThrew)) ? log.slice(-25) : log.slice(-8), ilog, ft: ft.summarizeFt(), firstFrameMs: ft.firstFrameMs, ...extra } });
   if (!r.unwound) { report({ exited: true }); return; }
@@ -139,9 +139,9 @@ export async function runKraftSingle(d, post) {
     persisting = persistNow().catch(e => errors.push('persist: ' + String(e && e.message || e))).finally(() => { persisting = null; });
     if (force) await persisting;
   };
-  let gl, host;
+  let gl, host, inMain = true; // inMain: main() has not returned yet (bench direct frame loop); lkgl frame boundary
   const providers = ctx => {
-    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s), slowMs: d.glSlowMs || 0, glSync: !!d.glSync, bigDraw: d.glBig || 0, mega: !!d.mega, onSlow: (n, ms, a) => onConsole('lkgl slow: ' + n + ' ' + ms.toFixed(1) + ' ms args=' + a.slice(0, 8).join(','), true) });
+    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s), slowMs: d.glSlowMs || 0, glSync: !!d.glSync, bigDraw: d.glBig || 0, mega: !!d.mega, presentSync: d.presentSync, inMain: () => inMain, onSlow: (n, ms, a) => onConsole('lkgl slow: ' + n + ' ' + ms.toFixed(1) + ' ms args=' + a.slice(0, 8).join(','), true) });
     host = makeHost(ctx, { canvas: d.canvas, search: d.search, post: m => post(m) });
     return { ...gl.imports, ...host.imports };
   };
@@ -152,7 +152,7 @@ export async function runKraftSingle(d, post) {
     r = await lkBoot({ moduleSingle: module, mode: 'single', memory, singleStore: rw, mainCanBlock: true, cpuCount: 1,
       onConsole, providers, argv: d.argv, isUnwind: e => isUnwindTrap(e, host) });
   } catch (e) { post({ kraft: { fatal: String(e && e.stack || e), errors, log: log.slice(-40) } }); return; }
-  const ft = (() => {
+  inMain = false;  const ft = (() => {
     const dts = [];
     let firstFrameMs = null;
     const summarizeFt = () => {
@@ -165,7 +165,7 @@ export async function runKraftSingle(d, post) {
     };
     return { summarizeFt, note(t1, t2, tBoot) { if (firstFrameMs == null) firstFrameMs = Math.round(t2 - tBoot); dts.push(t2 - t1); }, get firstFrameMs() { return firstFrameMs; } };
   })();
-  const report = extra => post({ kraft: { mode: 'single', unwound: r.unwound, code: r.code, frames: host.state.frames, draws: gl.stats.draws,
+  const report = extra => post({ kraft: { mode: 'single', unwound: r.unwound, code: r.code, frames: host.state.frames, draws: gl.stats.draws, boundaries: gl.stats.boundaries | 0, boundaryErr: gl.stats.boundaryErr,
     glCalls: gl.stats.calls, glErrors: gl.stats.glErrors, gaps: gl.stats.gaps, contexts: gl.stats.contexts, title: host.state.title, events: host.state.events, ringWrites: host.state.ringWrites, queued: host.state.queue.length, ringOn: host.state.ringOn,
     threadsLeft: 0, memMiB: Math.round(memory.buffer.byteLength / 1048576),
     ms: Math.round(performance.now() - t0), errors: errors.slice(0, 20), errorCount: errors.length, log: (extra && (extra.exited || extra.loopCancelled || extra.frameThrew)) ? log.slice(-25) : log.slice(-8), ilog, ft: ft.summarizeFt(), firstFrameMs: ft.firstFrameMs, ...extra } });
