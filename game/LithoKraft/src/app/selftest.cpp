@@ -1,3 +1,4 @@
+#include <limits>
 // Cortana 2026-10-15 0455: PORT getpid on _WIN32
 // Headless checks (--selftest): signal logic, audio, input, dimension load/unload, demo circuit, mesher,
 // overlay geometry and a headless Vulkan instance (skipped without a Vulkan loader).
@@ -1481,7 +1482,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
           prev = g;
         }
         check(mono && floor1, "frame budget: the grant never rises as the frame gets busier, and stays in [1, 10]");
-        check(cFrameBudget::requestGrant(std::nan(""), t30) == 2 && cFrameBudget::requestGrant(5.0, 0.0) == cFrameBudget::requestGrant(5.0, t30),
+        check(cFrameBudget::requestGrant(std::numeric_limits<double>::quiet_NaN(), t30) == 2 && cFrameBudget::requestGrant(5.0, 0.0) == cFrameBudget::requestGrant(5.0, t30),
               "frame budget: NaN busy prices as a full frame; a zero target falls back to 30 FPS");
         check(std::abs(cFrameBudget::uploadMsBudget(cFrameBudget::targetMsFor(60)) - 1.5) < 0.01 &&
                   std::abs(cFrameBudget::uploadMsBudget(t30) - 3.0) < 0.01,

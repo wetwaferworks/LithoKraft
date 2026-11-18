@@ -44,6 +44,15 @@ set(CMAKE_CXX_COMPILER "${LK_LLVM_HOME}/bin/clang++")
 set(CMAKE_AR           "${LK_LLVM_HOME}/bin/llvm-ar"   CACHE FILEPATH "")
 set(CMAKE_RANLIB       "${LK_LLVM_HOME}/bin/llvm-ranlib" CACHE FILEPATH "")
 set(CMAKE_LINKER       "${LK_LLVM_HOME}/bin/wasm-ld"   CACHE FILEPATH "")
+# Windows host: the LLVM package ships clang.exe / wasm-ld.exe; CMake's compiler
+# identity check fails if the path has no suffix.
+if(CMAKE_HOST_WIN32)
+  set(CMAKE_C_COMPILER   "${LK_LLVM_HOME}/bin/clang.exe")
+  set(CMAKE_CXX_COMPILER "${LK_LLVM_HOME}/bin/clang++.exe")
+  set(CMAKE_AR           "${LK_LLVM_HOME}/bin/llvm-ar.exe"    CACHE FILEPATH "" FORCE)
+  set(CMAKE_RANLIB       "${LK_LLVM_HOME}/bin/llvm-ranlib.exe" CACHE FILEPATH "" FORCE)
+  set(CMAKE_LINKER       "${LK_LLVM_HOME}/bin/wasm-ld.exe"    CACHE FILEPATH "" FORCE)
+endif()
 
 set(CMAKE_C_COMPILER_TARGET   wasm32-unknown-unknown)
 set(CMAKE_CXX_COMPILER_TARGET wasm32-unknown-unknown)

@@ -160,8 +160,8 @@ endif()
 #   audio_device (miniaudio backend) -> audio; render_vk (Vulkan backend) -> render
 # The game (LithoKraft/): lithokraft (exe) -> lithokraft_game -> engine modules.
 # Optimisation comes from CMake's per-config flags (Release: /O2 or -O3 and NDEBUG; Debug: /Od /RTC1
-# or -O0 -g), never forced here: /O2 next to Debug's /RTC1 is MSVC error D8016. GCC/Clang non-Debug
-# builds keep -O2 as before. LITHOLATTICE_WERROR (off by default, on in CI) turns warnings into errors.
+# or -O0 -g), never forced here: /O2 next to Debug's /RTC1 is MSVC error D8016. GCC/Clang DebugOpt
+# and RelWithDebInfo keep -O2 as before; Release uses CMake's -O3 (a trailing -O2 was clobbering it). LITHOLATTICE_WERROR (off by default, on in CI) turns warnings into errors.
 option(LITHOLATTICE_WERROR "Treat warnings in LithoLattice / LithoKraft code as errors" OFF)
 # Verbose thread/job-system debug logging (job lifecycle, steals, lock order, wake/sleep,
 # queue depths, affinity). Compile-time gated: zero overhead when off. The self-tests
@@ -197,7 +197,7 @@ function(litholattice_module_options target)
     target_compile_options(${target} PRIVATE /W4 /permissive- /w14265 /we4293 /we4715 /we4716 /we4700
                            $<$<BOOL:${LITHOLATTICE_WERROR}>:/WX>)
   else()
-    target_compile_options(${target} PRIVATE -Wall -Wextra $<$<NOT:$<CONFIG:Debug>>:-O2>
+    target_compile_options(${target} PRIVATE -Wall -Wextra $<$<OR:$<CONFIG:DebugOpt>,$<CONFIG:RelWithDebInfo>>:-O2>
                            $<$<BOOL:${LITHOLATTICE_WERROR}>:-Werror>)
     if(NOT LK_WEB)
       target_compile_options(${target} PRIVATE -Wshadow -Wnon-virtual-dtor
