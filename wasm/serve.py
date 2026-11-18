@@ -11,7 +11,8 @@ Also serves .wasm with the correct application/wasm MIME type so browsers
 accept streaming compilation. Dependency-free (http.server only).
 
 Usage:
-    python3 serve.py <directory> [port]     # port defaults to 8080
+    python3 serve.py <directory> [port]     # port defaults to 8080; COOP/COEP on
+    python3 serve.py <directory> [port] --no-isolate  # no isolation headers (GitHub Pages)
 
 Then open http://localhost:<port>/ in a browser.
 """
@@ -25,6 +26,13 @@ mimetypes.add_type("application/wasm", ".wasm")
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("application/json", ".json")
 
+
+class PlainHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+    def log_message(self, fmt, *args):
+        sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
 class IsolatedHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -43,15 +51,24 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
-    directory = os.path.abspath(sys.argv[1])
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8080
+    args = [a for a in sys.argv[1:] if a]
+    isolate = True
+    if "--no-isolate" in args:
+        isolate = False
+        args.remove("--no-isolate")
+    if len(args) < 1:
+        print(__doc__)
+        return 2
+    directory = os.path.abspath(args[0])
+    port = int(args[1]) if len(args) > 1 else 8080
     if not os.path.isdir(directory):
         print(f"error: not a directory: {directory}")
         return 2
-    handler = functools.partial(IsolatedHandler, directory=directory)
+    cls = IsolatedHandler if isolate else PlainHandler
+    handler = functools.partial(cls, directory=directory)
     with http.server.ThreadingHTTPServer(("127.0.0.1", port), handler) as httpd:
-        print(f"Serving {directory} at http://localhost:{port}/ "
-              f"(cross-origin isolated; Ctrl+C to stop)")
+        kind = "cross-origin isolated" if isolate else "no COOP/COEP (GitHub Pages / single-thread)"
+        print(f"Serving {directory} at http://127.0.0.1:{port}/ ({kind}; Ctrl+C to stop)")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

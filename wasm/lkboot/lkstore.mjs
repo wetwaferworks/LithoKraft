@@ -124,7 +124,7 @@ export class MemoryBackend {
     if (this.files.get(k)?.ro && (fl & (2 | 8))) return -E.EROFS;
     if (!this.files.has(k)) { if (!(fl & 4) || !this.dirs.has(parentOf(k))) return -E.ENOENT; this.files.set(k, { data: new Uint8Array(0), mtime: now() }); }
     else if ((fl & 4) && (fl & 16)) return -E.EEXIST;
-    if (fl & 8) this.files.get(k).data = new Uint8Array(0);
+    if (fl & 8) { const f = this.files.get(k); f.data = new Uint8Array(0); f.buf = null; }
     this.handles.set(this.nextH, k); return this.nextH++; }
   lk_store_read(h, buf, len, off) { const k = this.handles.get(h); if (!k) return -E.EBADF;
     const d = this.files.get(k).data, o = Number(off); if (o >= d.length) return 0;
@@ -132,11 +132,15 @@ export class MemoryBackend {
   lk_store_write(h, buf, len, off) { const k = this.handles.get(h); if (!k) return -E.EBADF;
     const f = this.files.get(k), o = Number(off);
     if (f.ro) return -E.EROFS;
-    if (o + len > f.data.length) { const nd = new Uint8Array(o + len); nd.set(f.data); f.data = nd; }
+    if (o + len > f.data.length) { // geometric capacity: appends were O(n^2) (whole-file copy per write)
+      const cap = f.buf ? f.buf.length : f.data.length;
+      if (o + len > cap) { const nb = new Uint8Array(Math.max(o + len, cap * 2, 4096)); nb.set(f.data); f.buf = nb; }
+      f.data = f.buf.subarray(0, o + len);
+    }
     f.data.set(new Uint8Array(this.mem.buffer, buf, len).slice(), o); f.mtime = now(); return len; }
   lk_store_truncate(h, size) { const k = this.handles.get(h); if (!k) return -E.EBADF;
     const f = this.files.get(k); if (f.ro) return -E.EROFS;
-    const nd = new Uint8Array(Number(size)); nd.set(f.data.subarray(0, Number(size))); f.data = nd; return 0; }
+    const nd = new Uint8Array(Number(size)); nd.set(f.data.subarray(0, Number(size))); f.data = nd; f.buf = null; return 0; }
   lk_store_flush(h) { return this.handles.has(h) ? 0 : -E.EBADF; }
   lk_store_close(h) { return this.handles.delete(h) ? 0 : -E.EBADF; }
   lk_store_stat(p, n, out) { const k = str(this.mem, p, n);
@@ -255,4 +259,113 @@ export class PackOverlay {
   lk_store_list(p, n, b, c) { return this.owns(p, n) ? this.ro.lk_store_list(p, n, b, c) : this.rw.lk_store_list(p, n, b, c); }
   lk_store_remove(p, n) { return this.owns(p, n) ? -E.EROFS : this.rw.lk_store_remove(p, n); }
   lk_store_rename(a, an, b, bn) { return (this.owns(a, an) || this.owns(b, bn)) ? -E.EROFS : this.rw.lk_store_rename(a, an, b, bn); }
+}
+
+// ---- single-thread persistent memory (no SAB store worker) -----------------
+// OPFS methods are async, but wasm imports must return synchronously. Hydrate
+// a MemoryBackend at boot, serve the engine from it, and flush dirty files
+// back to OPFS after each host frame (and on close/flush). The pack stays a
+// read-only MemoryBackend in front via PackOverlay.
+async function walkOpfs(dir, prefix, files, dirs) {
+  dirs.add(prefix || '/');
+  for await (const [name, h] of dir.entries()) {
+    const path = (prefix === '/' ? '' : prefix) + '/' + name;
+    if (h.kind === 'directory') await walkOpfs(h, path, files, dirs);
+    else {
+      const f = await h.getFile();
+      files.set(path, { data: new Uint8Array(await f.arrayBuffer()), mtime: BigInt(f.lastModified) * 1000000n });
+    }
+  }
+}
+
+export class PersistentMemory extends MemoryBackend {
+  constructor(mem, root) {
+    super(mem);
+    this.root = root;
+    this.dirty = new Set();
+    this.removed = new Set();
+  }
+  static async open(mem) {
+    if (!(globalThis.navigator && navigator.storage && navigator.storage.getDirectory)) {
+      return new MemoryBackend(mem);
+    }
+    const root = await navigator.storage.getDirectory();
+    const p = new PersistentMemory(mem, root);
+    const files = new Map(), dirs = new Set();
+    await walkOpfs(root, '/', files, dirs);
+    for (const d of dirs) p.dirs.add(d);
+    for (const [k, v] of files) p.files.set(k, v);
+    return p;
+  }
+  _mark(k) { if (k) { this.dirty.add(k); this.removed.delete(k); } }
+  lk_store_open(p, n, fl) {
+    const k = str(this.mem, p, n);
+    const r = super.lk_store_open(p, n, fl);
+    if (r >= 0 && (fl & (4 | 8))) this._mark(k);
+    return r;
+  }
+  lk_store_write(h, buf, len, off) {
+    const r = super.lk_store_write(h, buf, len, off);
+    if (r >= 0) this._mark(this.handles.get(h));
+    return r;
+  }
+  lk_store_truncate(h, size) {
+    const r = super.lk_store_truncate(h, size);
+    if (r >= 0) this._mark(this.handles.get(h));
+    return r;
+  }
+  lk_store_mkdir(p, n) {
+    const r = super.lk_store_mkdir(p, n);
+    if (r >= 0) this._mark(str(this.mem, p, n));
+    return r;
+  }
+  lk_store_remove(p, n) {
+    const k = str(this.mem, p, n);
+    const r = super.lk_store_remove(p, n);
+    if (r >= 0) { this.dirty.delete(k); this.removed.add(k); }
+    return r;
+  }
+  lk_store_rename(a, an, b, bn) {
+    const src = str(this.mem, a, an), dst = str(this.mem, b, bn);
+    const r = super.lk_store_rename(a, an, b, bn);
+    if (r >= 0) {
+      this.removed.add(src);
+      this.dirty.delete(src);
+      this._mark(dst);
+      for (const k of [...this.dirty]) if (k.startsWith(src + '/')) { this.dirty.delete(k); this.dirty.add(dst + k.slice(src.length)); }
+    }
+    return r;
+  }
+  // Snapshot the dirty set synchronously (bytes copied now), then write to OPFS
+  // asynchronously, so the engine may keep mutating files while the flush runs.
+  // A failed write puts its path back in the dirty set for the next flush.
+  async persist() {
+    if (!this.root || (this.dirty.size === 0 && this.removed.size === 0)) return; // cheap no-op on clean frames
+    const removed = [...this.removed]; this.removed.clear();
+    const dirs = [], files = [];
+    for (const k of this.dirty) {
+      if (this.dirs.has(k)) { if (k !== '/') dirs.push(k); continue; }
+      const f = this.files.get(k);
+      if (f && !f.ro) files.push([k, f.data.slice()]);
+    }
+    this.dirty.clear();
+    const mkdir = async path => { let d = this.root; for (const p of split(path)) d = await d.getDirectoryHandle(p, { create: true }); return d; };
+    for (const k of removed) {
+      if (this.files.has(k) || this.dirs.has(k)) continue; // re-created since: the write below wins
+      try {
+        let x = this.root; for (const p of split(parentOf(k))) x = await x.getDirectoryHandle(p);
+        await x.removeEntry(baseOf(k), { recursive: true });
+      } catch {}
+    }
+    for (const k of dirs) { try { await mkdir(k); } catch {} }
+    for (const [k, bytes] of files) {
+      try {
+        const d = await mkdir(parentOf(k));
+        const fh = await d.getFileHandle(baseOf(k), { create: true });
+        const w = await fh.createWritable();
+        await w.write(bytes);
+        await w.close();
+      } catch (e) { this.dirty.add(k); console.log('lkstore persist failed ' + k + ': ' + e); }
+    }
+  }
 }

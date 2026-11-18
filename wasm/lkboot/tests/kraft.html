@@ -17,9 +17,10 @@ const storeReady = new Promise(res => store.onmessage = e => { if ('storeReady' 
 const main = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' });
 const page = lkPageAttach(document.getElementById('canvas'), main);
 window.__kraft = null;
-main.onmessage = e => { if (e.data.kraft) { window.__kraft = e.data.kraft; console.log('KRAFT ' + JSON.stringify(e.data.kraft).slice(0, 3000)); } else page.onMessage(e.data); };
+window.__klog = [];
+main.onmessage = e => { if (e.data.kraftLog) { if (window.__klog.length < 6000) window.__klog.push(e.data.kraftLog); return; } if (e.data.kraft) { window.__kraft = e.data.kraft; console.log('KRAFT ' + JSON.stringify(e.data.kraft).slice(0, 3000)); } else page.onMessage(e.data); };
 main.onerror = e => console.log('KRAFT worker error ' + e.message);
 await storeReady;
 main.postMessage({ lkKind: 'kraft', url: new URL('./LithoKraft.wasm', import.meta.url).href, memory, channel, cpuCount: 4, pool: 12,
-  canvas: page.offscreen, search: location.search, argv: ['LithoKraft', ...(Q.get('args') ?? '').split(' ').filter(Boolean)] }, [page.offscreen]);
+  liveLog: Q.has('livelog'), canvas: page.offscreen, search: location.search, argv: ['LithoKraft', ...(Q.get('args') ?? '').split(' ').filter(Boolean)] }, [page.offscreen]);
 </script>

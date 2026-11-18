@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><title>LithoKraft (lkboot single)</title>
+<!-- Single-thread fallback: no SharedArrayBuffer. The worker creates unshared
+     memory and boots LithoKraft-single.wasm (lkboot mode=single). Serve WITHOUT
+     COOP/COEP to exercise GitHub Pages' missing-header case. Persistent saves
+     go through lk_store + OPFS (PersistentMemory) on the same worker. -->
+<style>html,body{margin:0;background:#000}canvas{width:960px;height:540px;display:block}</style>
+<div id="wrap" style="position:relative;width:960px;height:540px"><canvas id="canvas" width="960" height="540"></canvas></div>
+<script src="../touch.js"></script>
+<script type="module">
+import { lkPageAttach } from '../lkpage.mjs';
+const Q = new URLSearchParams(location.search);
+const main = new Worker(new URL('../lkthread.mjs', import.meta.url), { type: 'module' });
+const page = lkPageAttach(document.getElementById('canvas'), main);
+window.__kraft = null;
+window.__isolated = self.crossOriginIsolated;
+window.__klog = [];
+main.onmessage = e => { if (e.data.kraftLog) { if (window.__klog.length < 6000) window.__klog.push(e.data.kraftLog); return; } if (e.data.kraft) { window.__kraft = e.data.kraft; console.log('KRAFT ' + JSON.stringify(e.data.kraft).slice(0, 3000)); } else page.onMessage(e.data); };
+main.onerror = e => console.log('KRAFT worker error ' + e.message);
+main.postMessage({
+  lkKind: 'kraft-single',
+  url: new URL('./LithoKraft-single.wasm', import.meta.url).href,
+  packUrl: Q.has('nopack') ? null : new URL('./LithoKraft.lkp2', import.meta.url).href,
+  liveLog: Q.has('livelog'), canvas: page.offscreen,
+  search: location.search,
+  argv: ['LithoKraft', ...(Q.get('args') ?? '').split(' ').filter(Boolean)]
+}, [page.offscreen]);
+</script>

@@ -158,8 +158,10 @@ export function makeImports(sh, t) {
 export function storeImports(sh, canBlock, singleStore) {
   if (sh.mode === 'threaded') return new StoreClient(sh.channel, canBlock).imports();
   const b = singleStore; const o = {};
-  for (const k of Object.keys(Object.getPrototypeOf(b)).concat(Object.getOwnPropertyNames(Object.getPrototypeOf(b))))
-    if (k.startsWith('lk_store_')) o[k] = (...a) => { const r = b[k](...a); return typeof r === 'number' ? r : -52; /* async backend: ENOSYS */ };
+  // Walk the whole prototype chain: PersistentMemory inherits read/stat/list/close from MemoryBackend.
+  for (let pr = Object.getPrototypeOf(b); pr && pr !== Object.prototype; pr = Object.getPrototypeOf(pr))
+    for (const k of Object.getOwnPropertyNames(pr))
+      if (k.startsWith('lk_store_') && !(k in o)) o[k] = (...a) => { const r = b[k](...a); return typeof r === 'number' ? r : -52; /* async backend: ENOSYS */ };
   return o;
 }
 
