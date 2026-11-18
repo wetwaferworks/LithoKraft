@@ -206,9 +206,16 @@ static int lv__publish_edit(const char* path, int type, const char* rename_to) {
     lv_snap_t* cur = lv__acquire();
     lv_snap_t* nx;
     size_t i, k = 0, plen = strlen(path);
+    size_t moved = 0, keep;
+    lv_ent_t* tail = NULL;
     if (cur == NULL) { lv__release(); return -ENOMEM; }
     nx = lv__snap_new(cur->n + 1);
     if (nx == NULL) { lv__release(); return -ENOMEM; }
+    /* Entries that stay keep their sorted order. New / renamed entries go to
+     * the tail; one tail entry (create, file rename: the common case, e.g.
+     * every writeFileAtomic backup rotation) is placed by binary search, more
+     * (a directory rename) fall back to qsort. Same snapshot as before, but no
+     * O(n log n) strcmp sort per edit on a ~6k-entry tree (web save hitches). */
     for (i = 0; i < cur->n; ++i) {
       const char* p = cur->e[i].path;
       int hit = strcmp(p, path) == 0;
@@ -218,19 +225,43 @@ static int lv__publish_edit(const char* path, int type, const char* rename_to) {
         if (strlen(rename_to) + strlen(p + plen) + 1 > sizeof np) continue;
         strcpy(np, rename_to);
         strcat(np, p + plen);
-        nx->e[k].path = lv__intern(np);
-        nx->e[k++].type = cur->e[i].type;
+        if (moved == 0 || (moved & (moved - 1)) == 0) {
+          lv_ent_t* nt = (lv_ent_t*)realloc(tail, (moved ? moved * 2 : 1) * sizeof(lv_ent_t));
+          if (nt == NULL) continue;
+          tail = nt;
+        }
+        tail[moved].path = lv__intern(np);
+        tail[moved++].type = cur->e[i].type;
         continue;
       }
       if (hit || (type == LV_NONE && under && rename_to == NULL)) continue;
       nx->e[k++] = cur->e[i];
     }
     if (type != LV_NONE && rename_to == NULL) {
-      nx->e[k].path = lv__intern(path);
-      nx->e[k++].type = type;
+      lv_ent_t* nt = (lv_ent_t*)realloc(tail, sizeof(lv_ent_t));
+      if (nt != NULL) { tail = nt; tail[0].path = lv__intern(path); tail[0].type = type; moved = 1; }
     }
+    keep = k;
+    if (moved > 0 && keep + moved > cur->n + 1) { /* grow: a rename can only re-key, never add */
+      lv_snap_t* g = lv__snap_new(keep + moved);
+      if (g == NULL) { free(nx); free(tail); lv__release(); return -ENOMEM; }
+      if (keep) memcpy(g->e, nx->e, keep * sizeof(lv_ent_t));
+      free(nx);
+      nx = g;
+    }
+    if (moved == 1) {
+      size_t lo = 0, hi = keep;
+      while (lo < hi) { size_t mid = (lo + hi) / 2; if (strcmp(nx->e[mid].path, tail[0].path) < 0) lo = mid + 1; else hi = mid; }
+      memmove(&nx->e[lo + 1], &nx->e[lo], (keep - lo) * sizeof(lv_ent_t));
+      nx->e[lo] = tail[0];
+      k = keep + 1;
+    } else if (moved > 1) {
+      memcpy(&nx->e[keep], tail, moved * sizeof(lv_ent_t));
+      k = keep + moved;
+      qsort(nx->e, k, sizeof(lv_ent_t), lv__ent_cmp);
+    }
+    free(tail);
     nx->n = k;
-    qsort(nx->e, k, sizeof(lv_ent_t), lv__ent_cmp);
     {
       lv_snap_t* expect = cur;
       int ok = __atomic_compare_exchange_n(&lv__root, &expect, nx, 0, SC, SC);
