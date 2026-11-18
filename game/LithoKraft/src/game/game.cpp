@@ -1999,6 +1999,37 @@ void Game::pumpSimCooperative() {
   if (sim_ && sim_->cooperative()) sim_->pumpCooperative();
 }
 
+bool Game::frameGateAdmit() {
+  // Force 16 (Mode 416): render-side gate only. Reads the published completed-tick count;
+  // nothing here (or in the render path it gates) writes back into the sim.
+  if (!settings_.frameGate || paused_ || !sim_ || !sim_->running()) { frameGateArmed_ = false; return true; }
+  const litholattice::RenderShiftMode m = litholattice::renderShiftModeFromInt(settings_.renderShiftMode);
+  const auto now = std::chrono::steady_clock::now();
+  if (!frameGateArmed_ || frameGate_.mode() != m) {
+    frameGate_.setMode(m);
+    frameGateArmed_ = true;
+    logInfo("frame gate: %s, %s", litholattice::renderShiftModeName(m), frameGateReadout().c_str());
+  }
+  if (frameGate_.admit(sim_->stats().worldTick)) { frameGateLastShow_ = now; return true; }
+  if (now - frameGateLastShow_ >= std::chrono::seconds(1)) {  // keep-alive: same snapshot again
+    frameGateLastShow_ = now; ++frameGateKeepAlive_;
+    return true;
+  }
+  return false;
+}
+
+std::string Game::frameGateReadout() const {
+  const litholattice::RenderShiftMode m = litholattice::renderShiftModeFromInt(settings_.renderShiftMode);
+  const litholattice::FrameGate g(m);
+  int tps = 0;
+  if (sim_) tps = sim_->stats().targetTps;
+  if (tps <= 0) tps = cfg_.tps > 0 ? cfg_.tps : 32;
+  char buf[96];
+  std::snprintf(buf, sizeof buf, "%d TPS / %u FPS (%u:1)%s", tps, g.fpsAt(uint32_t(tps)), g.ratio(),
+                settings_.frameGate ? "" : " - gate off");
+  return buf;
+}
+
 bool Game::switchDimension(const std::string& id) {
   // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   Dimension* next = registry_.find(id);
@@ -3841,6 +3872,11 @@ void Game::onSettingsChanged(const GameSettings& s) {
       s.twoTierOuterDeg != old.twoTierOuterDeg) {
     pushCullProtoConfig();
     logInfo("settings: cull prototypes pushed");
+  }
+  if (s.frameGate != old.frameGate || s.renderShiftMode != old.renderShiftMode) {
+    frameGateArmed_ = false;  // re-arm at the next frame boundary (render side only)
+    logInfo("settings: frame gate %s, %s -> %s", s.frameGate ? "on" : "off",
+            litholattice::renderShiftModeName(litholattice::renderShiftModeFromInt(s.renderShiftMode)), frameGateReadout().c_str());
   }
   if (s.fpsCap != old.fpsCap) {
     // No Game-side action: the main loop owns the cFramePacer and reads

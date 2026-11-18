@@ -122,6 +122,11 @@ struct GameSettings {
   // Cortana 2026-10-15 1610 (ENGINE): fpsCap -1 = auto (60 if the machine renders <=14 ms, else 30; the new default), 0 = off, N = cap.
   int swapImages = 3;      ///< 2026-10-24 (JD): render.swap_images 2 (double) / 3 (triple, default); Vulkan, boot-only
   int fpsCap = 30;         ///< 2026-10-24 (JD): default 30. render.fps_cap: frame-rate cap in FPS for the
+  // Force 16 (Mode 416; brief JD and Argon, WWW-LLE-416-20261117; handshake JD and Elfie):
+  // frameGate on = show one frame per 2^renderShiftMode world ticks (render.frame_gate).
+  // renderShiftMode 0..5 = Sync512, Sync256, Sync128, Sync64, Sync32, Mode416 (render.shift_mode).
+  bool frameGate = false;
+  int renderShiftMode = 5;
   bool fpsCounter = false;  ///< Cortana 2026-10-15 1610; F56-4 (2026-10-17): perf readout on every backend (FPS, avg/p99 ms, update ms, GPU ms; off by default)
 #if defined(NDEBUG)
   bool tickProfile = false;  ///< release builds: tick/GUI profiling stays opt-in

@@ -89,6 +89,7 @@ static lithokraft::cFrameHashRecorder* g_frameHashRec = nullptr;  // --frame-has
 #include "handshake_test.h"
 #include "control_latency.h"
 #include "control_stream_test.h"
+#include <cctype>  // Force 16: --force16-test argument parse
 #include "demo_record_test.h"
 #include "litholattice/audio/audio_engine.h"
 #include "litholattice/audio/audio_output.h"
@@ -1009,6 +1010,7 @@ int main(int argc, char** argv) {
   bool mcpStdio = false;  // --mcp-stdio: engine MCP server on stdin/stdout (P2c, F-M9)
   bool runScenario = false; int scenarioTicks = 0, scenarioWorkers = 4, scenarioPhases = 4;
   bool wantControlLatency = false, wantControlTest = false, wantControlScenario = false;
+  bool wantForce16Test = false, force16All = false; int force16Ticks = 10000;  // Force 16 (Mode 416)
   bool wantDemoTest = false, wantDemoDump = false, wantDemoVerify = false;
   std::string demoFile; bool demoTicksGiven = false; uint64_t demoTicksLo = 0, demoTicksHi = 0;
   int controlScenarioTicks = 0; std::string controlScenarioMode = "legacy";
@@ -1203,6 +1205,11 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--handshake-test")) runHandshakeTest = true;
     else if (!std::strcmp(argv[i], "--control-latency")) wantControlLatency = true;
     else if (!std::strcmp(argv[i], "--control-test")) wantControlTest = true;
+    else if (!std::strcmp(argv[i], "--force16-test")) {  // Force 16 (Mode 416): --force16-test [TICKS] [all]
+      wantForce16Test = true;
+      if (i + 1 < argc && std::isdigit(static_cast<unsigned char>(argv[i + 1][0]))) force16Ticks = std::clamp(std::atoi(argv[++i]), 64, 1000000);
+      if (i + 1 < argc && !std::strcmp(argv[i + 1], "all")) { force16All = true; ++i; }
+    }
     else if (!std::strcmp(argv[i], "--demo-test")) wantDemoTest = true;
     else if (!std::strcmp(argv[i], "--demo-dump")) {
       if (i + 1 >= argc) { std::fprintf(stderr, "--demo-dump: needs FILE\n"); badArg = true; }
@@ -1440,6 +1447,7 @@ int main(int argc, char** argv) {
   if (runScenario) return runHandshakeScenario(scenarioTicks, scenarioMode, scenarioWorkers, scenarioPhases);
   if (wantControlLatency) return runControlLatency();
   if (wantControlTest) return runControlTests();
+  if (wantForce16Test) return runForce16Test(force16Ticks, force16All) ? 1 : 0;
   if (wantDemoTest) return runDemoTests();
   if (wantDemoDump) return runDemoDump(demoFile, demoTicksGiven, demoTicksLo, demoTicksHi);
   if (wantDemoVerify) return runDemoVerify(demoFile);
@@ -2275,7 +2283,11 @@ static bool lkStepFrame(FrameCtx& F) {
         // 2026-10-31 (JD): never topmost in any mode (borderless must minimize and Alt-Tab like a normal window).
         window->setTopmost(false);
       }
-      if (w > 0 && h > 0) {
+      // Force 16 (Mode 416; brief JD and Argon, WWW-LLE-416-20261117; handshake JD and Elfie): the
+      // gate decides whether this pass renders the published snapshot. It reads the completed-tick
+      // count only; render and present stay outside the sim tick and write nothing into the sim.
+      const bool gateShow = game.frameGateAdmit();
+      if (w > 0 && h > 0 && gateShow) {
         game.uploadEntities();
         FrameParams fp = game.frameParams(w, h);
         // Default: wall-clock render/animation time.
@@ -2314,7 +2326,7 @@ static bool lkStepFrame(FrameCtx& F) {
         }
       }
       const auto tPresent = Clock::now();
-      if (display.presenter && display.software) {  // software backend: blit the CPU
+      if (gateShow && display.presenter && display.software) {  // software backend: blit the CPU
         // Design B Stage 1: on the split path the presenter reads the newest FINISHED
         // handoff slot, never the renderer's live framebuffer (a frame may be in flight
         // on the executor). Off the split path this is the framebuffer, exactly as before.
@@ -2364,7 +2376,10 @@ static bool lkStepFrame(FrameCtx& F) {
         }
         if (swThreewayOn) sw.releasePresent();  // slot: Presenting -> Shown (re-presentable, recyclable)
       }
-      window->swap();
+      if (gateShow) window->swap();
+#if !defined(__wasm__)
+      else if (pacer.capFps() <= 0) std::this_thread::sleep_for(std::chrono::microseconds(500));  // gated pass, uncapped: do not spin
+#endif
       F.pacerSleptMs = std::chrono::duration<double, std::milli>(pacer.endFrameAndWait()).count();  // render.fps_cap: sleep to the frame deadline (no-op when uncapped)
       msPresent = msBetween(tPresent, Clock::now());  // present = blit + swap (swap only on GPU backends)
       msRender = msBetween(tRender, tPresent);

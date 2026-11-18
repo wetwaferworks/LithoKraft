@@ -1,3 +1,4 @@
+#include "litholattice/sim/frame_gate.h"  // Force 16 (Mode 416)
 #include <cstdlib>
 #include <cctype>
 #include "lithokraft/game/game_ui.h"
@@ -932,6 +933,37 @@ void cGameUi::openSettings(const GameSettings& cur) {
       buf.setId("set-buffering");
       buf.on("change", [changed, state](ui::cWidget& w) {
         state->swapImages = static_cast<ui::cDropdown&>(w).selected() == 1 ? 3 : 2;
+        changed();
+      });
+    }
+    {  // Force 16 (Mode 416; brief JD and Argon, WWW-LLE-416-20261117; handshake JD and Elfie), live
+      ui::cCheckbox& f16 = pg.add<ui::cCheckbox>("Force 16 (Mode 416)", cur.frameGate);
+      f16.setId("set-force16");
+      ui::cStackPanel& sr = row(pg, "Render shift mode");
+      std::vector<std::string> modeItems;
+      for (int i = 0; i < litholattice::kRenderShiftModeCount; ++i)
+        modeItems.emplace_back(litholattice::renderShiftModeName(litholattice::renderShiftModeFromInt(i)));
+      ui::cDropdown& md = sr.add<ui::cDropdown>(modeItems, std::clamp(cur.renderShiftMode, 0, 5));
+      md.setId("set-shiftmode");
+      ui::cLabel& rd = sr.add<ui::cLabel>();
+      rd.setId("set-shiftmode-readout");
+      auto showGate = [&rd, state] {
+        const litholattice::FrameGate g(litholattice::renderShiftModeFromInt(state->renderShiftMode));
+        const int tps = state->tps > 0 ? state->tps : 32;
+        char buf[96];
+        std::snprintf(buf, sizeof buf, "%d TPS / %u FPS (%u:1)%s", tps, g.fpsAt(uint32_t(tps)), g.ratio(),
+                      state->frameGate ? "" : " - off");
+        rd.setText(buf);
+      };
+      showGate();
+      f16.on("change", [changed, state, showGate](ui::cWidget& w) {
+        state->frameGate = static_cast<ui::cCheckbox&>(w).checked();
+        showGate();
+        changed();
+      });
+      md.on("change", [changed, state, showGate](ui::cWidget& w) {
+        state->renderShiftMode = std::clamp(static_cast<ui::cDropdown&>(w).selected(), 0, 5);
+        showGate();
         changed();
       });
     }

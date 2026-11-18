@@ -43,6 +43,7 @@
 #include "lithokraft/game/tick_signal_posts.h"  // t46u 6b-3b: cSignalInitTickets
 #include "lithokraft/game/cWorldLoadSoak.h"
 #include "lithokraft/game/cTickStabilityMeter.h"  // 2026-10-31 (JD): Save World, tick-boundary snapshot + pool write
+#include "litholattice/sim/frame_gate.h"  // Force 16 (Mode 416)
 #include "lithokraft/game/lithography.h"  // Cortana 2026-10-15 1900
 #include "lithokraft/game/camera_controller.h"  // cGameCameraController (engine camera system)
 #include "lithokraft/game/sprite_host.h"        // cSpriteHost (engine sprite system)
@@ -150,6 +151,16 @@ class Game {
   void update(float dt, int width, int height);
   /// Pump a cooperative (no-thread) sim on the caller. No-op when the sim has a dedicated thread.
   void pumpSimCooperative();
+  /// Force 16 (Mode 416; brief JD and Argon, WWW-LLE-416-20261117; handshake JD and Elfie).
+  /// Frame loop, once per pass, before render: true = render and present this pass. With
+  /// render.frame_gate off, in menus / paused, or with no running sim, always true. Otherwise
+  /// reads the sim's completed-tick count (published stats, a phase boundary) and admits one
+  /// frame per 2^shift world ticks. Read-only: never writes into the sim. A 1 s keep-alive
+  /// re-shows the same snapshot if the sim stops reaching frame ticks (window stays live).
+  bool frameGateAdmit();
+  /// Live readout, e.g. "512 TPS / 16 FPS (32:1)".
+  std::string frameGateReadout() const;
+  const litholattice::FrameGate& frameGate() const { return frameGate_; }
   FrameParams frameParams(int width, int height) const;
   /// The view pose the render path uses: the camera system's active camera
   /// (first person resolves live from the player â€” the identical view the
@@ -769,6 +780,10 @@ class Game {
   mutable int pbrLightsCamCx_ = 0, pbrLightsCamCz_ = 0;
   mutable bool pbrLightsValid_ = false;
   cSimThread::SubmitMesh submitMesh_;
+  litholattice::FrameGate frameGate_;  // Force 16 (Mode 416): render side only
+  bool frameGateArmed_ = false;
+  std::chrono::steady_clock::time_point frameGateLastShow_{};
+  uint64_t frameGateKeepAlive_ = 0;
   std::unique_ptr<cSimThread> sim_;               // owns active_->chunks while alive
   uint32_t epoch_ = 0;
   uint64_t initSeq_ = 0;

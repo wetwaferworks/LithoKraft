@@ -58,6 +58,8 @@ GameSettings GameSettings::load(const std::string& path, const GameSettings& def
   s.fpsCap = clampInt(int(json.getNum("fpsCap", s.fpsCap)), -1, 1000);  // Cortana 2026-10-15 1610: -1 = auto
   if (const std::string r = json.getStr("renderer", s.renderer); r == "software" || r == "gl33" || r == "vulkan") s.renderer = r;  // JD 2026-10-24
   s.fpsCounter = json.getBool("fpsCounter", s.fpsCounter);
+  s.frameGate = json.getBool("frameGate", s.frameGate);  // Force 16 (Mode 416)
+  s.renderShiftMode = clampInt(int(json.getNum("renderShiftMode", s.renderShiftMode)), 0, 5);
   s.tickProfile = json.getBool("tickProfile", s.tickProfile);  // JD ruling 2026-11-09: profiling on by default (dev builds)
   s.timingHandshake = json.getBool("timingHandshake", s.timingHandshake);
   s.handshakePhases = clampInt(int(json.getNum("handshakePhases", s.handshakePhases)), 1, 16);
@@ -99,6 +101,8 @@ bool GameSettings::save(const std::string& path) const {
   json.add("ambientMode", litholattice::Json::number(ambientMode));
   json.add("fpsCap", litholattice::Json::number(fpsCap));
   json.add("renderer", litholattice::Json::string(renderer));  // JD 2026-10-24
+  json.add("frameGate", litholattice::Json::boolean(frameGate));  // Force 16 (Mode 416)
+  json.add("renderShiftMode", litholattice::Json::number(renderShiftMode));
   json.add("fpsCounter", litholattice::Json::boolean(fpsCounter));  // Cortana 2026-10-15 1610
   json.add("tickProfile", litholattice::Json::boolean(tickProfile));  // JD ruling 2026-11-09
   json.add("timingHandshake", litholattice::Json::boolean(timingHandshake));

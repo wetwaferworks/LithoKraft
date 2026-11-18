@@ -301,6 +301,14 @@ void SettingsCvars::registerOn(cConsoleReg& r) {
        // drives the pacer from Settings live (init + on settings change).
        [](GameSettings& s, const std::string& v) { s.fpsCap = std::clamp(toInt(v), -1, 1000); },  // Cortana 2026-10-15 1610: -1 = auto
        CVarType::Int},
+      {"render.frame_gate",  // Force 16 (Mode 416): one shown frame per 2^shift world ticks
+       [](const GameSettings& s) { return s.frameGate ? "1" : "0"; },
+       [](GameSettings& s, const std::string& v) { s.frameGate = toBool(v); },
+       CVarType::Bool},
+      {"render.shift_mode",  // 0 Sync512 .. 4 Sync32, 5 Mode416 (512 TPS / 16 FPS)
+       [](const GameSettings& s) { return std::to_string(s.renderShiftMode); },
+       [](GameSettings& s, const std::string& v) { s.renderShiftMode = std::clamp(toInt(v), 0, 5); },
+       CVarType::Int},
       {"render.ascii",
        [](const GameSettings& s) { return s.asciiMode ? "1" : "0"; },
        // ASCII output pipeline (experiment tier, JD 2026-10-13): the
@@ -413,6 +421,8 @@ void SettingsCvars::syncFrom(const GameSettings& s) {
   registry_->setCVar("render.aa", s.aaMode);
   registry_->setCVar("render.tex_filter", s.texFilter == 1 ? "bilinear" : s.texFilter == 2 ? "trilinear" : "sharp");
   registry_->setCVar("render.anisotropy", std::to_string(s.anisotropy));
+  registry_->setCVar("render.frame_gate", s.frameGate ? "1" : "0");  // Force 16 (Mode 416)
+  registry_->setCVar("render.shift_mode", std::to_string(s.renderShiftMode));
   registry_->setCVar("render.ascii", s.asciiMode ? "1" : "0");
   registry_->setCVar("render.ascii_mode", s.asciiMode ? "1" : "0");
   registry_->setCVar("render.ascii_cols", std::to_string(s.asciiCols));
