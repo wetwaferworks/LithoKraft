@@ -122,8 +122,8 @@ export function makeGL(ctx, canvas, opts = {}) {
     glVertexAttribIPointer: (i, s, t, st, off) => gl.vertexAttribIPointer(i, s, t, st, off),
     glVertexAttribDivisor: (i, d) => gl.vertexAttribDivisor(i, d),
     // draws
-    glDrawArrays: (m, f, c) => { stats.draws++; gl.drawArrays(m, f, c); },
-    glDrawElements: (m, c, t, off) => { stats.draws++; gl.drawElements(m, c, t, off); },
+    glDrawArrays: (m, f, c) => { stats.draws++; if (bigDraw && c >= bigDraw) bigNote('glDrawArrays', [m, f, c]); gl.drawArrays(m, f, c); },
+    glDrawElements: (m, c, t, off) => { stats.draws++; if (bigDraw && c >= bigDraw) bigNote('glDrawElements', [m, c, t, off]); gl.drawElements(m, c, t, off); },
     glDrawElementsBaseVertex: gap('DrawElementsBaseVertex'),
     // shaders and programs
     glCreateShader: t => { const o = gl.createShader(t); return o ? alloc('shader', o) : 0; },
@@ -204,29 +204,85 @@ export function makeGL(ctx, canvas, opts = {}) {
   const LAYOUT_OFF = [0, 12, 28, 44, 60];
   function lk_mega_draw(mode, countsPtr, offsetsPtr, n) {
     if (!gl) return -1; if (!n) return 0;
+    if (slowMs > 0 && glSync) gl.getError();  // ?glsync: drain earlier work so it is not billed to this call
+    const tA = slowMs > 0 ? performance.now() : 0; let drawMs = 0;
     const m = i32(), counts = m.slice(countsPtr >> 2, (countsPtr >> 2) + n), offs = m.slice(offsetsPtr >> 2, (offsetsPtr >> 2) + n);
     const s = [];
     for (let a = 4; a <= 8; a++) s.push({ b: gl.getVertexAttrib(a, 0x889F), size: gl.getVertexAttrib(a, 0x8623), type: gl.getVertexAttrib(a, 0x8625),
       norm: gl.getVertexAttrib(a, 0x886A), stride: gl.getVertexAttrib(a, 0x8624), off: LAYOUT_OFF[a - 4] });
     const stride = s[0].stride; if (!stride) return -1;
     const prev = gl.getParameter(0x8894);
+    const tB = slowMs > 0 ? performance.now() : 0;
     gl.bindBuffer(0x8892, s[0].b);
     for (let i = 0; i < n; i++) {
       for (let a = 4; a <= 8; a++) { const q = s[a - 4]; gl.vertexAttribPointer(a, q.size, q.type, q.norm, q.stride, q.off + i * stride); }
+      const t0 = slowMs > 0 ? performance.now() : 0;
+      if (bigDraw && counts[i] >= bigDraw) bigNote('lk_mega_draw[record ' + i + '/' + n + ']', [counts[i], offs[i]]);
       gl.drawElementsInstanced(mode, counts[i], 0x1405, offs[i], 1); stats.draws++;
+      if (slowMs > 0) {
+        if (glSync) gl.getError();  // ?glsync: force a round trip so each record's GPU cost lands on that record
+        const ms = performance.now() - t0; drawMs += ms;
+        if (ms >= slowMs) {  // diagnosis: which record, its index range and its instance data
+          const inst = new Float32Array(stride >> 2);
+          try { gl.getBufferSubData(0x8892, i * stride, inst); } catch (e) {}
+          const eab = gl.getParameter(0x8895);
+          const ebSize = eab ? (gl.bindBuffer(0x8893, eab), gl.getBufferParameter(0x8893, 0x8764)) : -1;
+          const vbSize = (() => { const vb = gl.getVertexAttrib(0, 0x889F); if (!vb) return -1; gl.bindBuffer(0x8892, vb); const z = gl.getBufferParameter(0x8892, 0x8764); gl.bindBuffer(0x8892, s[0].b); return z; })();
+          onSlow('lk_mega_draw[record ' + i + '/' + n + ']', ms, [counts[i], offs[i], 'err=' + gl.getError(), 'ebo=' + ebSize, 'vbo=' + vbSize,
+            'counts=' + Array.from(counts).join('/'), 'offs=' + Array.from(offs).join('/'), 'inst=' + Array.from(inst).map(v => +v.toFixed(3)).join('/')]);
+        }
+      }
     }
     for (let a = 4; a <= 8; a++) { const q = s[a - 4]; gl.vertexAttribPointer(a, q.size, q.type, q.norm, q.stride, q.off); }
     gl.bindBuffer(0x8892, prev);
+    if (slowMs > 0) {  // diagnosis: split a slow call into the state queries, the draws and the rest
+      const tE = performance.now();
+      if (tE - tA >= slowMs) onSlow('lk_mega_draw[sections]', tE - tA, ['query=' + (tB - tA).toFixed(1), 'draws=' + drawMs.toFixed(1),
+        'other=' + (tE - tA - (tB - tA) - drawMs).toFixed(1), 'sync=' + glSync, 'counts=' + Array.from(counts).join('/'), 'offs=' + Array.from(offs).join('/')]);
+    }
     return 0;
   }
 
+  // Diagnosis (opts.slowMs > 0, test pages ?glslow=N): time every GL import; a call that takes
+  // slowMs or more is reported through opts.onSlow(name, ms, args). Off by default (no wrapper cost).
+  const slowMs = +opts.slowMs || 0, glSync = !!opts.glSync;
+  // Diagnosis (opts.bigDraw > 0, test pages ?glbig=N): report draws of N or more vertices/indices, with the
+  // bound program and buffer sizes (at most 40 reports).
+  const bigDraw = +opts.bigDraw || 0; let bigLeft = 40;
+  function bigNote(name, a) {
+    if (bigLeft-- <= 0) return;
+    const p = gl.getParameter(0x8B8D), e = gl.getParameter(0x8895);
+    const ebo = e ? (gl.bindBuffer(0x8893, e), gl.getBufferParameter(0x8893, 0x8764)) : -1;
+    (opts.onSlow ?? (() => {}))('big ' + name, 0, [...a, 'prog=' + nameOf(p), 'ebo=' + ebo, 'vao=' + nameOf(gl.getParameter(0x85B5))]);
+  }
+  const onSlow = opts.onSlow ?? ((n, ms, a) => log('lkgl slow: ' + n + ' ' + ms.toFixed(1) + ' ms'));
+  stats.glMs = 0; stats.slow = 0;
+  const RING = 4000, ring = new Array(RING); let ringAt = 0;
+  const HEAVY = /BufferData|SubData|CopyBuffer|TexImage|TexSubImage|TexStorage|Delete|ReadPixels|CompileShader|LinkProgram|GenerateMipmap|Map|Flush|Finish/, heavy = new Array(60); let heavyAt = 0;
+  const timed = (name, fn) => (slowMs > 0 ? (...a) => {
+    ring[ringAt] = name + '(' + a.slice(0, 5).join(',') + ')'; ringAt = (ringAt + 1) % RING;
+    if (HEAVY.test(name) && !(/SubData$/.test(name) && a[2] < 65536)) { heavy[heavyAt] = performance.now().toFixed(0) + ' ' + ring[(ringAt + RING - 1) % RING]; heavyAt = (heavyAt + 1) % 60; }
+    const t0 = performance.now(); const r = fn(...a); if (glSync && gl) gl.getError(); const ms = performance.now() - t0;
+    stats.glMs += ms;
+    if (ms >= slowMs) {
+      stats.slow++; onSlow(name, ms, a);
+      // and the calls that led up to it: a histogram of the last RING calls plus the last 60 verbatim
+      const last = [], hist = new Map();
+      for (let k = 0; k < RING; k++) { const s = ring[(ringAt + k) % RING]; if (!s) continue; last.push(s); const nm = s.slice(0, s.indexOf('(')); hist.set(nm, (hist.get(nm) || 0) + 1); }
+      onSlow('  before (histogram of last ' + last.length + ')', ms, [[...hist].sort((x, y) => y[1] - x[1]).map(([k, v]) => k + 'x' + v).join(' ')]);
+      for (let k = Math.max(0, last.length - 60); k < last.length; k++) onSlow('  before[' + (k - last.length) + '] ' + last[k], 0, []);
+      onSlow('  heavy calls (t ms, now ' + t0.toFixed(0) + ')', 0, []);
+      for (let k = 0; k < 60; k++) { const s = heavy[(heavyAt + k) % 60]; if (s) onSlow('  heavy ' + s, 0, []); }
+    }
+    return r;
+  } : fn);
   const imports = {};
   for (const [k, fn] of Object.entries(G)) {
     const name = 'lk_' + k;
-    imports[name] = k.startsWith('gl_') ? fn : (...a) => { stats.calls++; return gl ? fn(...a) : 0; };
+    imports[name] = timed(name, k.startsWith('gl_') ? fn : (...a) => { stats.calls++; return gl ? fn(...a) : 0; });
   }
-  imports.lkio_present = lkio_present;
+  imports.lkio_present = timed('lkio_present', lkio_present);
   imports.lk_mega_probe = () => (gl && typeof gl.drawElementsInstanced === 'function' ? 1 : 0);
-  imports.lk_mega_draw = lk_mega_draw;
+  imports.lk_mega_draw = timed('lk_mega_draw', lk_mega_draw);
   return { imports, stats, get gl() { return gl; } };
 }

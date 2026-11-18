@@ -71,7 +71,7 @@ export async function runKraft(d, post) {
   const module = new WebAssembly.Module(await (await fetch(d.url)).arrayBuffer());
   let gl, host;
   const providers = ctx => {
-    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s) });
+    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s), slowMs: d.glSlowMs || 0, glSync: !!d.glSync, bigDraw: d.glBig || 0, onSlow: (n, ms, a) => onConsole('lkgl slow: ' + n + ' ' + ms.toFixed(1) + ' ms args=' + a.slice(0, 8).join(','), true) });
     host = makeHost(ctx, { canvas: d.canvas, search: d.search, post: m => post(m) });
     return { ...gl.imports, ...host.imports };
   };
@@ -141,7 +141,7 @@ export async function runKraftSingle(d, post) {
   };
   let gl, host;
   const providers = ctx => {
-    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s) });
+    gl = makeGL(ctx, d.canvas, { onError: s => errors.push(s), slowMs: d.glSlowMs || 0, glSync: !!d.glSync, bigDraw: d.glBig || 0, onSlow: (n, ms, a) => onConsole('lkgl slow: ' + n + ' ' + ms.toFixed(1) + ' ms args=' + a.slice(0, 8).join(','), true) });
     host = makeHost(ctx, { canvas: d.canvas, search: d.search, post: m => post(m) });
     return { ...gl.imports, ...host.imports };
   };

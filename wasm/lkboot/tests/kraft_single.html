@@ -20,7 +20,7 @@ main.postMessage({
   lkKind: 'kraft-single',
   url: new URL('./LithoKraft-single.wasm', import.meta.url).href,
   packUrl: Q.has('nopack') ? null : new URL('./LithoKraft.lkp2', import.meta.url).href,
-  liveLog: Q.has('livelog'), canvas: page.offscreen,
+  liveLog: Q.has('livelog'), glSlowMs: Number(Q.get('glslow') || 0), glSync: Q.has('glsync'), glBig: Number(Q.get('glbig') || 0), canvas: page.offscreen,
   search: location.search,
   argv: ['LithoKraft', ...(Q.get('args') ?? '').split(' ').filter(Boolean)]
 }, [page.offscreen]);
