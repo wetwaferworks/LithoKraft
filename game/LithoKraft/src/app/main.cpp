@@ -1841,11 +1841,17 @@ int main(int argc, char** argv) {
       sw.post = [&F] { if (F.game) F.game->capturePendingScreenshot(); };  // Phase 2: follows an in-process world load
       sw.pending = [&F] { return (F.game && F.game->screenshotPending()) || lithokraft::cFrameDumpHub::instance().sink() || lithokraft::cMcpDisplayVision::instance().pending(); };  // --frame-hash/--frame-dump every frame
       cSoftwareRenderer::setDetachedPoolMode(true);  // Design B Stage 1: the pool spawns its executor worker (band count unchanged)
+    }
+    if (swThreewayOn && !cSoftwareRenderer::detachedPoolMode()) {
+      // Single-thread WASM: no executor thread could be spawned, so there is no split to run.
+      F.swThreewayOn = false;
+      logInfo("threeway: software split unavailable (no worker threads, single-thread web); staying on the single-thread path");
+    } else if (swThreewayOn) {
       display.software->setUploadRingEnabled(true);  // Design B Stage 2: game uploads stage in the lock-free ring; the executor applies them at the frame seal
       F.mbox->setDeferred(true);  // t46u item 2: the executor owns the renderer from here on
       sw.start();                 // t46u item 2: the executor polls the frame mailbox
       logInfo("threeway: ON (LL_THREEWAY=1): software path, stage 2 async mailbox + upload ring: main = window/input/game + present (newest finished frame), frame job copied and rendered on the band-pool executor, pixels-only slots, uploads lock-free via the ring (no upload guard), sim unchanged (Proposed by JD; co-implemented by JD and Cortana)");
-    } else if (litholattice::threeway::enabled()) {
+    } else if (litholattice::threeway::enabled() && !threewayOn) {
       logInfo("threeway: requested but renderer is %s; no split path for this backend, staying on the single-thread path", renderer->name());
     }
     // Build 50 (2026-10-19, web present fix): the frame-loop state lives

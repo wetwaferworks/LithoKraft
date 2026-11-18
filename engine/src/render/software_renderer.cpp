@@ -1,4 +1,4 @@
-﻿// Cortana 2026-10-15 1010-1116: RND-H4/H3/H2, GAME-H1, RND-MT band raster
+// Cortana 2026-10-15 1010-1116: RND-H4/H3/H2, GAME-H1, RND-MT band raster
 // Software renderer: full CPU rasterizer implementation.
 // Optimized for voxels: backface culling, depth buffer, scanline rasterization.
 // Shading: flat face colors, or per-pixel fragment shaders (basic / PBR tiers)
@@ -16,6 +16,7 @@
 #include "litholattice/core/threading.h"
 #include "litholattice/core/f3_trace.h"
 #include <array>
+#include <system_error>
 #include <vector>
 #include "litholattice/core/bitops.h"
 #include "font_data.h"  // Cortana 2026-10-15 1610: Debug Overlay strip glyphs
@@ -560,8 +561,16 @@ class cSwBandPool {
     }
     const uint64_t g = gen_.load(std::memory_order_relaxed);
     if (detachedMode_) {
-      threads_.emplace_back([this] { ::litholattice::setCurrentThreadName("lk-sw-exec"); executorLoop(); });
-      records_.add(ThreadClass::Dedicated, ThreadRole::RenderExecutor, 0, "sw-executor");
+      // Single-thread WASM (no COOP/COEP) gets EAGAIN from std::thread: stay the caller-runs pool
+      // (not detached) instead of letting the system_error escape main(); the app checks
+      // cSoftwareRenderer::detachedPoolMode() and keeps its single-thread software path.
+      try {
+        threads_.emplace_back([this] { ::litholattice::setCurrentThreadName("lk-sw-exec"); executorLoop(); });
+        records_.add(ThreadClass::Dedicated, ThreadRole::RenderExecutor, 0, "sw-executor");
+      } catch (const std::system_error& e) {
+        detachedMode_ = false;
+        logInfo("software renderer: detached executor unavailable (thread spawn failed: %s); caller-runs pool", e.what());
+      }
     }
     folded_ = n > 1 && foldWanted();
     if (folded_) {
@@ -884,6 +893,7 @@ void cSoftwareRenderer::drainUploadRing(uint64_t target) {
   ringCoalesced_ += n - appliedNow;  // pre-clear wipe + superseded: drained but never applied
 }
 void cSoftwareRenderer::setDetachedPoolMode(bool on) { cSwBandPool::get().setDetachedMode(on); }
+bool cSoftwareRenderer::detachedPoolMode() { return cSwBandPool::get().detachedMode(); }
 void cSoftwareRenderer::setDetachedPump(IDetachedPump* p) { cSwBandPool::get().setPump(p); }
 void cSoftwareRenderer::renderJobOnExecutor(const FrameParams& fp, uint64_t drainTarget) {
   std::exception_ptr err;

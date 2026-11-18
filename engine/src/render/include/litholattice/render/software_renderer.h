@@ -249,6 +249,9 @@ class cSoftwareRenderer : public IRenderer {
   /// app when the software threeway split is enabled; off (the default) is
   /// the pre-Stage-1 pool exactly.
   static void setDetachedPoolMode(bool on);
+  /// True when the pool really runs detached. setDetachedPoolMode(true) leaves it false
+  /// where no worker thread can be spawned (single-thread WASM).
+  static bool detachedPoolMode();
   RenderStats stats() const override { return stats_; }
   void requestGrab() override { grabArmed_ = true; }
   /// The frame snapshot by the most recent armed renderFrame(), as
