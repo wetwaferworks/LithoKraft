@@ -2036,6 +2036,7 @@ int runSelfTests(const std::string& scriptsDir, const std::vector<std::filesyste
   if (timingHandshake) std::printf("  (selftest invoked with --timing-handshake: the handshake section below A/B-compares both modes in-process)\n");
   fails += runHandshakeSelfTest();
   fails += runControlSelfTest();
+  fails += runForce16Test(10000, false);  // Force 16 (Mode 416): Sync512 vs Mode416 over 10,000 ticks, identical hash
   fails += runDemoSelfTest();
   std::printf("%s\n", fails ? "ALL SELFTESTS: FAILED" : "ALL SELFTESTS: OK");
   return fails ? 1 : 0;

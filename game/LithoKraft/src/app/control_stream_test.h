@@ -17,4 +17,10 @@ int runControlScenario(int ticks, const std::string& mode);
 /// accounting, format round-trip). Returns the number of failed checks;
 /// every check prints a [PASS]/[FAIL] line prefixed "control:".
 int runControlSelfTest();
+/// Force 16 (Mode 416; brief JD and Argon, WWW-LLE-416-20261117; handshake JD and Elfie):
+/// FrameGate rule checks, then the circuit scenario for `ticks` world ticks through the real
+/// cSimThread with a render thread gated per RenderShiftMode. Every arm must end on the same
+/// state hash as Sync512 and as a run with no render thread. allModes = all six, else Sync512 +
+/// Mode416. Returns the number of failed checks. --force16-test [TICKS] [all].
+int runForce16Test(int ticks, bool allModes);
 }  // namespace lithokraft

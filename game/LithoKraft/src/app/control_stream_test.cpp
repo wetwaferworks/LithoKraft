@@ -14,6 +14,7 @@
 #include "control_stream_test.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -24,6 +25,7 @@
 #include "handshake_test.h"
 #include "litholattice/sim/control_stream.h"
 #include "litholattice/sim/det_sched.h"
+#include "litholattice/sim/frame_gate.h"
 #include "litholattice/sim/sim_thread.h"
 #include "lithokraft/content/blocks.h"
 
@@ -438,5 +440,180 @@ int runControlScenario(int ticks, const std::string& mode) {
               (unsigned long long)r.stats.dropped, (unsigned long long)r.stats.orderViolations);
   return (r.steppedAll && r.stoppedCleanly) ? 0 : 1;
 }
+
+// ------------------------------------------------- Force 16 (Mode 416)
+// Brief: JD and Argon (WWW-LLE-416-20261117). Handshake (mutex-free published snapshots read at a
+// phase boundary): JD and Elfie. The gate is render-side only, so every RenderShiftMode must end on
+// the identical sim state. Each arm drives the §6.4 circuit scenario (with the scripted Break / Use /
+// Place inputs) through the real cSimThread at 512 TPS, while a render thread pins the published
+// front at phase boundaries, asks the FrameGate whether the completed-tick count reached a new frame
+// tick, and on a frame reads the snapshot (blocks around the circuit) - read-only, never a write.
+
+namespace {
+using namespace litholattice;
+
+struct Force16Arm {
+  uint64_t hash = 0;
+  uint64_t frames = 0;        // frames the gate admitted on the render thread
+  uint64_t badFrameTicks = 0; // admitted ticks that were not frame ticks (must be 0)
+  uint64_t reads = 0;         // snapshot block reads done by the render thread
+  uint64_t lastCompleted = 0; // completed-tick count the render side saw last (must reach ticks)
+  bool steppedAll = false, stoppedCleanly = false;
+  double ms = 0;
+};
+
+Force16Arm driveForce16(int ticks, int mode /* -1 = no render thread */, const std::vector<ControlEvent>& script) {
+  Force16Arm res;
+  const auto t0 = std::chrono::steady_clock::now();
+  ControlScenarioWorld sc = buildControlScenarioWorld();
+  ChunkMap& w = sc.wafer->chunks;
+  const int wx = sc.wireX, wy = sc.y, wz = sc.wireZ;
+  SimConfig cfg;
+  cfg.tickRate = 512;
+  cfg.radiusChunks = 8;
+  cfg.belowWorldFill = sc.wafer->belowWorldFill;
+  cfg.timingHandshake = true;
+  cfg.handshakePhasesPerCycle = 4;
+  cfg.handshakeWorkerThreads = 4;
+  cSimThread st(w, blockRegistry(), std::move(sc.ws), std::move(cfg), [](std::shared_ptr<MeshInput>) {});
+  cSignalWorldSim& sig = static_cast<cSignalWorldSim&>(st.simulation());
+  if (!script.empty()) st.controlStream().submitStamped(script);
+  st.setPaused(true);
+  st.start();
+
+  std::atomic<bool> stopRender{false};
+  std::thread render;
+  if (mode >= 0) {
+    render = std::thread([&] {
+      FrameGate gate(renderShiftModeFromInt(mode));
+      uint64_t sink = 0;
+      while (!stopRender.load(std::memory_order_acquire)) {
+        const uint64_t completed = st.stats().worldTick;  // published at the phase boundary (sole stats reader)
+        res.lastCompleted = completed;
+        if (gate.admit(completed)) {
+          if (!gate.isFrameTick(gate.lastShownTick())) ++res.badFrameTicks;
+          for (int dx = -2; dx <= 2; ++dx)
+            for (int dz = -2; dz <= 2; ++dz) { sink += st.getBlock(wx + dx, wy, wz + dz); ++res.reads; }  // published front only
+          ++res.frames;
+        }
+        std::this_thread::yield();
+      }
+      if (sink == 0xFFFFFFFFFFFFFFFFull) std::printf(" ");  // keep the reads
+    });
+  }
+
+  bool ok = true;
+  uint64_t stepped = 0;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(600);
+  while (stepped < uint64_t(ticks) && ok) {
+    // One tick per step: each step is one sim pass, so each completed tick reaches the
+    // published stats at its own phase boundary (what the gate keys on in live play at 512 TPS).
+    const uint64_t chunk = 1;
+    st.stepTicks(chunk);
+    const uint64_t target = stepped + chunk;
+    while (st.ticksStepped() < target) {
+      if (std::chrono::steady_clock::now() > deadline) { ok = false; break; }
+      std::this_thread::yield();
+    }
+    stepped = target;
+  }
+  if (mode < 0) {  // no render thread: this thread is the stats reader; wait for the last pass's publish
+    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while ((res.lastCompleted = st.stats().worldTick) < uint64_t(ticks) && std::chrono::steady_clock::now() < until)
+      std::this_thread::yield();
+  }
+  if (mode >= 0) {
+    // Let the render side see the final published count, then stop it before the sim stops.
+    const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(200);
+    while (std::chrono::steady_clock::now() < until) std::this_thread::yield();
+    stopRender.store(true, std::memory_order_release);
+    render.join();
+  }
+  res.steppedAll = ok && st.ticksStepped() == uint64_t(ticks) && res.lastCompleted == uint64_t(ticks);
+  res.stoppedCleanly = st.stop();
+  res.hash = hashControlWorld(w, sig.signal(), uint64_t(ticks));
+  res.ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  return res;
+}
+
+int force16Fails = 0;
+void f16check(bool ok, const char* what) {
+  std::printf("  [%s] %s\n", ok ? "PASS" : "FAIL", what);
+  if (!ok) ++force16Fails;
+}
+
+void force16GateUnit() {
+  std::printf("== Force 16: FrameGate rule (frame_mask = (1u<<shift)-1, frame when (uint32_t(tick) & mask) == 0)\n");
+  for (int m = 0; m < kRenderShiftModeCount; ++m) {
+    const FrameGate g(renderShiftModeFromInt(m));
+    char what[160];
+    std::snprintf(what, sizeof what, "force16: %s mask 0x%X ratio %u:1 -> %u FPS at 512 TPS", renderShiftModeName(g.mode()),
+                  g.frame_mask, g.ratio(), g.fpsAt(512));
+    f16check(g.frame_mask == (1u << m) - 1u && g.fpsAt(512) == (512u >> m), what);
+  }
+  const FrameGate m416(RenderShiftMode::Mode416);
+  f16check(m416.frame_mask == 0x1Fu && m416.fpsAt(512) == 16 && m416.ratio() == 32,
+           "force16: Mode 416 = shift 5, mask 0x1F, 512 TPS / 16 FPS (32:1)");
+  // One completed tick per phase boundary: exactly one frame per 32 ticks, all on frame ticks.
+  for (int m = 0; m < kRenderShiftModeCount; ++m) {
+    FrameGate g(renderShiftModeFromInt(m));
+    uint64_t bad = 0;
+    for (uint64_t t = 0; t <= 10000; ++t)
+      if (g.admit(t) && !g.isFrameTick(g.lastShownTick())) ++bad;
+    const uint64_t want = 10000 / (1u << m) + 1;  // frame ticks 0, 2^m, ... <= 10000
+    char what[160];
+    std::snprintf(what, sizeof what, "force16: %s over 0..10000 one tick per boundary admits %llu frames (want %llu), off-gate 0",
+                  renderShiftModeName(g.mode()), (unsigned long long)g.admitted(), (unsigned long long)want);
+    f16check(g.admitted() == want && bad == 0, what);
+  }
+  {  // Several ticks per pass (the sim publishes per pass): never a repeat, never off-gate, never early.
+    FrameGate g(RenderShiftMode::Mode416);
+    uint64_t t = 0, bad = 0, last = 0; bool any = false, early = false;
+    for (int i = 0; i < 4000; ++i) {
+      t += uint64_t(1 + (i * 7) % 5);
+      if (g.admit(t)) {
+        if (!g.isFrameTick(g.lastShownTick()) || (any && g.lastShownTick() <= last)) ++bad;
+        if (g.lastShownTick() > t) early = true;
+        last = g.lastShownTick(); any = true;
+      }
+    }
+    f16check(bad == 0 && !early && g.admitted() == t / 32 + 1, "force16: Mode 416 with 1-5 ticks per pass shows each frame tick at most once, in order, none ahead of the sim");
+  }
+}
+
+int runForce16(int ticks, bool allModes) {
+  force16Fails = 0;
+  force16GateUnit();
+  std::printf("== Force 16: %d-tick circuit scenario through cSimThread (512 TPS, handshake 4x4) with a render-side gate\n", ticks);
+  ControlScenarioWorld probe = buildControlScenarioWorld();
+  f16check(probe.wireX >= 0 && probe.repX >= 0, "force16: scenario world built (trace + repeator found)");
+  const std::vector<ControlEvent> script = scenarioScript(probe, true);
+  probe.ws.reset();
+  const Force16Arm none = driveForce16(ticks, -1, script);
+  std::printf("  no render thread : hash=%016llx (%.0f ms)\n", (unsigned long long)none.hash, none.ms);
+  f16check(none.steppedAll && none.stoppedCleanly, "force16: baseline arm stepped every tick and stopped cleanly");
+  std::vector<int> modes = allModes ? std::vector<int>{0, 1, 2, 3, 4, 5} : std::vector<int>{0, 5};
+  uint64_t sync512 = 0;
+  for (int m : modes) {
+    const Force16Arm a = driveForce16(ticks, m, script);
+    if (m == 0) sync512 = a.hash;
+    std::printf("  %-16s: hash=%016llx frames=%llu (max %d) reads=%llu off-gate=%llu (%.0f ms)\n",
+                renderShiftModeName(renderShiftModeFromInt(m)), (unsigned long long)a.hash, (unsigned long long)a.frames,
+                ticks / (1 << m) + 1, (unsigned long long)a.reads, (unsigned long long)a.badFrameTicks, a.ms);
+    char what[200];
+    std::snprintf(what, sizeof what, "force16: %s stepped all %d ticks, stopped cleanly, render saw frames, none off-gate",
+                  renderShiftModeName(renderShiftModeFromInt(m)), ticks);
+    f16check(a.steppedAll && a.stoppedCleanly && a.frames > 0 && a.frames <= uint64_t(ticks / (1 << m) + 1) && a.badFrameTicks == 0, what);
+    std::snprintf(what, sizeof what, "force16: %s ends on the identical state hash as Sync512 and the no-render baseline",
+                  renderShiftModeName(renderShiftModeFromInt(m)));
+    f16check(a.hash == none.hash && a.hash == sync512, what);
+  }
+  std::printf("force16: %s (%d ticks)\n", force16Fails ? "FAILED" : "OK", ticks);
+  return force16Fails;
+}
+
+}  // namespace
+
+int runForce16Test(int ticks, bool allModes) { return runForce16(ticks, allModes); }
 
 }  // namespace lithokraft
