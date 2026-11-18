@@ -85,6 +85,8 @@ class ColumnTable {
   void noteStale(int cx, int sy, int cz);
   /// M9 (ruling 6): take the stale masks (column key -> sub mask) for the per-tick batch.
   std::vector<std::pair<uint64_t, uint64_t>> takeStale();
+  /// Owner thread: copy every retained snap pointer into `out` for a published front buffer.
+  void exportSnaps(std::vector<std::pair<uint64_t, std::shared_ptr<const ColumnSnap>>>& out);
   /// 2026-11-01 (JD LL_LF_COWTABLE=1, default off): no mutex. noteStale (any thread) goes to a
   /// lock-free key table (spill: lock-free handoff); publish / pin / drop / takeStale run on the
   /// owner thread only (the thread that may mutate the map: sim thread, or main before the sim

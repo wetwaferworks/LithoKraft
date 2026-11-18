@@ -259,6 +259,14 @@ size_t ColumnTable::columns() const {
   return lfCount_.load(std::memory_order_relaxed);  // PlayI LF-only
 }
 
+void ColumnTable::exportSnaps(std::vector<std::pair<uint64_t, std::shared_ptr<const ColumnSnap>>>& out) {
+  out.clear();
+  if (!lfEnter()) return;
+  out.reserve(entries_.size());
+  entries_.forEach([&](uint64_t k, const Entry& e) { if (e.snap) out.emplace_back(k, e.snap); });
+  lfLeave();
+}
+
 // ---- worker side ----
 void gatherPinned(MeshInput& out) {
   if (!out.pin) return;

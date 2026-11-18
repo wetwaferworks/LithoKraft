@@ -2469,6 +2469,7 @@ void Game::submitMeshColumn(int cx, int cz) {
   const ChunkColumn* c = active_->chunks.column(cx, cz);
   if (!c || c->edgeShell) return;  // Q12: a demoted column keeps its meshes
   if (!viewGate_.inView(cx, cz)) { viewGate_.defer(cx, cz); return; }  // Archie Phase 1: meshes when it enters the view
+  if (plinkSimOwned(sim_)) { sim_->noteDirtyColumn(cx, cz); return; }  // JD r6: sim owns publish/pin
   std::vector<std::shared_ptr<MeshInput>> batch;
   batch.reserve(kSubChunks);
   const auto tPub = std::chrono::steady_clock::now();
@@ -2528,6 +2529,7 @@ void Game::startFirstMesh(int cx, int cz) {
 void Game::submitMeshAt(int cx, int sy, int cz) {
   if (const ChunkColumn* dc = active_->chunks.column(cx, cz); dc && dc->edgeShell) return;  // Q12
   if (!viewGate_.inView(cx, cz)) { viewGate_.defer(cx, cz); return; }  // Archie Phase 1
+  if (plinkSimOwned(sim_)) { sim_->noteDirtySub(cx, sy, cz); return; }  // JD r6: sim owns publish/pin
   if (meshBackpressured()) {  // t3366u: paused + Render Ingress at cap -> defer the key, never drop
     const int64_t k = packPos(cx, sy, cz);
     if (deferredMeshKeys_.insert(k).second) { deferredMeshOrder_.push_back(k); ++meshDeferredTotal_; }

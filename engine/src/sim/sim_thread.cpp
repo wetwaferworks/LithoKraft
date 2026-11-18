@@ -236,7 +236,6 @@ void cSimThread::runBetweenTicks(std::function<void()> fn) {
   // that hold is released, so queuing would deadlock. The gate stays in this step for the point readers.
   if (!running_.load(std::memory_order_acquire) || simTid_.load(std::memory_order_acquire) == std::this_thread::get_id() ||
       blockMutex_.heldByMe()) {
-    locktiming::TimedGuard l(blockMutex_, locktiming::kBlock);  // 0.0.1.60 timing (diagnostic)
     fn();
     return;
   }
@@ -289,7 +288,6 @@ void cSimThread::runOwnerJobs() {
 void cSimThread::serveOwnerJobsGated() {
   const bool onTick = simTid_.load(std::memory_order_acquire) == std::this_thread::get_id();
   if (!ownerJobs_.load(std::memory_order_acquire) && !(onTick && tickPosts_.load(std::memory_order_acquire))) return;
-  litholattice::cGateGuard l(blockMutex_);
   if (onTick) adoptBoundary();  // t46u 6b-2b/6b-3 (posts are the tick side's: never run here off the tick thread)
   runOwnerJobs();
 }
@@ -300,7 +298,6 @@ uint64_t cSimThread::postToTick(std::function<void()> fn) {
   if (!tickLive_.load(std::memory_order_acquire)) {
     // No tick thread: the world is ours (owner thread). Older posts first, then this one. Gated like the
     // inline runBetweenTicks path (the gate is reentrant, so a caller already holding it is fine).
-    litholattice::cGateGuard l(blockMutex_);
     if (tickPosts_.load(std::memory_order_acquire)) runTickPosts();
     fn();
     tickPostsRun_.fetch_add(1, std::memory_order_release);
@@ -331,31 +328,43 @@ void cSimThread::runTickPosts() {
 
 bool cSimThread::tryHoldBetweenTicks(::litholattice::cGateLock<cBlockGate>& hold, bool* busy) {
   if (busy) *busy = false;
-  ::litholattice::cGateLock<cBlockGate> l(blockMutex_, ::litholattice::kTryToLock);
-  if (!l.owns_lock()) { if (busy) *busy = true; return false; }
   if (handshake_ && (handshake_->frozen() || handshake_->workersOutstanding())) return false;
-  hold = std::move(l);
+  // JD 2026-11-17 r6: no gate. Structure changes use the published directory; block
+  // reads use the front snapshot. The returned hold is empty (unlock is a no-op).
+  hold = ::litholattice::cGateLock<cBlockGate>();
   return true;
 }
 
 bool cSimThread::holdBetweenTicks(::litholattice::cGateLock<cBlockGate>& hold) {
-  // Waits out any in-flight iteration (ticks + post-tick flush both hold
-  // blockMutex_). The sim thread keeps running; it simply cannot start its
-  // next iteration until hold is released. A frozen or poisoned handshake
-  // may still have a worker inside a component, so refuse and let the caller
-  // use the fail-closed stop() path. Checked under the lock: freezes are only
-  // raised on the sim thread inside a tick, so this check cannot race one.
-  // LL_THREEWAY (Proposed by JD; co-implemented by JD and Cortana): a streaming insert announces itself like a point read, so the sim
-  // hands blockMutex_ over between whole ticks of a catch-up burst instead of making the insert wait out the burst.
-  PointRead pr(threewayYield_ ? &pointReaders_ : nullptr, threewayYield_ ? &insertWaiting_ : nullptr);
-  locktiming::lockTimed(blockMutex_, locktiming::kBlock);  // 0.0.1.60 timing (diagnostic); same lock, adopted below
-  pr.done();
-  ::litholattice::cGateLock<cBlockGate> l(blockMutex_, ::litholattice::kAdoptLock);
+  // JD 2026-11-17 r6: no spin, no wait on the sim thread. A frozen or poisoned
+  // handshake may still have a worker inside a component, so refuse and let the
+  // caller use the fail-closed stop() path.
   if (handshake_ && (handshake_->frozen() || handshake_->workersOutstanding())) return false;
   if (stallLogWindow())  // LL_SIM_STALL_MS (measure only; Proposed by Herominde; implemented by Cortana)
     logInfo("sim-stall: insert landed at world tick %llu (%s)", (unsigned long long)worldTickN_, inBurst_ ? "mid-burst handoff" : "between sim iterations");
-  hold = std::move(l);
+  hold = ::litholattice::cGateLock<cBlockGate>();
   return true;
+}
+
+void cSimThread::noteDirtyColumn(int cx, int cz) {
+  for (int sy = 0; sy < kSubChunks; ++sy) dirtyIngress_.push(packPos(cx, sy, cz));
+  notifyWake();
+}
+
+void cSimThread::noteDirtySub(int cx, int sy, int cz) {
+  dirtyIngress_.push(packPos(cx, sy, cz));
+  notifyWake();
+}
+
+void cSimThread::seedPublishedFront() {
+  if (!cowColumnsEnabled()) return;
+  if (!flushPub_.tryBeginWrite()) return;
+  for (const auto& [key, col] : chunks_.columns()) {
+    if (!col) continue;
+    chunks_.cowTable().publish(chunks_, blocks_, col->cx, col->cz, ~uint64_t(0));
+  }
+  chunks_.cowTable().exportSnaps(flushPub_.back().cols);
+  flushPub_.publish();
 }
 
 void cSimThread::start() {
@@ -365,6 +374,7 @@ void cSimThread::start() {
     logError("sim_thread: start() refused — a handshake worker is still outstanding from a failed stop()");
     return;
   }
+  seedPublishedFront();  // owner thread: first front so getBlock is not air after running_ flips
   if (running_.exchange(true)) return;  // already running: a second std::thread assignment would terminate
   tickLive_.store(true, std::memory_order_release);  // t46u 6a: owner jobs go to the tick thread from here on
   chunks_.tickSideStarting();  // t46u 6b-2b: the caller (structure owner) publishes the column directory first
@@ -392,7 +402,6 @@ bool cSimThread::stop() {
     chunks_.tickSideStopped();
   }
   if (tickPosts_.load(std::memory_order_acquire)) {  // t46u 6b-3: joined; the owner runs what the tick thread did not reach
-    litholattice::cGateGuard l(blockMutex_);
     runTickPosts();
   }
   serveOwnerJobsGated();  // t46u 6a: jobs that missed the tick thread's last pass run here
@@ -443,7 +452,8 @@ void cSimThread::markDirty(int x, int y, int z, bool activeSignal) {
       }
 }
 
-void cSimThread::flushDirty(bool forceInView) {
+bool cSimThread::flushDirty(bool forceInView) {
+  dirtyIngress_.drain([&](int64_t k) { dirtySubs_.insert(k); });
   // PlayJ fix 1: skip pin/submit for dirty subs outside vertical + frustum (cheb) of the eye;
   // keep their dirty flags so they remesh when they come into view. LL_MESH_VERT_SUBS (default 4),
   // LL_MESH_CHEB (default 6). LL_PROF_CULL=1 logs the census (I2 baseline shape).
@@ -501,6 +511,12 @@ void cSimThread::flushDirty(bool forceInView) {
     }
   }
 
+  // JD 2026-11-17 r6: claim the retired publish slot first. If a reader still holds it,
+  // skip this pass and leave dirtySubs_ intact (no spin).
+  if (!flushPub_.tryBeginWrite()) return false;
+  flushPub_.back().dirtyWork = flushWork_;
+  flushPub_.back().dirtyHold = flushHold_;
+
   // PlayJ fix 3: no mesh consumer (null renderer / LL_NO_MESH=1) - drop in-view work without pin/submit;
   // still keep held out-of-view flags so a later consumer (or view move) can catch up.
   signalDirtySubs_.clear();  // all signal-priority keys entered flushWork_ (or lost their column)
@@ -525,7 +541,9 @@ void cSimThread::flushDirty(bool forceInView) {
     for (const auto& [key, mask] : ordered)
       chunks_.cowTable().publish(chunks_, blocks_, int(int32_t(key >> 32)), int(int32_t(key & 0xffffffffu)), mask);
   }
-  if (!meshConsumes_ || flushWork_.empty()) return;
+  chunks_.cowTable().exportSnaps(flushPub_.back().cols);
+  const bool doMesh = meshConsumes_ && !flushWork_.empty();
+  if (doMesh) {
   for (int64_t k : flushWork_) {
     int cx, sy, cz; unpackPos(k, cx, sy, cz);
     if (!chunks_.column(cx, cz)) continue;
@@ -545,6 +563,9 @@ void cSimThread::flushDirty(bool forceInView) {
       pool->give(std::move(u));  // PlayI: lock-free; pool full drops it (bounds retained memory)
     }));
   }
+  }
+  flushPub_.publish();  // JD 2026-11-17 r6: atomic index swap publishes the new front
+  return true;
 }
 
 void cSimThread::castRay(const RayInput& ray) {
@@ -864,17 +885,14 @@ void cSimThread::run() {
       reconfigure();
     }
 
-    // ---- sim-thread mutation window: the edit drain plus every tick of this
-    // iteration run under blockMutex_. getBlock() (game/MCP thread) takes the same
-    // mutex, so cross-thread block reads are race-free (the old lock was theater:
-    // no writer ever took it). Uncontended for the sim thread.
+    // ---- sim-thread mutation window (JD 2026-11-17 r6): no blockMutex_.
+    // Main reads the published front; this thread mutates the live map and publishes at flush.
     bool editsApplied = false;
     bool raycastDone = false;
     bool passCut = false;
     {
       const bool rdOn = cThreadReadout::enabled();  // LL_THREAD_READOUT (read-only; tick thread is this slot's only writer)
       const uint64_t rdT0 = rdOn ? cThreadReadout::nowNs() : 0;
-      litholattice::cGateGuard l(blockMutex_);
       adoptBoundary();  // t46u 6b-2b/6b-3: phase boundary: adopt the owner's newest column directory, run its posts
       const uint64_t rdT1 = rdOn ? cThreadReadout::nowNs() : 0;
       struct RdPass { bool on; uint64_t t0, t1; ~RdPass() { if (on) cNamedThreadLoad::instance().pass(cNamedThreadLoad::kTick, t1 - t0, cThreadReadout::nowNs() - t1); } } rdPass{rdOn, rdT0, rdT1};
@@ -1006,14 +1024,11 @@ void cSimThread::run() {
         raycastDone |= stepRaycastDone_;
       }
       if (!raycastDone) castRay(ray);  // no tick ran: keep the HUD highlight live
-    }  // release blockMutex_ before the sleep below
-    // 2026-10-15 (stream hand-off): the post-tick section below reads chunks_
-    // (flushDirty snapshots, HUD inspect) and also runs under blockMutex_, so
-    // holdBetweenTicks() callers may insert/erase columns without stop()/start().
-    ::litholattice::cGateLock<cBlockGate> postLock(blockMutex_);
+    }  // end mutation window
+    // Post-tick section (JD 2026-11-17 r6): no postLock. Directory adopt is the phase boundary.
     adoptBoundary();  // t46u 6b-2b/6b-3: the owner may have changed the column set between window and post
-    locktiming::setBlockHolder(locktiming::kHolderSimPost);  // 0.0.1.60 diagnostic (cleared before postLock.unlock())
 
+    dirtyIngress_.drain([&](int64_t k) { dirtySubs_.insert(k); });
     bool flushNow = editsApplied;  // player edits remesh at once (no added latency)
     if (remeshAll_.exchange(false)) {
       for (const auto& [key, col] : chunks_.columns())
@@ -1026,18 +1041,12 @@ void cSimThread::run() {
     const auto tFlush = Clock::now();
     if (!dirtySubs_.empty() && (flushNow || (tFlush - lastFlush >= kRemeshInterval && (worldTickN_ - lastFlushTick >= kRenderDiv || tFlush - lastFlush >= kRenderMaxWait)))) {
       const int64_t tpF = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only)
-      // JD 2026-11-17: PlayJ fix 7 used to drop blockMutex_ around flushDirty when CoW
-      // was on so streaming tryHoldBetweenTicks was not stalled for remesh. Main then
-      // succeeded the hold and called owner-only ColumnTable publish/pin/drop while
-      // the tick thread was still in takeStale/publish/pin — a real overlap of
-      // entries_/stale_/lfOwner_ (and of live Column lookups). The mutex stays held
-      // for the flush; that is the phase boundary. ColumnTable also hands back
-      // ownership at the end of each owner-only call so a legal between-ticks visit
-      // cannot leave a sticky lfOwner_ for the next tick. Streaming hitch (worst / p99)
-      // is measured before and after this change.
-      flushDirty(editsApplied);  // Cortana 2026-11-06: player edits bypass view cull
+      // JD 2026-11-17 r6: copy snaps into the back buffer, flush the original dirty set,
+      // then atomically swap the front. Skip (and keep dirty) if a reader still holds the retired slot.
+      if (flushDirty(editsApplied)) {  // Cortana 2026-11-06: player edits bypass view cull
+        lastFlush = tFlush; lastFlushTick = worldTickN_;
+      }
       if (tpF) ::litholattice::tickprof::ticks().noteFlush(::litholattice::tickprof::nowNs() - tpF);
-      lastFlush = tFlush; lastFlushTick = worldTickN_;
     }
     publishEvents();
 
@@ -1097,10 +1106,8 @@ void cSimThread::run() {
     }
     stats_.publish();
 
-    locktiming::setBlockHolder(locktiming::kHolderNone);  // 0.0.1.60 diagnostic
-    postLock.unlock();  // tail wait runs unlocked (stream hand-off can take the mutex here)
     // mutexfree 2a: PARK phase. Requested by a hook at the end of a world tick; runs here, after the post
-    // section and with blockMutex_ released, so main/MCP readers and stream inserts are never blocked by it.
+    // section. JD r6: no gate was held.
     if (parkReq_) { parkReq_ = false; if (parkHook_) parkHook_(); }
     // ---- tail wait (review A-M7) ----
     // Live: pace to the next master step as before. Paused with nothing

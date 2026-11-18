@@ -69,13 +69,14 @@ class ChunkMap {
     dir_->publish(std::move(m), structureGen_);
     publishedGen_ = structureGen_;
   }
-  /// Tick side, holding the world: adopts the newest directory. One built from an older structure
-  /// generation (the owner changed the map and has not published yet) is not used: lookups fall back to
-  /// the live map, which is safe because the tick side holds the world gate (counted: staleAdoptions).
+  /// Tick side: adopts the newest directory whose generation matches the live structure.
+  /// A publish that has not caught up is left unused (counted: staleAdoptions). JD 2026-11-17 r6:
+  /// do not drop the last adopted directory and fall back to the live map — the owner may be
+  /// changing structure without the world gate, so the tick side keeps the last consistent view
+  /// until a matching publish arrives.
   void adoptDirectory() {
     const cColumnDirectory::Dir* d = dir_->adopt();
     if (d && d->gen == structureGen_) { tickDir_ = d; return; }
-    tickDir_ = nullptr;
     if (d) dir_->noteStale();
   }
   /// After the tick thread is joined (the stopper owns everything): forget the adopted view and free
