@@ -1033,6 +1033,20 @@ int main(int argc, char** argv) {
       }
       return v;
     };
+    if (!std::strcmp(argv[i], "--setenv") && i + 1 < argc) {
+      const char* nv = argv[++i];
+      const char* eq = std::strchr(nv, '=');
+      if (!eq || eq == nv) { std::fprintf(stderr, "--setenv: expected NAME=value, got '%s'\n", nv); badArg = true; }
+      else {
+        const std::string name(nv, static_cast<size_t>(eq - nv));
+#if defined(_WIN32) && !defined(__wasm__)
+        _putenv_s(name.c_str(), eq + 1);
+#else
+        setenv(name.c_str(), eq + 1, 1);
+#endif
+      }
+      continue;
+    }
     if (!std::strcmp(argv[i], "--size")) cfg.worldChunks = std::max(4, int(num(0, 1024)));
     else if (!std::strcmp(argv[i], "--tps")) { cfg.tps = int(num(1, 8192)); tpsGiven = true; }
     else if (!std::strcmp(argv[i], "--tps-unlock")) tpsUnlock = true;
@@ -2212,6 +2226,7 @@ static bool lkStepFrame(FrameCtx& F) {
       }
       const auto tUp = Clock::now();
       game.setFramePacing(pacer.capFps(), F.pacerSleptMs);  // R4 (B5/B6): budgets price against the frame target
+      game.pumpSimCooperative();  // single-thread WASM: due ticks + flush on this thread, then render
       game.update(dt, w, h);
       if (benchSeconds > 0) {
         // --frame-hash: drive camera from present ordinal (deterministic across runs);
@@ -2634,7 +2649,17 @@ static void lkShutdownTail(FrameCtx& F) {
 #if defined(__wasm__)
 static void lkFrameThunk(void* p) {
   FrameCtx& F = *static_cast<FrameCtx*>(p);
-  if (!lkStepFrame(F)) {
+  bool more = false;
+  try {
+    more = lkStepFrame(F);
+  } catch (const std::exception& e) {  // web: name what escaped the frame before the host sees a bare WebAssembly.Exception
+    logError("web frame: uncaught exception: %s", e.what());
+    throw;
+  } catch (...) {
+    logError("web frame: uncaught non-std exception");
+    throw;
+  }
+  if (!more) {
     lk_frame_loop_cancel();
     lkShutdownTail(F);
     F.game.reset();

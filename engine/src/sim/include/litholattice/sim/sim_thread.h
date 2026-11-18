@@ -250,6 +250,13 @@ class cSimThread {
   void setParkHook(std::function<void()> fn) { parkHook_ = std::move(fn); }
   /// True from start() until stop() returns (the thread is joined after).
   bool running() const { return running_.load(std::memory_order_acquire); }
+  /// True when start() could not spawn a dedicated tick thread (no host threads,
+  /// including lkboot single-thread / no-COOP WASM). The game frame loop must then
+  /// call pumpCooperative() so ticks, flush, and hashes keep the threaded order.
+  bool cooperative() const { return cooperative_; }
+  /// One or more sim-loop passes on the caller, with no park/pace sleeps. No-op unless
+  /// cooperative() and running(). Safe from the game frame after input is drained.
+  void pumpCooperative();
   /// World TPS in force for the current tick. SIM THREAD ONLY (the player hook).
   int simThreadWorldTps() const { return cfgWorldTps_; }
   /// LL_HANDOFF_COUNT probe (measure only): handoffs fired, reads and inserts served by them so far.
@@ -348,7 +355,7 @@ class cSimThread {
   void resetTimeDebt() { debtResetReq_.store(true, std::memory_order_release); notifyWake(); }
 
  private:
-  void run();
+  void run(bool cooperativePass = false);
   /// POST phase of the control coupling: extract every stream event
   /// stamped for `tick` or earlier and apply them in (tick, seq) order —
   /// Ray events move the stamped aim, PlayerChunk events move the tick
@@ -487,6 +494,10 @@ class cSimThread {
   std::atomic<uint32_t> domainToggles_{0};
   std::atomic<bool> remeshAll_{false};
   std::thread thread_;
+  bool cooperative_ = false;  // start() fell back: pumpCooperative() is the tick loop
+  Clock::time_point paceLast_{};     // wall-clock pacing; persists across cooperative pumps
+  Clock::time_point lastFlush_{};    // remesh coalescing clock (same)
+  uint64_t lastFlushTick_ = 0;
   cThreadRecordSet threadRecord_;  // Thread Handshake P2: the sim clock (Class A)
   TripleBuffer<SimStats> stats_;
   std::atomic<std::thread::id> statsReader_{};  // Cortana 2026-10-15 1658: F-2 (checked in Debug only)

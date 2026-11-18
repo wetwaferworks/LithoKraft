@@ -24,6 +24,7 @@
 #include <functional>
 #include <memory>
 #include <thread>
+#include <system_error>
 #include <vector>
 #if defined(_M_X64) || defined(__x86_64__) || defined(_M_IX86) || defined(__i386__)
 #include <immintrin.h>
@@ -58,8 +59,18 @@ class cLockFreePool {
     if (cThreadReadout::enabled()) readout_ = std::make_unique<cThreadReadout>(n);  // LL_THREAD_READOUT
     workers_.reserve(n);
     for (unsigned i = 0; i < n; ++i) workers_.push_back(std::make_unique<Worker>());
-    for (unsigned i = 0; i < n; ++i)
-      workers_[i]->thread = std::thread([this, i, threadInit] { char nm[16]; std::snprintf(nm, sizeof nm, "lk-lfpool-%u", unsigned(i)); ::litholattice::setCurrentThreadName(nm); if (threadInit) threadInit(); run(i); });
+    try {
+      for (unsigned i = 0; i < n; ++i)
+        workers_[i]->thread = std::thread([this, i, threadInit] { char nm[16]; std::snprintf(nm, sizeof nm, "lk-lfpool-%u", unsigned(i)); ::litholattice::setCurrentThreadName(nm); if (threadInit) threadInit(); run(i); });
+    } catch (const std::system_error& e) {
+      logInfo("job pool: worker spawn failed (%s); running jobs inline on the caller", e.what());
+      stop_.store(true, std::memory_order_release);
+      wake(true);
+      for (auto& w : workers_) if (w && w->thread.joinable()) w->thread.join();
+      workers_.clear();
+      lendCap_.store(0, std::memory_order_relaxed);
+      stop_.store(false, std::memory_order_release);
+    }
   }
   ~cLockFreePool() {
     stop_.store(true, std::memory_order_release);

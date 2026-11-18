@@ -20,6 +20,7 @@
 #include "litholattice/core/tick_profile.h"  // LL_TICK_PROFILE (measure only; Proposed by JD; co-implemented by JD and Cortana)
 #include "litholattice/core/atomic_gate.h"
 #include "litholattice/core/idle_backoff.h"  // t46u item 6a
+#include <system_error>
 
 namespace litholattice {
 using Ns = std::chrono::nanoseconds;
@@ -368,6 +369,10 @@ void cSimThread::seedPublishedFront() {
 }
 
 void cSimThread::start() {
+  cooperative_ = false;
+  paceLast_ = {};
+  lastFlush_ = {};
+  lastFlushTick_ = 0;
   if (handshakeWorkersOutstanding()) {
     // C2 poison: a pull worker from a failed stop() is still running
     // against the world; starting again would run two pools against it.
@@ -387,8 +392,13 @@ void cSimThread::start() {
     stepRefusalLogged_.store(false);
   }
   logInfo("threads: sim thread starting");  // Q5b census naming (2026-10-28)
-  thread_ = std::thread([this] { ::litholattice::setCurrentThreadName("lk-tick-sim"); raiseCurrentThreadForSim(); run(); });  // 0.0.1.57 F57-1 (R21)
-  threadRecord_.add(ThreadClass::Dedicated, ThreadRole::SimClock, 0, "sim-clock");
+  try {
+    thread_ = std::thread([this] { ::litholattice::setCurrentThreadName("lk-tick-sim"); raiseCurrentThreadForSim(); run(); });  // 0.0.1.57 F57-1 (R21)
+    threadRecord_.add(ThreadClass::Dedicated, ThreadRole::SimClock, 0, "sim-clock");
+  } catch (const std::system_error& e) {
+    cooperative_ = true;
+    logInfo("threads: sim thread spawn failed (%s); running cooperatively on the caller thread", e.what());
+  }
 }
 
 bool cSimThread::stop() {
@@ -738,19 +748,25 @@ void cSimThread::publishEvents() {
   }
 }
 
-void cSimThread::run() {
+void cSimThread::run(bool cooperativePass) {
   const HighResTimerScope timerResolution;  // 1 ms sleeps for the high-rate domains
   simTid_.store(std::this_thread::get_id(), std::memory_order_release);  // t46u 6a: runBetweenTicks from a hook runs inline
   tl_lkTickSide = true;  // t46u 6b-2b: this thread's column lookups read the adopted directory
-  struct TidClear { std::atomic<std::thread::id>& t; ~TidClear() { t.store(std::thread::id{}, std::memory_order_release); } } tidClear{simTid_};
+  struct TidClear {
+    std::atomic<std::thread::id>& t;
+    ~TidClear() {
+      t.store(std::thread::id{}, std::memory_order_release);
+      tl_lkTickSide = false;
+    }
+  } tidClear{simTid_};
   // CH-H8: masterStep_/worldTickN_/dropped_/acc_/window state are MEMBERS,
   // initialised once at construction — this function deliberately does NOT
   // reset them. Every stop()/start() (every save, every stream pump)
   // resumes the tick exactly where it stopped: keyed random streams never
   // replay, edit stamps never regress, SimStats.worldTick never goes
   // backwards. Only the wall-clock pacing timestamp is re-based per run.
-  auto last = Clock::now();
-  if (windowStart_.time_since_epoch().count() == 0) windowStart_ = last;
+  if (paceLast_.time_since_epoch().count() == 0) paceLast_ = Clock::now();
+  if (windowStart_.time_since_epoch().count() == 0) windowStart_ = paceLast_;
   // Fail-fast boundary (fail_fast.h, contract section 2; review CH-H6): the
   // WHOLE loop body runs under this guard — not just the per-step pipeline.
   // applyControlEvents (paused branch), publishEvents/takeEvents, the stats calls
@@ -770,7 +786,7 @@ void cSimThread::run() {
   };
   const auto dirtyFn = [this](int x, int y, int z) { simChanged(x, y, z); };
   constexpr auto kRemeshInterval = std::chrono::microseconds(8333);
-  auto lastFlush = Clock::now();
+  if (lastFlush_.time_since_epoch().count() == 0) lastFlush_ = paceLast_.time_since_epoch().count() ? paceLast_ : Clock::now();
   // PlayI/PlayJ (JD render divider): signal-driven remesh flushes wait for LL_RENDER_DIV world ticks
   // (default 32; JD preferred) or LL_RENDER_MAX_WAIT_US (default 62500), whichever comes first.
   // Player edits / remesh-all still flush at once. Off-screen dirty subs are held by view cull (fix 1).
@@ -780,7 +796,7 @@ void cSimThread::run() {
     const long v = e ? std::atol(e) : 62500;
     return std::chrono::microseconds(v > 0 ? v : 62500);
   }();
-  uint64_t lastFlushTick = 0;
+  // lastFlushTick_ persists across cooperative pumps
 
   auto reconfigure = [&] {
     cfgWorldTps_ = requestedTps_.load();
@@ -934,14 +950,14 @@ void cSimThread::run() {
         // load/menu wall time can neither burst nor book drops here. The
         // clamp below is skipped for this delta only; tick math is
         // otherwise untouched, and dropped_ keeps its history.
-        const auto pending = acc_ + (now - last);
+        const auto pending = acc_ + (now - paceLast_);
         logInfo("timing: play transition — time debt zeroed (pre-reset debt %lld ticks / %.1f ms pending; ticks executed last pass %u)",
                 (long long)(stepDur_.count() > 0 ? pending / stepDur_ : 0),
                 double(pending.count()) / 1e6, lastPassTicks_);
         acc_ = Ns(0);
-        last = now;
+        paceLast_ = now;
       } else {
-        acc_ += now - last; last = now;
+        acc_ += now - paceLast_; paceLast_ = now;
       }
       const Ns maxLag = std::chrono::milliseconds(100);
       if (acc_ > maxLag) {
@@ -1039,12 +1055,12 @@ void cSimThread::run() {
     // Signal-driven changes are coalesced to at most ~120 remesh passes per second: at 512 Hz a
     // busy circuit would otherwise snapshot and mesh the same sub-chunks hundreds of times a second.
     const auto tFlush = Clock::now();
-    if (!dirtySubs_.empty() && (flushNow || (tFlush - lastFlush >= kRemeshInterval && (worldTickN_ - lastFlushTick >= kRenderDiv || tFlush - lastFlush >= kRenderMaxWait)))) {
+    if (!dirtySubs_.empty() && (flushNow || (tFlush - lastFlush_ >= kRemeshInterval && (worldTickN_ - lastFlushTick_ >= kRenderDiv || tFlush - lastFlush_ >= kRenderMaxWait)))) {
       const int64_t tpF = ::litholattice::tickprof::enabled() ? ::litholattice::tickprof::nowNs() : 0;  // LL_TICK_PROFILE (measure only)
       // JD 2026-11-17 r6: copy snaps into the back buffer, flush the original dirty set,
       // then atomically swap the front. Skip (and keep dirty) if a reader still holds the retired slot.
       if (flushDirty(editsApplied)) {  // Cortana 2026-11-06: player edits bypass view cull
-        lastFlush = tFlush; lastFlushTick = worldTickN_;
+        lastFlush_ = tFlush; lastFlushTick_ = worldTickN_;
       }
       if (tpF) ::litholattice::tickprof::ticks().noteFlush(::litholattice::tickprof::nowNs() - tpF);
     }
@@ -1120,7 +1136,11 @@ void cSimThread::run() {
     // predicate below sees it — the park can never swallow a step or an
     // edit. Promptness: the wake is a CV notify, so edit application and
     // step response are faster than the old one-master-step poll.
-    if (paused_.load(std::memory_order_relaxed) && stepRequested_.load(std::memory_order_relaxed) == 0) {
+    // Cooperative (no dedicated tick thread): skip park/pace sleeps and
+    // return to the host frame; pumpCooperative() comes back next frame.
+    if (cooperativePass) {
+      serveOwnerJobsGated();
+    } else if (paused_.load(std::memory_order_relaxed) && stepRequested_.load(std::memory_order_relaxed) == 0) {
       // PlayL JD: cruise — spin/poll wakeEpoch_ (short yield); never CV-wait on another thread.
       const uint64_t e = wakeEpoch_.load(std::memory_order_relaxed);
       while (running_.load(std::memory_order_relaxed) && paused_.load(std::memory_order_relaxed) &&
@@ -1137,7 +1157,7 @@ void cSimThread::run() {
     } else {
       // t46u item 6a: pace as waitUntil does, but serve runBetweenTicks jobs while waiting (main used
       // to take the gate during this sleep; a once-per-frame camera raycast must not wait it out).
-      const auto until = last + (stepDur_ - acc_);
+      const auto until = paceLast_ + (stepDur_ - acc_);
       for (;;) {
         serveOwnerJobsGated();
         const auto left = until - Clock::now();
@@ -1148,10 +1168,33 @@ void cSimThread::run() {
     }
   };
 
-  while (running_.load(std::memory_order_relaxed)) {
+  auto onePass = [&] {
     loops_.fetch_add(1, std::memory_order_acq_rel);
     tickGuard("sim_thread", [&] { loopBody(); });
+  };
+  if (cooperativePass) {
+    // Drain due ticks this frame. One loopBody pass already spends up to kPassBudget
+    // (~6 ms) of backlog; keep going while debt remains and a short frame budget is left
+    // so 512 TPS can still catch up when ticks are cheap. Never sleep here.
+    const auto pumpStart = Clock::now();
+    const auto kPumpBudget = std::chrono::milliseconds(8);
+    onePass();
+    while (running_.load(std::memory_order_relaxed) &&
+           !paused_.load(std::memory_order_relaxed) &&
+           acc_ >= stepDur_ &&
+           Clock::now() - pumpStart < kPumpBudget) {
+      onePass();
+    }
+    return;
   }
+  while (running_.load(std::memory_order_relaxed)) {
+    onePass();
+  }
+}
+
+void cSimThread::pumpCooperative() {
+  if (!cooperative_ || !running_.load(std::memory_order_acquire)) return;
+  run(true);
 }
 
 }  // namespace litholattice

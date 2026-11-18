@@ -1995,6 +1995,10 @@ void Game::loadActive() {
           active_->chunks.columns().size(), totalSubs_, msBetween(t0, Clock::now()), msBetween(tSim, Clock::now()));
 }
 
+void Game::pumpSimCooperative() {
+  if (sim_ && sim_->cooperative()) sim_->pumpCooperative();
+}
+
 bool Game::switchDimension(const std::string& id) {
   // t46u item 2: no renderer lock; on the split path renderer_ is the command mailbox (renderer_mailbox.h)
   Dimension* next = registry_.find(id);

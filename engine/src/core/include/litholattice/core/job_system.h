@@ -73,6 +73,7 @@
 #include "litholattice/core/thread_census.h"  // Thread Handshake P3
 #include "litholattice/core/threading.h"
 #include "litholattice/core/atomic_gate.h"      // P4: cJobPool::shared() backs every cJobSystem
+#include <system_error>
 
 #if defined(__linux__)
 #include <pthread.h>
@@ -185,6 +186,10 @@ class cJobSystem {
   void submitIo(Job job) {
     assert(!stop_.load(std::memory_order_relaxed) && "submitIo during/after shutdown");
     ioInFlight_.fetch_add(1, std::memory_order_relaxed);
+    if (ioThreads_.empty()) {
+      executeJob(std::move(job), ioInFlight_, "io", 0);  // no I/O thread: caller-runs (single-thread WASM)
+      return;
+    }
     {
       cGateGuard<cAtomicGate> l(ioGate_);
       ioQueue_.push_back(std::move(job));
@@ -253,19 +258,23 @@ class cJobSystem {
     unsigned ios = cfg.ioThreads < 1 ? 1 : cfg.ioThreads;
     if (ios > kMaxJobThreads) ios = kMaxJobThreads;
     ioThreads_.reserve(ios);
-    for (unsigned i = 0; i < ios; ++i) {
-      std::string name = std::string(cfg.namePrefix) + "-io" + std::to_string(i);
-      ioThreads_.emplace_back([this, i, name] {
-        t_onJobThread = true;
-        ThreadUtil::setName(name.c_str());
-        LITHO_THREAD_LOG("thread", "io thread %u online", i);
-        ioLoop(i);
-        LITHO_THREAD_LOG("thread", "io thread %u offline", i);
-      });
+    try {
+      for (unsigned i = 0; i < ios; ++i) {
+        std::string name = std::string(cfg.namePrefix) + "-io" + std::to_string(i);
+        ioThreads_.emplace_back([this, i, name] {
+          t_onJobThread = true;
+          ThreadUtil::setName(name.c_str());
+          LITHO_THREAD_LOG("thread", "io thread %u online", i);
+          ioLoop(i);
+          LITHO_THREAD_LOG("thread", "io thread %u offline", i);
+        });
+      }
+    } catch (const std::system_error& e) {
+      logInfo("job system: io thread spawn failed (%s); I/O jobs run on the caller", e.what());
     }
-    for (unsigned i = 0; i < ios; ++i) records_.add(ThreadClass::System, ThreadRole::Storage, uint16_t(i), "jobsys-io");
+    for (unsigned i = 0; i < unsigned(ioThreads_.size()); ++i) records_.add(ThreadClass::System, ThreadRole::Storage, uint16_t(i), "jobsys-io");
     LITHO_THREAD_LOG("thread", "cJobSystem up: facade cap %u on the %u-worker shared pool + %u io threads", cap_,
-                     pool_->size(), ios);
+                     pool_->size(), unsigned(ioThreads_.size()));
   }
 
   void shutdown() {

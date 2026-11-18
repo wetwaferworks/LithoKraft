@@ -148,6 +148,8 @@ class Game {
   /// Reads this frame's actions (the app updated the cInputSystem first), turns them into sim
   /// commands (applied by the sim thread at its next tick boundary), uploads meshes, plays sounds.
   void update(float dt, int width, int height);
+  /// Pump a cooperative (no-thread) sim on the caller. No-op when the sim has a dedicated thread.
+  void pumpSimCooperative();
   FrameParams frameParams(int width, int height) const;
   /// The view pose the render path uses: the camera system's active camera
   /// (first person resolves live from the player â€” the identical view the
