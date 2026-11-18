@@ -282,7 +282,13 @@ export function makeGL(ctx, canvas, opts = {}) {
     imports[name] = timed(name, k.startsWith('gl_') ? fn : (...a) => { stats.calls++; return gl ? fn(...a) : 0; });
   }
   imports.lkio_present = timed('lkio_present', lkio_present);
-  imports.lk_mega_probe = () => (gl && typeof gl.drawElementsInstanced === 'function' ? 1 : 0);
+  // Walk-freeze fix (2026-11-17): the mega-draw is OFF on the web unless asked for (opts.mega, test pages ?mega).
+  // WebGL2 has no multi-draw here, so this shim re-points instance attributes 4..8 and issues one
+  // drawElementsInstanced per record. In headless Chromium (ANGLE/SwiftShader), that froze the GPU process for 48-84 s
+  // about 53 s into --bench-path walk, every run, in both coop and single modes. With the shim off (arena still on), the same walk
+  // has no freeze (worst frame 46 ms) and runs faster (avg 1274 vs ~600 fps). The engine falls back to its
+  // per-mesh arena draws when this returns 0.
+  imports.lk_mega_probe = () => (gl && opts.mega && typeof gl.drawElementsInstanced === 'function' ? 1 : 0);
   imports.lk_mega_draw = timed('lk_mega_draw', lk_mega_draw);
   return { imports, stats, get gl() { return gl; } };
 }
